@@ -3,12 +3,14 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
+import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 import { generate } from "./scripts/gen-types.mjs";
 import { packFiles, packed, pluginFiles } from "./scripts/pack-plugin.mjs";
 import { drifted } from "./scripts/sync-examples.mjs";
 
-const sdk = resolve("plugin-sdk/lattice-plugin.mjs");
+// A URL, since ESM cannot import a Windows path like C:\...
+const sdk = pathToFileURL(resolve("plugin-sdk/lattice-plugin.mjs")).href;
 
 /** Run a plugin as Lattice does (minus the sandbox): NDJSON on stdio, with
  *  `answer` serving its host calls. */

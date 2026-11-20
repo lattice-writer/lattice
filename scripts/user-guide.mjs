@@ -17,7 +17,7 @@
  *       every other page NAME.md becomes NAME.html, and images/ is copied.
  */
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join, posix, relative } from "node:path";
+import { join, posix, relative, sep } from "node:path";
 import { Marked } from "marked";
 import { isMain, projectRoot } from "./lib/util.mjs";
 
@@ -56,7 +56,7 @@ export function checkGuide() {
       const path = posix.join(language.dir, page);
       for (const target of localTargets(readFileSync(join(GUIDE_DIR, path), "utf8"))) {
         const resolved = join(GUIDE_DIR, language.dir, target);
-        const inGuide = relative(GUIDE_DIR, resolved);
+        const inGuide = relative(GUIDE_DIR, resolved).split(sep).join("/");
         if (inGuide.startsWith("..")) problems.push(`${path} links to ${target}, outside the guide, which the website does not carry`);
         else if (!existsSync(resolved)) problems.push(`${path} links to ${target}, which does not exist`);
         else if (inGuide.startsWith("images/")) usedImages.add(inGuide);

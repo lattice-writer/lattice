@@ -46,11 +46,11 @@ describe("ci-tier", () => {
       if (crates.has(dir) || !existsSync(manifest)) return;
       crates.add(dir);
       for (const [, dependency] of readFileSync(manifest, "utf8").matchAll(/path\s*=\s*"([^"]+)"/g)) {
-        visit(path.relative(repo, path.join(repo, dir, dependency)));
+        visit(path.relative(repo, path.join(repo, dir, dependency)).split(path.sep).join("/"));
       }
     };
     visit("gpui");
-    for (const crate of readdirSync(path.join(repo, "gpui", "crates"))) visit(path.join("gpui", "crates", crate));
+    for (const crate of readdirSync(path.join(repo, "gpui", "crates"))) visit(`gpui/crates/${crate}`);
     const outside = [...crates].filter((dir) => !dir.startsWith("gpui"));
     expect(outside).toContain("src-tauri/lattice-core");
     expect(outside.filter((dir) => !GPUI_INPUTS.test(`${dir}/src/lib.rs`))).toEqual([]);
