@@ -225,6 +225,9 @@ pub struct Island {
     /// Files dragged in from the Finder come to the owner instead of the
     /// page ([`Island::accept_file_drops`]).
     file_drops: bool,
+    /// The page's own zoom over the window's interface size
+    /// ([`Island::set_page_zoom`]), which a page built again takes too.
+    page_zoom: f64,
     _inbox: Option<Task<()>>,
     _drops: Option<Task<()>>,
     /// The page's view taking AppKit's keyboard (`native::watch_keyboard`).
@@ -267,6 +270,7 @@ impl Island {
             hibernation_held: false,
             stats: IslandStats::default(),
             file_drops: false,
+            page_zoom: 1.,
             _inbox: None,
             _drops: None,
             _keyboard: None,
@@ -374,6 +378,29 @@ impl Island {
         }
         self.sync_native_visibility(cx);
         cx.notify();
+    }
+
+    /// Zoom the page, `1.0` being its natural size, on top of the window's
+    /// interface size. The engine lays the page out again at the new scale,
+    /// as a browser's page zoom does, so its text stays sharp, its pointer
+    /// targets and input method follow it, and a page built again after
+    /// hibernating opens at it.
+    pub fn set_page_zoom(&mut self, zoom: f64, cx: &mut Context<Self>) {
+        if self.page_zoom == zoom {
+            return;
+        }
+        self.page_zoom = zoom;
+        if let Some(webview) = &self.webview
+            && let Err(error) = webview.read(cx).set_zoom(zoom)
+        {
+            log::warn!("{}: could not zoom the page: {error}", self.config.name);
+        }
+        cx.notify();
+    }
+
+    /// The page zoom [`Island::set_page_zoom`] last set.
+    pub fn page_zoom(&self) -> f64 {
+        self.page_zoom
     }
 
     /// Let the page be seen (its first frame is ready).

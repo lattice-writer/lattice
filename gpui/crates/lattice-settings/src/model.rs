@@ -17,6 +17,18 @@ pub const SOURCE_LINE_HEIGHT: f32 = 1.6;
 pub const PROSE_FONT_SIZE: f32 = 14.;
 pub const PROSE_LINE_HEIGHT: f32 = 1.7;
 pub const EDITOR_FONT_SIZE: f32 = 14.;
+/// The Agent's text size (Settings › Agent › Display), in the CSS pixels of
+/// Synara's chat text: its default is Synara's own (`DEFAULT_CHAT_FONT_SIZE_PX`),
+/// so the Agent draws at its natural size until the writer picks another.
+pub const AGENT_FONT_SIZE: f32 = 13.;
+pub const AGENT_FONT_SIZE_RANGE: (f32, f32) = (11., 20.);
+
+/// The page zoom that draws the Agent's text at `size`: the whole page
+/// scales with it, so its spacing, icons and code blocks keep their
+/// proportions to the text.
+pub fn agent_font_zoom(size: f32) -> f32 {
+    size.clamp(AGENT_FONT_SIZE_RANGE.0, AGENT_FONT_SIZE_RANGE.1) / AGENT_FONT_SIZE
+}
 
 /// A choice among named values, stored as the Tauri app stores it.
 pub trait Choice: Sized + Copy + PartialEq + 'static {
@@ -150,6 +162,8 @@ choice!(
         Archived = "archived",
         Environment = "environment",
         ModelEndpoint = "model-endpoint",
+        /// The GPUI app's own: the Agent's font size.
+        AgentDisplay = "agent-display",
         Overleaf = "overleaf",
         Literature = "literature",
         Plugins = "plugins",
@@ -235,6 +249,8 @@ pub struct Appearance {
     pub prose_font: String,
     pub prose_font_size: f32,
     pub prose_line_height: f32,
+    /// The Agent's text size, apart from the editors' (`agentFontSize`).
+    pub agent_font_size: f32,
     pub editor_keymap: EditorKeymap,
     /// Settings › Editor & builds › Check spelling (`editorSpellcheck`).
     pub editor_spellcheck: bool,
@@ -262,6 +278,7 @@ impl Default for Appearance {
             prose_font: String::new(),
             prose_font_size: PROSE_FONT_SIZE,
             prose_line_height: PROSE_LINE_HEIGHT,
+            agent_font_size: AGENT_FONT_SIZE,
             editor_keymap: EditorKeymap::Default,
             editor_spellcheck: true,
             interface_sounds: true,
@@ -432,6 +449,12 @@ impl Appearance {
                 field("proseLineHeight"),
                 defaults.prose_line_height,
             ),
+            agent_font_size: number_or(
+                field("agentFontSize"),
+                defaults.agent_font_size,
+                AGENT_FONT_SIZE_RANGE,
+            )
+            .round(),
             editor_keymap: choice(field("editorKeymap"), defaults.editor_keymap),
             // Absent means "never chose"; only an explicit false turns it off.
             editor_spellcheck: field("editorSpellcheck") != Some(&Value::Bool(false)),
@@ -632,6 +655,41 @@ mod tests {
         assert_eq!(appearance.accent.custom_rgb(), Some([0x3d, 0x7a, 0xf2]));
         assert_eq!(appearance.code_theme, CodeTheme::TokyoNight);
         assert_eq!(appearance.code_theme_variant, CodeThemeVariant::Dark);
+    }
+
+    #[test]
+    fn the_agent_font_size_is_read_apart_from_the_editors() {
+        let read = |stored| Appearance::from_value(&stored, false).agent_font_size;
+        assert_eq!(read(json!({})), AGENT_FONT_SIZE);
+        assert_eq!(
+            read(json!({ "agentFontSize": 16, "editorFontSize": 20 })),
+            16.
+        );
+        assert_eq!(read(json!({ "agentFontSize": "15" })), 15.);
+        assert_eq!(read(json!({ "agentFontSize": 15.4 })), 15.);
+        assert_eq!(read(json!({ "agentFontSize": 4 })), AGENT_FONT_SIZE_RANGE.0);
+        assert_eq!(
+            read(json!({ "agentFontSize": 99 })),
+            AGENT_FONT_SIZE_RANGE.1
+        );
+        assert_eq!(read(json!({ "agentFontSize": "big" })), AGENT_FONT_SIZE);
+        let stored = serde_json::to_value(Appearance {
+            agent_font_size: 18.,
+            ..Appearance::default()
+        })
+        .unwrap();
+        assert_eq!(stored["agentFontSize"], json!(18.));
+        assert_eq!(read(stored), 18.);
+    }
+
+    #[test]
+    fn the_agent_zoom_is_its_size_over_synaras_own() {
+        assert_eq!(agent_font_zoom(AGENT_FONT_SIZE), 1.);
+        assert!((agent_font_zoom(19.5) - 1.5).abs() < 1e-6);
+        assert_eq!(
+            agent_font_zoom(40.),
+            AGENT_FONT_SIZE_RANGE.1 / AGENT_FONT_SIZE
+        );
     }
 
     #[test]

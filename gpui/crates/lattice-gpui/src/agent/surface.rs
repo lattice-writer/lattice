@@ -143,6 +143,12 @@ pub struct SynaraSurface {
     drop_read: Option<Result<usize, String>>,
     /// The project's annotations as the page last heard (`annotations.rs`).
     annotations: annotations::PageAnnotations,
+    /// The Agent's page zoom, from Settings › Agent › Display's font size
+    /// (`agent_font_zoom`); the Git workspace and Settings' pages stay at 1.
+    font_zoom: f32,
+    /// The composer's width as the page last measured it, in its own
+    /// (zoomed) pixels, so a new zoom moves the panel's minimum with it.
+    minimum_width: Option<f32>,
     last_pointer: Option<Instant>,
     _subscriptions: Vec<Subscription>,
 }
@@ -163,6 +169,14 @@ impl SynaraSurface {
         let mut subscriptions = vec![
             cx.observe_global::<lattice_ui::LatticeTheme>(|this, cx| this.push_appearance(cx)),
         ];
+        let font_zoom = font_zoom(kind, cx);
+        if kind == SurfaceKind::Agent {
+            subscriptions.push(
+                cx.observe_global::<crate::settings::AppSettings>(|this, cx| {
+                    this.follow_font_size(cx)
+                }),
+            );
+        }
         let (island, unavailable) = match bundle {
             Ok(scope) => {
                 let config = IslandConfig {
@@ -183,6 +197,7 @@ impl SynaraSurface {
                     if kind == SurfaceKind::Agent {
                         island.accept_file_drops();
                     }
+                    island.set_page_zoom(f64::from(font_zoom), cx);
                     island
                 });
                 subscriptions.push(cx.subscribe_in(&island, window, Self::on_island));
@@ -227,6 +242,8 @@ impl SynaraSurface {
             dropped: Vec::new(),
             drop_read: None,
             annotations: Default::default(),
+            font_zoom,
+            minimum_width: None,
             last_pointer: None,
             _subscriptions: subscriptions,
         }
@@ -269,6 +286,22 @@ impl SynaraSurface {
     fn respond(&self, id: u64, result: Result<Value, String>, cx: &mut App) {
         if let Some(island) = &self.island {
             island.update(cx, |island, _| island.respond(id, result));
+        }
+    }
+
+    /// Settings changed: draw the page at the Agent's font size, and move
+    /// the panel's minimum with the composer it was measured from.
+    fn follow_font_size(&mut self, cx: &mut Context<Self>) {
+        let zoom = font_zoom(self.kind, cx);
+        if zoom == self.font_zoom {
+            return;
+        }
+        self.font_zoom = zoom;
+        if let Some(island) = &self.island {
+            island.update(cx, |island, cx| island.set_page_zoom(f64::from(zoom), cx));
+        }
+        if let Some(width) = self.minimum_width {
+            cx.emit(SurfaceEvent::MinimumWidth(width * zoom));
         }
     }
 
@@ -558,6 +591,11 @@ impl SynaraSurface {
                 }
             }
             _ => match surface_event(kind, payload) {
+                Some(SurfaceEvent::MinimumWidth(width)) => {
+                    // Measured in the page's pixels, which the zoom scales.
+                    self.minimum_width = Some(width);
+                    cx.emit(SurfaceEvent::MinimumWidth(width * self.font_zoom));
+                }
                 Some(event) => {
                     if let SurfaceEvent::Turn(presence) = &event {
                         self.hold_page(presence.is_some(), cx);
@@ -618,6 +656,17 @@ fn ground(kind: SurfaceKind, palette: &Palette) -> gpui::Hsla {
 /// attributes: the accent as the writer chose it (a preset's name, or the
 /// custom colour as `#rrggbb`) and the window's translucency, which the
 /// host theme snapshot carries (`agent-host-theme.ts`).
+/// The page zoom for a surface: the Agent's font size for the Agent's own
+/// page (the panel and its separate window share it), natural elsewhere.
+fn font_zoom(kind: SurfaceKind, cx: &App) -> f32 {
+    match kind {
+        SurfaceKind::Agent => {
+            lattice_settings::agent_font_zoom(crate::settings::get(cx).appearance.agent_font_size)
+        }
+        SurfaceKind::Git | SurfaceKind::Settings => 1.,
+    }
+}
+
 fn appearance(cx: &App) -> Value {
     let palette = cx.palette();
     let accent = match palette.accent_preset {

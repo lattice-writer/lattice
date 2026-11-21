@@ -77,6 +77,13 @@ fn groups() -> Vec<(SharedString, Vec<(Section, SharedString)>)> {
                 ),
                 (
                     Section {
+                        tab: SettingsTab::AgentDisplay,
+                        icon: ProductIcon::Faders,
+                    },
+                    t!("Display").into(),
+                ),
+                (
+                    Section {
                         tab: SettingsTab::Mcp,
                         icon: ProductIcon::Plugs,
                     },

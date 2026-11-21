@@ -27,6 +27,7 @@
 //! reads or changes the writer's own preferences.
 
 mod acknowledgements;
+mod agent_display_pane;
 mod appearance_pane;
 mod controls;
 mod dialog;

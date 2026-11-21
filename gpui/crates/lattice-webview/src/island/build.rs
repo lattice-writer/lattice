@@ -215,6 +215,11 @@ impl Island {
         }
         self.handle = Some(webview.handle());
         self.token = token;
+        if self.page_zoom != 1.
+            && let Err(error) = webview.set_zoom(self.page_zoom)
+        {
+            log::warn!("{}: could not zoom the page: {error}", self.config.name);
+        }
         let webview = cx.new(|_| webview);
         self.webview = Some(webview);
         self.listen_to_focus(window, cx);

@@ -77,6 +77,8 @@ pub struct Fields {
     pub source_line_height: Entity<SliderState>,
     pub prose_font_size: Entity<SliderState>,
     pub prose_line_height: Entity<SliderState>,
+    /// Settings › Agent › Display's font size.
+    pub agent_font_size: Entity<SliderState>,
     /// Whether a face is being typed by name ("Other font…").
     pub source_other: bool,
     pub prose_other: bool,
@@ -226,6 +228,8 @@ impl SettingsDialog {
             slider(line_min, line_max, 0.05, appearance.source_line_height, cx);
         let prose_font_size = slider(size_min, size_max, 1., appearance.prose_font_size, cx);
         let prose_line_height = slider(line_min, line_max, 0.05, appearance.prose_line_height, cx);
+        let (agent_min, agent_max) = lattice_settings::AGENT_FONT_SIZE_RANGE;
+        let agent_font_size = slider(agent_min, agent_max, 1., appearance.agent_font_size, cx);
 
         let mut subscriptions = vec![
             cx.subscribe_in(&search, window, |this, _, event: &InputEvent, _, cx| {
@@ -297,6 +301,10 @@ impl SettingsDialog {
             on_slider(|appearance, value| appearance.prose_font_size = value.round()),
         ));
         subscriptions.push(cx.subscribe(
+            &agent_font_size,
+            on_slider(|appearance, value| appearance.agent_font_size = value.round()),
+        ));
+        subscriptions.push(cx.subscribe(
             &prose_line_height,
             on_slider(|appearance, value| {
                 appearance.prose_line_height = (value * 20.).round() / 20.
@@ -337,6 +345,7 @@ impl SettingsDialog {
                 source_line_height,
                 prose_font_size,
                 prose_line_height,
+                agent_font_size,
                 source_other,
                 prose_other,
                 custom_accent_open: false,
@@ -418,6 +427,7 @@ impl SettingsDialog {
             ),
             (&self.fields.prose_font_size, appearance.prose_font_size),
             (&self.fields.prose_line_height, appearance.prose_line_height),
+            (&self.fields.agent_font_size, appearance.agent_font_size),
         ] {
             if state.read(cx).value().start() != value {
                 state.update(cx, |state, cx| state.set_value(value, window, cx));
