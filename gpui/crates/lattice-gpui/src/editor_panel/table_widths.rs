@@ -77,11 +77,13 @@ impl TableWidths {
 
     /// Keep `tables` as `file`'s (none forgets the file); the file and its
     /// project become the newest, and the oldest go past [`MAX_FILES`] and
-    /// [`MAX_ROOTS`]. A list holding anything that is not a table's widths
-    /// is refused whole. Whether anything changed.
-    pub fn set(&mut self, root: &Path, file: &str, tables: Vec<SavedTable>) -> bool {
-        if tables.len() > MAX_TABLES || !tables.iter().all(SavedTable::valid) {
-            return false;
+    /// [`MAX_ROOTS`]. An entry that is not a table's widths is left out on
+    /// its own, and past [`MAX_TABLES`] the first entries go. Whether
+    /// anything changed.
+    pub fn set(&mut self, root: &Path, file: &str, mut tables: Vec<SavedTable>) -> bool {
+        tables.retain(SavedTable::valid);
+        if tables.len() > MAX_TABLES {
+            tables.drain(..tables.len() - MAX_TABLES);
         }
         let mut files = self.0.shift_remove(root).unwrap_or_default();
         let before = files.shift_remove(file);
@@ -270,7 +272,7 @@ mod tests {
     }
 
     #[test]
-    fn a_list_holding_anything_but_widths_is_refused_whole() {
+    fn an_entry_that_is_not_widths_is_left_out_on_its_own() {
         let root = Path::new("/p");
         let mut all = TableWidths::default();
         let good = table(0, "1|a", &[80.]);
@@ -282,10 +284,23 @@ mod tests {
             table(1, "1|b", &[1.; MAX_COLUMNS + 1]),
             table(1, &"s".repeat(MAX_SIGNATURE + 1), &[80.]),
         ] {
-            assert!(!all.set(root, "a.md", vec![good.clone(), bad]));
+            all.set(root, "a.md", vec![bad.clone(), good.clone(), bad]);
+            assert_eq!(all.of(root, "a.md"), Some([good.clone()].as_slice()));
         }
-        assert!(!all.set(root, "a.md", vec![good.clone(); MAX_TABLES + 1]));
-        assert_eq!(all, TableWidths::default());
+        assert!(
+            !all.set(root, "b.md", vec![table(0, "1|b", &[0.])]),
+            "nothing left, nothing kept"
+        );
+        assert_eq!(all.of(root, "b.md"), None);
+        let many: Vec<_> = (0..MAX_TABLES as u32 + 2)
+            .map(|index| table(index, &format!("1|{index}"), &[80.]))
+            .collect();
+        all.set(root, "c.md", many.clone());
+        assert_eq!(
+            all.of(root, "c.md"),
+            Some(&many[2..]),
+            "past the cap the first go"
+        );
     }
 
     #[test]

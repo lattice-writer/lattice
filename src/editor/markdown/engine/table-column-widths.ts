@@ -50,9 +50,27 @@ export type TableColumnWidths = {
 export const MIN_COLUMN_WIDTH = 48;
 /** The most tables a file keeps widths for. */
 const MAX_SAVED = 64;
+/** The most columns a table's widths are saved for (the host keeps no more). */
+const MAX_COLUMNS = 256;
+/**
+ * The longest signature, in UTF-16 units: at most 3 bytes each in UTF-8, so
+ * within the 4096 bytes the host keeps. A longer one is its column count and
+ * a hash of the whole.
+ */
+const MAX_SIGNATURE = 1024;
 /** How near a cell's edge, in CSS pixels, the pointer starts a resize. */
 const EDGE = 5;
 const SEPARATOR = "\u001f";
+
+/** FNV-1a over UTF-16 units, as eight hex digits. */
+function hash(text: string): string {
+  let value = 0x811c9dc5;
+  for (let index = 0; index < text.length; index += 1) {
+    value ^= text.charCodeAt(index);
+    value = Math.imul(value, 0x01000193) >>> 0;
+  }
+  return value.toString(16).padStart(8, "0");
+}
 
 /** Widths drawn ahead of the host, by table index, for the table that had `signature` there. */
 type Overlay = Readonly<Record<number, { signature: string; widths: readonly number[] }>>;
@@ -75,7 +93,9 @@ const tableWidthsKey = new PluginKey<WidthsState>("latticeTableColumnWidths");
 function tableSignature(table: PmNode): string {
   const header: string[] = [];
   table.firstChild?.forEach((cell) => header.push(cell.textContent.replace(/\s+/g, " ").trim()));
-  return [String(TableMap.get(table).width), ...header].join(SEPARATOR);
+  const columns = String(TableMap.get(table).width);
+  const signature = [columns, ...header].join(SEPARATOR);
+  return signature.length <= MAX_SIGNATURE ? signature : `${columns}${SEPARATOR}#${hash(signature)}:${signature.length}`;
 }
 
 /**
@@ -92,9 +112,10 @@ function matchSaved(signatures: readonly string[], saved: readonly SavedTable[])
 }
 
 /**
- * The list after table `table` takes `widths`: its entry replaced or added,
- * every matched entry at its table's index now, and past {@link MAX_SAVED}
- * the oldest entries no table matches dropped first.
+ * The list after table `table` takes `widths`: its entry replaced or added
+ * (a table wider than {@link MAX_COLUMNS} is drawn at its widths but not
+ * saved), every matched entry at its table's index now, and past
+ * {@link MAX_SAVED} the oldest entries no table matches dropped first.
  */
 function savedAfter(state: WidthsState, table: number, widths: readonly number[]): SavedTable[] {
   const own = state.matched[table];
@@ -102,7 +123,7 @@ function savedAfter(state: WidthsState, table: number, widths: readonly number[]
     const at = state.matched.indexOf(entry);
     return { entry: at >= 0 && at !== entry.index ? { ...entry, index: at } : entry, matched: at >= 0 };
   });
-  kept.push({ entry: { index: table, signature: state.signatures[table]!, widths: [...widths] }, matched: true });
+  if (widths.length <= MAX_COLUMNS) kept.push({ entry: { index: table, signature: state.signatures[table]!, widths: [...widths] }, matched: true });
   while (kept.length > MAX_SAVED) {
     const orphan = kept.findIndex((item) => !item.matched);
     kept.splice(orphan >= 0 ? orphan : 0, 1);
@@ -280,12 +301,28 @@ class ColumnResize {
     return own && own.length === TableMap.get(table).width ? [...own] : drawnWidths(this.view, border.tablePos, table);
   }
 
-  private show(table: number, widths: readonly number[] | null) {
+  /**
+   * Where the table pressed on is now: the same node (an edit elsewhere
+   * keeps it), else the one table of its signature; null when it is gone or
+   * cannot be told apart.
+   */
+  private indexOf(table: PmNode, signature: string): number | null {
+    const state = this.state();
+    const { doc } = this.view.state;
+    const same = state.tables.findIndex((pos) => doc.nodeAt(pos) === table);
+    if (same >= 0) return same;
+    const named = state.signatures.flatMap((other, index) => (other === signature ? [index] : []));
+    return named.length === 1 ? named[0]! : null;
+  }
+
+  private show(table: number | null, widths: readonly number[] | null) {
+    if (table === null) return;
     const meta: Meta = { overlay: { table, signature: this.state().signatures[table] ?? "", widths } };
     this.view.dispatch(this.view.state.tr.setMeta(tableWidthsKey, meta).setMeta("addToHistory", false));
   }
 
-  private commit(host: TableColumnWidths, table: number, widths: readonly number[]) {
+  private commit(host: TableColumnWidths, table: number | null, widths: readonly number[]) {
+    if (table === null) return;
     this.show(table, widths);
     host.onChange(savedAfter(this.state(), table, widths));
   }
@@ -326,13 +363,17 @@ class ColumnResize {
     const start = event.clientX;
     const from = widths[border.column]!;
     const before = this.state().overlay[border.table]?.widths ?? null;
+    const signature = this.state().signatures[border.table] ?? "";
+    // The table is found again at each step: an edit elsewhere (a co-author's, an
+    // undo) can move it to another index while the pointer is down.
+    const at = () => this.indexOf(table, signature);
     let moved = false;
     const drag = (moveEvent: MouseEvent) => {
       const width = Math.max(MIN_COLUMN_WIDTH, Math.round(from + (moveEvent.clientX - start) / (scale || 1)));
       if (width === widths[border.column]) return;
       moved = true;
       widths[border.column] = width;
-      this.show(border.table, [...widths]);
+      this.show(at(), [...widths]);
     };
     const key = (keyEvent: KeyboardEvent) => {
       if (keyEvent.key !== "Escape") return;
@@ -348,8 +389,8 @@ class ColumnResize {
       window.removeEventListener("blur", blur);
       this.finish = null;
       if (!moved || this.view.isDestroyed) return;
-      if (keep) this.commit(host, border.table, widths);
-      else this.show(border.table, before);
+      if (keep) this.commit(host, at(), widths);
+      else this.show(at(), before);
     };
     window.addEventListener("mousemove", drag);
     window.addEventListener("mouseup", up);

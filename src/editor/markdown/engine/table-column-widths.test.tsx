@@ -221,4 +221,37 @@ describe("table column widths", () => {
     expect(tables()[0]).not.toHaveAttribute("data-sized");
     expect(colWidths(tables()[1]!)).toEqual(["70px", "80px"]);
   });
+
+  it("keeps a table with a very long header within the signature's bound, and finds it again", async () => {
+    const long = "w".repeat(5000);
+    const text = doc(`| ${long} | Short |\n| --- | --- |\n| a | b |`);
+    const host = keeper();
+    const { rerender } = renderEditor({ tableColumnWidths: host, text });
+    await waitFor(() => expect(tables()).toHaveLength(1));
+    pressBorder(tables()[0]!);
+    fireEvent.mouseMove(window, { clientX: 148 });
+    fireEvent.mouseUp(window, { clientX: 148 });
+    const next = host.onChange.mock.lastCall![0];
+    expect(next).toHaveLength(1);
+    expect(next[0]!.signature.length).toBeLessThanOrEqual(1024);
+    expect(next[0]!.signature.startsWith("2\u001f#")).toBe(true);
+    rerender({ tableColumnWidths: { ...host, tables: next } });
+    await waitFor(() => expect(colWidths(tables()[0]!)).toEqual(["150px", "100px"]));
+  });
+
+  it("commits a drag to the table it started on when a table is inserted above it meanwhile", async () => {
+    const host = keeper();
+    const { rerender } = renderEditor({ tableColumnWidths: host });
+    await waitFor(() => expect(tables()).toHaveLength(2));
+    pressBorder(tableNamed("Model"));
+    fireEvent.mouseMove(window, { clientX: 148 });
+    const inserted = ["| One | Two |", "| --- | --- |", "| 1 | 2 |"].join("\n");
+    rerender({ text: doc(inserted, TABLES) });
+    await waitFor(() => expect(tables()).toHaveLength(3));
+    fireEvent.mouseMove(window, { clientX: 158 });
+    fireEvent.mouseUp(window, { clientX: 158 });
+    expect(host.onChange).toHaveBeenLastCalledWith([{ index: 1, signature: SIG_A, widths: [160, 100] }]);
+    expect(tableNamed("One")).not.toHaveAttribute("data-sized");
+    expect(colWidths(tableNamed("Model"))).toEqual(["160px", "100px"]);
+  });
 });
