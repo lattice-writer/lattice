@@ -5,13 +5,14 @@
 //! - the pointer resting on a column's border shows the resize cursor;
 //! - a drag of the first table's first border widens that column by the
 //!   distance dragged, the file's bytes as they were, and the widths are
-//!   kept for the file's table 0;
+//!   kept for that table (saved at index 0);
 //! - a double-click on the second table's first border fits that column to
 //!   its content (its long header), kept as table 1's;
 //! - the tab closed and the file opened again draws both tables at the
 //!   widths kept;
-//! - a column added to the first table on disk drops its widths, and only
-//!   its: the second keeps its own.
+//! - a column added to the first table on disk draws it at its content's
+//!   widths, the second keeping its own, and nothing saved is dropped: the
+//!   column taken away again brings the first table's widths back.
 
 #![cfg(target_os = "macos")]
 
@@ -67,6 +68,17 @@ fn table_facts(index: usize) -> String {
            cols: [...table.querySelectorAll('col')].map((col) => col.style.width), sized: table.hasAttribute('data-sized'), \
            cursor: document.querySelector('.lx-md-editor')?.hasAttribute('data-column-resize') ?? false }}); }})()"
     )
+}
+
+/// The widths kept for the table saved at `index` (the file's tables have
+/// distinct signatures, so each is saved at its own index).
+fn kept_at(saved: &Value, index: u64) -> Vec<f64> {
+    saved
+        .as_array()
+        .and_then(|tables| tables.iter().find(|table| table["index"] == index))
+        .and_then(|table| table["widths"].as_array())
+        .map(|widths| widths.iter().filter_map(Value::as_f64).collect())
+        .unwrap_or_default()
 }
 
 fn px_widths(facts: &Value) -> Vec<f64> {
@@ -152,7 +164,7 @@ impl Run {
         );
         let kept = |cx: &mut AsyncApp| cx.update(|_| table_widths::page_widths(root, FILE));
         self.wait_for(cx, Duration::from_secs(3), |_, _| {
-            table_widths::page_widths(root, FILE).get("0").is_some()
+            !kept_at(&table_widths::page_widths(root, FILE), 0).is_empty()
         })
         .await;
         let after = self.evaluate(cx, &island, &table_facts(0)).await;
@@ -161,11 +173,11 @@ impl Run {
         let saved = kept(cx);
         let unchanged = std::fs::read_to_string(&path).is_ok_and(|text| text == TABLES);
         steps.check(
-            "a Markdown table's column border dragged widens the column by the distance dragged; the widths are kept for the file's table 0 and the file's bytes stay as they were",
+            "a Markdown table's column border dragged widens the column by the distance dragged; the widths are kept for that table and the file's bytes stay as they were",
             after["sized"] == true
                 && widths.first().is_some_and(|width| (width - expected).abs() <= 2.)
-                && saved["0"].as_array().map(|kept| kept.len()) == Some(2)
-                && saved["0"][0].as_f64().zip(widths.first()).is_some_and(|(kept, shown)| (kept - shown).abs() < 0.5)
+                && kept_at(&saved, 0).len() == 2
+                && kept_at(&saved, 0).first().zip(widths.first()).is_some_and(|(kept, shown)| (kept - shown).abs() < 0.5)
                 && unchanged,
             json!({ "before": before, "after": after, "expected": expected, "saved": saved, "unchanged": unchanged }),
         );
@@ -179,18 +191,18 @@ impl Run {
             native::send_double_click(native, edge)?;
         }
         self.wait_for(cx, Duration::from_secs(3), |_, _| {
-            table_widths::page_widths(root, FILE).get("1").is_some()
+            !kept_at(&table_widths::page_widths(root, FILE), 1).is_empty()
         })
         .await;
         let fitted = self.evaluate(cx, &island, &table_facts(1)).await;
         let fitted_widths = px_widths(&fitted);
         let saved = kept(cx);
         steps.check(
-            "a double-click on a Markdown table's column border fits the column to its content, kept as the file's table 1",
+            "a double-click on a Markdown table's column border fits the column to its content, kept for that table",
             fitted["sized"] == true
-                && saved["1"].as_array().map(|kept| kept.len()) == Some(3)
+                && kept_at(&saved, 1).len() == 3
                 && fitted_widths.first().is_some_and(|width| (width - fitted["width"].as_f64().unwrap_or_default()).abs() <= 1.)
-                && saved["1"][0].as_f64().is_some_and(|width| width >= MIN_FIT),
+                && kept_at(&saved, 1).first().is_some_and(|width| *width >= MIN_FIT),
             json!({ "before": second, "after": fitted, "saved": saved }),
         );
 
@@ -225,40 +237,54 @@ impl Run {
             return Ok(());
         };
         let saved = kept(cx);
-        let same = |facts: &Value, table: &str| {
+        let same = |facts: &Value, table: u64| {
             let shown = px_widths(facts);
-            let kept: Vec<f64> = saved[table]
-                .as_array()
-                .map(|kept| kept.iter().filter_map(Value::as_f64).collect())
-                .unwrap_or_default();
+            let kept = kept_at(&saved, table);
             !kept.is_empty()
                 && shown.len() == kept.len()
                 && shown.iter().zip(&kept).all(|(shown, kept)| (shown - kept).abs() < 0.5)
         };
         steps.check(
             "a Markdown file closed and opened again draws its tables at the column widths kept",
-            same(&first, "0") && same(&second, "1"),
+            same(&first, 0) && same(&second, 1),
             json!({ "first": first, "second": second, "saved": saved }),
         );
 
-        // A column added on disk drops the first table's widths, not the second's.
+        // A column added on disk: the first table sizes to its content, and
+        // its widths come back once the column goes again.
+        let before_change = kept(cx);
         std::fs::write(&path, WIDER)?;
-        self.wait_for(cx, Duration::from_secs(10), |_, _| {
-            table_widths::page_widths(root, FILE).get("0").is_none()
-        })
-        .await;
-        self.pause(cx, Duration::from_millis(300)).await;
-        let first = self.evaluate(cx, &island, &table_facts(0)).await;
+        let mut first = Value::Null;
+        let started = std::time::Instant::now();
+        while started.elapsed() < Duration::from_secs(10) {
+            first = self.evaluate(cx, &island, &table_facts(0)).await;
+            if first["cols"].as_array().map(Vec::len) == Some(3) {
+                break;
+            }
+            self.pause(cx, Duration::from_millis(150)).await;
+        }
         let second = self.evaluate(cx, &island, &table_facts(1)).await;
-        let saved = kept(cx);
+        let during = kept(cx);
+        std::fs::write(&path, TABLES)?;
+        let mut back = Value::Null;
+        let started = std::time::Instant::now();
+        while started.elapsed() < Duration::from_secs(10) {
+            back = self.evaluate(cx, &island, &table_facts(0)).await;
+            if back["sized"] == true {
+                break;
+            }
+            self.pause(cx, Duration::from_millis(150)).await;
+        }
+        let after_change = kept(cx);
         steps.check(
-            "a Markdown table whose column count changed drops its kept widths and sizes to its content, the other table keeping its own",
-            saved.get("0").is_none()
-                && saved.get("1").is_some()
-                && first["sized"] == false
+            "a Markdown table whose column count changed sizes to its content, the other table keeping its widths, and gets its own back when the column goes again; nothing saved is dropped",
+            first["sized"] == false
                 && first["cols"].as_array().map(Vec::len) == Some(3)
-                && second["sized"] == true,
-            json!({ "first": first, "second": second, "saved": saved }),
+                && second["sized"] == true
+                && px_widths(&back) == kept_at(&before_change, 0)
+                && during == before_change
+                && after_change == before_change,
+            json!({ "first": first, "second": second, "back": back, "before": before_change, "during": during, "after": after_change }),
         );
         self.close_tab(cx, panel)?;
         Ok(())

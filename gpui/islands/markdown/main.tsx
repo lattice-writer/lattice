@@ -24,8 +24,9 @@
  *   source is mounted), so the two views step through one history.
  *
  * Host to page, beside the document protocol's `doc:open` (with `projectRoot`,
- * `files`, `texSources`, `split`, `papers`, and `tableWidths`: the file's tables'
- * column widths by table index, kept by the owner and never in the file),
+ * `files`, `texSources`, `split`, `papers`, and `tableWidths`: the file's saved
+ * tables' column widths, `[{ index, signature, widths }]`, kept by the owner
+ * and never in the file),
  * `doc:source`, `doc:active`, `doc:flush`
  * and `doc:locale`:
  *   md:split          { split }         the view is Split (source labels kept for its scroll sync)
@@ -43,8 +44,8 @@
  * Page to host:
  *   md:change         { source, base }  the whole file after an edit made against `base`
  *   md:undo, md:redo
- *   md:table-widths   { table, widths }   a table's column widths were set by a drag or a fit,
- *                     or dropped (null) once its column count changed
+ *   md:table-widths   { tables }        a drag or a fit changed the file's saved tables: the
+ *                     whole list, which the owner keeps as it is
  *   md:overleaf-accept, md:overleaf-reject   { id }   a suggestion card's Accept or Reject
  *   md:view-in-source { offset }        show the source with the caret at a UTF-16 offset
  *   md:open-path      { path }          a project link followed
@@ -78,7 +79,7 @@ import type { usePaperPdf } from "../../../src/canvas/use-paper-pdf";
 import { LatticeVisualMarkdownEditor } from "../../../src/editor/markdown/engine/lattice-visual-editor";
 import { MarkdownWorkspaceIndex } from "../../../src/editor/markdown/markdown-workspace-index";
 import type { VisualRevealTarget } from "../../../src/editor/markdown/visual-editor-props";
-import type { TableColumnWidths } from "../../../src/editor/markdown/engine/table-column-widths";
+import type { SavedTable, TableColumnWidths } from "../../../src/editor/markdown/engine/table-column-widths";
 import { katexMacrosFromSources } from "../../../src/editor/latex/latex-text";
 import { markdownFrontmatterEnd } from "../../../src/app-utils";
 import type { FileNode, PaperSummary } from "../../../src/app-types";
@@ -173,12 +174,10 @@ type MarkdownOpen = {
   presence?: PresenceCursor[];
   papers?: PaperSummary[];
   overleaf?: Partial<MarkdownOverleaf>;
-  tableWidths?: TableWidths;
+  tableWidths?: SavedTable[];
 };
 
-/** Column widths by table index, as JSON keys them. */
-type TableWidths = Readonly<Record<number, readonly number[]>>;
-const NO_WIDTHS: TableWidths = {};
+const NO_TABLES: SavedTable[] = [];
 
 type Reveal = { id: string; target: VisualRevealTarget };
 
@@ -198,7 +197,7 @@ type State = {
   papers: PaperSummary[];
   /** Overleaf's suggestions on the file, positioned in it. */
   overleaf: MarkdownOverleaf;
-  tableWidths: TableWidths;
+  tableWidths: SavedTable[];
 };
 
 /** What the owner sends of Overleaf's suggestions (`md:overleaf`, `markdown_host.rs`). */
@@ -220,7 +219,7 @@ type Action =
   | { type: "papers"; papers: PaperSummary[] }
   | { type: "overleaf"; overleaf: MarkdownOverleaf }
   | { type: "editable"; editable: boolean }
-  | { type: "table-widths"; table: number; widths: number[] | null };
+  | { type: "table-widths"; tables: SavedTable[] };
 
 function reduce(state: State, action: Action): State {
   switch (action.type) {
@@ -232,7 +231,7 @@ function reduce(state: State, action: Action): State {
         presence: action.open.presence ?? [],
         papers: action.open.papers ?? [],
         overleaf: { ...NO_OVERLEAF, ...action.open.overleaf },
-        tableWidths: action.open.tableWidths ?? NO_WIDTHS,
+        tableWidths: action.open.tableWidths ?? NO_TABLES,
       };
     case "source":
       return { ...state, source: action.source };
@@ -256,10 +255,8 @@ function reduce(state: State, action: Action): State {
       return { ...state, overleaf: action.overleaf };
     case "editable":
       return state.opened ? { ...state, opened: { ...state.opened, editable: action.editable } } : state;
-    case "table-widths": {
-      const rest = Object.fromEntries(Object.entries(state.tableWidths).filter(([table]) => Number(table) !== action.table));
-      return { ...state, tableWidths: action.widths ? { ...rest, [action.table]: action.widths } : rest };
-    }
+    case "table-widths":
+      return { ...state, tableWidths: action.tables };
   }
 }
 
@@ -296,7 +293,7 @@ function Markdown() {
     presence: [],
     papers: [],
     overleaf: NO_OVERLEAF,
-    tableWidths: NO_WIDTHS,
+    tableWidths: NO_TABLES,
   });
   const { opened, source, split, ready, assetRevision, reveal, files, texSources, paper, presence, papers, overleaf, tableWidths } = state;
   // Why the engine cannot show this full text as written, for its masthead
@@ -498,10 +495,10 @@ function Markdown() {
   }, [markEcho]);
 
   const tableColumnWidths = useMemo((): TableColumnWidths => ({
-    widths: tableWidths,
-    onChange: (table, widths) => {
-      dispatch({ type: "table-widths", table, widths });
-      host().post("md:table-widths", { table, widths });
+    tables: tableWidths,
+    onChange: (tables) => {
+      dispatch({ type: "table-widths", tables });
+      host().post("md:table-widths", { tables });
     },
   }), [tableWidths]);
 
