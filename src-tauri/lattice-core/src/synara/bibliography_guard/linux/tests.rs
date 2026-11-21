@@ -539,7 +539,7 @@ fn a_walk_through_the_filter_leaves_it_descriptors_to_spare() {
                 }
                 for file in fs::read_dir(&folder)? {
                     fs::symlink_metadata(file?.path())?;
-                    if passed.fetch_add(1, Ordering::Relaxed) % 25 == 0 {
+                    if passed.fetch_add(1, Ordering::Relaxed).is_multiple_of(25) {
                         most = most.max(descriptors());
                     }
                 }
