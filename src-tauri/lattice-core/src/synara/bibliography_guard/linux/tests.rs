@@ -4,6 +4,8 @@ use std::ffi::CString;
 use std::os::fd::AsRawFd;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::{FileExt, PermissionsExt};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 
 /// The keys Lattice passes in, which the sandbox cannot read from the keyring.
 mod keys;
@@ -492,19 +494,27 @@ fn a_walk_through_the_filter_leaves_it_descriptors_to_spare() {
     }
     let module = module_path!().split_once("::").map_or(module_path!(), |(_, path)| path);
     let name = format!("{module}::a_walk_through_the_filter_leaves_it_descriptors_to_spare");
-    let mut guard = Command::new(std::env::current_exe().unwrap())
+    let mut command = Command::new(std::env::current_exe().unwrap());
+    command
         .args(["--exact", &name, "--nocapture", "--test-threads=1"])
         .env(WALKED, &tree.0)
+        .stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .spawn()
-        .expect("start the filter's process");
-    let stdout = guard.stdout.take().unwrap();
-    let mut lines = io::BufRead::lines(io::BufReader::new(stdout));
-    let mountpoint = lines
-        .by_ref()
-        .map_while(Result::ok)
-        .find_map(|line| line.strip_prefix(MOUNTED_AT).map(PathBuf::from))
-        .expect("the filter's process mounted it");
+        .process_group(0);
+    let mut guard = Served(command.spawn().expect("start the filter's process"));
+    let pid = guard.0.id();
+    let stdout = guard.0.stdout.take().unwrap();
+    let (lines, mounted) = std::sync::mpsc::channel();
+    thread::spawn(move || {
+        for line in io::BufRead::lines(io::BufReader::new(stdout)).map_while(Result::ok) {
+            if let Some(path) = line.strip_prefix(MOUNTED_AT) {
+                let _ = lines.send(PathBuf::from(path));
+            }
+        }
+    });
+    let mountpoint = mounted
+        .recv_timeout(WALK_DEADLINE)
+        .unwrap_or_else(|_| panic!("the filter was not mounted in time\n{}", served_state(pid)));
 
     // Nothing outside lists its way into the mount.
     // SAFETY: `geteuid` takes and returns plain integers.
@@ -513,30 +523,95 @@ fn a_walk_through_the_filter_leaves_it_descriptors_to_spare() {
         assert_eq!(listed.unwrap_err().kind(), io::ErrorKind::PermissionDenied);
     }
 
-    let descriptors = || fs::read_dir(format!("/proc/{}/fd", guard.id())).unwrap().count();
-    let (mut passed, mut most) = (0, descriptors());
-    for folder in fs::read_dir(mountpoint.join(tree.0.strip_prefix("/").unwrap())).unwrap() {
-        let folder = folder.expect("list the tree through the filter").path();
-        if !folder.is_dir() {
-            continue;
-        }
-        for file in fs::read_dir(&folder).expect("list a folder through the filter") {
-            fs::symlink_metadata(file.expect("list a file through the filter").path())
-                .expect("look a file up through the filter");
-            passed += 1;
-            if passed % 25 == 0 {
-                most = most.max(descriptors());
+    // On a thread of its own: a walk that hangs in the filter is ended by
+    // ending the filter's process, which fails it.
+    let passed = Arc::new(AtomicUsize::new(0));
+    let walked = mountpoint.join(tree.0.strip_prefix("/").unwrap());
+    let walking = {
+        let passed = Arc::clone(&passed);
+        thread::spawn(move || -> io::Result<usize> {
+            let descriptors = || fs::read_dir(format!("/proc/{pid}/fd")).map_or(0, Iterator::count);
+            let mut most = descriptors();
+            for folder in fs::read_dir(walked)? {
+                let folder = folder?.path();
+                if !folder.is_dir() {
+                    continue;
+                }
+                for file in fs::read_dir(&folder)? {
+                    fs::symlink_metadata(file?.path())?;
+                    if passed.fetch_add(1, Ordering::Relaxed) % 25 == 0 {
+                        most = most.max(descriptors());
+                    }
+                }
             }
+            Ok(most)
+        })
+    };
+    let started = std::time::Instant::now();
+    while !walking.is_finished() {
+        if started.elapsed() > WALK_DEADLINE {
+            panic!(
+                "the walk stopped after {} files\n{}",
+                passed.load(Ordering::Relaxed),
+                served_state(pid)
+            );
         }
+        thread::sleep(Duration::from_millis(50));
     }
+    let most = walking.join().unwrap().expect("walk the tree through the filter");
     fs::write(tree.0.join("stop"), "").unwrap();
-    let status = guard.wait().unwrap();
-    assert_eq!(passed, folders * files);
+    let status = loop {
+        if let Some(status) = guard.0.try_wait().unwrap() {
+            break status;
+        }
+        if started.elapsed() > 2 * WALK_DEADLINE {
+            panic!("the filter's process did not end\n{}", served_state(pid));
+        }
+        thread::sleep(Duration::from_millis(50));
+    };
+    assert_eq!(passed.load(Ordering::Relaxed), folders * files);
     assert!(
         most < WALK_LIMIT as usize / 2,
-        "the filter had {most} descriptors open for a walk of {passed} files"
+        "the filter had {most} descriptors open for a walk of {folders}×{files} files"
     );
     assert!(status.success(), "the program in the sandbox failed during the walk");
+}
+
+/// How long each part of that test may take, far longer than it does.
+const WALK_DEADLINE: Duration = Duration::from_secs(60);
+
+/// The filter's process in that test, ended with everything it started
+/// when the test ends, however it ends.
+struct Served(std::process::Child);
+
+impl Drop for Served {
+    fn drop(&mut self) {
+        // SAFETY: `kill` takes and returns plain integers; the group is the
+        // process's own (`process_group(0)`), not yet waited for here.
+        unsafe { libc::kill(-(self.0.id() as libc::pid_t), libc::SIGKILL) };
+        let _ = self.0.wait();
+    }
+}
+
+/// What the filter's process `pid` and its threads are doing, for a
+/// failure that has to say where it hung.
+fn served_state(pid: u32) -> String {
+    let read = |path: String| fs::read_to_string(path).unwrap_or_default();
+    let mut state = format!(
+        "descriptors: {}\n",
+        fs::read_dir(format!("/proc/{pid}/fd")).map_or(0, Iterator::count)
+    );
+    for task in fs::read_dir(format!("/proc/{pid}/task")).into_iter().flatten().flatten() {
+        let task = task.path().display().to_string();
+        state += &format!(
+            "{} {} wchan={} stack={}\n",
+            task,
+            read(format!("{task}/comm")).trim(),
+            read(format!("{task}/wchan")),
+            read(format!("{task}/stack")).replace('\n', " | "),
+        );
+    }
+    state
 }
 
 /// The other side of that test: the filter, under [`WALK_LIMIT`], and a
@@ -552,11 +627,13 @@ fn serve_walked_tree(tree: &Path) {
     }
     let sandbox = Sandbox::new();
     println!("{MOUNTED_AT}{}", sandbox.mountpoint.0.display());
+    eprintln!("walk test: the filter is mounted, under a limit of {}", limit.rlim_cur);
     let script = "opened=0; \
          while [ ! -e \"$1/stop\" ]; do \
            cat \"$1/0/0\" > /dev/null || exit 1; opened=$((opened + 1)); \
          done; \
          [ \"$opened\" -gt 0 ]";
     let status = sandbox.command(script).arg(tree).status().expect("run sandboxed command");
+    eprintln!("walk test: the program in the sandbox ended with {status}");
     assert!(status.success(), "the program in the sandbox could not open and close a file");
 }
