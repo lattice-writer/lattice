@@ -412,36 +412,51 @@ impl Run {
             }),
         );
 
-        // A real ⌘Z goes through the window server, where the Edit menu holds
-        // it: it reaches GPUI as the menu's Undo, never the page's keys. With
-        // the page focused, that Undo undoes the page's edit.
+        // A real ⌘Z goes through the application, where the Edit menu holds
+        // it: it reaches GPUI as the menu's Undo, never as the page's keys.
+        // With the page focused, one press undoes the page's last edit, once:
+        // " plum" goes and " kiwi", typed before it, stays.
         self.markdown_type(cx, island, " kiwi").await?;
-        let typed = self
+        let kiwi = self
             .wait_for(cx, Duration::from_secs(10), |_, _| {
                 std::fs::read_to_string(path).is_ok_and(|text| text.contains("kiwi"))
             })
             .await;
-        self.with_window(cx, |_, window, cx| {
-            window.dispatch_action(Box::new(editor::actions::Undo), cx)
-        })?;
-        let undone = self
+        self.pause(cx, Duration::from_millis(1200)).await;
+        for character in " plum".chars() {
+            native::send_key(native, character, false)?;
+            self.pause(cx, Duration::from_millis(40)).await;
+        }
+        let plum = self
             .wait_for(cx, Duration::from_secs(10), |_, _| {
-                std::fs::read_to_string(path).is_ok_and(|text| !text.contains("kiwi"))
+                std::fs::read_to_string(path).is_ok_and(|text| text.contains("plum"))
             })
             .await;
-        if !undone {
-            for _ in 0..4 {
-                self.with_window(cx, |_, window, cx| {
-                    window.dispatch_action(Box::new(editor::actions::Undo), cx)
-                })?;
-                self.pause(cx, Duration::from_millis(300)).await;
-            }
-        }
+        native::send_key_equivalent(native, 'z')?;
+        self.wait_for(cx, Duration::from_secs(10), |_, _| {
+            std::fs::read_to_string(path).is_ok_and(|text| !text.contains("plum"))
+        })
+        .await;
+        self.pause(cx, Duration::from_millis(1500)).await;
         let text = std::fs::read_to_string(path).unwrap_or_default();
         steps.check(
-            "the Edit menu's Undo, which a real ⌘Z in the page arrives as, undoes the visual editor's typing once it is saved",
-            typed && text == NOTES,
-            json!({ "typed": typed, "undone_at_once": undone, "text": if text == NOTES { Value::Null } else { json!(text) } }),
+            "a real ⌘Z in the visual editor, which arrives as the Edit menu's Undo, undoes its last edit once, after the save",
+            kiwi && plum && text.contains("kiwi") && !text.contains("plum"),
+            json!({ "kiwi": kiwi, "plum": plum, "text": text }),
+        );
+
+        // ⌥⇧K types Apple's logo, a private-use character that is text: the
+        // key the layout gives it, committed as WebKit's `insertText:`.
+        native::send_key(native, '\u{F8FF}', false)?;
+        let apple = self
+            .wait_for(cx, Duration::from_secs(10), |_, _| {
+                std::fs::read_to_string(path).is_ok_and(|text| text.contains('\u{F8FF}'))
+            })
+            .await;
+        steps.check(
+            "⌥⇧K's  typed in the visual editor is saved: only the keys' own characters are dropped",
+            apple,
+            json!({ "apple": apple }),
         );
         Ok(())
     }

@@ -250,6 +250,15 @@ describe("SpreadsheetEditor", () => {
     expect(firstSheet(workbook.data).cellData[0][1].v).toBe("ab\tc\nd");
   });
 
+  it("leaves a reserved character in a cell nobody edits as the file has it", async () => {
+    const file = createDefaultSpreadsheet("Reserved");
+    firstSheet(file.workbook).cellData[0] = { 0: { v: "TiM\x1c", t: 1 } };
+    const { onChange, workbook } = renderSheet({ file });
+    firstSheet(workbook.data).cellData[20] = { 0: { v: "A note", t: 1 } };
+    await dispatchMutation(workbook);
+    expect(firstSheet(await savedWorkbook(onChange)).cellData).toMatchObject({ 0: { 0: { v: "TiM\x1c" } }, 20: { 0: { v: "A note" } } });
+  });
+
   it("keeps Univer's reserved characters out of what an edit writes into a cell", () => {
     renderSheet();
     const params = { cellValue: { 0: { 0: { v: "MIT\x1f", t: 1 }, 1: { v: 3 } } } };

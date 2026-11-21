@@ -39,10 +39,6 @@ impl Render for Shell {
             // ⌘Z and ⌘⇧Z in a page arrive as the Edit menu's actions, which
             // nothing under a focused island takes: the page gets the press.
             .on_action(|_: &editor::actions::Undo, window, cx| {
-                log::warn!(
-                    "LATA65 undo island={:?}",
-                    lattice_webview::focused_island(window, cx).is_some()
-                );
                 if let Some(island) = lattice_webview::focused_island(window, cx) {
                     island.read(cx).undo(false, cx);
                 }

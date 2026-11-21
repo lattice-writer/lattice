@@ -17,7 +17,7 @@ function sheetHost() {
   return { host, canvas, seen };
 }
 
-const press = (canvas: HTMLElement, type: "pointerdown" | "pointerup", init: PointerEventInit) => (
+const press = (canvas: HTMLElement, type: "pointerdown" | "pointerup" | "pointercancel", init: PointerEventInit) => (
   canvas.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 1, clientX: 40, ...init }))
 );
 
@@ -48,6 +48,29 @@ describe("secondaryClickAsRightButton", () => {
       { type: "pointerdown", button: 0, buttons: 1, ctrlKey: true, clientX: 40 },
       { type: "pointerup", button: 0, buttons: 0, ctrlKey: false, clientX: 40 },
     ]);
+    stop();
+  });
+
+  it("leaves a Command-click off the canvas alone, for the formula bar and toolbar", () => {
+    const { host, seen } = sheetHost();
+    const bar = document.createElement("div");
+    host.append(bar);
+    const barSeen: boolean[] = [];
+    bar.addEventListener("pointerdown", (event) => barSeen.push(event.ctrlKey));
+    const stop = secondaryClickAsRightButton(host);
+    press(bar, "pointerdown", { button: 0, buttons: 1, metaKey: true });
+    expect(barSeen).toEqual([false]);
+    expect(seen).toEqual([]);
+    stop();
+  });
+
+  it("forgets a Control-click whose press was cancelled", () => {
+    const { host, canvas, seen } = sheetHost();
+    const stop = secondaryClickAsRightButton(host);
+    press(canvas, "pointerdown", { button: 0, buttons: 1, ctrlKey: true });
+    press(canvas, "pointercancel", {});
+    press(canvas, "pointerup", { button: 0, buttons: 0 });
+    expect(seen.map(({ type, button }) => `${type}:${button}`)).toEqual(["pointerdown:2", "pointerup:0"]);
     stop();
   });
 

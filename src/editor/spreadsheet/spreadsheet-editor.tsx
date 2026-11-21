@@ -331,7 +331,10 @@ function SpreadsheetEditorSurface({
       if (render.unitId === workbook.getId() || render.unitId === DOCS_FORMULA_BAR_EDITOR_UNIT_ID_KEY) scheduleRenderAppearance();
     });
     workbookRef.current = workbook;
-    let renderedSnapshot = initialSnapshot;
+    // What Univer shows: the file's values without reserved characters. A
+    // cell nobody edits keeps its value in the file as it was, since every
+    // write below is the difference from this.
+    let renderedSnapshot = withPlainCellText(clone(initialSnapshot));
     let applyingRemote = false;
     let localSyncQueued = false;
     let queuedEdit = false;
@@ -351,7 +354,7 @@ function SpreadsheetEditorSurface({
 
     const replaceWorkbook = (next: SpreadsheetWorkbookData) => asRemote(() => {
       const viewState = workbookViewState(workbook);
-      const display = withPlainCellText(withSpreadsheetAppearance(withSheetViews(next, commandSnapshot(workbook, renderedSnapshot).sheets), appearance));
+      const display = withSpreadsheetAppearance(withSheetViews(next, commandSnapshot(workbook, renderedSnapshot).sheets), appearance);
       univerAPI.disposeUnit(workbook.getId());
       workbook = univerAPI.createWorkbook(display as unknown as IWorkbookData);
       workbookRef.current = workbook;
@@ -363,7 +366,7 @@ function SpreadsheetEditorSurface({
     const applyRemoteSnapshot = () => {
       remoteSyncQueued = false;
       if (disposed) return;
-      const next = spreadsheetSnapshotFromDoc(doc);
+      const next = withPlainCellText(spreadsheetSnapshotFromDoc(doc));
       if (jsonEqual(next, renderedSnapshot)) return;
       const sameStructure = structureFingerprint(next) === structureFingerprint(renderedSnapshot);
       const cells = sameStructure ? changedCells(renderedSnapshot, next) : [];

@@ -168,10 +168,12 @@ pub(crate) fn refuse_keyboard_while_hidden(_: &WebView, _: &gpui::Window) {}
 
 /// Whether `character` is one no key types as text: a control character
 /// other than tab and the line breaks (the arrows' old character codes,
-/// U+001C–U+001F, End's U+0004, Home's U+0001, DEL), or one AppKit reserves
-/// for a function key's `NSEvent.characters` (U+F700–U+F8FF, ← is U+F702).
+/// U+001C–U+001F, End's U+0004, Home's U+0001, DEL), or one of AppKit's
+/// function keys' `NSEvent.characters` (NSUpArrowFunctionKey U+F700 to
+/// NSModeSwitchFunctionKey U+F747; ← is U+F702). The rest of the private-use
+/// area is text: ⌥⇧K types , and icon fonts live there.
 pub fn is_key_control_character(character: char) -> bool {
-    matches!(character, '\u{0}'..='\u{8}' | '\u{B}' | '\u{C}' | '\u{E}'..='\u{1F}' | '\u{7F}' | '\u{F700}'..='\u{F8FF}')
+    matches!(character, '\u{0}'..='\u{8}' | '\u{B}' | '\u{C}' | '\u{E}'..='\u{1F}' | '\u{7F}' | '\u{F700}'..='\u{F747}')
 }
 
 /// Text committed to the page, without the keys' control characters.
@@ -186,14 +188,6 @@ pub fn without_key_control_characters(text: &str) -> std::borrow::Cow<'_, str> {
     }
 }
 
-/// An arrow, Home or End pressed in a page sometimes reached WebKit's
-/// `insertText:` as the key's character instead of as a move: ← as
-/// U+001C (its old character code) or U+F702 (its `NSEvent.characters`).
-/// WebKit inserted it into the focused field, a missing-glyph box after the
-/// text, in a sheet's cell, the visual Markdown page or the Agent's
-/// composer, the last in a cross-origin frame no script of ours reaches. The
-/// page's view drops those characters before WebKit sees them; text without
-/// any goes through untouched.
 /// The script an Undo (Redo) run in a page: the ⌘Z (⌘⇧Z) it stands for,
 /// for the focused editor to take as its own (the visual Markdown page's
 /// goes through the buffer's history), and WebKit's own undo only when
@@ -208,8 +202,17 @@ pub(crate) fn page_undo_script(redo: bool) -> String {
     )
 }
 
+/// An arrow, Home or End pressed in a page sometimes reached WebKit's
+/// `insertText:` as the key's character instead of as a move: ← as
+/// U+001C (its old character code) or U+F702 (its `NSEvent.characters`).
+/// WebKit inserted it into the focused field, a missing-glyph box after the
+/// text, in a sheet's cell, the visual Markdown page or the Agent's
+/// composer, the last in a cross-origin frame no script of ours reaches. The
+/// page's view drops those characters before WebKit sees them, keeping an
+/// attributed string's attributes; text without any goes through untouched.
 #[cfg(target_os = "macos")]
 unsafe fn add_key_control_text_filter(class: *mut objc2::runtime::AnyClass) {
+    use objc2::rc::Retained;
     use objc2::{
         ffi, msg_send,
         runtime::{AnyClass, AnyObject, Bool, Imp, Sel},
@@ -231,6 +234,9 @@ unsafe fn add_key_control_text_filter(class: *mut objc2::runtime::AnyClass) {
             else {
                 return;
             };
+            let insert = |text: *mut AnyObject| {
+                let _: () = msg_send![super(this, superclass), insertText: text, replacementRange: replacement];
+            };
             let attributed: Bool =
                 msg_send![text, isKindOfClass: objc2::class!(NSAttributedString)];
             let plain: *mut AnyObject = if attributed.as_bool() {
@@ -238,19 +244,44 @@ unsafe fn add_key_control_text_filter(class: *mut objc2::runtime::AnyClass) {
             } else {
                 text
             };
-            let plain = (!plain.is_null()).then(|| (*plain.cast::<NSString>()).to_string());
-            match plain.as_deref().map(without_key_control_characters) {
-                Some(std::borrow::Cow::Owned(kept)) => {
-                    if kept.is_empty() {
-                        return;
-                    }
-                    let kept = NSString::from_str(&kept);
-                    let _: () = msg_send![super(this, superclass), insertText: &*kept, replacementRange: replacement];
-                }
-                _ => {
-                    let _: () = msg_send![super(this, superclass), insertText: text, replacementRange: replacement];
-                }
+            if plain.is_null() {
+                return insert(text);
             }
+            let plain = (*plain.cast::<NSString>()).to_string();
+            if !plain.chars().any(is_key_control_character) {
+                return insert(text);
+            }
+            if !attributed.as_bool() {
+                let kept = without_key_control_characters(&plain);
+                if !kept.is_empty() {
+                    insert(
+                        Retained::as_ptr(&NSString::from_str(&kept))
+                            .cast_mut()
+                            .cast(),
+                    );
+                }
+                return;
+            }
+            // The characters' UTF-16 ranges, deleted back to front from a
+            // copy, so every other character keeps its attributes.
+            let mut dropped = Vec::new();
+            let mut at = 0;
+            for character in plain.chars() {
+                let length = character.len_utf16();
+                if is_key_control_character(character) {
+                    dropped.push(NSRange::new(at, length));
+                }
+                at += length;
+            }
+            let copy: *mut AnyObject = msg_send![text, mutableCopy];
+            for range in dropped.into_iter().rev() {
+                let _: () = msg_send![copy, deleteCharactersInRange: range];
+            }
+            let length: usize = msg_send![copy, length];
+            if length > 0 {
+                insert(copy);
+            }
+            let _: () = msg_send![copy, release];
         }
     }
 
@@ -423,7 +454,7 @@ mod tests {
     use super::without_key_control_characters;
 
     #[test]
-    fn an_input_methods_text_loses_only_the_function_keys_characters() {
+    fn an_input_methods_text_loses_only_the_keys_control_characters() {
         assert_eq!(
             without_key_control_characters("a\u{F702}b\u{F703}\u{F72B}"),
             "ab"
@@ -435,7 +466,7 @@ mod tests {
         assert_eq!(without_key_control_characters("a\tb\nc\r"), "a\tb\nc\r");
         assert_eq!(without_key_control_characters("\u{F702}"), "");
         assert!(matches!(
-            without_key_control_characters("你好 \u{E000} \u{F6FF} \u{F900}"),
+            without_key_control_characters("你好 \u{E000} \u{F6FF} \u{F748} \u{F8FF} \u{F900}"),
             std::borrow::Cow::Borrowed(_)
         ));
     }

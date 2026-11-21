@@ -5,7 +5,7 @@ const isSecondaryClick = (event: PointerEvent) => (
 );
 
 const isAddRangeClick = (event: PointerEvent) => (
-  event.button === 0 && event.metaKey && !event.ctrlKey && !event.altKey
+  event.button === 0 && event.metaKey && !event.ctrlKey && !event.altKey && event.target instanceof HTMLCanvasElement
 );
 
 /**
@@ -17,7 +17,8 @@ const isAddRangeClick = (event: PointerEvent) => (
  * it, and the context menu opens.
  *
  * Univer adds a range only for Ctrl, never for Command, so a Mac's
- * Command-click reaches it with Control in Command's place.
+ * Command-click on the sheet's canvas reaches it with Control in Command's
+ * place; the formula bar, toolbar and panels keep their own events.
  */
 export function secondaryClickAsRightButton(host: HTMLElement): () => void {
   if (hostPlatform() !== "mac") return () => {};
@@ -25,7 +26,12 @@ export function secondaryClickAsRightButton(host: HTMLElement): () => void {
   const translated = new WeakSet<Event>();
   const redispatch = (event: PointerEvent) => {
     if (translated.has(event)) return;
+    if (event.type === "pointercancel") {
+      pressed.delete(event.pointerId);
+      return;
+    }
     const press = event.type === "pointerdown";
+    if (press) pressed.delete(event.pointerId);
     const addRange = press && isAddRangeClick(event);
     if (!addRange && (press ? !isSecondaryClick(event) : !pressed.delete(event.pointerId))) return;
     if (press && !addRange) pressed.add(event.pointerId);
@@ -56,8 +62,10 @@ export function secondaryClickAsRightButton(host: HTMLElement): () => void {
   };
   host.addEventListener("pointerdown", redispatch, true);
   host.addEventListener("pointerup", redispatch, true);
+  host.addEventListener("pointercancel", redispatch, true);
   return () => {
     host.removeEventListener("pointerdown", redispatch, true);
     host.removeEventListener("pointerup", redispatch, true);
+    host.removeEventListener("pointercancel", redispatch, true);
   };
 }
