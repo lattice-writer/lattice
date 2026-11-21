@@ -468,8 +468,10 @@ fn the_sandbox_has_its_own_session_and_stops_on_its_sigterm() {
 const WALK_LIMIT: libc::rlim_t = 256;
 /// Set for the copy of this test binary that serves the walked tree.
 const WALKED: &str = "LATTICE_TEST_WALKED_TREE";
-/// What that copy prints before the folder the filter is mounted on.
-const MOUNTED_AT: &str = "mounted at ";
+/// The file in the walked tree that copy names the filter's mount point
+/// in, once it is mounted: a file in the tree's top folder, which the walk
+/// passes over.
+const MOUNTED_AT: &str = "mounted-at";
 
 /// A walk over the filter's mount, as a `du` outside the sandbox made
 /// (lattice#1221), took a descriptor for each file it passed and kept it,
@@ -499,22 +501,20 @@ fn a_walk_through_the_filter_leaves_it_descriptors_to_spare() {
         .args(["--exact", &name, "--nocapture", "--test-threads=1"])
         .env(WALKED, &tree.0)
         .stdin(Stdio::null())
-        .stdout(Stdio::piped())
         .process_group(0);
     let mut guard = Served(command.spawn().expect("start the filter's process"));
     let pid = guard.0.id();
-    let stdout = guard.0.stdout.take().unwrap();
-    let (lines, mounted) = std::sync::mpsc::channel();
-    thread::spawn(move || {
-        for line in io::BufRead::lines(io::BufReader::new(stdout)).map_while(Result::ok) {
-            if let Some(path) = line.strip_prefix(MOUNTED_AT) {
-                let _ = lines.send(PathBuf::from(path));
-            }
+    let started = std::time::Instant::now();
+    let report = tree.0.join(MOUNTED_AT);
+    let mountpoint = loop {
+        if let Ok(path) = fs::read_to_string(&report) {
+            break PathBuf::from(path);
         }
-    });
-    let mountpoint = mounted
-        .recv_timeout(WALK_DEADLINE)
-        .unwrap_or_else(|_| panic!("the filter was not mounted in time\n{}", served_state(pid)));
+        if started.elapsed() > WALK_DEADLINE {
+            panic!("the filter was not mounted in time\n{}", served_state(pid));
+        }
+        thread::sleep(Duration::from_millis(50));
+    };
 
     // Nothing outside lists its way into the mount.
     // SAFETY: `geteuid` takes and returns plain integers.
@@ -626,9 +626,10 @@ fn serve_walked_tree(tree: &Path) {
         assert_eq!(libc::setrlimit(libc::RLIMIT_NOFILE, &limit), 0);
     }
     let sandbox = Sandbox::new();
-    println!("{MOUNTED_AT}{}", sandbox.mountpoint.0.display());
-    // Not line by line into a pipe: the test waits on this line.
-    io::Write::flush(&mut io::stdout()).unwrap();
+    let report = tree.join(MOUNTED_AT);
+    let partial = tree.join(format!("{MOUNTED_AT}.partial"));
+    fs::write(&partial, sandbox.mountpoint.0.as_os_str().as_bytes()).unwrap();
+    fs::rename(&partial, &report).unwrap();
     eprintln!("walk test: the filter is mounted, under a limit of {}", limit.rlim_cur);
     let script = "opened=0; \
          while [ ! -e \"$1/stop\" ]; do \
