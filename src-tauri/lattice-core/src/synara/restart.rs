@@ -12,6 +12,8 @@ use super::shell_env::ShellRead;
 use super::{proxy, RunningSynara, SynaraRuntime};
 use crate::host::EventSink;
 use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::{Duration, Instant};
 
 /// Payload `{ stale }`: whether the running sidecar's proxy settings now
 /// differ from the system's.
@@ -43,6 +45,42 @@ pub(super) fn watch_system_proxy(
             return;
         };
         events.emit(ENVIRONMENT_CHANGED_EVENT, serde_json::json!({ "stale": stale }));
+    });
+}
+
+/// How often [`watch_exit`] looks, and the least time between two restarts
+/// it asks for: a sidecar that keeps exiting just after its start is left
+/// to the next request, which reports why.
+const EXIT_POLL: Duration = Duration::from_secs(2);
+const EXIT_RESTART_GAP: Duration = Duration::from_secs(60);
+
+/// Notice a sidecar that exited on its own, and have the windows ask for a
+/// new one at once. Otherwise the exited process waits, unreaped, for the
+/// writer's next request to find it gone; on Linux the guard ends the
+/// sandbox when its file system stops, and the writer would only learn of
+/// it then (lattice#1221).
+pub(super) fn watch_exit(
+    events: Option<Arc<dyn EventSink>>, running: Arc<Mutex<Option<RunningSynara>>>,
+) {
+    let Some(events) = events else { return };
+    thread::spawn(move || {
+        let mut asked: Option<Instant> = None;
+        loop {
+            thread::sleep(EXIT_POLL);
+            let Ok(mut running) = running.lock() else { return };
+            let exited = running
+                .as_mut()
+                .is_some_and(|current| !matches!(current.child.try_wait(), Ok(None)));
+            if !exited {
+                continue;
+            }
+            *running = None;
+            drop(running);
+            if asked.is_none_or(|asked| asked.elapsed() >= EXIT_RESTART_GAP) {
+                asked = Some(Instant::now());
+                announce(Some(events.as_ref()));
+            }
+        }
     });
 }
 

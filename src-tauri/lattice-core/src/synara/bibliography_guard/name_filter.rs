@@ -11,11 +11,13 @@
 //! mounts it where the agent's writable files are, so the rule holds for
 //! files and folders created later too, which read-only binds cannot do.
 //!
-//! It never follows a link itself. Every file is held by an `O_PATH`
+//! It never follows a link itself. Every file is reached by an `O_PATH`
 //! descriptor opened one name at a time with `O_NOFOLLOW`, as libfuse's
 //! `passthrough_hp` does, and the kernel resolves symbolic links inside the
 //! sandbox, where they lead back here. So a link cannot walk this process
-//! out to a path the agent could not open itself.
+//! out to a path the agent could not open itself. Only a bounded number of
+//! those descriptors stay open; the others are opened the same way again
+//! when used, and must name the inode they did (`nodes`).
 //!
 //! This file is the operations the rule (`rule`) applies to. `nodes` keeps
 //! the inodes the kernel has looked up, and `host` makes the calls on the
@@ -53,6 +55,18 @@ const NO_TTL: Duration = Duration::ZERO;
 /// The kernel's request threads; each can block on one slow disk operation.
 const THREADS: usize = 8;
 
+/// How many descriptors of looked-up files stay open (`nodes`): an eighth
+/// of what this process may have open, the rest left for the files the
+/// sandbox opens, which each hold one here as well.
+fn kept_open() -> usize {
+    let mut limit = libc::rlimit { rlim_cur: 0, rlim_max: 0 };
+    // SAFETY: `limit` is an rlimit the call writes into.
+    if unsafe { libc::getrlimit(libc::RLIMIT_NOFILE, &mut limit) } != 0 {
+        return 32;
+    }
+    usize::try_from(limit.rlim_cur / 8).unwrap_or(usize::MAX).clamp(32, 4096)
+}
+
 pub(super) struct BibliographyFilter {
     nodes: Nodes,
     /// The folder this is mounted on, by its parent's key and its name: it
@@ -80,7 +94,7 @@ pub(super) fn mount(source: &Path, mountpoint: &Path) -> io::Result<fuser::Backg
 
 impl BibliographyFilter {
     fn new(source: &Path, mountpoint: &Path) -> io::Result<Self> {
-        let nodes = Nodes::new(open_folder(source)?)?;
+        let nodes = Nodes::new(open_folder(source)?, kept_open())?;
         let mountpoint =
             mountpoint.parent().zip(mountpoint.file_name()).and_then(|(parent, name)| {
                 let parent = std::fs::metadata(parent).ok()?;
@@ -124,9 +138,10 @@ impl BibliographyFilter {
 
     /// Look `name` up in `parent` without following it.
     fn lookup_in(
-        &self, parent: &Node, name: &OsStr, c_name: &CStr,
+        &self, parent: &Arc<Node>, name: &OsStr, c_name: &CStr,
     ) -> Result<(INodeNo, FileAttr, Arc<Node>), Errno> {
-        let fd = open_child(parent.fd.as_raw_fd(), c_name)?;
+        let folder = parent.fd()?;
+        let fd = self.nodes.descriptors().with_room(|| open_child(folder.as_raw_fd(), c_name))?;
         self.nodes.remember(parent, name, fd)
     }
 
@@ -138,10 +153,12 @@ impl BibliographyFilter {
     }
 
     /// Open the inode itself, through its `O_PATH` descriptor.
-    fn reopen(node: &Node, flags: libc::c_int) -> Result<RawFd, Errno> {
-        let path = node.path();
+    fn reopen(&self, node: &Node, flags: libc::c_int) -> Result<RawFd, Errno> {
+        let fd = node.fd()?;
+        let path = fd.path();
         // SAFETY: `path` is a NUL-terminated string that outlives the call.
-        Ok(cvt(unsafe { libc::open(path.as_ptr(), flags | libc::O_CLOEXEC) })?)
+        let open = || cvt(unsafe { libc::open(path.as_ptr(), flags | libc::O_CLOEXEC) });
+        Ok(self.nodes.descriptors().with_room(open)?)
     }
 
     fn set_attributes(
@@ -149,8 +166,9 @@ impl BibliographyFilter {
         size: Option<u64>, times: (Option<TimeOrNow>, Option<TimeOrNow>), fh: Option<FileHandle>,
     ) -> Result<FileAttr, Errno> {
         may_change(node, fh)?;
-        let fd = node.fd.as_raw_fd();
-        let path = node.path();
+        let descriptor = node.fd()?;
+        let fd = descriptor.as_raw_fd();
+        let path = descriptor.path();
         if let Some(mode) = mode {
             if node.is(libc::S_IFLNK) {
                 return Err(Errno::EOPNOTSUPP);
@@ -224,9 +242,17 @@ impl Filesystem for BibliographyFilter {
         self.nodes.forget(ino, nlookup);
     }
 
-    fn getattr(&self, _req: &Request, ino: INodeNo, _fh: Option<FileHandle>, reply: ReplyAttr) {
-        let node = attempt!(reply, self.node(ino));
-        let mut attr = attributes(&attempt!(reply, status_of(node.fd.as_raw_fd())));
+    fn getattr(&self, _req: &Request, ino: INodeNo, fh: Option<FileHandle>, reply: ReplyAttr) {
+        // An open file is asked through its own descriptor, which still
+        // names it after a rename the node's name has not caught up with.
+        let status = match fh {
+            Some(fh) => status_of(fh.0 as RawFd),
+            None => {
+                let node = attempt!(reply, self.node(ino));
+                status_of(attempt!(reply, node.fd()).as_raw_fd())
+            }
+        };
+        let mut attr = attributes(&attempt!(reply, status));
         attr.ino = ino;
         reply.attr(&NO_TTL, &attr);
     }
@@ -247,12 +273,13 @@ impl Filesystem for BibliographyFilter {
 
     fn readlink(&self, _req: &Request, ino: INodeNo, reply: ReplyData) {
         let node = attempt!(reply, self.node(ino));
+        let fd = attempt!(reply, node.fd());
         let mut target = vec![0u8; libc::PATH_MAX as usize];
         // SAFETY: an empty path names the link `fd` holds; the buffer is
         // `target.len()` bytes long.
         let length = unsafe {
             libc::readlinkat(
-                node.fd.as_raw_fd(),
+                fd.as_raw_fd(),
                 EMPTY.as_ptr(),
                 target.as_mut_ptr().cast(),
                 target.len(),
@@ -274,10 +301,15 @@ impl Filesystem for BibliographyFilter {
         if ![libc::S_IFREG, libc::S_IFIFO, libc::S_IFSOCK].contains(&kind) {
             return reply.error(Errno::EPERM);
         }
-        let fd = parent.fd.as_raw_fd();
+        let fd = attempt!(reply, parent.fd());
         // SAFETY: `c_name` is NUL-terminated and `fd` is open.
         let made = unsafe {
-            libc::mknodat(fd, c_name.as_ptr(), mode as libc::mode_t, libc::dev_t::from(rdev))
+            libc::mknodat(
+                fd.as_raw_fd(),
+                c_name.as_ptr(),
+                mode as libc::mode_t,
+                libc::dev_t::from(rdev),
+            )
         };
         attempt!(reply, cvt(made));
         let (id, mut attr, _) = attempt!(reply, self.lookup_in(&parent, name, &c_name));
@@ -290,9 +322,9 @@ impl Filesystem for BibliographyFilter {
         reply: ReplyEntry,
     ) {
         let (parent, c_name) = attempt!(reply, self.folder_to_change(parent, name));
+        let fd = attempt!(reply, parent.fd());
         // SAFETY: `c_name` is NUL-terminated and the descriptor is open.
-        let made =
-            unsafe { libc::mkdirat(parent.fd.as_raw_fd(), c_name.as_ptr(), mode as libc::mode_t) };
+        let made = unsafe { libc::mkdirat(fd.as_raw_fd(), c_name.as_ptr(), mode as libc::mode_t) };
         attempt!(reply, cvt(made));
         let (id, mut attr, _) = attempt!(reply, self.lookup_in(&parent, name, &c_name));
         attr.ino = id;
@@ -301,17 +333,19 @@ impl Filesystem for BibliographyFilter {
 
     fn unlink(&self, _req: &Request, parent: INodeNo, name: &OsStr, reply: ReplyEmpty) {
         let (parent, c_name) = attempt!(reply, self.folder_to_change(parent, name));
+        let fd = attempt!(reply, parent.fd());
         // SAFETY: `c_name` is NUL-terminated and the descriptor is open.
-        let removed = unsafe { libc::unlinkat(parent.fd.as_raw_fd(), c_name.as_ptr(), 0) };
+        let removed = unsafe { libc::unlinkat(fd.as_raw_fd(), c_name.as_ptr(), 0) };
         attempt!(reply, cvt(removed));
         reply.ok();
     }
 
     fn rmdir(&self, _req: &Request, parent: INodeNo, name: &OsStr, reply: ReplyEmpty) {
         let (parent, c_name) = attempt!(reply, self.folder_to_change(parent, name));
+        let fd = attempt!(reply, parent.fd());
         // SAFETY: `c_name` is NUL-terminated and the descriptor is open.
         let removed =
-            unsafe { libc::unlinkat(parent.fd.as_raw_fd(), c_name.as_ptr(), libc::AT_REMOVEDIR) };
+            unsafe { libc::unlinkat(fd.as_raw_fd(), c_name.as_ptr(), libc::AT_REMOVEDIR) };
         attempt!(reply, cvt(removed));
         reply.ok();
     }
@@ -341,22 +375,28 @@ impl Filesystem for BibliographyFilter {
         // `RENAME_EXCHANGE` moves the destination as well. No link can come
         // in meanwhile: the filter makes none, and a rename from a folder
         // outside it fails with EXDEV.
-        let link = |folder: &Node, name: &CStr| is_link(folder.fd.as_raw_fd(), name);
-        if attempt!(reply, link(&parent, &c_name)) || attempt!(reply, link(&newparent, &c_newname))
+        let (from, to) = (attempt!(reply, parent.fd()), attempt!(reply, newparent.fd()));
+        if attempt!(reply, is_link(from.as_raw_fd(), &c_name))
+            || attempt!(reply, is_link(to.as_raw_fd(), &c_newname))
         {
             return reply.error(DENIED);
         }
         // SAFETY: both names are NUL-terminated and both descriptors open.
         let renamed = unsafe {
             libc::renameat2(
-                parent.fd.as_raw_fd(),
+                from.as_raw_fd(),
                 c_name.as_ptr(),
-                newparent.fd.as_raw_fd(),
+                to.as_raw_fd(),
                 c_newname.as_ptr(),
                 flags.bits(),
             )
         };
         attempt!(reply, cvt(renamed));
+        // A node is opened again by the name it was last seen under.
+        self.nodes.moved(&newparent, newname);
+        if flags.contains(RenameFlags::RENAME_EXCHANGE) {
+            self.nodes.moved(&parent, name);
+        }
         reply.ok();
     }
 
@@ -370,13 +410,14 @@ impl Filesystem for BibliographyFilter {
             return reply.error(DENIED);
         }
         let (newparent, c_newname) = attempt!(reply, self.folder_to_change(newparent, newname));
-        let path = node.path();
+        let (fd, to) = (attempt!(reply, node.fd()), attempt!(reply, newparent.fd()));
+        let path = fd.path();
         // SAFETY: both strings are NUL-terminated and the descriptor is open.
         let linked = unsafe {
             libc::linkat(
                 libc::AT_FDCWD,
                 path.as_ptr(),
-                newparent.fd.as_raw_fd(),
+                to.as_raw_fd(),
                 c_newname.as_ptr(),
                 libc::AT_SYMLINK_FOLLOW,
             )
@@ -395,7 +436,7 @@ impl Filesystem for BibliographyFilter {
         // The descriptor's path is itself a link, and the kernel has already
         // decided what the caller's O_NOFOLLOW meant.
         let flags = flags.0 & !(libc::O_NOFOLLOW | libc::O_CREAT | libc::O_EXCL | libc::O_DIRECT);
-        let fd = attempt!(reply, Self::reopen(&node, flags));
+        let fd = attempt!(reply, self.reopen(&node, flags));
         reply.opened(FileHandle(fd as u64), FopenFlags::empty());
     }
 
@@ -413,11 +454,14 @@ impl Filesystem for BibliographyFilter {
             | libc::O_NOFOLLOW
             | libc::O_NONBLOCK
             | libc::O_CLOEXEC;
+        let folder = attempt!(reply, parent.fd());
         // SAFETY: `c_name` is NUL-terminated and the descriptor is open.
-        let fd = unsafe {
-            libc::openat(parent.fd.as_raw_fd(), c_name.as_ptr(), open_flags, mode as libc::c_uint)
+        let open = || {
+            cvt(unsafe {
+                libc::openat(folder.as_raw_fd(), c_name.as_ptr(), open_flags, mode as libc::c_uint)
+            })
         };
-        let fd = attempt!(reply, cvt(fd));
+        let fd = attempt!(reply, self.nodes.descriptors().with_room(open));
         // SAFETY: `openat` just returned this descriptor.
         let file = unsafe { OwnedFd::from_raw_fd(fd) };
         let (id, mut attr, node) = attempt!(reply, self.lookup_in(&parent, name, &c_name));
@@ -488,7 +532,18 @@ impl Filesystem for BibliographyFilter {
     ) {
         // Closing a duplicate reports what the caller's own close would.
         // SAFETY: the kernel hands back a descriptor `open` gave it.
-        let duplicate = attempt!(reply, cvt(unsafe { libc::dup(fh.0 as RawFd) }));
+        let duplicate = || cvt(unsafe { libc::dup(fh.0 as RawFd) });
+        let duplicate = match self.nodes.descriptors().with_room(duplicate) {
+            Ok(duplicate) => duplicate,
+            // The caller's close must not fail because this process has no
+            // descriptor to spare: Node aborts on a failed close
+            // (lattice#1221). A local file system reports nothing at close
+            // that its writes did not, so there is nothing to lose.
+            Err(error) if matches!(error.raw_os_error(), Some(libc::EMFILE | libc::ENFILE)) => {
+                return reply.ok();
+            }
+            Err(error) => return reply.error(error.into()),
+        };
         // SAFETY: `dup` just returned this descriptor.
         attempt!(reply, cvt(unsafe { libc::close(duplicate) }));
         reply.ok();
@@ -520,7 +575,7 @@ impl Filesystem for BibliographyFilter {
 
     fn opendir(&self, _req: &Request, ino: INodeNo, _flags: OpenFlags, reply: ReplyOpen) {
         let node = attempt!(reply, self.node(ino));
-        let fd = attempt!(reply, Self::reopen(&node, libc::O_RDONLY | libc::O_DIRECTORY));
+        let fd = attempt!(reply, self.reopen(&node, libc::O_RDONLY | libc::O_DIRECTORY));
         reply.opened(FileHandle(fd as u64), FopenFlags::empty());
     }
 
@@ -558,7 +613,8 @@ impl Filesystem for BibliographyFilter {
         // SAFETY: an all-zero statvfs is a valid value for the call to fill.
         let mut status: libc::statvfs = unsafe { std::mem::zeroed() };
         // SAFETY: `status` is a statvfs the call writes into.
-        attempt!(reply, cvt(unsafe { libc::fstatvfs(node.fd.as_raw_fd(), &mut status) }));
+        let fd = attempt!(reply, node.fd());
+        attempt!(reply, cvt(unsafe { libc::fstatvfs(fd.as_raw_fd(), &mut status) }));
         reply.statfs(
             status.f_blocks,
             status.f_bfree,
@@ -576,7 +632,8 @@ impl Filesystem for BibliographyFilter {
         _position: u32, reply: ReplyEmpty,
     ) {
         let (node, name) = attempt!(reply, self.attribute_target(ino, name, true));
-        let path = node.path();
+        let fd = attempt!(reply, node.fd());
+        let path = fd.path();
         // SAFETY: both strings are NUL-terminated; `value` is `value.len()`
         // bytes long.
         let set = unsafe {
@@ -588,7 +645,8 @@ impl Filesystem for BibliographyFilter {
 
     fn getxattr(&self, _req: &Request, ino: INodeNo, name: &OsStr, size: u32, reply: ReplyXattr) {
         let (node, name) = attempt!(reply, self.attribute_target(ino, name, false));
-        let path = node.path();
+        let fd = attempt!(reply, node.fd());
+        let path = fd.path();
         let mut value = vec![0u8; size as usize];
         // SAFETY: both strings are NUL-terminated; the buffer is
         // `value.len()` bytes long, and a zero length only asks for the size.
@@ -605,7 +663,8 @@ impl Filesystem for BibliographyFilter {
 
     fn listxattr(&self, _req: &Request, ino: INodeNo, size: u32, reply: ReplyXattr) {
         let (node, _) = attempt!(reply, self.attribute_target(ino, OsStr::new("list"), false));
-        let path = node.path();
+        let fd = attempt!(reply, node.fd());
+        let path = fd.path();
         let mut names = vec![0u8; size as usize];
         // SAFETY: as in `getxattr`.
         let length =
@@ -620,7 +679,8 @@ impl Filesystem for BibliographyFilter {
 
     fn removexattr(&self, _req: &Request, ino: INodeNo, name: &OsStr, reply: ReplyEmpty) {
         let (node, name) = attempt!(reply, self.attribute_target(ino, name, true));
-        let path = node.path();
+        let fd = attempt!(reply, node.fd());
+        let path = fd.path();
         // SAFETY: both strings are NUL-terminated.
         let removed = unsafe { libc::removexattr(path.as_ptr(), name.as_ptr()) };
         attempt!(reply, cvt(removed));
@@ -629,7 +689,8 @@ impl Filesystem for BibliographyFilter {
 
     fn access(&self, _req: &Request, ino: INodeNo, mask: AccessFlags, reply: ReplyEmpty) {
         let node = attempt!(reply, self.node(ino));
-        let path = node.path();
+        let fd = attempt!(reply, node.fd());
+        let path = fd.path();
         // SAFETY: `path` is NUL-terminated and outlives the call.
         let allowed = unsafe { libc::access(path.as_ptr(), mask.bits()) };
         attempt!(reply, cvt(allowed));

@@ -18,7 +18,7 @@ use abstract_sockets::AbstractSocketScope;
 use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::io;
-use std::os::unix::fs::{DirBuilderExt, MetadataExt};
+use std::os::unix::fs::{DirBuilderExt, MetadataExt, PermissionsExt};
 use std::os::unix::process::{CommandExt, ExitStatusExt};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -291,26 +291,44 @@ fn guard(mut arguments: impl Iterator<Item = OsString>) -> Result<i32, String> {
     pass_on_termination(termination, sandbox.id() as libc::pid_t);
 
     // Lattice is this process's parent only while it lives. bubblewrap dies
-    // with this process, and the sandbox with bubblewrap.
+    // with this process, and the sandbox with bubblewrap. Nor does the
+    // sandbox outlive the filter, which is its root: without it every file
+    // access fails, and a program that cannot close a file can abort
+    // anywhere. Ended at once, the sidecar's exit tells Lattice to start a
+    // new one, rather than the writer's next request finding it broken.
     // SAFETY: `getppid` and `kill` take and return plain integers.
     let (lattice, sandbox_pid) = (unsafe { libc::getppid() }, sandbox.id() as libc::pid_t);
-    thread::spawn(move || loop {
-        thread::sleep(Duration::from_millis(500));
-        // SAFETY: as above.
-        if unsafe { libc::getppid() } != lattice {
-            // SAFETY: as above; the sandbox has not been waited for while
-            // this thread runs, so the number still names it.
-            unsafe { libc::kill(sandbox_pid, libc::SIGKILL) };
-            return;
+    let mut stopped = false;
+    let status = loop {
+        let waited = sandbox.try_wait();
+        if let Some(status) =
+            waited.map_err(|error| format!("could not wait for bubblewrap: {error}"))?
+        {
+            break status;
         }
-    });
-
-    let status =
-        sandbox.wait().map_err(|error| format!("could not wait for bubblewrap: {error}"))?;
+        // SAFETY: as above.
+        let orphaned = unsafe { libc::getppid() } != lattice;
+        if !stopped && (orphaned || filter.guard.is_finished()) {
+            if !orphaned {
+                eprintln!(
+                    "Lattice agent guard: the bibliography filter stopped serving the sandbox's \
+                     files; stopping the sandbox so Lattice starts a new one."
+                );
+            }
+            // SAFETY: as above; the sandbox has not been waited for yet, so
+            // the number still names it.
+            unsafe { libc::kill(sandbox_pid, libc::SIGKILL) };
+            stopped = true;
+        }
+        thread::sleep(WATCH_PAUSE);
+    };
     drop(filter);
     drop(mountpoint);
     Ok(status.code().unwrap_or_else(|| 128 + status.signal().unwrap_or(0)))
 }
+
+/// How often the guard looks at the sandbox, at Lattice and at the filter.
+const WATCH_PAUSE: Duration = Duration::from_millis(200);
 
 /// SIGTERM, as a signal set.
 fn termination() -> libc::sigset_t {
@@ -398,7 +416,18 @@ fn clear_service_locks(agent_home: &Path) {
 /// The folder the name filter is mounted on, removed when dropped. The
 /// sandbox gets the folder it is in covered with an empty one
 /// ([`Layout::arguments`]).
+///
+/// That folder can be entered but not listed (mode 0100), so nothing
+/// outside the sandbox walks into the filter by accident: a `du` or a
+/// `find` over the runtime folder stops there with an error, rather than
+/// walking the whole of `/` through the filter (lattice#1221). It is only
+/// out of the way, not out of reach: a process of this user that reads the
+/// guard's mount table can still find the mount and enter it, as it can
+/// change any bibliography without the filter.
 struct Mountpoint(PathBuf);
+
+/// The mount point's name, in the folder of the guard's own process ID.
+const MOUNTPOINT: &str = "root";
 
 impl Mountpoint {
     /// A fresh folder only this user can enter, in `XDG_RUNTIME_DIR` or,
@@ -415,21 +444,34 @@ impl Mountpoint {
         let failed = |error: io::Error| format!("could not create the filter's folder: {error}");
         fs::DirBuilder::new().recursive(true).mode(0o700).create(base).map_err(failed)?;
         clear_stale(base);
-        let path = base.join(std::process::id().to_string());
-        fs::DirBuilder::new().mode(0o700).create(&path).map_err(failed)?;
-        Ok(Self(path))
+        let folder = base.join(std::process::id().to_string());
+        fs::DirBuilder::new().mode(0o700).create(&folder).map_err(failed)?;
+        let mountpoint = Self(folder.join(MOUNTPOINT));
+        fs::DirBuilder::new().mode(0o700).create(&mountpoint.0).map_err(failed)?;
+        fs::set_permissions(&folder, fs::Permissions::from_mode(0o100)).map_err(failed)?;
+        Ok(mountpoint)
     }
 }
 
 impl Drop for Mountpoint {
     fn drop(&mut self) {
+        let Some(folder) = self.0.parent() else { return };
+        let _ = fs::set_permissions(folder, fs::Permissions::from_mode(0o700));
         let _ = fs::remove_dir(&self.0);
+        let _ = fs::remove_dir(folder);
     }
 }
 
 /// Unmount what guards that were killed left behind in `base`: a dead mount
-/// answers every access with an error until someone unmounts it.
+/// answers every access with an error until someone unmounts it. A guard
+/// before lattice#1221 mounted on the folder of its process ID itself.
 fn clear_stale(base: &Path) {
+    let unmount = |path: &Path| {
+        let Some(fusermount) = fusermount() else { return };
+        let mut unmount = Command::new(fusermount);
+        unmount.args(["-u", "-z"]).arg(path).stdout(Stdio::null());
+        let _ = host_environment(&mut unmount).stderr(Stdio::null()).status();
+    };
     for entry in fs::read_dir(base).into_iter().flatten().flatten() {
         let Some(pid) = entry.file_name().to_str().and_then(|name| name.parse::<i32>().ok()) else {
             continue;
@@ -438,24 +480,38 @@ fn clear_stale(base: &Path) {
         if unsafe { libc::kill(pid, 0) } == 0 {
             continue;
         }
-        if let Some(fusermount) = fusermount() {
-            let mut unmount = Command::new(fusermount);
-            unmount.args(["-u", "-z"]).arg(entry.path()).stdout(Stdio::null());
-            let _ = host_environment(&mut unmount).stderr(Stdio::null()).status();
+        let folder = entry.path();
+        if fs::symlink_metadata(&folder)
+            .is_err_and(|error| error.raw_os_error() == Some(libc::ENOTCONN))
+        {
+            unmount(&folder);
         }
-        let _ = fs::remove_dir(entry.path());
+        let _ = fs::set_permissions(&folder, fs::Permissions::from_mode(0o700));
+        for mount in fs::read_dir(&folder).into_iter().flatten().flatten() {
+            unmount(&mount.path());
+            let _ = fs::remove_dir(mount.path());
+        }
+        let _ = fs::remove_dir(&folder);
     }
 }
 
-/// Let the filter hold a descriptor for every file the sandbox has looked
-/// up. Answers the limit to give back to the sandbox.
+/// How many descriptors the guard may have open, where the system allows
+/// that many. The filter keeps an eighth of them for files looked up
+/// (`name_filter::kept_open`) and needs one for each file the sandbox has
+/// open. Not the hard limit, which can be a million: a table that size
+/// filled up is what took the sandbox down in lattice#1221.
+const DESCRIPTOR_LIMIT: libc::rlim_t = 1 << 16;
+
+/// Give the filter room for the files the sandbox opens. Answers the limit
+/// to give back to the sandbox.
 fn raise_descriptor_limit() -> Option<libc::rlimit> {
     let mut limit = libc::rlimit { rlim_cur: 0, rlim_max: 0 };
     // SAFETY: `limit` is an rlimit the call writes into.
     if unsafe { libc::getrlimit(libc::RLIMIT_NOFILE, &mut limit) } != 0 {
         return None;
     }
-    let raised = libc::rlimit { rlim_cur: limit.rlim_max, rlim_max: limit.rlim_max };
+    let wanted = limit.rlim_cur.max(DESCRIPTOR_LIMIT.min(limit.rlim_max));
+    let raised = libc::rlimit { rlim_cur: wanted, rlim_max: limit.rlim_max };
     // SAFETY: `raised` is a valid rlimit that only moves the soft limit.
     (unsafe { libc::setrlimit(libc::RLIMIT_NOFILE, &raised) } == 0).then_some(limit)
 }

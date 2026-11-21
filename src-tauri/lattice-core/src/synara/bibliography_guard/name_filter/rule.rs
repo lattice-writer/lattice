@@ -34,7 +34,7 @@ pub(super) fn is_named_bibliography(node: &Node, fh: Option<FileHandle>) -> Resu
         Some(fh) => named(fh.0 as RawFd)?,
         None => false,
     };
-    Ok(node.is_bibliography() || renamed || named(node.fd.as_raw_fd())?)
+    Ok(node.is_bibliography() || renamed || named(node.fd()?.as_raw_fd())?)
 }
 
 /// Refuse a change to what the file `node` names holds, or to its
@@ -42,7 +42,7 @@ pub(super) fn is_named_bibliography(node: &Node, fh: Option<FileHandle>) -> Resu
 /// one name may be a bibliography by one the filter has not seen, such as a
 /// hard link made before the sandbox started.
 pub(super) fn may_change(node: &Node, fh: Option<FileHandle>) -> Result<(), Errno> {
-    let status = status_of(node.fd.as_raw_fd())?;
+    let status = status_of(node.fd()?.as_raw_fd())?;
     let other_names = status.st_mode & libc::S_IFMT == libc::S_IFREG && status.st_nlink > 1;
     if other_names || is_named_bibliography(node, fh)? {
         return Err(DENIED);

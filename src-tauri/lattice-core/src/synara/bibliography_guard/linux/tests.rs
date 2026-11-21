@@ -460,3 +460,103 @@ fn the_sandbox_has_its_own_session_and_stops_on_its_sigterm() {
     unsafe { libc::kill(-leader, libc::SIGTERM) };
     assert_eq!(command.wait().unwrap().code(), Some(7));
 }
+
+/// What the filter's process may have open in [`a_walk_through_the_filter_leaves_it_descriptors_to_spare`],
+/// far fewer than the files walked.
+const WALK_LIMIT: libc::rlim_t = 256;
+/// Set for the copy of this test binary that serves the walked tree.
+const WALKED: &str = "LATTICE_TEST_WALKED_TREE";
+/// What that copy prints before the folder the filter is mounted on.
+const MOUNTED_AT: &str = "mounted at ";
+
+/// A walk over the filter's mount, as a `du` outside the sandbox made
+/// (lattice#1221), took a descriptor for each file it passed and kept it,
+/// until the filter's process had none left: the mount stopped, and the
+/// program in the sandbox failed to open and close its own files. Under a
+/// low limit, the walk passes many more files than that limit, the filter's
+/// count stays well below it, and the program inside keeps working.
+#[test]
+fn a_walk_through_the_filter_leaves_it_descriptors_to_spare() {
+    if let Some(tree) = std::env::var_os(WALKED) {
+        return serve_walked_tree(Path::new(&tree));
+    }
+    if !guard_available() {
+        return;
+    }
+    let tree = Guarded::new();
+    let (folders, files) = (20, 100);
+    for folder in 0..folders {
+        for file in 0..files {
+            tree.write(&format!("{folder}/{file}"), "x");
+        }
+    }
+    let module = module_path!().split_once("::").map_or(module_path!(), |(_, path)| path);
+    let name = format!("{module}::a_walk_through_the_filter_leaves_it_descriptors_to_spare");
+    let mut guard = Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", &name, "--nocapture", "--test-threads=1"])
+        .env(WALKED, &tree.0)
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("start the filter's process");
+    let stdout = guard.stdout.take().unwrap();
+    let mut lines = io::BufRead::lines(io::BufReader::new(stdout));
+    let mountpoint = lines
+        .by_ref()
+        .map_while(Result::ok)
+        .find_map(|line| line.strip_prefix(MOUNTED_AT).map(PathBuf::from))
+        .expect("the filter's process mounted it");
+
+    // Nothing outside lists its way into the mount.
+    // SAFETY: `geteuid` takes and returns plain integers.
+    if unsafe { libc::geteuid() } != 0 {
+        let listed = fs::read_dir(mountpoint.parent().unwrap()).map(|_| ());
+        assert_eq!(listed.unwrap_err().kind(), io::ErrorKind::PermissionDenied);
+    }
+
+    let descriptors = || fs::read_dir(format!("/proc/{}/fd", guard.id())).unwrap().count();
+    let (mut passed, mut most) = (0, descriptors());
+    for folder in fs::read_dir(mountpoint.join(tree.0.strip_prefix("/").unwrap())).unwrap() {
+        let folder = folder.expect("list the tree through the filter").path();
+        if !folder.is_dir() {
+            continue;
+        }
+        for file in fs::read_dir(&folder).expect("list a folder through the filter") {
+            fs::symlink_metadata(file.expect("list a file through the filter").path())
+                .expect("look a file up through the filter");
+            passed += 1;
+            if passed % 25 == 0 {
+                most = most.max(descriptors());
+            }
+        }
+    }
+    fs::write(tree.0.join("stop"), "").unwrap();
+    let status = guard.wait().unwrap();
+    assert_eq!(passed, folders * files);
+    assert!(
+        most < WALK_LIMIT as usize / 2,
+        "the filter had {most} descriptors open for a walk of {passed} files"
+    );
+    assert!(status.success(), "the program in the sandbox failed during the walk");
+}
+
+/// The other side of that test: the filter, under [`WALK_LIMIT`], and a
+/// program in the sandbox that opens and closes a file of `tree` until
+/// the walk is over.
+fn serve_walked_tree(tree: &Path) {
+    let mut limit = libc::rlimit { rlim_cur: 0, rlim_max: 0 };
+    // SAFETY: `limit` is an rlimit the calls read and write.
+    unsafe {
+        assert_eq!(libc::getrlimit(libc::RLIMIT_NOFILE, &mut limit), 0);
+        limit.rlim_cur = WALK_LIMIT.min(limit.rlim_max);
+        assert_eq!(libc::setrlimit(libc::RLIMIT_NOFILE, &limit), 0);
+    }
+    let sandbox = Sandbox::new();
+    println!("{MOUNTED_AT}{}", sandbox.mountpoint.0.display());
+    let script = "opened=0; \
+         while [ ! -e \"$1/stop\" ]; do \
+           cat \"$1/0/0\" > /dev/null || exit 1; opened=$((opened + 1)); \
+         done; \
+         [ \"$opened\" -gt 0 ]";
+    let status = sandbox.command(script).arg(tree).status().expect("run sandboxed command");
+    assert!(status.success(), "the program in the sandbox could not open and close a file");
+}

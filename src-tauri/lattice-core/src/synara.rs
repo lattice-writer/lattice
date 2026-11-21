@@ -119,7 +119,8 @@ pub struct SynaraRuntime {
     /// Where restarts and environment changes are announced. None only in tests.
     events: Option<Arc<dyn EventSink>>,
     shell_prefetch: Arc<shell_env::Prefetch>,
-    proxy_watch: OnceLock<()>,
+    /// The system proxy and exit watchers (`restart`), started once.
+    watchers: OnceLock<()>,
 }
 
 impl SynaraRuntime {
@@ -155,7 +156,7 @@ impl SynaraRuntime {
             running: Arc::default(),
             events: Some(events),
             shell_prefetch,
-            proxy_watch: OnceLock::new(),
+            watchers: OnceLock::new(),
         }
     }
 
@@ -258,8 +259,9 @@ impl SynaraRuntime {
         let (child, info, environment) = info?;
         *running = Some(RunningSynara { child, info: info.clone(), environment });
         drop(running);
-        self.proxy_watch.get_or_init(|| {
-            restart::watch_system_proxy(self.events.clone(), Arc::clone(&self.running))
+        self.watchers.get_or_init(|| {
+            restart::watch_system_proxy(self.events.clone(), Arc::clone(&self.running));
+            restart::watch_exit(self.events.clone(), Arc::clone(&self.running));
         });
         // Windows hold the exited sidecar's token, and its tasks are gone:
         // they learn of this restart as of one asked for (`restart`).
