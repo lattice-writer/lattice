@@ -627,6 +627,8 @@ fn serve_walked_tree(tree: &Path) {
     }
     let sandbox = Sandbox::new();
     println!("{MOUNTED_AT}{}", sandbox.mountpoint.0.display());
+    // Not line by line into a pipe: the test waits on this line.
+    io::Write::flush(&mut io::stdout()).unwrap();
     eprintln!("walk test: the filter is mounted, under a limit of {}", limit.rlim_cur);
     let script = "opened=0; \
          while [ ! -e \"$1/stop\" ]; do \
