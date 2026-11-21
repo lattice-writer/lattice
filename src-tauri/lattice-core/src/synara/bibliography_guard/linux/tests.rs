@@ -82,8 +82,18 @@ impl Sandbox {
         Self::with_runtime(&runtime_folders())
     }
 
+    /// The sandbox over a filter that keeps a single descriptor of the
+    /// files looked up open, so that every operation opens its file again.
+    fn keeping_one_open() -> Self {
+        Self::mounted(&runtime_folders(), Some(1))
+    }
+
     /// The sandbox for a user whose runtime folders are `runtime`.
     fn with_runtime(runtime: &[PathBuf]) -> Self {
+        Self::mounted(runtime, None)
+    }
+
+    fn mounted(runtime: &[PathBuf], open: Option<usize>) -> Self {
         let app_data = TempDir::new("bib-guard-app");
         let home = fs::canonicalize(&app_data).unwrap().join("synara");
         fs::create_dir(&home).unwrap();
@@ -92,7 +102,11 @@ impl Sandbox {
         fs::create_dir(&options).unwrap();
         fs::write(options.join("options.json"), "{}").unwrap();
         let mountpoint = Mountpoint::create_in(&home.join(MOUNTS)).expect("the filter's folder");
-        let filter = name_filter::mount(Path::new("/"), &mountpoint.0).expect("mount the filter");
+        let filter = match open {
+            Some(open) => name_filter::mount_keeping(Path::new("/"), &mountpoint.0, open),
+            None => name_filter::mount(Path::new("/"), &mountpoint.0),
+        }
+        .expect("mount the filter");
         Self {
             _filter: filter,
             mountpoint,
@@ -263,10 +277,14 @@ fn a_file_opened_before_a_rename_onto_a_bibliography_cannot_change_it() {
     if !guard_available() {
         return;
     }
+    rename_onto_a_bibliography(Sandbox::new());
+    rename_onto_a_bibliography(Sandbox::keeping_one_open());
+}
+
+fn rename_onto_a_bibliography(sandbox: Sandbox) {
     let root = Guarded::new();
     let bibliography = root.write("references.bib", "original");
     let (draft, other) = (root.write("draft.txt", "draft"), root.write("other.txt", "other"));
-    let sandbox = Sandbox::new();
     let file = fs::OpenOptions::new().read(true).write(true).open(sandbox.through(&draft)).unwrap();
     let source = fs::File::open(sandbox.through(&other)).unwrap();
     let fd = file.as_raw_fd();
@@ -315,18 +333,21 @@ fn refused(result: &io::Result<()>) -> bool {
 
 /// A second name a bibliography had before the sandbox started, written
 /// without ever looking the `.bib` name up, which would tell the filter.
+/// With one descriptor kept open as well, so the file is opened again by
+/// name each time and the rule still holds then.
 #[test]
 fn a_second_name_made_before_the_sandbox_cannot_change_a_bibliography() {
     if !guard_available() {
         return;
     }
-    let root = Guarded::new();
-    let bibliography = root.write("references.bib", "original");
-    let prelinked = root.0.join("prelinked.txt");
-    fs::hard_link(&bibliography, &prelinked).unwrap();
-    let sandbox = Sandbox::new();
-    assert!(!sandbox.run("printf changed >> \"$1\"", &[&prelinked]));
-    assert_eq!(fs::read_to_string(&bibliography).unwrap(), "original");
+    for sandbox in [Sandbox::new(), Sandbox::keeping_one_open()] {
+        let root = Guarded::new();
+        let bibliography = root.write("references.bib", "original");
+        let prelinked = root.0.join("prelinked.txt");
+        fs::hard_link(&bibliography, &prelinked).unwrap();
+        assert!(!sandbox.run("printf changed >> \"$1\"", &[&prelinked]));
+        assert_eq!(fs::read_to_string(&bibliography).unwrap(), "original");
+    }
 }
 
 /// The broker writes a bibliography through a temporary beside it and

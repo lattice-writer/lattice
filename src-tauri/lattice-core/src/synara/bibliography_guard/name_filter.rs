@@ -78,7 +78,15 @@ pub(super) struct BibliographyFilter {
 /// Mount the filter over `source` at `mountpoint` and serve it on background
 /// threads until the returned session is dropped.
 pub(super) fn mount(source: &Path, mountpoint: &Path) -> io::Result<fuser::BackgroundSession> {
-    let filter = BibliographyFilter::new(source, mountpoint)?;
+    mount_keeping(source, mountpoint, kept_open())
+}
+
+/// [`mount`], keeping at most `open` descriptors of looked-up files open:
+/// a test's few, so that every operation opens its file again.
+pub(super) fn mount_keeping(
+    source: &Path, mountpoint: &Path, open: usize,
+) -> io::Result<fuser::BackgroundSession> {
+    let filter = BibliographyFilter::new(source, mountpoint, open)?;
     let mut config = Config::default();
     config.mount_options = vec![
         MountOption::FSName("lattice-bibliography-guard".to_string()),
@@ -93,8 +101,8 @@ pub(super) fn mount(source: &Path, mountpoint: &Path) -> io::Result<fuser::Backg
 }
 
 impl BibliographyFilter {
-    fn new(source: &Path, mountpoint: &Path) -> io::Result<Self> {
-        let nodes = Nodes::new(open_folder(source)?, kept_open())?;
+    fn new(source: &Path, mountpoint: &Path, open: usize) -> io::Result<Self> {
+        let nodes = Nodes::new(open_folder(source)?, open)?;
         let mountpoint =
             mountpoint.parent().zip(mountpoint.file_name()).and_then(|(parent, name)| {
                 let parent = std::fs::metadata(parent).ok()?;
@@ -537,8 +545,10 @@ impl Filesystem for BibliographyFilter {
             Ok(duplicate) => duplicate,
             // The caller's close must not fail because this process has no
             // descriptor to spare: Node aborts on a failed close
-            // (lattice#1221). A local file system reports nothing at close
-            // that its writes did not, so there is nothing to lose.
+            // (lattice#1221). The cost: on a network home (NFS, CIFS) a
+            // write-back error such as EIO or EDQUOT that only close would
+            // have reported goes unseen, and only when the guard is out of
+            // descriptors even after freeing half of those it keeps.
             Err(error) if matches!(error.raw_os_error(), Some(libc::EMFILE | libc::ENFILE)) => {
                 return reply.ok();
             }

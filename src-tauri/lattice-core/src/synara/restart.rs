@@ -11,6 +11,7 @@ use super::shell_env;
 use super::shell_env::ShellRead;
 use super::{proxy, RunningSynara, SynaraRuntime};
 use crate::host::EventSink;
+use crate::sidecar::terminate_process_group;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -49,8 +50,8 @@ pub(super) fn watch_system_proxy(
 }
 
 /// How often [`watch_exit`] looks, and the least time between two restarts
-/// it asks for: a sidecar that keeps exiting just after its start is left
-/// to the next request, which reports why.
+/// it asks for. A sidecar that exits again within that gap is left for the
+/// next request, which starts a new one and announces it itself.
 const EXIT_POLL: Duration = Duration::from_secs(2);
 const EXIT_RESTART_GAP: Duration = Duration::from_secs(60);
 
@@ -64,24 +65,35 @@ pub(super) fn watch_exit(
 ) {
     let Some(events) = events else { return };
     thread::spawn(move || {
-        let mut asked: Option<Instant> = None;
+        let mut announced = None;
         loop {
             thread::sleep(EXIT_POLL);
-            let Ok(mut running) = running.lock() else { return };
-            let exited = running
-                .as_mut()
-                .is_some_and(|current| !matches!(current.child.try_wait(), Ok(None)));
-            if !exited {
-                continue;
-            }
-            *running = None;
-            drop(running);
-            if asked.is_none_or(|asked| asked.elapsed() >= EXIT_RESTART_GAP) {
-                asked = Some(Instant::now());
+            if reap_exited(&running, &mut announced) {
                 announce(Some(events.as_ref()));
             }
         }
     });
+}
+
+/// Take the running sidecar away if it exited, ending what it left running
+/// in its process group, and answer whether to announce a restart.
+/// `announced` is when this last did. Within [`EXIT_RESTART_GAP`] of that
+/// the exited sidecar stays where it is: `ensure_ready` finds it exited,
+/// starts a new one and announces that, so no window keeps the old token.
+fn reap_exited(running: &Mutex<Option<RunningSynara>>, announced: &mut Option<Instant>) -> bool {
+    let Ok(mut running) = running.lock() else { return false };
+    let Some(current) = running.as_mut() else { return false };
+    if matches!(current.child.try_wait(), Ok(None)) {
+        return false;
+    }
+    if announced.is_some_and(|announced| announced.elapsed() < EXIT_RESTART_GAP) {
+        return false;
+    }
+    if let Some(mut exited) = running.take() {
+        terminate_process_group(&mut exited.child);
+    }
+    *announced = Some(Instant::now());
+    true
 }
 
 /// `inspect` of the environment the live sidecar started with; `None` while
@@ -120,5 +132,46 @@ impl SynaraRuntime {
     pub fn restart(&self) {
         self.shutdown();
         announce(self.events.as_deref());
+    }
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+    use std::process::Command;
+
+    fn exited() -> Option<RunningSynara> {
+        let mut child = Command::new("/bin/sh").args(["-c", "exit 3"]).spawn().unwrap();
+        while matches!(child.try_wait(), Ok(None)) {
+            thread::sleep(Duration::from_millis(5));
+        }
+        let info = SynaraRuntime::default().unsupported_info("exited");
+        Some(RunningSynara { child, info, environment: AgentEnvironment::default() })
+    }
+
+    /// A sidecar that exits on its own is reaped and announced once; one
+    /// that exits again soon after is left for `ensure_ready` to find, which
+    /// announces the restart it makes.
+    #[test]
+    fn a_second_exit_within_the_gap_is_left_for_the_next_start_to_announce() {
+        let running = Mutex::new(exited());
+        let mut announced = None;
+        assert!(reap_exited(&running, &mut announced));
+        assert!(running.lock().unwrap().is_none());
+        // Nothing running: nothing to announce.
+        assert!(!reap_exited(&running, &mut announced));
+
+        *running.lock().unwrap() = exited();
+        assert!(!reap_exited(&running, &mut announced));
+        {
+            let mut left = running.lock().unwrap();
+            let left = left.as_mut().expect("the exited sidecar stays for ensure_ready");
+            assert!(left.child.try_wait().unwrap().is_some());
+        }
+
+        // Once the gap has passed, it is reaped and announced again.
+        announced = Instant::now().checked_sub(EXIT_RESTART_GAP + Duration::from_secs(1));
+        assert!(reap_exited(&running, &mut announced));
+        assert!(running.lock().unwrap().is_none());
     }
 }
