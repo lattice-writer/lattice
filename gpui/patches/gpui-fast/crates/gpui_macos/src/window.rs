@@ -2644,7 +2644,9 @@ extern "C" fn reset_cursor_rects(this: &AnyObject, _: Sel) {
         };
 
         let bounds: NSRect = msg_send![this, bounds];
-        let _: () = msg_send![this, addCursorRect: bounds, cursor: cursor];
+        for rect in crate::fast::composition::window_cursor_rects(&window_state.lock(), bounds) {
+            let _: () = msg_send![this, addCursorRect: rect, cursor: cursor];
+        }
     }
 }
 

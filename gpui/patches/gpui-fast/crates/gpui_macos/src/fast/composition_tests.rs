@@ -1,4 +1,4 @@
-use super::whole_scene_layer;
+use super::{subtract_rect, whole_scene_layer};
 use gpui::{
     AppContext as _, Bounds, ComposedSceneLayer, CompositionSurfaceId, ContentMask, Context,
     DevicePixels, IntoElement, ParentElement as _, PlatformHeadlessRenderer as _, Quad, Render,
@@ -125,4 +125,30 @@ fn partial_or_split_layers_require_replay_even_when_primitives_match() {
         assert!(std::ptr::eq(borrowed, &empty));
     }
     assert!(whole_scene_layer(&empty, &[layer(vec![0..0]), layer(vec![0..0])]).is_none());
+}
+
+#[test]
+fn cursor_rects_leave_out_a_native_view() {
+    use objc2_foundation::{NSPoint, NSRect, NSSize};
+    let rect = |x: f64, y: f64, w: f64, h: f64| NSRect::new(NSPoint::new(x, y), NSSize::new(w, h));
+    let area = |rects: &[NSRect]| {
+        rects
+            .iter()
+            .map(|r| r.size.width * r.size.height)
+            .sum::<f64>()
+    };
+
+    let window = rect(0., 0., 100., 80.);
+    let inside = subtract_rect(window, rect(20., 10., 30., 40.));
+    assert_eq!(inside.len(), 4);
+    assert_eq!(area(&inside), 100. * 80. - 30. * 40.);
+
+    // A view at the window's edge leaves the rest whole; one outside it
+    // leaves the window as it is.
+    let edge = subtract_rect(window, rect(60., 0., 40., 80.));
+    assert_eq!(edge.len(), 1);
+    assert_eq!(area(&edge), 60. * 80.);
+    let outside = subtract_rect(window, rect(200., 0., 10., 10.));
+    assert_eq!(outside.len(), 1);
+    assert_eq!(outside[0].size, window.size);
 }

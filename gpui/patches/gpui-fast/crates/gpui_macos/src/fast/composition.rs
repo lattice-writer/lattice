@@ -75,6 +75,9 @@ pub(crate) struct MacComposition {
     /// Native identities, parents and sibling order, independent of geometry.
     view_order: Vec<(CompositionSurfaceId, usize, usize)>,
     native_views: Rc<Vec<usize>>,
+    /// Where the window's view leaves the cursor to the native views over
+    /// it, in its own coordinates, as its cursor rects were last laid out.
+    cursor_holes: Vec<NSRect>,
     /// Every surface above the base one, bottom to top: a GPUI surface's
     /// backdrops blur the base frame except over the native views under it.
     stacking: Vec<Stacked>,
@@ -94,6 +97,7 @@ impl MacComposition {
             renderer_context,
             view_order: Vec::new(),
             native_views: Rc::new(Vec::new()),
+            cursor_holes: Vec::new(),
             stacking: Vec::new(),
             input_order: Rc::new(Vec::new()),
             native_event: 0,
@@ -950,7 +954,97 @@ pub(crate) fn set_composition_order(
             let _: () = msg_send![view, setFrame: frame];
         }
     }
+    refresh_cursor_holes(&mut lock);
     Ok(())
+}
+
+/// The frames, in the window view's coordinates, of the shown native views
+/// that own their pointer input (a webview, not a view forwarding its input
+/// back to GPUI), which set their own cursor.
+fn native_cursor_frames(state: &MacWindowState) -> Vec<NSRect> {
+    let native_view = state.native_view.as_ptr();
+    state
+        .fast_composition
+        .native_views
+        .iter()
+        .filter(|view| !state.fast_composition.input_forwarders.contains(view))
+        .filter_map(|&view| unsafe {
+            let view = view as Id;
+            let hidden: Bool = msg_send![view, isHiddenOrHasHiddenAncestor];
+            if hidden.as_bool() {
+                return None;
+            }
+            let bounds: NSRect = msg_send![view, bounds];
+            let frame: NSRect = msg_send![view, convertRect: bounds, toView: native_view];
+            (frame.size.width > 0. && frame.size.height > 0.).then_some(frame)
+        })
+        .collect()
+}
+
+/// Lays the window view's cursor rects out again when a native view that sets
+/// its own cursor moved, resized, showed or hid.
+///
+/// GPUI's view registers its cursor as a cursor rect over its whole bounds,
+/// and AppKit applies that rect as the pointer moves over a webview in it
+/// too, so the page's own cursor (the I-beam over text, the pointing hand on
+/// a link, a column's resize cursor) was put back to GPUI's at once
+/// ([`window_cursor_rects`] leaves these frames out).
+pub(crate) fn refresh_cursor_holes(state: &mut MacWindowState) {
+    let holes = native_cursor_frames(state);
+    let unchanged = holes.len() == state.fast_composition.cursor_holes.len()
+        && holes
+            .iter()
+            .zip(&state.fast_composition.cursor_holes)
+            .all(|(a, b)| a.origin == b.origin && a.size == b.size);
+    if unchanged {
+        return;
+    }
+    state.fast_composition.cursor_holes = holes;
+    unsafe {
+        let _: () = msg_send![
+            state.native_window,
+            invalidateCursorRectsForView: state.native_view.as_ptr()
+        ];
+    }
+}
+
+/// The rects GPUI's cursor covers in a view of `bounds`: all of it but where
+/// a native view sets its own cursor.
+pub(crate) fn window_cursor_rects(state: &MacWindowState, bounds: NSRect) -> Vec<NSRect> {
+    let mut rects = vec![bounds];
+    for hole in &state.fast_composition.cursor_holes {
+        rects = rects
+            .into_iter()
+            .flat_map(|rect| subtract_rect(rect, *hole))
+            .collect();
+    }
+    rects
+}
+
+/// `rect` without `hole`: up to four rects, the bands below and above the
+/// hole across `rect`'s width and the pieces left and right of it.
+fn subtract_rect(rect: NSRect, hole: NSRect) -> Vec<NSRect> {
+    let (left, right) = (rect.origin.x, rect.origin.x + rect.size.width);
+    let (bottom, top) = (rect.origin.y, rect.origin.y + rect.size.height);
+    let hole_left = hole.origin.x.max(left);
+    let hole_right = (hole.origin.x + hole.size.width).min(right);
+    let hole_bottom = hole.origin.y.max(bottom);
+    let hole_top = (hole.origin.y + hole.size.height).min(top);
+    if hole_left >= hole_right || hole_bottom >= hole_top {
+        return vec![rect];
+    }
+    let rect_of = |x0: f64, y0: f64, x1: f64, y1: f64| {
+        NSRect::new(NSPoint::new(x0, y0), NSSize::new(x1 - x0, y1 - y0))
+    };
+    [
+        rect_of(left, bottom, right, hole_bottom),
+        rect_of(left, hole_top, right, top),
+        rect_of(left, hole_bottom, hole_left, hole_top),
+        rect_of(hole_right, hole_bottom, right, hole_top),
+    ]
+    .into_iter()
+    .filter(|piece| piece.size.width > 0. && piece.size.height > 0.)
+    .collect()
 }
 
 /// Creates the overlay view and renderer of a GPUI surface, the size of the
@@ -1075,7 +1169,7 @@ impl PlatformSurfaceAttachment for MacNativeSurface {
             .window_state
             .upgrade()
             .context("native surface window has been released")?;
-        let window_state = window_state.lock();
+        let mut window_state = window_state.lock();
         unsafe {
             let native_view = window_state.native_view.as_ptr();
             let parent: Id = msg_send![self.view.as_ptr(), superview];
@@ -1088,6 +1182,7 @@ impl PlatformSurfaceAttachment for MacNativeSurface {
             let frame: NSRect = msg_send![native_view, convertRect: window_frame, toView: parent];
             let _: () = msg_send![self.view.as_ptr(), setFrame: frame];
         }
+        refresh_cursor_holes(&mut window_state);
         self.bounds.set(bounds);
         Ok(())
     }
@@ -1103,6 +1198,9 @@ impl PlatformSurfaceAttachment for MacNativeSurface {
     fn set_visible(&self, visible: bool) -> Result<()> {
         unsafe {
             let _: () = msg_send![self.view.as_ptr(), setHidden: Bool::new(!visible)];
+        }
+        if let Some(window_state) = self.window_state.upgrade() {
+            refresh_cursor_holes(&mut window_state.lock());
         }
         Ok(())
     }
