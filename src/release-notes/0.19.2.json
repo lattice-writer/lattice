@@ -1,0 +1,77 @@
+{
+  "version": "0.19.2",
+  "date": "2026-11-22",
+  "highlights": [
+    {
+      "icon": "menu",
+      "title": {
+        "en": "Resize Markdown table columns",
+        "zh": "调整 Markdown 表格的列宽"
+      },
+      "body": {
+        "en": "In the native Lattice, drag a column border in a Markdown file's visual editor to resize that column, or double-click the border to fit the column to its content. Lattice remembers the widths for each table and opens the file with them next time, including after a rename or move. The .md file itself doesn't change, so Overleaf, git and other editors see plain Markdown.",
+        "zh": "在原生 Lattice 中，在 Markdown 文件的可视编辑器里拖动列边框即可调整这一列的宽度，双击边框则让这一列适应内容宽度。Lattice 会按表格记住列宽，下次打开文件时照样显示，文件改名或移动后也一样。.md 文件本身不会改变，所以 Overleaf、git 和其他编辑器看到的仍是普通的 Markdown。"
+      }
+    },
+    {
+      "icon": "bot",
+      "title": {
+        "en": "Pick the Agent's font size",
+        "zh": "设置 AI 助手的字号"
+      },
+      "body": {
+        "en": "In the native Lattice, Settings › Agent › Display sets the Agent's font size, from 11 to 20 px, apart from the editors' sizes. The conversation, the message box and code blocks all scale with it, in the panel and in the Agent's own window.",
+        "zh": "在原生 Lattice 中，设置 › AI 助手 › 显示 可以设置 AI 助手的字号，范围 11 到 20 px，与编辑器的字号分开。对话、输入框和代码块都会一起缩放，在面板里和助手的单独窗口里都一样。"
+      }
+    },
+    {
+      "icon": "git",
+      "title": {
+        "en": "Overleaf keeps your live typing when you switch projects",
+        "zh": "切换项目时，Overleaf 不再丢掉你刚输入的内容"
+      },
+      "body": {
+        "en": "When you switch a window to another project while an Overleaf file is open, Lattice now sends your last typing and hands the file back to Overleaf before it leaves, in both versions of Lattice. When you come back, a co-author's edits made in the meantime merge cleanly with yours instead of showing up as conflict markers.",
+        "zh": "打开 Overleaf 文件时把窗口切换到另一个项目，Lattice 现在会先把你最后输入的内容发出去，并把文件交还给 Overleaf 再离开，两个版本的 Lattice 都是如此。回到这个项目时，合作者在此期间的修改会和你的修改干净地合并，而不会变成冲突标记。"
+      }
+    }
+  ],
+  "fixes": [
+    {
+      "en": "Live preview starts rtex again by itself when it exits mid-session, for example when macOS ends it under memory pressure, in both versions of Lattice. Only when rtex stops three times within five minutes does live preview stop, and its pill then says how often and how rtex ended. A document whose first pass has a TeX error now shows \"Waiting for the document to compile\" instead of \"Live preview stopped\".",
+      "zh": "rtex 在编辑中途退出时（例如 macOS 在内存紧张时结束了它），实时预览现在会自己重新启动它，两个版本的 Lattice 都是如此。只有 rtex 在五分钟内停止三次，实时预览才会停下，状态标签会说明停了几次以及 rtex 是怎样结束的。文档第一遍编译遇到 TeX 错误时，现在显示「等待文档编译通过」，而不是「实时预览已停止」。"
+    },
+    {
+      "en": "In spreadsheets, Control-click now opens the context menu as a right-click does, and ⌘-click adds another range to the selection. A right-click no longer tints the whole sheet, and a cell whose value held a control character no longer shows a box or opens an empty editor.",
+      "zh": "在表格中，按住 Control 点按现在会像右键一样打开快捷菜单，按住 ⌘ 点按会在选区中再加一个范围。右键点按不会再把整张表染上颜色；值里含控制字符的单元格也不会再显示方框，或打开一个空的编辑框。"
+    },
+    {
+      "en": "In the native Lattice, the arrow keys, Home and End no longer type box characters into the visual Markdown editor, a spreadsheet or the Agent's message box.",
+      "zh": "在原生 Lattice 中，方向键、Home 和 End 不会再在 Markdown 可视编辑器、表格或 AI 助手的输入框里打出方框字符。"
+    },
+    {
+      "en": "In the native Lattice, the pointer over the visual Markdown editor, a spreadsheet and the Agent's message box shows the page's own cursor, such as the I-beam over text or the resize cursor on a table's column border, instead of an arrow.",
+      "zh": "在原生 Lattice 中，指针移到 Markdown 可视编辑器、表格和 AI 助手的输入框上时，显示页面自己的光标，例如文字上的 I 形光标或表格列边框上的调整宽度光标，而不再是箭头。"
+    },
+    {
+      "en": "In the native Lattice, ⌘Z and ⌘⇧Z undo and redo in a Markdown file's visual editor, a whole typed word at a time.",
+      "zh": "在原生 Lattice 中，⌘Z 和 ⌘⇧Z 可以在 Markdown 文件的可视编辑器里撤销和重做，一次一整个输入的词。"
+    },
+    {
+      "en": "In a Markdown file's visual editor, a click on an inline formula selects that formula and opens its settings, instead of highlighting the paragraph from its start.",
+      "zh": "在 Markdown 文件的可视编辑器中，点按行内公式会选中这个公式并打开它的设置，而不再高亮从段首到公式的整段文字。"
+    },
+    {
+      "en": "In the file tree, a click on empty space clears the selection, so the + button creates a file or folder at the top of the project. The name field for a new or renamed file no longer overlaps its icon.",
+      "zh": "在文件树中，点按空白处会清除选择，所以 + 按钮会把文件或文件夹建在项目的最上层。新建或重命名文件时的名称输入框不会再盖住图标。"
+    },
+    {
+      "en": "On Linux, a tool such as du walking the runtime folder no longer stops the Agent. When the Agent's background process exits on its own, Lattice now starts a new one instead of finding it gone at the next request.",
+      "zh": "在 Linux 上，du 之类的工具遍历运行时目录时，不会再让 AI 助手停止工作。AI 助手的后台进程自己退出时，Lattice 现在会启动一个新的，而不是等到下一次请求才发现它没了。"
+    },
+    {
+      "en": "Report a Problem, Download, About and the user guide now open Lattice's new home at lattice-writer.",
+      "zh": "报告问题、下载、关于和用户指南现在打开 Lattice 在 lattice-writer 的新地址。"
+    }
+  ]
+}

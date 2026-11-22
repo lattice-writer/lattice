@@ -10,7 +10,7 @@ Open the **Agent** panel (`⌘⌥3`, or the robot icon on the left). Then use on
 - **Another agent CLI** you have installed, such as Cursor, OpenCode or Droid.
 - **Your own API**: **Settings › Agent › Model endpoint** takes an OpenAI- or Anthropic-compatible address, a key (kept in your Keychain) and model names. Nothing else to install.
 
-**Settings › Agent › Providers** sets the default provider and the models Lattice uses for its own small tasks (proofreading, commit messages, compile repair). **MCP** adds tools such as Zotero to the Agent; **Usage & limits** shows what you have used.
+**Settings › Agent › Providers** sets the default provider and the models Lattice uses for its own small tasks (proofreading, commit messages, compile repair). **MCP** adds tools such as Zotero to the Agent; **Usage & limits** shows what you have used. In the native Lattice, **Display** sets the Agent's font size, from 11 to 20 px, apart from the editors' sizes.
 
 ## Work with it
 
