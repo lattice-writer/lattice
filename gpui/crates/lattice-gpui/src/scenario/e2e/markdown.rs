@@ -436,11 +436,17 @@ impl Run {
                 std::fs::read_to_string(path).is_ok_and(|text| text.contains("plum"))
             })
             .await;
-        native::send_key_equivalent(native, 'z')?;
-        self.wait_for(cx, Duration::from_secs(10), |_, _| {
-            std::fs::read_to_string(path).is_ok_and(|text| !text.contains("plum"))
-        })
-        .await;
+        // The menu bar's key equivalents go only to the active app's key
+        // window, so the press is made in a foreground section; outside one
+        // it passed only when an earlier step had left the app active.
+        {
+            let _front = self.foreground(cx, "markdown menu undo").await?;
+            native::send_key_equivalent(native, 'z')?;
+            self.wait_for(cx, Duration::from_secs(10), |_, _| {
+                std::fs::read_to_string(path).is_ok_and(|text| !text.contains("plum"))
+            })
+            .await;
+        }
         self.pause(cx, Duration::from_millis(1500)).await;
         let text = std::fs::read_to_string(path).unwrap_or_default();
         steps.check(

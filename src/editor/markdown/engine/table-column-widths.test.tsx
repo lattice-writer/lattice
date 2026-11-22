@@ -154,6 +154,46 @@ describe("table column widths", () => {
     expect(host.onChange).not.toHaveBeenCalled();
   });
 
+  it("ends a drag whose mouseup never reached the page: the next press drags again and the cursor leaves the page", async () => {
+    const host = keeper();
+    renderEditor({ tableColumnWidths: host });
+    await waitFor(() => expect(tables()).toHaveLength(2));
+    const frame = document.querySelector(".lx-md-editor")!;
+    fireEvent.mouseMove(header(tables()[0]!), { clientX: 98 });
+    pressBorder(tables()[0]!);
+    fireEvent.mouseMove(window, { clientX: 148 });
+    // The release is lost: the next press, on the other table, still drags.
+    pressBorder(tableNamed("Step"));
+    expect(host.onChange).toHaveBeenCalledTimes(1);
+    expect(host.onChange.mock.lastCall![0]).toEqual([{ index: 0, signature: SIG_A, widths: [150, 100] }]);
+    fireEvent.mouseMove(window, { clientX: 128 });
+    fireEvent.mouseUp(window, { clientX: 128 });
+    expect(colWidths(tableNamed("Step"))).toEqual(["130px", "100px", "100px"]);
+    expect(host.onChange).toHaveBeenCalledTimes(2);
+    expect(frame).not.toHaveAttribute("data-column-resize");
+    fireEvent.mouseMove(header(tables()[0]!), { clientX: 50 });
+    expect(frame).not.toHaveAttribute("data-column-resize");
+  });
+
+  it("puts a drag back when the pointer is cancelled or the page is hidden", async () => {
+    const host = keeper();
+    renderEditor({ tableColumnWidths: host });
+    await waitFor(() => expect(tables()).toHaveLength(2));
+    pressBorder(tables()[0]!);
+    fireEvent.mouseMove(window, { clientX: 148 });
+    expect(tables()[0]).toHaveAttribute("data-sized");
+    fireEvent(window, new Event("pointercancel"));
+    expect(tables()[0]).not.toHaveAttribute("data-sized");
+    pressBorder(tables()[0]!);
+    fireEvent.mouseMove(window, { clientX: 148 });
+    vi.spyOn(document, "hidden", "get").mockReturnValue(true);
+    fireEvent(document, new Event("visibilitychange"));
+    expect(tables()[0]).not.toHaveAttribute("data-sized");
+    fireEvent.mouseMove(window, { clientX: 300 });
+    expect(tables()[0]).not.toHaveAttribute("data-sized");
+    expect(host.onChange).not.toHaveBeenCalled();
+  });
+
   it("fits a column to its content on a double-click on its border", async () => {
     const host = keeper([{ index: 0, signature: SIG_A, widths: [60, 90] }]);
     renderEditor({ tableColumnWidths: host });

@@ -347,7 +347,12 @@ class ColumnResize {
   /** A press on a border: a double-click fits the column, else the press drags it. */
   down(event: MouseEvent): boolean {
     const host = this.source();
-    if (!host || event.button !== 0 || this.finish) return false;
+    if (!host || event.button !== 0) return false;
+    // A press comes only after the last drag's button went up, so a drag still
+    // under way missed its mouseup (the host's window can keep it from the
+    // page): it ends here as that release would have ended it. Refusing the
+    // press instead left every border dead, the resize cursor on everything.
+    this.finish?.(true);
     const border = borderAt(this.view, event);
     const table = border ? this.view.state.doc.nodeAt(border.tablePos) : null;
     if (!border || !table) return false;
@@ -381,13 +386,17 @@ class ColumnResize {
       this.finish?.(false);
     };
     const up = () => this.finish?.(true);
-    const blur = () => this.finish?.(false);
+    const cancel = () => this.finish?.(false);
+    const hidden = () => document.hidden && this.finish?.(false);
     this.finish = (keep) => {
       window.removeEventListener("mousemove", drag);
       window.removeEventListener("mouseup", up);
       window.removeEventListener("keydown", key, true);
-      window.removeEventListener("blur", blur);
+      window.removeEventListener("blur", cancel);
+      window.removeEventListener("pointercancel", cancel);
+      document.removeEventListener("visibilitychange", hidden);
       this.finish = null;
+      this.setCursor(false);
       if (!moved || this.view.isDestroyed) return;
       if (keep) this.commit(host, at(), widths);
       else this.show(at(), before);
@@ -395,7 +404,9 @@ class ColumnResize {
     window.addEventListener("mousemove", drag);
     window.addEventListener("mouseup", up);
     window.addEventListener("keydown", key, true);
-    window.addEventListener("blur", blur);
+    window.addEventListener("blur", cancel);
+    window.addEventListener("pointercancel", cancel);
+    document.addEventListener("visibilitychange", hidden);
     return true;
   }
 

@@ -8,6 +8,8 @@
 //!   kept for that table (saved at index 0);
 //! - a double-click on the second table's first border fits that column to
 //!   its content (its long header), kept as table 1's;
+//! - a drag left without its mouse-up, a press on the second table's border
+//!   still drags that border, and no resize cursor is left behind;
 //! - the tab closed and the file opened again draws both tables at the
 //!   widths kept;
 //! - a column added to the first table on disk draws it at its content's
@@ -57,6 +59,8 @@ Between the tables.
 
 /// How far the border is dragged, in the page's pixels.
 const DRAG: f64 = 80.;
+/// How far the second table's border is dragged after a lost release.
+const REPRESS_DRAG: f64 = 30.;
 
 /// The page's view of a table: its first header cell's right edge (brought
 /// into view first), its columns' set widths, and the width of its frame (a
@@ -211,6 +215,37 @@ impl Run {
                         && (*width >= MIN_FIT || (*width - frame).abs() <= 1.)
                 }),
             json!({ "before": second, "after": fitted, "saved": saved }),
+        );
+
+        // A drag whose release never reaches the page (the window can keep a
+        // mouse-up from it): the next press, on the second table's border,
+        // still drags that border, and the resize cursor is gone after it.
+        let stale = self.evaluate(cx, &island, &table_facts(0)).await;
+        if let Some(edge) = bounds.and_then(|bounds| to_window(bounds, &stale["edge"])) {
+            native::send_mouse(native, native::Mouse::Down, edge)?;
+            native::send_mouse(native, native::Mouse::Dragged, edge + gpui::point(gpui::px(10.), gpui::px(0.)))?;
+            self.pause(cx, Duration::from_millis(100)).await;
+        }
+        let pressed = self.evaluate(cx, &island, &table_facts(1)).await;
+        if let Some(edge) = bounds.and_then(|bounds| to_window(bounds, &pressed["edge"])) {
+            native::send_mouse(native, native::Mouse::Down, edge)?;
+            for step in 1..=6 {
+                let dx = REPRESS_DRAG as f32 * step as f32 / 6.;
+                native::send_mouse(native, native::Mouse::Dragged, edge + gpui::point(gpui::px(dx), gpui::px(0.)))?;
+                self.pause(cx, Duration::from_millis(30)).await;
+            }
+            native::send_mouse(native, native::Mouse::Up, edge + gpui::point(gpui::px(REPRESS_DRAG as f32), gpui::px(0.)))?;
+        }
+        let from = pressed["width"].as_f64().unwrap_or_default();
+        let wanted = |saved: &Value| kept_at(saved, 1).first().is_some_and(|width| (width - from - REPRESS_DRAG).abs() <= 2.);
+        self.wait_for(cx, Duration::from_secs(3), |_, _| wanted(&table_widths::page_widths(root, FILE)))
+            .await;
+        let repressed = self.evaluate(cx, &island, &table_facts(1)).await;
+        let saved = kept(cx);
+        steps.check(
+            "a press after a drag whose mouse-up never reached the page drags the border pressed, and leaves no resize cursor behind",
+            wanted(&saved) && repressed["cursor"] == false,
+            json!({ "stale": stale, "before": pressed, "after": repressed, "saved": saved }),
         );
 
         // Closed and opened again: both tables come back at their widths.
