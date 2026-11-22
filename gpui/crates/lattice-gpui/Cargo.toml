@@ -52,6 +52,8 @@ lattice-core.workspace = true
 lattice-editor.workspace = true
 lattice-i18n.workspace = true
 lattice-settings.workspace = true
+# Typst root documents, compiled in process (lattice-typst).
+lattice-typst.workspace = true
 # The history's source diffs, as a patch GPUI Kit's diff reads (history/diff_view.rs).
 similar = "2"
 lattice-ui.workspace = true

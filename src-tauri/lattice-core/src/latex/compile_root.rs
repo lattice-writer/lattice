@@ -258,4 +258,33 @@ mod tests {
         assert_eq!(compiled(), "main_v2.tex");
         assert!(!project::main_document_chosen(&root));
     }
+
+    #[test]
+    fn a_typst_note_in_a_latex_project_builds_once_and_latexmk_refuses_it() {
+        let root = TempDir::new("typst-one-off");
+        project::write_manifest(&root, &project::default_manifest("paper")).unwrap();
+        root.write("main.tex", "\\documentclass{article}\n\\begin{document}x\\end{document}\n");
+        root.write("notes.typ", "= Notes\n");
+
+        assert_eq!(
+            super::super::choose_document(&root, Some("notes.typ")).unwrap(),
+            ("notes.typ".to_string(), true)
+        );
+        assert_eq!(
+            super::super::choose_document(&root, Some("main.tex")).unwrap(),
+            ("main.tex".to_string(), false)
+        );
+        let active = super::super::ActiveBuild::default();
+        let steps = super::super::BuildSteps::silent();
+        let refused = super::super::build(
+            &root,
+            false,
+            false,
+            &active,
+            Some("notes.typ"),
+            &steps,
+            super::super::AuxFiles::Beside,
+        );
+        assert_eq!(refused.unwrap_err(), super::super::TYPST_NATIVE_ONLY);
+    }
 }

@@ -372,6 +372,9 @@ pub struct CompileRoot {
 /// Markdown) and the manifest default stands.
 pub fn resolve_compile_root(root: &Path, open_path: &str) -> Option<CompileRoot> {
     let relative = open_path.trim().replace('\\', "/");
+    if is_typst_path(&relative) {
+        return resolve_typst_root(root, relative);
+    }
     if !relative.to_ascii_lowercase().ends_with(".tex") {
         return None;
     }
@@ -404,6 +407,35 @@ pub fn resolve_compile_root(root: &Path, open_path: &str) -> Option<CompileRoot>
     });
     let one_off = compiles_alone(&content) && default.is_some_and(|default| default != relative);
     Some(CompileRoot { path: relative, one_off })
+}
+
+/// Whether `path` is a Typst source, which the native app compiles itself.
+pub fn is_typst_path(path: &str) -> bool {
+    path.to_ascii_lowercase().ends_with(".typ")
+}
+
+/// A Typst file has no document class: any of them compiles. The open one
+/// builds when no Typst root stands for it: as the default in a project with
+/// none, and once (a one-off) beside a LaTeX default, so a mixed project's
+/// paper stays what its other builds compile. Under a Typst default it casts
+/// no vote, as that document `#include`s its chapters.
+fn resolve_typst_root(root: &Path, relative: String) -> Option<CompileRoot> {
+    if !safe_path(root, &relative).ok()?.is_file() {
+        return None;
+    }
+    let exists = |path: &str| safe_path(root, path).is_ok_and(|path| path.is_file());
+    let default = read_manifest(root)
+        .ok()
+        .and_then(|manifest| default_root_document(&manifest).map(|document| document.path.clone()))
+        .filter(|default| exists(default));
+    match default {
+        Some(default) if default == relative => {
+            Some(CompileRoot { path: relative, one_off: false })
+        }
+        Some(default) if is_typst_path(&default) => None,
+        Some(_) => Some(CompileRoot { path: relative, one_off: true }),
+        None => Some(CompileRoot { path: relative, one_off: false }),
+    }
 }
 
 /// Whether the document class is one made for typesetting a piece of a
@@ -534,6 +566,43 @@ fn detect_root_document(root: &Path) -> Option<String> {
             best = Some((score, relative));
         }
     }
+    best.map(|(_, path)| path).or_else(|| detect_typst_root(root))
+}
+
+/// A folder with no LaTeX document may be a Typst one: its `main.typ`, or
+/// the file the others are included into. A mixed folder's LaTeX wins above.
+fn detect_typst_root(root: &Path) -> Option<String> {
+    let mut best: Option<(i32, String)> = None;
+    for entry in WalkDir::new(root).max_depth(4).into_iter().filter_map(Result::ok) {
+        let path = entry.path();
+        if !path.is_file() || !path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("typ")) {
+            continue;
+        }
+        let Ok(relative) = path.strip_prefix(root) else { continue };
+        let relative = relative.to_string_lossy().replace('\\', "/");
+        if relative.split('/').any(|part| part.starts_with('.')) {
+            continue;
+        }
+        let file_name =
+            path.file_name().and_then(|value| value.to_str()).unwrap_or("").to_ascii_lowercase();
+        let mut score = match file_name.as_str() {
+            "main.typ" => 120,
+            "paper.typ" | "manuscript.typ" | "thesis.typ" | "report.typ" | "document.typ" => 90,
+            _ => 0,
+        };
+        let content = fs::read_to_string(path).unwrap_or_default();
+        // A document sets itself up; a chapter or a template only defines.
+        if content.contains("#include") || content.contains("#show:") {
+            score += 40;
+        }
+        if content.contains("#set document") || content.contains("#set page") {
+            score += 20;
+        }
+        score -= relative.matches('/').count() as i32 * 3;
+        if best.as_ref().is_none_or(|(best_score, _)| score > *best_score) {
+            best = Some((score, relative));
+        }
+    }
     best.map(|(_, path)| path)
 }
 
@@ -629,6 +698,31 @@ mod tests {
     }
 
     #[test]
+    fn a_typst_file_compiles_when_no_typst_root_stands_for_it() {
+        let fixture = Fixture::folder("typst-roots", "mixed");
+        fixture.write("paper.tex", ARTICLE);
+        fixture.write("notes.typ", "= Notes\n");
+        fixture.write("chapters/one.typ", "= One\n");
+        let opened = open(&fixture.root).unwrap();
+        assert_eq!(root_paths(&opened.manifest), vec![("paper.tex", true)]);
+        let target = |path: &str| {
+            resolve_compile_root(&fixture.root, path).map(|target| (target.path, target.one_off))
+        };
+        // Beside a LaTeX default, once.
+        assert_eq!(target("notes.typ"), Some(("notes.typ".into(), true)));
+        // Under a Typst default, the default stands for its chapters.
+        set_compile_root(&fixture.root, "notes.typ").unwrap();
+        assert_eq!(target("chapters/one.typ"), None);
+        assert_eq!(target("notes.typ"), Some(("notes.typ".into(), false)));
+        // With no default at all, it becomes the default.
+        let mut manifest = read_manifest(&fixture.root).unwrap();
+        manifest.root_documents.clear();
+        write_manifest(&fixture.root, &manifest).unwrap();
+        assert_eq!(target("chapters/one.typ"), Some(("chapters/one.typ".into(), false)));
+        assert_eq!(target("missing.typ"), None);
+    }
+
+    #[test]
     fn the_open_file_wins_the_compile_when_it_is_a_root_and_is_recorded() {
         let fixture = Fixture::folder("compile-root", "papers");
         fixture.write("main.tex", ARTICLE);
@@ -713,6 +807,20 @@ mod tests {
                     ("manuscript.tex", ARTICLE),
                 ],
                 "manuscript.tex",
+            ),
+            (
+                "detect-typst-root",
+                vec![
+                    ("chapters/one.typ", "= One\n"),
+                    ("thesis.typ", "#set page(paper: \"a4\")\n#include \"chapters/one.typ\"\n"),
+                    ("template.typ", "#let conf(doc) = doc\n"),
+                ],
+                "thesis.typ",
+            ),
+            (
+                "detect-tex-over-typst",
+                vec![("main.typ", "= Notes\n"), ("paper.tex", ARTICLE)],
+                "paper.tex",
             ),
         ] {
             let fixture = Fixture::folder(label, "proj");

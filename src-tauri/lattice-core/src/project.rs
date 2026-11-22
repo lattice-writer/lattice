@@ -115,9 +115,9 @@ pub use linked_bibliography::{
 };
 pub(crate) use manifest::ensure_ignore_line;
 pub use manifest::{
-    choose_root_document, classify_open_error, folder_root, has_latexmkrc, latexmk_engine_arg,
-    main_document_chosen, open, read_manifest, resolve_compile_root, set_compile_root,
-    tex_program_engine, CompileRoot,
+    choose_root_document, classify_open_error, folder_root, has_latexmkrc, is_typst_path,
+    latexmk_engine_arg, main_document_chosen, open, read_manifest, resolve_compile_root,
+    set_compile_root, tex_program_engine, CompileRoot,
 };
 pub use manifest_settings::{
     set_deadline, set_grammar_ignores, set_spelling_words, set_submission_items,

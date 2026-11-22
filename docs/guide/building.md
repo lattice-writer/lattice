@@ -28,3 +28,16 @@ When a build fails, the build button turns red and a panel opens over the PDF. E
 - **Export for arXiv…** (project menu or **File**) writes one ZIP that builds on its own.
 - **Export ZIP…** writes the whole project, which Overleaf can import.
 - The PDF panel's menu saves the compiled PDF.
+
+## Typst documents
+
+The native Lattice app also writes and builds [Typst](https://typst.app) documents (`.typ` files). Nothing needs installing: the Typst compiler is part of the app.
+
+- **Start one:** choose **Blank Typst document** when you create a project, or **New Typst file** in the Project panel's `+` menu. A folder you open that has a `main.typ` (or another `.typ` that includes the rest) and no LaTeX document builds that file.
+- **Build and preview:** `⌘S`, the build button and automatic builds work as they do for LaTeX. Typst also compiles as you type: a moment after you stop, the PDF shows your edit, unsaved, and keeps its page and scroll position.
+- **Errors:** the build button and the problems panel show Typst's errors and warnings with their file and line. Click one to jump to it.
+- **Fonts and packages:** your system fonts are available, plus the fonts Typst bundles (Libertinus Serif, New Computer Modern, DejaVu Sans Mono). `#import "@preview/…"` downloads the package from Typst Universe the first time; after that it works offline.
+- **In a LaTeX project**, a `.typ` file you build compiles on its own, and the LaTeX paper stays the document other builds compile.
+
+Clicking between the source and the PDF (SyncTeX), Overleaf sync and the Visual editor are LaTeX-only for now.
+

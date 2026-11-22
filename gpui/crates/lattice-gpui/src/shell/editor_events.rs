@@ -3,7 +3,7 @@
 //! closes, a card or outline row opens its place, and the editor in front
 //! marks its file in the tree and its section in the outline.
 
-use gpui::{Context, Entity, Window};
+use gpui::{AppContext as _, Context, Entity, Window};
 
 use super::{Shell, build::BuildRequest};
 use crate::editor_panel::{EditorPanel, EditorPanelEvent};
@@ -19,6 +19,11 @@ impl Shell {
     ) {
         cx.subscribe_in(editor, window, Self::on_editor_event)
             .detach();
+        // The first Typst file scans the fonts its first build needs.
+        if lattice_typst::is_typst(editor.read(cx).relative()) {
+            cx.background_spawn(async { lattice_typst::prewarm_fonts() })
+                .detach();
+        }
         self.editors.push(editor.downgrade());
         self.show_outline(cx);
         self.show_editable(cx);
@@ -58,6 +63,11 @@ impl Shell {
             // app's follows its open file.
             EditorPanelEvent::Edited => {
                 self.document_edited(editor, cx);
+                if lattice_typst::is_typst(editor.read(cx).relative())
+                    && crate::settings::builds_automatically(cx)
+                {
+                    self.schedule_typst_live(window, cx);
+                }
                 if self.active_editor().as_ref() == Some(editor) {
                     self.live_preview
                         .update(cx, |live, cx| live.note_editor(editor, cx));

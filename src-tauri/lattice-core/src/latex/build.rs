@@ -285,6 +285,12 @@ fn build_passes(
 ) -> Result<(BuildResult, AuxFiles), String> {
     wide_event::record("force", force);
     choose_compile_root(root, open_document)?;
+    let document = project::read_manifest(root)
+        .ok()
+        .and_then(|m| super::compile_root::compiled_document(root, &m).ok());
+    if document.is_some_and(|document| project::is_typst_path(&document)) {
+        return Err(super::TYPST_NATIVE_ONLY.to_string());
+    }
     let layout = beside::layout_for(root, layout);
     // A Clean rebuild starts the preamble format over too. The reruns below
     // that force latexmk keep it: they are not about the preamble.

@@ -2,7 +2,8 @@
 //! editor gives them (`src/editor/editor-languages.ts`): BibTeX for a
 //! bibliography (codemirror-lang-bib) and HTML for a `.html` file
 //! (@codemirror/lang-html), whose `<style>` is CSS and `<script>`
-//! JavaScript. Each is a tree-sitter grammar with Lattice's own highlight
+//! JavaScript. Typst (`.typ`) is the native app's alone: the Tauri app has
+//! no Typst mode, so its query follows the roles LaTeX and Markdown use. Each is a tree-sitter grammar with Lattice's own highlight
 //! query, whose captures style the source as the Tauri app's highlight style
 //! (`latexHighlightStyle`) styles the same node.
 //!
@@ -72,6 +73,15 @@ pub(crate) fn javascript() -> Language {
     )
 }
 
+pub(crate) fn typst() -> Language {
+    build(
+        include_str!("../languages/typst/config.toml"),
+        |config| Language::new(config, Some(codebook_tree_sitter_typst::LANGUAGE.into())),
+        include_str!("../languages/typst/highlights.scm"),
+        Some(include_str!("../languages/typst/injections.scm")),
+    )
+}
+
 /// The bundled languages, built once, for [`crate::markdown::init`] to put
 /// in the registry.
 pub(crate) struct Bundled {
@@ -79,6 +89,7 @@ pub(crate) struct Bundled {
     pub html: Arc<Language>,
     pub css: Arc<Language>,
     pub javascript: Arc<Language>,
+    pub typst: Arc<Language>,
 }
 
 impl gpui::Global for Bundled {}
@@ -90,28 +101,31 @@ impl Bundled {
             html: Arc::new(html()),
             css: Arc::new(css()),
             javascript: Arc::new(javascript()),
+            typst: Arc::new(typst()),
         }
     }
 
-    pub(crate) fn all(&self) -> [Arc<Language>; 4] {
+    pub(crate) fn all(&self) -> [Arc<Language>; 5] {
         [
             self.bibtex.clone(),
             self.html.clone(),
             self.css.clone(),
             self.javascript.clone(),
+            self.typst.clone(),
         ]
     }
 }
 
-/// The language a bibliography or an HTML file opens in, as the Tauri app
-/// picks them (`immediateTextLanguageExtensions`, `isHtmlFilePath`: the
-/// extension, in any case).
+/// The language a bibliography, an HTML file or a Typst source opens in, as
+/// the Tauri app picks the first two (`immediateTextLanguageExtensions`,
+/// `isHtmlFilePath`: the extension, in any case).
 pub(crate) fn for_path(path: &Path, cx: &App) -> Option<Arc<Language>> {
     let extension = path.extension()?.to_str()?.to_ascii_lowercase();
     let bundled = cx.try_global::<Bundled>()?;
     match extension.as_str() {
         "bib" => Some(bundled.bibtex.clone()),
         "html" => Some(bundled.html.clone()),
+        "typ" => Some(bundled.typst.clone()),
         _ => None,
     }
 }
@@ -128,12 +142,19 @@ mod tests {
         html();
         css();
         javascript();
+        typst();
     }
 
     /// Each token of `text` and the capture the theme resolves it to.
     fn captures(language: Language, text: &str) -> Vec<(String, String)> {
         let language = Arc::new(language);
         let names = [
+            "markup.heading",
+            "markup.meta",
+            "markup.raw",
+            "markup.link",
+            "emphasis",
+            "emphasis.strong",
             "keyword",
             "type",
             "variable",
@@ -148,6 +169,7 @@ mod tests {
             "label",
             "function",
             "punctuation.bracket",
+            "punctuation",
         ];
         let theme = theme::SyntaxTheme::new(
             names
@@ -339,6 +361,73 @@ mod tests {
             capture_of(&captured, "// hi"),
             Some("comment"),
             "{captured:?}"
+        );
+    }
+
+    const TYPST_SAMPLE: &str = include_str!("../tests/fixtures/typst/highlights.typ");
+
+    /// Every styled run of the Typst sample, one `capture\ttext` line each,
+    /// against the committed snapshot. `LATTICE_BLESS=1 cargo test` rewrites
+    /// it after a deliberate change to the query; read the diff before
+    /// committing it.
+    #[test]
+    fn typst_sample_matches_its_snapshot() {
+        let rendered: String = captures(typst(), TYPST_SAMPLE)
+            .into_iter()
+            .map(|(text, name)| format!("{name}\t{}\n", text.escape_debug()))
+            .collect();
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/typst/highlights.snap");
+        if std::env::var_os("LATTICE_BLESS").is_some() {
+            std::fs::write(&path, &rendered).expect("the snapshot is writable");
+        }
+        let expected = std::fs::read_to_string(&path).unwrap_or_default();
+        assert!(
+            rendered == expected,
+            "the Typst highlighting changed; rerun with LATTICE_BLESS=1 and review:\n{rendered}"
+        );
+    }
+
+    /// The roles a writer sees, one per construct: code mode's keywords,
+    /// calls and named arguments, maths, strings, comments, labels and
+    /// references, raw text, headings and emphasis.
+    #[test]
+    fn typst_constructs_take_their_roles() {
+        let captured = captures(typst(), TYPST_SAMPLE);
+        let has = |token: &str, role: &str| {
+            captured
+                .iter()
+                .any(|(text, name)| text.contains(token) && name == role)
+        };
+        for (token, role) in [
+            ("// A line comment", "comment"),
+            ("/* A block comment */", "comment"),
+            ("set", "keyword"),
+            ("show", "keyword"),
+            ("let", "keyword"),
+            ("import", "keyword"),
+            ("page", "function"),
+            ("figure", "function"),
+            ("paper", "property"),
+            ("\"a4\"", "string"),
+            ("2cm", "number"),
+            ("<intro>", "label"),
+            ("@intro", "label"),
+            ("Introduction", "markup.heading"),
+            ("strong", "emphasis.strong"),
+            ("emphasised", "emphasis"),
+            ("pi", "variable"),
+            ("A = ", "variable"),
+            ("rust", "markup.raw"),
+            ("`inline`", "markup.raw"),
+            ("https://typst.app", "markup.link"),
+            ("none", "constant"),
+        ] {
+            assert!(has(token, role), "{token} is {role}: {captured:?}");
+        }
+        assert!(
+            captured.iter().all(|(text, _)| !text.contains("This is")),
+            "prose stays in the ink: {captured:?}"
         );
     }
 }

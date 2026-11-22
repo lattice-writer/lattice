@@ -255,6 +255,9 @@ pub struct Shell {
     build_trace: Option<crate::app_log::trace::Trace>,
     /// The build to run once the one under way ends.
     queued_build: Option<BuildRequest>,
+    /// Typst's live build, waiting for a pause in typing
+    /// (`schedule_typst_live`).
+    typst_live: Option<Task<()>>,
     /// A build the writer asked for is under way or queued: when the last
     /// pass ends, its outcome is heard (`crate::sounds`).
     build_sound: bool,
@@ -543,6 +546,7 @@ impl Shell {
             build_task: None,
             build_trace: None,
             queued_build: None,
+            typst_live: None,
             build_sound: false,
             build_waiters: Vec::new(),
             build_target: None,

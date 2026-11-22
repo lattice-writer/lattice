@@ -1,0 +1,24 @@
+[package]
+name = "lattice-typst"
+version = "0.1.0"
+description = "Typst documents compiled in process for Lattice's native app: a World over the project folder and the editor's unsaved buffers, system and bundled fonts, Typst Universe packages, and the result as lattice-core's BuildResult."
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+# The Typst compiler and its PDF export (Apache-2.0), in process rather than
+# the `typst` CLI so the live preview compiles the buffers as typed and
+# reuses the last compile's work (comemo's memoization) on every keystroke.
+typst.workspace = true
+typst-pdf.workspace = true
+# The paged document a compile makes (`PagedDocument`), which `typst` does
+# not re-export.
+typst-layout.workspace = true
+typst-kit.workspace = true
+comemo.workspace = true
+lattice-core.workspace = true
+log.workspace = true
+
+[dev-dependencies]
+tempfile = "3"

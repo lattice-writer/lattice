@@ -7,7 +7,7 @@ Lattice 是一款 Mac 上的 LaTeX 写作应用。论文始终是磁盘上的普
 1. [快速上手](getting-started.md)：安装 Lattice 和 TeX，打开或新建项目，「上手」清单。
 2. [写作](writing.md)：编辑器、源码与可视化模式、实时 PDF 以及两者之间的跳转。
 3. [引用与论文库](citations.md)：`⌘⇧K` 与 `⌘⇧L`、论文库、Zotero。
-4. [编译与排错](building.md)：`⌘S`、编译问题、从头编译、导出。
+4. [编译与排错](building.md)：`⌘S`、编译问题、从头编译、导出、Typst 文档。
 5. [历史与版本对比](history.md)：撤回任何改动、保存版本、对比两个版本。
 6. [Overleaf 同步](overleaf.md)：打开 Overleaf 项目、上传项目、同步规则。
 7. [白板](boards.md)：项目里的 Excalidraw 白板。
