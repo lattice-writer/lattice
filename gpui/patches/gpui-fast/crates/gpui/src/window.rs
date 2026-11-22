@@ -5944,7 +5944,8 @@ impl Window {
         self.window_profiler.begin_input(event.kind_name());
         let update_count_before = self.invalidator.update_count();
         // The platform's points, as the window's zoomed pixels.
-        let event = crate::fast::interface_zoom::unzoomed_input(event, self.fast_interface_zoom);
+        let event =
+            crate::fast::interface_zoom::unzoomed_input(event, self.fast_interface_zoom);
         // Track input modality for focus-visible styling and hover suppression.
         // Hover is suppressed during keyboard modality so that keyboard navigation
         // doesn't show hover highlights on the item under the mouse cursor.

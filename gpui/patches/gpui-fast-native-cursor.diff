@@ -19,7 +19,7 @@ index 444dbd96..e154c7c9 100644
      cx.propagate_event && (cx.has_active_drag() || !native_mouse(window, event))
  }
 diff --git a/gpui-fast/crates/gpui/src/window.rs b/gpui-fast/crates/gpui/src/window.rs
-index bf972228..f7af3aff 100644
+index bf972228..cb4671de 100644
 --- a/gpui-fast/crates/gpui/src/window.rs
 +++ b/gpui-fast/crates/gpui/src/window.rs
 @@ -5881,8 +5881,11 @@ impl Window {
@@ -36,18 +36,8 @@ index bf972228..f7af3aff 100644
              // A drag can start before the next paint records its cursor in the frame.
              let style = cx
                  .active_drag_cursor_style()
-@@ -5941,8 +5944,7 @@ impl Window {
-         self.window_profiler.begin_input(event.kind_name());
-         let update_count_before = self.invalidator.update_count();
-         // The platform's points, as the window's zoomed pixels.
--        let event =
--            crate::fast::interface_zoom::unzoomed_input(event, self.fast_interface_zoom);
-+        let event = crate::fast::interface_zoom::unzoomed_input(event, self.fast_interface_zoom);
-         // Track input modality for focus-visible styling and hover suppression.
-         // Hover is suppressed during keyboard modality so that keyboard navigation
-         // doesn't show hover highlights on the item under the mouse cursor.
 diff --git a/gpui-fast/crates/gpui_macos/src/fast/composition.rs b/gpui-fast/crates/gpui_macos/src/fast/composition.rs
-index c05bad1d..1d7d635a 100644
+index c05bad1d..09163835 100644
 --- a/gpui-fast/crates/gpui_macos/src/fast/composition.rs
 +++ b/gpui-fast/crates/gpui_macos/src/fast/composition.rs
 @@ -75,6 +75,9 @@ pub(crate) struct MacComposition {
@@ -68,7 +58,15 @@ index c05bad1d..1d7d635a 100644
              stacking: Vec::new(),
              input_order: Rc::new(Vec::new()),
              native_event: 0,
-@@ -950,9 +954,116 @@ pub(crate) fn set_composition_order(
+@@ -682,6 +686,7 @@ pub(crate) fn draw_composed(window_state: &Rc<Mutex<MacWindowState>>, scene: Com
+         }
+     }
+     state.renderer.keep_frame_for_backdrops(false);
++    refresh_cursor_holes(state);
+ }
+ 
+ /// The bounds of the shown native views stacked under the GPUI surface
+@@ -950,9 +955,201 @@ pub(crate) fn set_composition_order(
              let _: () = msg_send![view, setFrame: frame];
          }
      }
@@ -76,15 +74,55 @@ index c05bad1d..1d7d635a 100644
      Ok(())
  }
  
-+/// The frames, in the window view's coordinates, of the shown native views
-+/// that own their pointer input (a webview, not a view forwarding its input
-+/// back to GPUI), which set their own cursor. Walks the views now in the
-+/// window's view rather than the recorded ones, which a surface dropped since
-+/// the last composition order may have released.
-+fn native_cursor_frames(state: &MacWindowState) -> Vec<NSRect> {
++/// A layer of the window's input stack, bottom to top, as the cursor reads
++/// it: a native view's frame where it sets its own cursor (`None` for one
++/// that is hidden, or forwards its input back to GPUI), or the regions a
++/// GPUI surface takes the pointer in. Both are in the window view's
++/// coordinates.
++enum CursorLayer {
++    Native(Option<NSRect>),
++    Gpui(Vec<NSRect>),
++}
++
++/// Where the window's view leaves the cursor to the native views over it:
++/// each native frame, without the regions of the GPUI surfaces above it,
++/// whose overlays (the palette, menus, popovers, toasts) keep GPUI's cursor.
++fn cursor_holes(layers: &[CursorLayer]) -> Vec<NSRect> {
++    let mut holes = Vec::new();
++    for (index, layer) in layers.iter().enumerate() {
++        let CursorLayer::Native(Some(frame)) = layer else {
++            continue;
++        };
++        let mut pieces = vec![*frame];
++        for above in &layers[index + 1..] {
++            if let CursorLayer::Gpui(regions) = above {
++                for region in regions {
++                    pieces = pieces
++                        .into_iter()
++                        .flat_map(|piece| subtract_rect(piece, *region))
++                        .collect();
++                }
++            }
++        }
++        holes.extend(pieces);
++    }
++    holes
++}
++
++/// The window's input stack as [`cursor_holes`] reads it. A native view is
++/// read only when it is in the window's view now: one a dropped surface
++/// released since the last composition order is found by walking the live
++/// views (into GPUI surfaces' views too, where an island may float), never
++/// by its recorded pointer.
++fn cursor_layers(state: &MacWindowState) -> Vec<CursorLayer> {
 +    let composition = &state.fast_composition;
 +    let native_view = state.native_view.as_ptr();
-+    let mut frames = Vec::new();
++    let gpui_views = composition
++        .gpui_surfaces
++        .values()
++        .map(|surface| surface.view.as_ptr() as usize)
++        .collect::<FxHashSet<_>>();
++    let mut live = FxHashSet::default();
 +    let mut pending = vec![native_view];
 +    while let Some(parent) = pending.pop() {
 +        let subviews: Id = unsafe { msg_send![parent, subviews] };
@@ -92,39 +130,73 @@ index c05bad1d..1d7d635a 100644
 +        for index in 0..count {
 +            let view: Id = unsafe { msg_send![subviews, objectAtIndex: index] };
 +            let key = view as usize;
-+            if !composition.native_views.contains(&key) {
-+                continue;
-+            }
-+            pending.push(view);
-+            if composition.input_forwarders.contains(&key) {
-+                continue;
-+            }
-+            unsafe {
-+                let hidden: Bool = msg_send![view, isHiddenOrHasHiddenAncestor];
-+                if hidden.as_bool() {
-+                    continue;
-+                }
-+                let bounds: NSRect = msg_send![view, bounds];
-+                let frame: NSRect = msg_send![view, convertRect: bounds, toView: native_view];
-+                if frame.size.width > 0. && frame.size.height > 0. {
-+                    frames.push(frame);
-+                }
++            if composition.native_views.contains(&key) {
++                live.insert(key);
++                pending.push(view);
++            } else if gpui_views.contains(&key) {
++                pending.push(view);
 +            }
 +        }
 +    }
-+    frames
++    let (flipped, height) = unsafe {
++        let flipped: Bool = msg_send![native_view, isFlipped];
++        let bounds: NSRect = msg_send![native_view, bounds];
++        (flipped.as_bool(), bounds.size.height)
++    };
++    composition
++        .input_order
++        .iter()
++        .map(|layer| match layer {
++            InputLayer::Native(view) => CursorLayer::Native(
++                (live.contains(view) && !composition.input_forwarders.contains(view))
++                    .then(|| unsafe {
++                        let view = *view as Id;
++                        let hidden: Bool = msg_send![view, isHiddenOrHasHiddenAncestor];
++                        if hidden.as_bool() {
++                            return None;
++                        }
++                        let bounds: NSRect = msg_send![view, bounds];
++                        let frame: NSRect =
++                            msg_send![view, convertRect: bounds, toView: native_view];
++                        (frame.size.width > 0. && frame.size.height > 0.).then_some(frame)
++                    })
++                    .flatten(),
++            ),
++            // An overlay view has the window view's frame, and its regions are
++            // in the coordinates `overlay_hit_test` reads them in.
++            InputLayer::Gpui(regions) => CursorLayer::Gpui(
++                regions
++                    .borrow()
++                    .iter()
++                    .map(|region| {
++                        let (x, y) = (
++                            f64::from(region.bounds.origin.x),
++                            f64::from(region.bounds.origin.y),
++                        );
++                        let (w, h) = (
++                            f64::from(region.bounds.size.width),
++                            f64::from(region.bounds.size.height),
++                        );
++                        let y = if flipped { y } else { height - y - h };
++                        NSRect::new(NSPoint::new(x, y), NSSize::new(w, h))
++                    })
++                    .collect(),
++            ),
++        })
++        .collect()
 +}
 +
-+/// Lays the window view's cursor rects out again when a native view that sets
-+/// its own cursor moved, resized, showed or hid.
++/// Lays the window view's cursor rects out again when the places it leaves
++/// to native views changed: one moved, resized, showed or hid, or a GPUI
++/// overlay over one came, went or changed.
 +///
 +/// GPUI's view registers its cursor as a cursor rect over its whole bounds,
-+/// and AppKit applies that rect as the pointer moves over a webview in it
-+/// too, so the page's own cursor (the I-beam over text, the pointing hand on
-+/// a link, a column's resize cursor) was put back to GPUI's at once
-+/// ([`window_cursor_rects`] leaves these frames out).
++/// and AppKit applied that rect as the pointer moved over a webview in it
++/// too, so the page's own cursor (the I-beam over text, a column's resize
++/// cursor) was put back to GPUI's at once ([`window_cursor_rects`] leaves
++/// these holes out).
 +pub(crate) fn refresh_cursor_holes(state: &mut MacWindowState) {
-+    let holes = native_cursor_frames(state);
++    let holes = cursor_holes(&cursor_layers(state));
 +    let unchanged = holes.len() == state.fast_composition.cursor_holes.len()
 +        && holes
 +            .iter()
@@ -141,6 +213,17 @@ index c05bad1d..1d7d635a 100644
 +            let _: () = msg_send![window, invalidateCursorRectsForView: native_view];
 +        }
 +    }
++}
++
++/// Whether `point`, in the window view's coordinates, is where the view
++/// leaves the cursor to a native view.
++pub(crate) fn in_cursor_hole(state: &MacWindowState, point: NSPoint) -> bool {
++    state.fast_composition.cursor_holes.iter().any(|hole| {
++        point.x >= hole.origin.x
++            && point.x < hole.origin.x + hole.size.width
++            && point.y >= hole.origin.y
++            && point.y < hole.origin.y + hole.size.height
++    })
 +}
 +
 +/// The rects GPUI's cursor covers in a view of `bounds`: all of it but where
@@ -185,7 +268,7 @@ index c05bad1d..1d7d635a 100644
  /// Creates the overlay view and renderer of a GPUI surface, the size of the
  /// window's view.
  unsafe fn create_gpui_surface(
-@@ -1075,7 +1186,7 @@ impl PlatformSurfaceAttachment for MacNativeSurface {
+@@ -1075,7 +1272,7 @@ impl PlatformSurfaceAttachment for MacNativeSurface {
              .window_state
              .upgrade()
              .context("native surface window has been released")?;
@@ -194,7 +277,7 @@ index c05bad1d..1d7d635a 100644
          unsafe {
              let native_view = window_state.native_view.as_ptr();
              let parent: Id = msg_send![self.view.as_ptr(), superview];
-@@ -1088,6 +1199,7 @@ impl PlatformSurfaceAttachment for MacNativeSurface {
+@@ -1088,6 +1285,7 @@ impl PlatformSurfaceAttachment for MacNativeSurface {
              let frame: NSRect = msg_send![native_view, convertRect: window_frame, toView: parent];
              let _: () = msg_send![self.view.as_ptr(), setFrame: frame];
          }
@@ -202,7 +285,7 @@ index c05bad1d..1d7d635a 100644
          self.bounds.set(bounds);
          Ok(())
      }
-@@ -1104,6 +1216,9 @@ impl PlatformSurfaceAttachment for MacNativeSurface {
+@@ -1104,6 +1302,9 @@ impl PlatformSurfaceAttachment for MacNativeSurface {
          unsafe {
              let _: () = msg_send![self.view.as_ptr(), setHidden: Bool::new(!visible)];
          }
@@ -213,16 +296,16 @@ index c05bad1d..1d7d635a 100644
      }
  
 diff --git a/gpui-fast/crates/gpui_macos/src/fast/composition_tests.rs b/gpui-fast/crates/gpui_macos/src/fast/composition_tests.rs
-index 19322742..e538c16c 100644
+index 19322742..f64272dd 100644
 --- a/gpui-fast/crates/gpui_macos/src/fast/composition_tests.rs
 +++ b/gpui-fast/crates/gpui_macos/src/fast/composition_tests.rs
 @@ -1,4 +1,4 @@
 -use super::whole_scene_layer;
-+use super::{subtract_rect, whole_scene_layer};
++use super::{CursorLayer, cursor_holes, subtract_rect, whole_scene_layer};
  use gpui::{
      AppContext as _, Bounds, ComposedSceneLayer, CompositionSurfaceId, ContentMask, Context,
      DevicePixels, IntoElement, ParentElement as _, PlatformHeadlessRenderer as _, Quad, Render,
-@@ -126,3 +126,29 @@ fn partial_or_split_layers_require_replay_even_when_primitives_match() {
+@@ -126,3 +126,63 @@ fn partial_or_split_layers_require_replay_even_when_primitives_match() {
      }
      assert!(whole_scene_layer(&empty, &[layer(vec![0..0]), layer(vec![0..0])]).is_none());
  }
@@ -252,12 +335,109 @@ index 19322742..e538c16c 100644
 +    assert_eq!(outside.len(), 1);
 +    assert_eq!(outside[0].size, window.size);
 +}
++
++#[test]
++fn cursor_holes_keep_gpui_overlays_above_a_native_view() {
++    use objc2_foundation::{NSPoint, NSRect, NSSize};
++    let rect = |x: f64, y: f64, w: f64, h: f64| NSRect::new(NSPoint::new(x, y), NSSize::new(w, h));
++    let area = |rects: &[NSRect]| {
++        rects
++            .iter()
++            .map(|r| r.size.width * r.size.height)
++            .sum::<f64>()
++    };
++    let page = rect(0., 0., 200., 100.);
++    let menu = rect(50., 20., 40., 30.);
++
++    // A menu over the page keeps GPUI's cursor where it takes the pointer.
++    let over = cursor_holes(&[
++        CursorLayer::Gpui(vec![rect(0., 0., 400., 400.)]),
++        CursorLayer::Native(Some(page)),
++        CursorLayer::Gpui(vec![menu]),
++    ]);
++    assert_eq!(area(&over), 200. * 100. - 40. * 30.);
++    assert!(over.iter().all(|hole| subtract_rect(*hole, menu).len() == 1
++        && subtract_rect(*hole, menu)[0].size == hole.size));
++
++    // The base surface under the page, a hidden view and a view forwarding
++    // its input to GPUI leave no hole.
++    let under = cursor_holes(&[
++        CursorLayer::Gpui(vec![rect(0., 0., 400., 400.)]),
++        CursorLayer::Native(Some(page)),
++        CursorLayer::Native(None),
++    ]);
++    assert_eq!(under.len(), 1);
++    assert_eq!(area(&under), 200. * 100.);
++}
 diff --git a/gpui-fast/crates/gpui_macos/src/window.rs b/gpui-fast/crates/gpui_macos/src/window.rs
-index 90eb52c7..f01c1fbf 100644
+index 90eb52c7..28c2c27b 100644
 --- a/gpui-fast/crates/gpui_macos/src/window.rs
 +++ b/gpui-fast/crates/gpui_macos/src/window.rs
-@@ -2644,7 +2644,9 @@ extern "C" fn reset_cursor_rects(this: &AnyObject, _: Sel) {
-         };
+@@ -406,6 +406,19 @@ pub(crate) unsafe fn set_active_window_cursor_style(style: CursorStyle) {
+                 invalidateCursorRectsForView: window_state.native_view.as_ptr()
+             ];
+         }
++        // GPUI is asked for its cursor only while it holds the pointer. Where
++        // its view leaves the cursor to a native view, no cursor rect applies
++        // it, so a drag or a captured press over a webview sets it here.
++        let view = window_state.native_view.as_ptr();
++        let window: *mut AnyObject = msg_send![view, window];
++        if !window.is_null() {
++            let location: NSPoint = msg_send![window, mouseLocationOutsideOfEventStream];
++            let point: NSPoint =
++                msg_send![view, convertPoint: location, fromView: ptr::null_mut::<AnyObject>()];
++            if crate::fast::composition::in_cursor_hole(&window_state, point) {
++                let _: () = msg_send![ns_cursor(style), set];
++            }
++        }
+     }
+ }
+ 
+@@ -2597,17 +2610,14 @@ fn add_mouse_tracking_area(native_view: &NSView) {
+     native_view.addTrackingArea(&tracking_area);
+ }
+ 
+-extern "C" fn reset_cursor_rects(this: &AnyObject, _: Sel) {
+-    // SAFETY: AppKit invokes cursor-rect updates on the main thread for GPUIView instances,
+-    // whose WINDOW_STATE_IVAR is initialized when the view is created. The cursor registered
+-    // below is a valid NSCursor.
++/// AppKit's cursor for `style`.
++///
++/// # Safety
++///
++/// Called on the AppKit main thread.
++unsafe fn ns_cursor(style: CursorStyle) -> *mut AnyObject {
+     unsafe {
+-        let _: () = msg_send![super(this, class!(NSView)), resetCursorRects];
+-
+-        let window_state = get_window_state(this);
+-        let cursor_style = window_state.lock().cursor_style;
+-
+-        let cursor: *mut AnyObject = match cursor_style {
++        match style {
+             CursorStyle::Arrow => msg_send![class!(NSCursor), arrowCursor],
+             CursorStyle::IBeam => msg_send![class!(NSCursor), IBeamCursor],
+             CursorStyle::Crosshair => msg_send![class!(NSCursor), crosshairCursor],
+@@ -2641,10 +2651,26 @@ extern "C" fn reset_cursor_rects(this: &AnyObject, _: Sel) {
+             CursorStyle::DragLink => msg_send![class!(NSCursor), dragLinkCursor],
+             CursorStyle::DragCopy => msg_send![class!(NSCursor), dragCopyCursor],
+             CursorStyle::ContextualMenu => msg_send![class!(NSCursor), contextualMenuCursor],
+-        };
++        }
++    }
++}
++
++extern "C" fn reset_cursor_rects(this: &AnyObject, _: Sel) {
++    // SAFETY: AppKit invokes cursor-rect updates on the main thread for GPUIView instances,
++    // whose WINDOW_STATE_IVAR is initialized when the view is created. The cursor registered
++    // below is a valid NSCursor.
++    unsafe {
++        let _: () = msg_send![super(this, class!(NSView)), resetCursorRects];
++
++        let window_state = get_window_state(this);
++        let cursor_style = window_state.lock().cursor_style;
++
++        let cursor = ns_cursor(cursor_style);
  
          let bounds: NSRect = msg_send![this, bounds];
 -        let _: () = msg_send![this, addCursorRect: bounds, cursor: cursor];

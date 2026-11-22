@@ -1,4 +1,4 @@
-use super::{subtract_rect, whole_scene_layer};
+use super::{CursorLayer, cursor_holes, subtract_rect, whole_scene_layer};
 use gpui::{
     AppContext as _, Bounds, ComposedSceneLayer, CompositionSurfaceId, ContentMask, Context,
     DevicePixels, IntoElement, ParentElement as _, PlatformHeadlessRenderer as _, Quad, Render,
@@ -151,4 +151,38 @@ fn cursor_rects_leave_out_a_native_view() {
     let outside = subtract_rect(window, rect(200., 0., 10., 10.));
     assert_eq!(outside.len(), 1);
     assert_eq!(outside[0].size, window.size);
+}
+
+#[test]
+fn cursor_holes_keep_gpui_overlays_above_a_native_view() {
+    use objc2_foundation::{NSPoint, NSRect, NSSize};
+    let rect = |x: f64, y: f64, w: f64, h: f64| NSRect::new(NSPoint::new(x, y), NSSize::new(w, h));
+    let area = |rects: &[NSRect]| {
+        rects
+            .iter()
+            .map(|r| r.size.width * r.size.height)
+            .sum::<f64>()
+    };
+    let page = rect(0., 0., 200., 100.);
+    let menu = rect(50., 20., 40., 30.);
+
+    // A menu over the page keeps GPUI's cursor where it takes the pointer.
+    let over = cursor_holes(&[
+        CursorLayer::Gpui(vec![rect(0., 0., 400., 400.)]),
+        CursorLayer::Native(Some(page)),
+        CursorLayer::Gpui(vec![menu]),
+    ]);
+    assert_eq!(area(&over), 200. * 100. - 40. * 30.);
+    assert!(over.iter().all(|hole| subtract_rect(*hole, menu).len() == 1
+        && subtract_rect(*hole, menu)[0].size == hole.size));
+
+    // The base surface under the page, a hidden view and a view forwarding
+    // its input to GPUI leave no hole.
+    let under = cursor_holes(&[
+        CursorLayer::Gpui(vec![rect(0., 0., 400., 400.)]),
+        CursorLayer::Native(Some(page)),
+        CursorLayer::Native(None),
+    ]);
+    assert_eq!(under.len(), 1);
+    assert_eq!(area(&under), 200. * 100.);
 }
