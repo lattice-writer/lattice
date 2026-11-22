@@ -270,6 +270,7 @@ let pendingFlush: (() => boolean) | null = null;
 
 /** Which of the page's edits ⌘Z in the buffer undoes together. */
 const undoGrouping = new UndoGrouping();
+document.addEventListener("beforeinput", () => undoGrouping.input(performance.now()), true);
 
 const readProjectFile = (path: string) => host().request<string>("md:read", { path });
 const loadAsset = (path: string) => host().request<string | null>("md:load-asset", { path }).catch(() => null);

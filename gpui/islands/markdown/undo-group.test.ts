@@ -28,6 +28,19 @@ describe("UndoGrouping", () => {
     expect(grouping.next("one two three", "zero one two three", 1_100)).toBe(false);
   });
 
+  it("measures the delay between inputs, however late each publication comes", () => {
+    const grouping = new UndoGrouping();
+    grouping.input(1_000);
+    grouping.input(1_080);
+    grouping.next("Some text.", "Some text. quo", 1_300);
+    grouping.input(1_330);
+    grouping.input(1_410);
+    // Published 590 ms after " quo" was: its timers lagged.
+    expect(grouping.next("Some text. quo", "Some text. quokka", 1_890)).toBe(true);
+    grouping.input(1_410 + NEW_GROUP_DELAY);
+    expect(grouping.next("Some text. quokka", "Some text. quokka!", 2_200)).toBe(false);
+  });
+
   it("joins a deletion that touches the last insertion", () => {
     const grouping = new UndoGrouping();
     grouping.next("one", "one tow", 1_000);
