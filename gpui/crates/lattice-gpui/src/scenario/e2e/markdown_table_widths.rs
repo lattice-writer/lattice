@@ -59,12 +59,13 @@ Between the tables.
 const DRAG: f64 = 80.;
 
 /// The page's view of a table: its first header cell's right edge (brought
-/// into view first), and its columns' set widths.
+/// into view first), its columns' set widths, and the width of its frame (a
+/// fitted column is never wider).
 fn table_facts(index: usize) -> String {
     format!(
         "(() => {{ const table = document.querySelectorAll('.lx-md-surface table')[{index}]; if (!table) return null; \
          const cell = table.querySelector('th'); cell.scrollIntoView({{ block: 'center' }}); const r = cell.getBoundingClientRect(); \
-         return JSON.stringify({{ edge: [r.right - 1, r.top + r.height / 2], width: cell.offsetWidth, \
+         return JSON.stringify({{ edge: [r.right - 1, r.top + r.height / 2], width: cell.offsetWidth, frame: table.parentElement?.clientWidth ?? 0, \
            cols: [...table.querySelectorAll('col')].map((col) => col.style.width), sized: table.hasAttribute('data-sized'), \
            cursor: document.querySelector('.lx-md-editor')?.hasAttribute('data-column-resize') ?? false }}); }})()"
     )
@@ -202,7 +203,13 @@ impl Run {
             fitted["sized"] == true
                 && kept_at(&saved, 1).len() == 3
                 && fitted_widths.first().is_some_and(|width| (width - fitted["width"].as_f64().unwrap_or_default()).abs() <= 1.)
-                && kept_at(&saved, 1).first().is_some_and(|width| *width >= MIN_FIT),
+                && kept_at(&saved, 1).first().is_some_and(|width| {
+                    // The long header's width, or the frame's in a pane too
+                    // narrow for it (as on CI's runner, its window smaller).
+                    let frame = fitted["frame"].as_f64().unwrap_or_default();
+                    *width > second["width"].as_f64().unwrap_or_default()
+                        && (*width >= MIN_FIT || (*width - frame).abs() <= 1.)
+                }),
             json!({ "before": second, "after": fitted, "saved": saved }),
         );
 

@@ -42,7 +42,8 @@
  *   md:overleaf       { changes, authors, canAct }   Overleaf's suggestions on the file, painted with their cards (also `doc:open`'s `overleaf`)
  *   doc:editable      { editable }      the file may (not) be edited here
  * Page to host:
- *   md:change         { source, base }  the whole file after an edit made against `base`
+ *   md:change         { source, base, join }  the whole file after an edit made against `base`;
+ *                     `join` when it falls in the previous edit's undo group (`undo-group.ts`)
  *   md:undo, md:redo
  *   md:table-widths   { tables }        a drag or a fit changed the file's saved tables: the
  *                     whole list, which the owner keeps as it is
@@ -70,6 +71,7 @@ import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useReducer,
 import { mount, activateLocale } from "../shared/boot";
 import { host } from "../shared/host";
 import { LineIndex, SplitScroll } from "./split-scroll";
+import { UndoGrouping } from "./undo-group";
 import { paperDragReplay, type PaperDragMessage } from "../shared/paper-drag";
 import { ScrollArea } from "../../../src/components/ui/scroll-area";
 import { InlineMessage } from "../../../src/components/ui/inline-message";
@@ -265,6 +267,9 @@ const DRAWN_DELAY_MS = 120;
 
 /** The editor's flush of an edit it is still holding (`onFlushPendingChange`). */
 let pendingFlush: (() => boolean) | null = null;
+
+/** Which of the page's edits ⌘Z in the buffer undoes together. */
+const undoGrouping = new UndoGrouping();
 
 const readProjectFile = (path: string) => host().request<string>("md:read", { path });
 const loadAsset = (path: string) => host().request<string | null>("md:load-asset", { path }).catch(() => null);
@@ -490,7 +495,7 @@ function Markdown() {
     markEcho(next);
     sourceRef.current = next;
     dispatch({ type: "source", source: next });
-    host().post("md:change", { source: next, base });
+    host().post("md:change", { source: next, base, join: undoGrouping.next(base, next, performance.now()) });
     return true;
   }, [markEcho]);
 

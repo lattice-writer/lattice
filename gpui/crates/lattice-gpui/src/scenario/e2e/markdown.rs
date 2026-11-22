@@ -353,7 +353,11 @@ impl Run {
         // key's character (U+F700–U+F703) mid-word adds nothing to the file.
         let placed = self.markdown_type(cx, island, " quo").await?;
         cx.update(|cx| island.read(cx).insert_text("\u{F700}\u{F701}\u{F702}\u{F703}", cx));
-        self.pause(cx, Duration::from_millis(100)).await;
+        // A pause past the page's 200 ms publication delay: the word reaches
+        // the buffer as two edits over 300 ms apart, which the buffer's own
+        // grouping would split, and ⌘Z below undoes it at once only as the
+        // page groups it (`undo-group.ts`).
+        self.pause(cx, Duration::from_millis(250)).await;
         let native = self.native(cx)?;
         for character in "kka".chars() {
             native::send_key(native, character, false)?;
