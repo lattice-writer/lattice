@@ -47,7 +47,7 @@ index bf972228..f7af3aff 100644
          // Hover is suppressed during keyboard modality so that keyboard navigation
          // doesn't show hover highlights on the item under the mouse cursor.
 diff --git a/gpui-fast/crates/gpui_macos/src/fast/composition.rs b/gpui-fast/crates/gpui_macos/src/fast/composition.rs
-index c05bad1d..84b348e0 100644
+index c05bad1d..1d7d635a 100644
 --- a/gpui-fast/crates/gpui_macos/src/fast/composition.rs
 +++ b/gpui-fast/crates/gpui_macos/src/fast/composition.rs
 @@ -75,6 +75,9 @@ pub(crate) struct MacComposition {
@@ -68,7 +68,7 @@ index c05bad1d..84b348e0 100644
              stacking: Vec::new(),
              input_order: Rc::new(Vec::new()),
              native_event: 0,
-@@ -950,9 +954,99 @@ pub(crate) fn set_composition_order(
+@@ -950,9 +954,116 @@ pub(crate) fn set_composition_order(
              let _: () = msg_send![view, setFrame: frame];
          }
      }
@@ -78,25 +78,41 @@ index c05bad1d..84b348e0 100644
  
 +/// The frames, in the window view's coordinates, of the shown native views
 +/// that own their pointer input (a webview, not a view forwarding its input
-+/// back to GPUI), which set their own cursor.
++/// back to GPUI), which set their own cursor. Walks the views now in the
++/// window's view rather than the recorded ones, which a surface dropped since
++/// the last composition order may have released.
 +fn native_cursor_frames(state: &MacWindowState) -> Vec<NSRect> {
++    let composition = &state.fast_composition;
 +    let native_view = state.native_view.as_ptr();
-+    state
-+        .fast_composition
-+        .native_views
-+        .iter()
-+        .filter(|view| !state.fast_composition.input_forwarders.contains(view))
-+        .filter_map(|&view| unsafe {
-+            let view = view as Id;
-+            let hidden: Bool = msg_send![view, isHiddenOrHasHiddenAncestor];
-+            if hidden.as_bool() {
-+                return None;
++    let mut frames = Vec::new();
++    let mut pending = vec![native_view];
++    while let Some(parent) = pending.pop() {
++        let subviews: Id = unsafe { msg_send![parent, subviews] };
++        let count: usize = unsafe { msg_send![subviews, count] };
++        for index in 0..count {
++            let view: Id = unsafe { msg_send![subviews, objectAtIndex: index] };
++            let key = view as usize;
++            if !composition.native_views.contains(&key) {
++                continue;
 +            }
-+            let bounds: NSRect = msg_send![view, bounds];
-+            let frame: NSRect = msg_send![view, convertRect: bounds, toView: native_view];
-+            (frame.size.width > 0. && frame.size.height > 0.).then_some(frame)
-+        })
-+        .collect()
++            pending.push(view);
++            if composition.input_forwarders.contains(&key) {
++                continue;
++            }
++            unsafe {
++                let hidden: Bool = msg_send![view, isHiddenOrHasHiddenAncestor];
++                if hidden.as_bool() {
++                    continue;
++                }
++                let bounds: NSRect = msg_send![view, bounds];
++                let frame: NSRect = msg_send![view, convertRect: bounds, toView: native_view];
++                if frame.size.width > 0. && frame.size.height > 0. {
++                    frames.push(frame);
++                }
++            }
++        }
++    }
++    frames
 +}
 +
 +/// Lays the window view's cursor rects out again when a native view that sets
@@ -119,10 +135,11 @@ index c05bad1d..84b348e0 100644
 +    }
 +    state.fast_composition.cursor_holes = holes;
 +    unsafe {
-+        let _: () = msg_send![
-+            state.native_window,
-+            invalidateCursorRectsForView: state.native_view.as_ptr()
-+        ];
++        let native_view = state.native_view.as_ptr();
++        let window: Id = msg_send![native_view, window];
++        if !window.is_null() {
++            let _: () = msg_send![window, invalidateCursorRectsForView: native_view];
++        }
 +    }
 +}
 +
@@ -168,7 +185,7 @@ index c05bad1d..84b348e0 100644
  /// Creates the overlay view and renderer of a GPUI surface, the size of the
  /// window's view.
  unsafe fn create_gpui_surface(
-@@ -1075,7 +1169,7 @@ impl PlatformSurfaceAttachment for MacNativeSurface {
+@@ -1075,7 +1186,7 @@ impl PlatformSurfaceAttachment for MacNativeSurface {
              .window_state
              .upgrade()
              .context("native surface window has been released")?;
@@ -177,7 +194,7 @@ index c05bad1d..84b348e0 100644
          unsafe {
              let native_view = window_state.native_view.as_ptr();
              let parent: Id = msg_send![self.view.as_ptr(), superview];
-@@ -1088,6 +1182,7 @@ impl PlatformSurfaceAttachment for MacNativeSurface {
+@@ -1088,6 +1199,7 @@ impl PlatformSurfaceAttachment for MacNativeSurface {
              let frame: NSRect = msg_send![native_view, convertRect: window_frame, toView: parent];
              let _: () = msg_send![self.view.as_ptr(), setFrame: frame];
          }
@@ -185,7 +202,7 @@ index c05bad1d..84b348e0 100644
          self.bounds.set(bounds);
          Ok(())
      }
-@@ -1104,6 +1199,9 @@ impl PlatformSurfaceAttachment for MacNativeSurface {
+@@ -1104,6 +1216,9 @@ impl PlatformSurfaceAttachment for MacNativeSurface {
          unsafe {
              let _: () = msg_send![self.view.as_ptr(), setHidden: Bool::new(!visible)];
          }

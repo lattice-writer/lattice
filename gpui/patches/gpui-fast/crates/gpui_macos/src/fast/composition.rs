@@ -960,25 +960,41 @@ pub(crate) fn set_composition_order(
 
 /// The frames, in the window view's coordinates, of the shown native views
 /// that own their pointer input (a webview, not a view forwarding its input
-/// back to GPUI), which set their own cursor.
+/// back to GPUI), which set their own cursor. Walks the views now in the
+/// window's view rather than the recorded ones, which a surface dropped since
+/// the last composition order may have released.
 fn native_cursor_frames(state: &MacWindowState) -> Vec<NSRect> {
+    let composition = &state.fast_composition;
     let native_view = state.native_view.as_ptr();
-    state
-        .fast_composition
-        .native_views
-        .iter()
-        .filter(|view| !state.fast_composition.input_forwarders.contains(view))
-        .filter_map(|&view| unsafe {
-            let view = view as Id;
-            let hidden: Bool = msg_send![view, isHiddenOrHasHiddenAncestor];
-            if hidden.as_bool() {
-                return None;
+    let mut frames = Vec::new();
+    let mut pending = vec![native_view];
+    while let Some(parent) = pending.pop() {
+        let subviews: Id = unsafe { msg_send![parent, subviews] };
+        let count: usize = unsafe { msg_send![subviews, count] };
+        for index in 0..count {
+            let view: Id = unsafe { msg_send![subviews, objectAtIndex: index] };
+            let key = view as usize;
+            if !composition.native_views.contains(&key) {
+                continue;
             }
-            let bounds: NSRect = msg_send![view, bounds];
-            let frame: NSRect = msg_send![view, convertRect: bounds, toView: native_view];
-            (frame.size.width > 0. && frame.size.height > 0.).then_some(frame)
-        })
-        .collect()
+            pending.push(view);
+            if composition.input_forwarders.contains(&key) {
+                continue;
+            }
+            unsafe {
+                let hidden: Bool = msg_send![view, isHiddenOrHasHiddenAncestor];
+                if hidden.as_bool() {
+                    continue;
+                }
+                let bounds: NSRect = msg_send![view, bounds];
+                let frame: NSRect = msg_send![view, convertRect: bounds, toView: native_view];
+                if frame.size.width > 0. && frame.size.height > 0. {
+                    frames.push(frame);
+                }
+            }
+        }
+    }
+    frames
 }
 
 /// Lays the window view's cursor rects out again when a native view that sets
@@ -1001,10 +1017,11 @@ pub(crate) fn refresh_cursor_holes(state: &mut MacWindowState) {
     }
     state.fast_composition.cursor_holes = holes;
     unsafe {
-        let _: () = msg_send![
-            state.native_window,
-            invalidateCursorRectsForView: state.native_view.as_ptr()
-        ];
+        let native_view = state.native_view.as_ptr();
+        let window: Id = msg_send![native_view, window];
+        if !window.is_null() {
+            let _: () = msg_send![window, invalidateCursorRectsForView: native_view];
+        }
     }
 }
 
