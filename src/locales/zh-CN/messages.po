@@ -1656,6 +1656,10 @@ msgstr "工作表数量须在 1–200 之间"
 msgid "a terminal command"
 msgstr "1 个终端命令"
 
+#: src/live-preview/live-preview-status.tsx
+msgid "A TeX error stops the document before its first page. Live preview starts once it compiles."
+msgstr "TeX 错误使文档在第一页之前停止。文档能编译后实时预览即会开始。"
+
 #: src/platform/host-errors-workspace.ts
 msgid "A TIFF needs Ghostscript or pdftoppm (Poppler); the PDF is written."
 msgstr "生成 TIFF 需要 Ghostscript 或 pdftoppm（Poppler）；PDF 已写出。"
@@ -14558,9 +14562,21 @@ msgstr "已下载 rtex {version}。移除后，所有项目的实时预览都会
 msgid "rtex could not load the preamble for live typing. The preview still updates after each full layout and build."
 msgstr "rtex 无法为实时排版载入导言区。每次整篇排版和编译后，预览仍会更新。"
 
+#: src/live-preview/live-preview-session.ts
+msgid "rtex exited with status {code}."
+msgstr "rtex 以状态 {code} 退出。"
+
+#: src/live-preview/live-preview-session.ts
+msgid "rtex stopped {times} times in five minutes. Click to restart it."
+msgstr "rtex 在五分钟内停止了 {times} 次。点击可重新启动。"
+
 #: src/live-preview/live-preview-status.tsx
 msgid "rtex stopped. The PDF still updates with each build."
 msgstr "rtex 已停止。PDF 仍会随每次编译更新。"
+
+#: src/live-preview/live-preview-session.ts
+msgid "rtex was ended by signal {signal}."
+msgstr "rtex 被信号 {signal} 终止。"
 
 #: src/trellis/trellis-build-sequence.tsx
 msgid "run {run}"
@@ -19464,6 +19480,10 @@ msgstr "正在等待 Overleaf 发送"
 #: src/platform/host-errors-overleaf.ts
 msgid "Waiting for Overleaf's live file tree before syncing moved files."
 msgstr "正在等待 Overleaf 的实时文件树，之后再同步移动的文件"
+
+#: src/live-preview/live-preview-status.tsx
+msgid "Waiting for the document to compile"
+msgstr "等待文档编译通过"
 
 #: src/overleaf/overleaf-connect-parts.tsx
 msgid "Waiting for you to sign in in the Overleaf window…"

@@ -52,10 +52,14 @@ function StatusPill({ state, snapshot, onRetry }: {
   } else if (snapshot?.phase === "first-layout") {
     label = t`First layout…`;
     detail = t`Typesetting the whole document once. Typing shows here as soon as it finishes.`;
-  } else if (snapshot?.phase === "error") {
+  } else if (snapshot?.phase === "exited") {
     tone = "stopped";
     label = t`Live preview stopped`;
     detail = snapshot.detail ?? t`rtex stopped. The PDF still updates with each build.`;
+  } else if (snapshot?.phase === "uncompiled") {
+    tone = "pending";
+    label = t`Waiting for the document to compile`;
+    detail = t`A TeX error stops the document before its first page. Live preview starts once it compiles.`;
   } else if (snapshot?.phase === "paused") {
     tone = "pending";
     label = t`Live typing paused`;

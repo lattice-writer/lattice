@@ -182,6 +182,9 @@ interface SessionExitedEvent {
   event: "SessionExited";
   session: number;
   stderr: string;
+  /** rtex's exit code, or the signal that ended it (null when unknown). */
+  code?: number | null;
+  signal?: number | null;
 }
 
 export type RtexEvent =

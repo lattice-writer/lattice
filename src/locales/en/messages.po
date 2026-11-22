@@ -1656,6 +1656,10 @@ msgstr "A spreadsheet must contain between 1 and 200 sheets"
 msgid "a terminal command"
 msgstr "a terminal command"
 
+#: src/live-preview/live-preview-status.tsx
+msgid "A TeX error stops the document before its first page. Live preview starts once it compiles."
+msgstr "A TeX error stops the document before its first page. Live preview starts once it compiles."
+
 #: src/platform/host-errors-workspace.ts
 msgid "A TIFF needs Ghostscript or pdftoppm (Poppler); the PDF is written."
 msgstr "A TIFF needs Ghostscript or pdftoppm (Poppler); the PDF is written."
@@ -14558,9 +14562,21 @@ msgstr "rtex {version} is downloaded. Removing it turns live preview off in ever
 msgid "rtex could not load the preamble for live typing. The preview still updates after each full layout and build."
 msgstr "rtex could not load the preamble for live typing. The preview still updates after each full layout and build."
 
+#: src/live-preview/live-preview-session.ts
+msgid "rtex exited with status {code}."
+msgstr "rtex exited with status {code}."
+
+#: src/live-preview/live-preview-session.ts
+msgid "rtex stopped {times} times in five minutes. Click to restart it."
+msgstr "rtex stopped {times} times in five minutes. Click to restart it."
+
 #: src/live-preview/live-preview-status.tsx
 msgid "rtex stopped. The PDF still updates with each build."
 msgstr "rtex stopped. The PDF still updates with each build."
+
+#: src/live-preview/live-preview-session.ts
+msgid "rtex was ended by signal {signal}."
+msgstr "rtex was ended by signal {signal}."
 
 #: src/trellis/trellis-build-sequence.tsx
 msgid "run {run}"
@@ -19464,6 +19480,10 @@ msgstr "Waiting for Overleaf to send it"
 #: src/platform/host-errors-overleaf.ts
 msgid "Waiting for Overleaf's live file tree before syncing moved files."
 msgstr "Waiting for Overleaf's live file tree before syncing moved files."
+
+#: src/live-preview/live-preview-status.tsx
+msgid "Waiting for the document to compile"
+msgstr "Waiting for the document to compile"
 
 #: src/overleaf/overleaf-connect-parts.tsx
 msgid "Waiting for you to sign in in the Overleaf window…"

@@ -91,7 +91,12 @@ pub fn status(preview: &LivePreview) -> Option<Status> {
             t!("First layout…").to_string(),
             Some(t!("Typesetting the whole document once. Typing shows here as soon as it finishes.").to_string()),
         ),
-        _ if phase == Some(Phase::Error) => (
+        _ if phase == Some(Phase::Uncompiled) => (
+            Tone::Pending,
+            t!("Waiting for the document to compile").to_string(),
+            Some(t!("A TeX error stops the document before its first page. Live preview starts once it compiles.").to_string()),
+        ),
+        _ if phase == Some(Phase::Exited) => (
             Tone::Stopped,
             t!("Live preview stopped").to_string(),
             Some(
