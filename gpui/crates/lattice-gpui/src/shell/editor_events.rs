@@ -4,6 +4,7 @@
 //! marks its file in the tree and its section in the outline.
 
 use gpui::{AppContext as _, Context, Entity, Window};
+use lattice_core::project::is_typst_path;
 
 use super::{Shell, build::BuildRequest};
 use crate::editor_panel::{EditorPanel, EditorPanelEvent};
@@ -19,9 +20,12 @@ impl Shell {
     ) {
         cx.subscribe_in(editor, window, Self::on_editor_event)
             .detach();
-        // The first Typst file scans the fonts its first build needs.
-        if lattice_typst::is_typst(editor.read(cx).relative()) {
-            cx.background_spawn(async { lattice_typst::prewarm_fonts() })
+        // The first Typst file starts the Typst helper, which reads the
+        // fonts its first build needs, when Typst support is installed.
+        if is_typst_path(editor.read(cx).relative())
+            && let Some(binary) = crate::typst::binary(cx)
+        {
+            cx.background_spawn(async move { crate::typst::helper::prewarm(&binary) })
                 .detach();
         }
         self.editors.push(editor.downgrade());
@@ -63,8 +67,9 @@ impl Shell {
             // app's follows its open file.
             EditorPanelEvent::Edited => {
                 self.document_edited(editor, cx);
-                if lattice_typst::is_typst(editor.read(cx).relative())
+                if is_typst_path(editor.read(cx).relative())
                     && crate::settings::builds_automatically(cx)
+                    && crate::typst::live_compiles(cx)
                 {
                     self.schedule_typst_live(window, cx);
                 }

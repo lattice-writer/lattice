@@ -18,6 +18,8 @@ use std::{collections::HashMap, time::Duration};
 use futures::{StreamExt as _, channel::mpsc, channel::oneshot};
 use gpui::{App, AppContext as _, AsyncWindowContext, Context, Entity, WeakEntity, Window};
 use lattice_core::latex::{self, BuildResult, BuildStep, BuildSteps};
+use lattice_core::project::is_typst_path;
+use lattice_core::typst_wire::Reply;
 use lattice_i18n::{n, t, tr};
 use lattice_ui::components::ToastLevel;
 
@@ -191,7 +193,7 @@ impl Shell {
                 let relative = editor.relative().to_ascii_lowercase();
                 (relative.ends_with(".tex")
                     || relative.ends_with(".bib")
-                    || lattice_typst::is_typst(&relative))
+                    || is_typst_path(&relative))
                 .then(|| {
                     (
                         editor.relative().to_string(),
@@ -202,7 +204,7 @@ impl Shell {
             .collect();
         let overlay: HashMap<String, String> = saved
             .iter()
-            .filter(|(path, _)| lattice_typst::is_typst(path))
+            .filter(|(path, _)| is_typst_path(path))
             .map(|(path, text)| (path.clone(), text.clone()))
             .collect();
         let root = project.read(cx).root().to_path_buf();
@@ -248,6 +250,9 @@ impl Shell {
         crate::build::tex_setup::reminder::building(cx.entity_id(), true, cx);
         self.build_trace = Some(oplog::start(request, cx));
         let live_preview = self.live_preview.clone();
+        // Typst documents compile in the helper Typst support installs
+        // (`crate::typst`); without it, the build asks to download it.
+        let typst = crate::typst::binary(cx);
         self.build_task = Some(cx.spawn_in(window, async move |this, cx| {
             for save in saves {
                 if let Err(error) = save.await {
@@ -290,12 +295,18 @@ impl Shell {
                 let root = root.clone();
                 async move {
                     let before = fingerprint_pdfs(&root, &candidates);
+                    let mut needs_typst = false;
                     let result = match latex::choose_document(&root, open_document.as_deref()) {
-                        Ok((document, one_off)) if lattice_typst::is_typst(&document) => {
-                            let mut result = lattice_typst::build(&root, &document, &overlay);
-                            result.one_off = one_off;
-                            Ok(result)
-                        }
+                        Ok((document, one_off)) if is_typst_path(&document) => Ok(match &typst {
+                            Some(binary) => crate::typst::helper::build(
+                                binary, &root, &document, &overlay, one_off,
+                            ),
+                            None => {
+                                needs_typst = true;
+                                Reply::failed(t!("Typst support isn’t installed").to_string())
+                                    .into_build(&root, &document, one_off)
+                            }
+                        }),
                         _ => latex::build(
                             &root,
                             request.force,
@@ -321,6 +332,7 @@ impl Shell {
                             rewritten,
                             sources,
                             live,
+                            needs_typst,
                         }
                     })
                 }
@@ -333,10 +345,30 @@ impl Shell {
                 build_panel.update(cx, |panel, cx| panel.steps(latest, cx));
             }
             let outcome = build.await;
+            let needs_typst = matches!(&outcome, Ok(finished) if finished.needs_typst);
             this.update_in(cx, |this, window, cx| {
                 this.finish_build(&project, revision, request, Some(outcome), window, cx)
             })
             .ok();
+            // The build could not compile a Typst document: ask to download
+            // Typst support, and build again once it is installed.
+            if needs_typst {
+                let window = cx.window_handle();
+                cx.update(|_, cx| {
+                    crate::typst::require(
+                        request.live,
+                        move |cx| {
+                            window
+                                .update(cx, |_, window, cx| {
+                                    this.update(cx, |this, cx| this.run_build(request, window, cx))
+                                })
+                                .ok();
+                        },
+                        cx,
+                    )
+                })
+                .ok();
+            }
         }));
         cx.notify();
     }
@@ -349,7 +381,7 @@ impl Shell {
         let editor = self.active_editor()?;
         let editor = editor.read(cx);
         // Any Typst file compiles: it has no document class to look for.
-        if lattice_typst::is_typst(editor.relative()) {
+        if is_typst_path(editor.relative()) {
             return Some((editor.relative().to_string(), true));
         }
         editor
@@ -418,6 +450,7 @@ impl Shell {
                 rewritten,
                 sources,
                 live,
+                ..
             })) => {
                 let cancelled = result
                     .diagnostics
@@ -718,6 +751,8 @@ pub(super) struct Finished {
     sources: HashMap<String, String>,
     /// The live preview's token for the files the build read.
     live: Option<(u64, usize)>,
+    /// A Typst document Typst support is not installed for.
+    needs_typst: bool,
 }
 
 #[cfg(test)]

@@ -186,6 +186,7 @@ fn builds(
             width,
             cx,
         ),
+        row(dialog, typst_support(cx), width, cx),
     ];
     if let Some(project) = dialog.project.clone() {
         let manifest = project.read(cx).manifest().clone();
@@ -376,6 +377,58 @@ fn live_preview_rows(
         ));
     }
     rows
+}
+
+/// Typst support (`crate::typst`), which the first Typst build downloads:
+/// its state, and Remove and Download again, or Download before that.
+fn typst_support(cx: &App) -> Row {
+    let row = Row::new("typst-support", t!("Typst support"));
+    if !crate::typst::available(cx) {
+        return row.description(t!("Not available on this computer."), cx);
+    }
+    let buttons = div()
+        .w(controls::CONTROL_WIDTH)
+        .flex()
+        .justify_end()
+        .gap_2();
+    match (crate::typst::phase(cx), crate::typst::installed_size(cx)) {
+        (crate::typst::Phase::Downloading(_) | crate::typst::Phase::Installing, _) => {
+            row.description(t!("Downloading…"), cx)
+        }
+        (_, Some(bytes)) => row
+            .description(
+                t!(
+                    "Installed ({size} MB). Typst documents compile in Lattice.",
+                    size = bytes.div_ceil(1_000_000)
+                ),
+                cx,
+            )
+            .control(
+                buttons
+                    .child(
+                        Button::new("typst-download-again", t!("Download again"))
+                            .compact()
+                            .on_click(|_, _, cx| crate::typst::download(cx)),
+                    )
+                    .child(
+                        Button::new("typst-remove", t!("Remove"))
+                            .compact()
+                            .on_click(|_, _, cx| crate::typst::ask_remove(cx)),
+                    ),
+            ),
+        _ => row
+            .description(
+                t!("Not installed. The first Typst build asks to download it."),
+                cx,
+            )
+            .control(
+                buttons.child(
+                    Button::new("typst-download", t!("Download"))
+                        .compact()
+                        .on_click(|_, _, cx| crate::typst::download(cx)),
+                ),
+            ),
+    }
 }
 
 fn updates(

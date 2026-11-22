@@ -63,6 +63,7 @@ mod structured;
 mod submission;
 mod terminal;
 mod titlebar;
+mod typst;
 mod updater;
 mod welcome;
 mod window_material;

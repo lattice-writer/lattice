@@ -162,6 +162,7 @@ pub fn init(scripted: bool, cx: &mut App) {
     crate::app_log::capture::install(cx);
     // Always on for Lattice, behind Beta updates for Lattice Beta (`updater.rs`).
     crate::updater::install(scripted, cx);
+    crate::typst::init(scripted, cx);
     crate::updater::register_actions(cx);
     crate::get_started::progress::install(state.clone(), cx);
     crate::help::whats_new::announce_update(

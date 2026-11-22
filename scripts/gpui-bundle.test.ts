@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
-import { EXECUTABLE, FLAVORS, infoPlist, releaseRepository, updaterManifest } from "./gpui-bundle.mjs";
+import { EXECUTABLE, FLAVORS, infoPlist, releaseRepository, typstHelperFiles, updaterManifest } from "./gpui-bundle.mjs";
 
 // The GPUI package ships two ways. Lattice Beta never reaches the Tauri app's
 // users: it installs under its own identity and its feed is not the Tauri
@@ -95,6 +95,22 @@ describe("the GPUI package workflow", () => {
     expect(steps.some((step) => step.uses?.startsWith("actions/cache/save") || step.with?.["save-if"] === true)).toBe(false);
   });
 
+  it("packages the Typst helper the cargo build makes, checks its signatures and keeps it in the artifact", () => {
+    expect(scripts).toContain("--typst-helper gpui/target/release/lattice-typst");
+    expect(scripts).toContain("codesign --verify --strict --verbose=2 \"$helper_dir/lattice-typst\"");
+    const upload = steps.find((step) => step.uses?.startsWith("actions/upload-artifact"));
+    expect(String(upload?.with?.path)).toContain("gpui-bundle/Lattice-typst_*_aarch64.tar.gz.sig");
+    expect(read("gpui/Cargo.toml")).toMatch(/default-members = \[[^\]]*"crates\/lattice-typst"/);
+  });
+
+  it("names the Typst helper's archive as the native app downloads it", () => {
+    expect(typstHelperFiles("1.2.3")).toEqual({
+      archive: "Lattice-typst_1.2.3_aarch64.tar.gz",
+      signature: "Lattice-typst_1.2.3_aarch64.tar.gz.sig",
+    });
+    expect(read("gpui/crates/lattice-gpui/src/typst/install.rs")).toContain('format!("Lattice-typst_{}_aarch64.tar.gz", lattice_core::VERSION)');
+  });
+
   it("keeps either flavor's manifest in the artifact (latest.json or latest-native.json)", () => {
     const upload = steps.find((step) => step.uses?.startsWith("actions/upload-artifact"));
     expect(String(upload?.with?.path)).toContain("gpui-bundle/latest*.json");
@@ -134,5 +150,12 @@ describe("the release workflow", () => {
     expect(publish.find((step) => step.uses?.startsWith("actions/download-artifact"))?.with).toMatchObject({ name: "lattice-gpui-macos-aarch64-main" });
     expect(publish.some((step) => step.if)).toBe(false);
     expect(publish.map((step) => step.run ?? "").join("\n")).not.toMatch(/release-apps|replace-updater-archive/);
+  });
+
+  it("uploads the Typst helper under the version's tag once check-native-feed has verified it, before the asset check", () => {
+    expect(at("Upload Typst support")).toBeGreaterThan(at("Upload the native app"));
+    expect(at("Upload Typst support")).toBeLessThan(at("Check the release assets"));
+    expect(script("Upload Typst support")).toContain('node scripts/check-native-feed.mjs --typst "$GITHUB_REF_NAME"');
+    expect(script("Upload Typst support")).toContain('test "${#files[@]}" -eq 2');
   });
 });

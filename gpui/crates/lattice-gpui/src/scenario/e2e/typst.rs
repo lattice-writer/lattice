@@ -1,6 +1,12 @@
-//! A Typst document beside the fixture's LaTeX paper: Build compiles it on
-//! its own (a one-off, so the paper stays the default) into its PDF, which
-//! the PDF pane shows; an edit, unsaved, compiles live after a pause in
+//! A Typst document beside the fixture's LaTeX paper, with Typst support not
+//! installed (`crate::typst`): the first Build asks to download it, with its
+//! size, and Not now leaves the project as it was, typing compiling nothing;
+//! the next Build asks again, and Download installs the helper from a local
+//! stand-in release (gpui/script/e2e makes it, signed with a key of the
+//! run's own, `LATTICE_E2E_TYPST_RELEASE`) and runs the build that asked.
+//! That build compiles the document on its own (a one-off, so the paper
+//! stays the default) into its PDF, which the PDF pane shows; an edit,
+//! unsaved, compiles live after a pause in
 //! typing, its error lands in the error list at its file and line, and
 //! following it puts the cursor there; fixing the edit redraws the PDF in
 //! place. The edit-to-diagnostic and edit-to-pixels times go in the log.
@@ -23,6 +29,89 @@ impl Run {
         std::fs::write(&source, NOTES)?;
         let editor = self.open(cx, &source, Some(1))?;
         self.pause(cx, Duration::from_millis(200)).await;
+
+        let release = std::env::var_os("LATTICE_E2E_TYPST_RELEASE").map(std::path::PathBuf::from);
+        let archive = release.as_ref().map(|release| release.join("lattice-typst.tar.gz"));
+        let public_key = release
+            .as_ref()
+            .and_then(|release| std::fs::read_to_string(release.join("key.pub")).ok());
+        let (Some(archive), Some(public_key)) = (archive, public_key) else {
+            steps.check(
+                "the first Typst build asks to download Typst support, with its size, and Not now keeps the project as it was",
+                false,
+                json!({ "error": "no stand-in release: LATTICE_E2E_TYPST_RELEASE (gpui/script/e2e makes it from target/release/lattice-typst)" }),
+            );
+            return Ok(());
+        };
+        cx.update(|cx| {
+            crate::typst::use_source(
+                crate::typst::install::Source {
+                    urls: vec![format!("file://{}", archive.display())],
+                    public_key,
+                },
+                cx,
+            )
+        });
+        let question = |cx: &mut AsyncApp| {
+            cx.update(|cx| crate::confirm::install(cx).read(cx).question().map(|question| question.to_string()))
+        };
+
+        // Not installed: Build asks, and Not now leaves everything as it was.
+        let (declined_build, _) = self.build(cx).await?;
+        let asked = self
+            .wait_for(cx, Duration::from_secs(10), |_, cx| crate::confirm::install(cx).read(cx).is_open())
+            .await;
+        let asked_title = question(cx);
+        self.with_window(cx, |_, _, cx| crate::confirm::install(cx).update(cx, |host, cx| host.dismiss(cx)))?;
+        let reported = cx.update(|cx| {
+            self.shell
+                .read(cx)
+                .build_panel()
+                .read(cx)
+                .diagnostics()
+                .iter()
+                .any(|diagnostic| diagnostic.message.contains("Typst support"))
+        });
+        let buffer = cx.update(|cx| editor.read(cx).lattice_editor().read(cx).buffer().clone());
+        cx.update(|cx| buffer.update(cx, |buffer, cx| buffer.edit([(0..0, "// typed\n")], None, cx)));
+        self.pause(cx, Duration::from_millis(600)).await;
+        let typing_quiet = cx.update(|cx| !self.shell.read(cx).building() && !crate::confirm::install(cx).read(cx).is_open());
+        cx.update(|cx| buffer.update(cx, |buffer, cx| buffer.undo(cx)));
+        steps.check(
+            "the first Typst build asks to download Typst support, with its size, and Not now keeps the project as it was",
+            !declined_build
+                && asked
+                && asked_title.as_deref().is_some_and(|title| title.contains("one-time download (~") && title.contains("MB"))
+                && reported
+                && !pdf.exists()
+                && typing_quiet,
+            json!({ "asked": asked_title, "reported": reported, "pdf": pdf.exists(), "typing_quiet": typing_quiet }),
+        );
+
+        // Build asks again; Download installs the helper and runs the build.
+        let started = Instant::now();
+        self.with_window(cx, |shell, window, cx| {
+            shell.update(cx, |shell, cx| shell.build(&crate::shell::Build, window, cx))
+        })?;
+        let asked_again = self
+            .wait_for(cx, Duration::from_secs(10), |_, cx| crate::confirm::install(cx).read(cx).is_open())
+            .await;
+        self.with_window(cx, |_, window, cx| {
+            crate::confirm::install(cx).update(cx, |host, cx| host.accept(window, cx))
+        })?;
+        let installed = self
+            .wait_for(cx, Duration::from_secs(60), |_, cx| crate::typst::binary(cx).is_some())
+            .await;
+        let rebuilt = self
+            .wait_for(cx, Duration::from_secs(60), |shell, cx| {
+                !shell.read(cx).building() && pdf.is_file()
+            })
+            .await;
+        steps.check(
+            "Download installs Typst support from the release, checked with its key, and runs the build that asked",
+            asked_again && installed && rebuilt,
+            json!({ "asked_again": asked_again, "installed": installed, "built": rebuilt, "ms": started.elapsed().as_millis() }),
+        );
 
         let (built, took) = self.build(cx).await?;
         let (document, one_off) = cx.update(|cx| {
@@ -103,7 +192,7 @@ impl Run {
                 let panel = shell.read(cx).pdf().read(cx);
                 let view = panel.live_view().read(cx);
                 view.shown_digest().map(str::to_string) != before
-                    && panel.pages_drawn(cx) > 0
+                    && panel.page_count(cx) > 0
                     && shell.read(cx).build_panel().read(cx).succeeded() == Some(true)
             })
             .await;

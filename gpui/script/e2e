@@ -57,6 +57,15 @@ project="$scratch/project"
 out="${1:-$scratch/e2e.json}"
 mkdir -p "$scratch/home"
 cp -R "$root/fixtures/e2e" "$project"
+# Typst support as the app downloads it on first use, from a stand-in
+# release on disk signed with a key made for this run
+# (../scripts/typst-helper-fake-release.mjs); the typst module installs it
+# from there, so no step needs the network. The release build makes the
+# helper beside the app (both are the workspace's default members).
+if [ -x "$root/target/release/lattice-typst" ]; then
+  node "$root/../scripts/typst-helper-fake-release.mjs" "$root/target/release/lattice-typst" "$scratch/typst-release" >/dev/null
+  export LATTICE_E2E_TYPST_RELEASE="$scratch/typst-release"
+fi
 
 # The lab switches (patches/README.md). GPUI_LAB_IGNORE_OCCLUSION, as CI's
 # e2e step sets it: on a locked or covered display the window keeps drawing,

@@ -23,7 +23,9 @@ members = [
 # Vendored, patched upstream crates (patches/README.md): path dependencies
 # through `[patch]` below, never workspace members.
 exclude = ["patches"]
-default-members = ["crates/lattice-gpui"]
+# The app and the Typst helper it downloads on first use: a plain
+# `cargo build --release` makes both, as the release packages both.
+default-members = ["crates/lattice-gpui", "crates/lattice-typst"]
 
 [workspace.package]
 edition = "2024"
@@ -90,8 +92,9 @@ tree-sitter-javascript = "0.25.0"
 # Codebook publishes it, on tree-sitter-language like the LaTeX grammar above
 # (uben0's own crate still pins tree-sitter 0.20).
 codebook-tree-sitter-typst = "0.12.2"
-# Typst documents (lattice-typst), compiled in process: the compiler, its PDF
-# export and the kit's fonts, packages and clock, all Apache-2.0. The kit's
+# Typst documents, compiled by the lattice-typst helper the app downloads on
+# first use (never linked into lattice-gpui): the compiler, its PDF export
+# and the kit's fonts, packages and clock, all Apache-2.0. The kit's
 # downloader is left out (it links OpenSSL); packages come down through
 # lattice-core's HTTP client instead. comemo is the compiler's memoization,
 # direct for its cache eviction.
@@ -111,7 +114,6 @@ lattice-board = { path = "crates/lattice-board" }
 lattice-editor = { path = "crates/lattice-editor" }
 lattice-i18n = { path = "crates/lattice-i18n" }
 lattice-settings = { path = "crates/lattice-settings" }
-lattice-typst = { path = "crates/lattice-typst" }
 # The theme format and resolver, shared with the Tauri app (Apache-2.0).
 lattice-theme = { path = "../src-tauri/lattice-theme" }
 lattice-ui = { path = "crates/lattice-ui" }
