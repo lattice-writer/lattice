@@ -93,6 +93,8 @@
 /* A long document drawn in a window holds the reader's place itself (block-window.ts). */
 .lx-md-editor .lx-md-surface[data-lx-windowed] { overflow-anchor: none; }
 .lx-md-editor .lx-md-surface ::selection { background: var(--editor-selection-surface); }
+/* A selected inline formula draws its own highlight; the hidden DOM range ProseMirror keeps around it must not paint as text (WebKit painted it from the paragraph start). */
+.lx-md-editor .lx-md-surface.ProseMirror-hideselection:has(.lx-md-math.is-selected) ::selection { background: transparent; }
 
 /* Prose */
 .lx-md-editor .lx-md-surface p { margin: 0 0 var(--lx-md-flow); }
