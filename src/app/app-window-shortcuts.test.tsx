@@ -79,6 +79,42 @@ describe("Lattice's shortcuts with focus in a Synara frame", () => {
   });
 });
 
+describe("A held key", () => {
+  // The keyboard sends the press, then a repeat every 40 ms or so (25 a second
+  // on a Linux desktop) until the key is let go; the app renders in between.
+  const hold = async (press: (repeat: boolean) => void) => {
+    for (const repeat of [false, true, true, true]) {
+      press(repeat);
+      await act(() => new Promise((resolve) => setTimeout(resolve, 40)));
+    }
+  };
+
+  it("opens the palette once while ⌘K is held, beside the Agent panel or in it", async () => {
+    renderApp(projectCommands());
+    await screen.findByRole("button", { name: "Switch project" });
+    // The bug: each repeat toggled the palette again, so it flickered open and shut.
+    await hold((repeat) => fireEvent.keyDown(window, { key: "k", metaKey: true, repeat }));
+    expect(paletteInput()).toBeInTheDocument();
+
+    // Let go and pressed again, ⌘K still closes it.
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+    await waitFor(() => expect(paletteInput()).toBeNull());
+    // A frame that knows the key is held says so.
+    const { frame } = await openAgentFrame({ ready: true });
+    await hold((repeat) => postWindowMessage(frame.contentWindow, { ...forwarded("k", "KeyK"), repeat }));
+    expect(paletteInput()).toBeInTheDocument();
+  });
+
+  it("closes one tab while ⌘W is held, never the window behind it", async () => {
+    renderApp(refreshableProject());
+    await waitForSelectedTab("main.tex");
+    windowApi.close.mockClear();
+    await hold((repeat) => fireEvent.keyDown(window, { key: "w", metaKey: true, repeat }));
+    expect(documentTab("main.tex")).toBeNull();
+    expect(windowApi.close).not.toHaveBeenCalled();
+  });
+});
+
 describe("⌘W", () => {
   it("closes the document tab, and the window only once no tab is left", async () => {
     renderApp(refreshableProject());

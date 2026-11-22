@@ -249,7 +249,11 @@ export async function createAppSizeReport(workspace = process.cwd()) {
 // Raised by 1 KB because that local figure left no headroom: the v0.19.2
 // release build of the same tree on the Mac mini measured 1,471,863 bytes
 // (release run 45101775273), 84 over, and failed before publishing.
-const EAGER_JS_BUDGET_BYTES = Math.floor(1.4 * 1024 * 1024) + 4_797;
+// Raised by 115 bytes for running a held shortcut once: the repeat check in
+// the window's one key listener, the seven commands that ask to repeat, and
+// the flag on a key a Synara frame forwards, all read at the first keypress
+// (1,472,085 -> 1,472,200 bytes, a local build on Linux).
+const EAGER_JS_BUDGET_BYTES = Math.floor(1.4 * 1024 * 1024) + 4_912;
 // A perf-lab build (VITE_PERF_LAB=1, scripts/perf-lab.mjs) compiles in the
 // lab's hooks (~0.3 KB eager on 2026-11-04). They never ship, so they must not
 // spend the release budget: a release at its limit would fail every lab build.

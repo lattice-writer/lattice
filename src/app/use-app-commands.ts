@@ -37,6 +37,14 @@ export type AppCommand = {
   shortcut?: KeyCombo;
   when?: boolean;
   /**
+   * True for a command worth running again while its key stays down: a step
+   * through history or the build's problems, a zoom. Every other runs once a
+   * press. Most open, close or start something: a held ⌘K toggled the palette
+   * at each repeat the keyboard sent, and a held ⌘W closed the tab, then the
+   * window.
+   */
+  repeat?: true;
+  /**
    * False keeps a command out of the palette's Recent group: one that
    * discards work (cleaning, a layout reset) should be asked for by name,
    * never sit one Enter away.
@@ -70,8 +78,12 @@ export function paletteEntries(commands: readonly AppCommand[]): AppCommand[] {
   return commands.filter((command) => command.label && command.when !== false && command.palette !== false);
 }
 
-/** What a keydown says, for matching it to a combination: a real event, or one a Synara frame forwarded. */
-export type KeyPress = Pick<KeyboardEvent, "key" | "code" | "metaKey" | "ctrlKey" | "shiftKey" | "altKey">;
+/**
+ * What a keydown says, for matching it to a combination: a real event, or one
+ * a Synara frame forwarded. `repeat` is the keyboard sending the key again
+ * while it is held; a frame that does not say is taken as a first press.
+ */
+export type KeyPress = Pick<KeyboardEvent, "key" | "code" | "metaKey" | "ctrlKey" | "shiftKey" | "altKey"> & { repeat?: boolean };
 
 /**
  * Whether `press` is `combo`, the way the command table means its keys.
@@ -150,7 +162,10 @@ export function useAppCommands(commands: AppCommand[]) {
         return combo !== null && pressMatches(combo, event);
       });
       if (!command) return;
+      // A repeat is still the app's key: claimed, so the webview does nothing
+      // of its own with it, but run again only by a command that asks (`repeat`).
       event.preventDefault();
+      if (event.repeat && !command.repeat) return;
       command.run();
     };
     window.addEventListener("keydown", onKeyDown);

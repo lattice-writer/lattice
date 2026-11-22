@@ -59,6 +59,24 @@ describe("app commands", () => {
     expect(commandKeys({ key: "`", ctrl: true })).toEqual(["⌃", "`"]);
   });
 
+  it("runs a command once while its key is held, unless it asks to repeat, and keeps the key either way", () => {
+    const run = { palette: vi.fn(), forward: vi.fn() };
+    renderHook(() => useAppCommands([
+      { id: "palette", key: "k", run: run.palette },
+      { id: "forward", key: "]", repeat: true, run: run.forward },
+    ]));
+    // What a keyboard sends for a key held down: the press, then its repeats.
+    const hold = (key: string) => [false, true, true, true].map((repeat) => fireEvent.keyDown(window, { key, ctrlKey: true, repeat }));
+    // fireEvent says whether the event was left alone: every one was claimed.
+    expect(hold("k")).toEqual([false, false, false, false]);
+    expect(run.palette).toHaveBeenCalledOnce();
+    expect(hold("]")).toEqual([false, false, false, false]);
+    expect(run.forward).toHaveBeenCalledTimes(4);
+    // Let go and pressed again is a new press.
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+    expect(run.palette).toHaveBeenCalledTimes(2);
+  });
+
   it("writes a command's keys as one string for a hint elsewhere, and nothing for a command without keys", () => {
     const run = () => {};
     const commands: AppCommand[] = [
