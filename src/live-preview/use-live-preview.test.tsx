@@ -15,7 +15,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(async () => () => {}) }));
 const started = vi.hoisted(() => [] as string[]);
 /** Each session made, so a test can have its rtex exit. */
-const sessions = vi.hoisted(() => [] as Array<{ exit: (signal: number) => void }>);
+const sessions = vi.hoisted(() => [] as Array<{ exit: (signal: number) => void; report: () => void; dispose: () => void }>);
 vi.mock("./live-preview-chunk", async () => ({
   watchRestarts: (await vi.importActual<typeof import("./live-preview-session")>("./live-preview-session")).watchRestarts,
   LivePreviewSession: class {
@@ -36,6 +36,11 @@ vi.mock("./live-preview-chunk", async () => ({
     getSnapshot = () => this.snapshot;
     exit(signal: number) {
       this.snapshot = { ...this.snapshot, phase: "exited", detail: "rtex: out of memory", exit: { code: null, signal } };
+      for (const listener of [...this.listeners]) listener();
+    }
+    /** Another snapshot change after the exit, as a build still reporting to the session makes. */
+    report() {
+      this.snapshot = { ...this.snapshot, rebuilding: !this.snapshot.rebuilding };
       for (const listener of [...this.listeners]) listener();
     }
   },
@@ -191,4 +196,51 @@ it("stays stopped with the reason when rtex keeps exiting, until the writer rest
   expect(started).toHaveLength(MAX_RESTARTS + 2);
   act(() => sessions[MAX_RESTARTS + 1].exit(9));
   await waitFor(() => expect(started).toHaveLength(MAX_RESTARTS + 3));
+});
+
+it("counts an exit once, and once stopped stays stopped: a later report neither restarts nor counts it", async () => {
+  const now = vi.spyOn(Date, "now");
+  let clock = 1_000_000;
+  now.mockImplementation(() => clock);
+  try {
+    const { result } = open("/papers/lua");
+    await waitFor(() => expect(result.current.state.kind).toBe("running"));
+    act(() => {
+      sessions[0].exit(9);
+      sessions[0].report();
+    });
+    await waitFor(() => expect(started).toHaveLength(2));
+    for (let restart = 1; restart < MAX_RESTARTS; restart++) {
+      await waitFor(() => expect(result.current.state.kind).toBe("running"));
+      act(() => sessions[restart].exit(9));
+      await waitFor(() => expect(started).toHaveLength(restart + 2));
+    }
+    await waitFor(() => expect(result.current.state.kind).toBe("running"));
+    const last = sessions[MAX_RESTARTS];
+    act(() => last.exit(9));
+    await waitFor(() => expect(result.current.state.kind).toBe("failed"));
+    expect(last.dispose).toHaveBeenCalled();
+    expect(result.current.buildHooks.current).toBeNull();
+    clock += 6 * 60_000;
+    act(() => last.report());
+    await act(async () => {});
+    expect(result.current.state.kind).toBe("failed");
+    expect(started).toHaveLength(MAX_RESTARTS + 1);
+  } finally {
+    now.mockRestore();
+  }
+});
+
+it("starts a project opened after another's crashes with no restart history", async () => {
+  const { result, rerender } = open("/papers/a");
+  for (let restart = 0; restart < MAX_RESTARTS; restart++) {
+    await waitFor(() => expect(result.current.state.kind).toBe("running"));
+    act(() => sessions[restart].exit(9));
+    await waitFor(() => expect(started).toHaveLength(restart + 2));
+  }
+  rerender({ snapshot: project("/papers/b") });
+  await waitFor(() => expect(started.at(-1)).toBe("/papers/b"));
+  await waitFor(() => expect(result.current.state.kind).toBe("running"));
+  act(() => sessions.at(-1)!.exit(9));
+  await waitFor(() => expect(started.filter((root) => root === "/papers/b")).toHaveLength(2));
 });

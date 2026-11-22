@@ -70,8 +70,8 @@ export function useLivePreview({ project, activeFile, source, savedSource }: {
   const enabled = enabledFor.root === root ? enabledFor.enabled : Boolean(root && loadLivePreviewEnabled(root));
   if (enabledFor.root !== root) setEnabledFor({ root, enabled });
   const [attempt, setAttempt] = useState(0);
-  /** When rtex was last started again on its own, newest last. */
-  const restarts = useRef<number[]>([]);
+  /** When rtex was last started again on its own for `root`, newest last. */
+  const restarts = useRef<{ root: string | null; at: number[] }>({ root: null, at: [] });
   /** Each run's state under the key of the run it belongs to: another run's is not shown. */
   const [run, setRun] = useState<{ key: string; state: LivePreviewState }>({ key: "", state: OFF });
   /** The running session, for the build pipeline's calls; null otherwise. */
@@ -122,8 +122,13 @@ export function useLivePreview({ project, activeFile, source, savedSource }: {
       if (cancelled) return;
       const running = new LivePreviewSession(root, mainFile);
       session = running;
-      // Disposing the session drops this listener with the rest.
-      watchRestarts(running, restarts.current, () => setAttempt((count) => count + 1), setState);
+      if (restarts.current.root !== root) restarts.current = { root, at: [] };
+      watchRestarts(running, restarts.current.at, () => setAttempt((count) => count + 1), (stopped) => {
+        // Stop rtex's leftover engines, and the build pipeline's reports to it.
+        running.dispose();
+        buildHooks.current = null;
+        setState(stopped);
+      });
       buildHooks.current = session;
       // The perf lab's harness reads the session (src/platform/perf-lab-harness.ts).
       if (import.meta.env.VITE_PERF_LAB) Object.assign(window, { __latticeLiveSession: session });
@@ -162,7 +167,7 @@ export function useLivePreview({ project, activeFile, source, savedSource }: {
     setEnabledFor({ root, enabled: next });
   }, [root]);
   const retry = useCallback(() => {
-    restarts.current.length = 0;
+    restarts.current.at.length = 0;
     setAttempt((count) => count + 1);
   }, []);
   /** Turn live preview off everywhere and delete rtex and its build folders. */

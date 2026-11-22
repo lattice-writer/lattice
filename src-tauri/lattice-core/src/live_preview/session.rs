@@ -406,6 +406,7 @@ mod tests {
     }
 
     /// The lines a fake rtex's output reaches the window as.
+    #[cfg(unix)]
     fn forwarded(script: &str, stop_first: bool) -> Vec<serde_json::Value> {
         let mut child = Command::new("sh")
             .args(["-c", script])

@@ -235,6 +235,10 @@ impl LivePreview {
         });
         let changed =
             available != self.available || enabled != self.enabled || target != self.target;
+        if target != self.target {
+            // Another project's or document's rtex starts with no history.
+            self.restarts.clear();
+        }
         self.available = available;
         self.enabled = enabled;
         self.target = target;

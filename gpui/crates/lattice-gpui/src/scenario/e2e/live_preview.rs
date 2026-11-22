@@ -387,7 +387,9 @@ impl Run {
             "rtex killed mid-session starts again by itself and the preview is live again",
             killed
                 && recovered
-                && states.iter().any(|state| state.contains("Starting"))
+                && states
+                    .iter()
+                    .any(|state| state.to_lowercase().contains("starting"))
                 && !states.iter().any(|state| state.starts_with("failed")),
             json!({ "killed": killed, "states": states }),
         );

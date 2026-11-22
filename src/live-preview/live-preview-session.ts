@@ -70,17 +70,20 @@ const RESTART_WINDOW_MS = 5 * 60_000;
 export type GaveUp = { kind: "failed"; message: string };
 
 /**
- * Watch `session` for rtex exiting on its own and decide what follows:
+ * Watch `session` for rtex exiting on its own and decide, once, what follows:
  * `restart` when fewer than MAX_RESTARTS restarts (`restarts`, timestamps
  * shared across the project's sessions, newest last) fall within five
- * minutes, else `giveUp` with why. Disposing the session stops the watch.
+ * minutes, else `giveUp` with why. Only the first exit counts: later
+ * snapshot changes of the dead session (a build still reporting to it) must
+ * neither count the crash again nor, minutes later, restart it.
  */
 export function watchRestarts(
   session: LivePreviewSession, restarts: number[], restart: () => void, giveUp: (stopped: GaveUp) => void,
 ): void {
-  session.subscribe(() => {
+  const unsubscribe = session.subscribe(() => {
     const snapshot = session.getSnapshot();
     if (snapshot.phase !== "exited") return;
+    unsubscribe();
     const now = Date.now();
     const recent = restarts.filter((at) => now - at < RESTART_WINDOW_MS);
     restarts.splice(0, restarts.length, ...recent);
