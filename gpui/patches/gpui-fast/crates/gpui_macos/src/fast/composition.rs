@@ -1080,8 +1080,15 @@ fn cursor_layers(state: &MacWindowState) -> Vec<CursorLayer> {
 /// too, so the page's own cursor (the I-beam over text, a column's resize
 /// cursor) was put back to GPUI's at once ([`window_cursor_rects`] leaves
 /// these holes out).
+///
+/// A window with no native view has no holes, so it skips the walk over the
+/// view tree that every composed frame would otherwise pay.
 pub(crate) fn refresh_cursor_holes(state: &mut MacWindowState) {
-    let holes = cursor_holes(&cursor_layers(state));
+    let holes = if state.fast_composition.native_views.is_empty() {
+        Vec::new()
+    } else {
+        cursor_holes(&cursor_layers(state))
+    };
     let unchanged = holes.len() == state.fast_composition.cursor_holes.len()
         && holes
             .iter()

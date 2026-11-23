@@ -1567,11 +1567,20 @@ fn native_mouse(window: &Window, event: &dyn Any) -> bool {
 
 /// Whether the pointer is over a native view that takes it (a webview), so
 /// that the view, not GPUI, sets the cursor there. A drag or a captured
-/// hitbox keeps GPUI's cursor, as it keeps GPUI's pointer events.
+/// hitbox keeps GPUI's cursor, as it keeps GPUI's pointer events, and so does
+/// a surface GPUI forwards input to: its windowless consumer sets no cursor.
 pub(crate) fn native_owns_cursor(window: &Window, cx: &crate::App) -> bool {
     !cx.has_active_drag()
         && window.captured_hitbox.is_none()
-        && native_target(window, false).is_some()
+        && native_target(window, false).is_some_and(|surface| {
+            !window
+                .fast_composition
+                .0
+                .borrow()
+                .platform_surfaces
+                .get(&surface)
+                .is_some_and(|native| native.input_forwarding())
+        })
 }
 
 pub(crate) fn bubble_mouse(window: &Window, event: &dyn Any, cx: &crate::App) -> bool {
