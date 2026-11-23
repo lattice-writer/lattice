@@ -230,8 +230,16 @@ fn fill_slot(
 }
 
 /// The slots of `doc`'s panels that hold nothing but slots while another
-/// panel holds a document: such a panel closes rather than stand empty.
-pub fn stranded_slots(doc: &LayoutDocument) -> Vec<String> {
+/// panel holds a document: such a panel closes rather than stand empty,
+/// unless it is the only docked panel (floating and hidden panels leave the
+/// workspace blank). None while a preset or focus mode arranged the layout
+/// (`arranged`): its empty slots are its own.
+pub fn stranded_slots(doc: &LayoutDocument, arranged: bool) -> Vec<String> {
+    if arranged {
+        return Vec::new();
+    }
+    let docked = trellis::model::panels_of(doc.root.as_ref());
+    let only_docked = |panel: &PanelNode| docked.len() == 1 && docked[0].id == panel.id;
     let all = panels_of(doc, true);
     let only_slots = |panel: &PanelNode| {
         panel
@@ -249,7 +257,7 @@ pub fn stranded_slots(doc: &LayoutDocument) -> Vec<String> {
         return Vec::new();
     }
     all.into_iter()
-        .filter(|panel| !panel.views.is_empty() && only_slots(panel))
+        .filter(|panel| !panel.views.is_empty() && only_slots(panel) && !only_docked(panel))
         .flat_map(|panel| panel.views.iter().cloned())
         .collect()
 }
@@ -275,8 +283,9 @@ pub fn filled_slots(doc: &LayoutDocument) -> Vec<String> {
 }
 
 /// `current`, just after `view_id` closed out of `previous`, keeping the
-/// panel it was the only view of as an empty slot when it is the only panel
-/// left, so the window has something to show. `None` otherwise, and the
+/// panel it was the only view of as an empty slot when it is the only
+/// docked panel, so the workspace has something to show (a floating or
+/// hidden panel does not fill it). `None` otherwise, and the
 /// panel closes with its last view (Leo: closing a tab closes it, with no
 /// "Empty" left behind); the next document opened gets a panel of its own
 /// (`with_document_panel`).
@@ -290,8 +299,9 @@ pub fn keep_document_slot(
         .iter()
         .copied()
         .find(|target| target.views.iter().any(|id| id == view_id))?;
-    if panel.views.iter().any(|id| id != view_id) || all.iter().any(|target| target.id != panel.id)
-    {
+    let docked = trellis::model::panels_of(previous.root.as_ref());
+    let only_docked = matches!(docked.as_slice(), [only] if only.id == panel.id);
+    if panel.views.iter().any(|id| id != view_id) || !only_docked {
         return None;
     }
     let (slot, slot_record) = document_slot(&panel.id);
