@@ -3,10 +3,11 @@
 //! the fixture's `references.bib` opens in BibTeX, its entry type a keyword
 //! and a field name a property; a scratch `page.html` opens in HTML, a tag a
 //! type and an attribute an attribute, with its `<style>` highlighted as CSS
-//! and its `<script>` as JavaScript; a scratch `e2e-script.py` opens in
-//! Python, built the first time it is needed (`lattice_editor::code_languages`);
-//! and a scratch Markdown file's fenced `css` block is CSS and its `python`
-//! block Python. The scratch files go after.
+//! and its `<script>` as JavaScript; a scratch Markdown file's fenced `css`
+//! block is CSS and its `python` block Python, opened before anything has
+//! built Python, so the fence waits for its language and is reparsed once it
+//! loads (`code_languages::reparse_on_load`); and a scratch `e2e-script.py`
+//! opens in Python. The scratch files go after.
 
 use std::{path::Path, time::Duration};
 
@@ -155,6 +156,21 @@ impl Run {
         );
         self.close_panel(cx, &panel).await?;
 
+        let notes = root.join(NOTES);
+        std::fs::write(&notes, NOTES_TEXT)?;
+        let panel = self.open(cx, &notes, Some(1))?;
+        let (language, found) = self
+            .parsed_highlights(cx, &panel, &[("margin", 0), ("import", 0)])
+            .await;
+        self.completion_shot(cx, "source-language-markdown-css").await;
+        steps.check(
+            "a Markdown file's fenced css block is highlighted as CSS, and its python block as Python once Python has loaded, with no edit",
+            language.as_deref() == Some("Markdown")
+                && capture(&found, "margin") == Some("property")
+                && capture(&found, "import") == Some("keyword"),
+            json!({ "language": language, "captures": found }),
+        );
+        self.close_panel(cx, &panel).await?;
         let script = root.join(SCRIPT);
         std::fs::write(&script, SCRIPT_TEXT)?;
         let panel = self.open(cx, &script, Some(1))?;
@@ -167,7 +183,7 @@ impl Run {
             .await;
         self.completion_shot(cx, "source-language-python").await;
         steps.check(
-            "a .py file opens in Python, built on first use: a comment a comment, def a keyword, the function's name a function, an attribute a property",
+            "a .py file opens in Python: a comment a comment, def a keyword, the function's name a function, an attribute a property",
             language.as_deref() == Some("Python")
                 && capture(&found, "# Fit") == Some("comment")
                 && capture(&found, "def") == Some("keyword")
@@ -178,21 +194,6 @@ impl Run {
         );
         self.close_panel(cx, &panel).await?;
 
-        let notes = root.join(NOTES);
-        std::fs::write(&notes, NOTES_TEXT)?;
-        let panel = self.open(cx, &notes, Some(1))?;
-        let (language, found) = self
-            .parsed_highlights(cx, &panel, &[("margin", 0), ("import", 0)])
-            .await;
-        self.completion_shot(cx, "source-language-markdown-css").await;
-        steps.check(
-            "a Markdown file's fenced css block is highlighted as CSS, and its python block as Python",
-            language.as_deref() == Some("Markdown")
-                && capture(&found, "margin") == Some("property")
-                && capture(&found, "import") == Some("keyword"),
-            json!({ "language": language, "captures": found }),
-        );
-        self.close_panel(cx, &panel).await?;
         std::fs::remove_file(&page).ok();
         std::fs::remove_file(&script).ok();
         std::fs::remove_file(&notes).ok();

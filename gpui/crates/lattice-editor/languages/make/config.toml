@@ -1,6 +1,6 @@
 name = "Makefile"
 grammar = "make"
-path_suffixes = ["mk", "mak", "Makefile", "makefile", "GNUmakefile"]
+path_suffixes = ["mk", "mak", "make", "Makefile", "makefile", "GNUmakefile"]
 line_comments = ["# "]
 hard_tabs = true
 autoclose_before = ";:.,=}])>"

@@ -1,6 +1,6 @@
 name = "Go"
 grammar = "go"
-path_suffixes = ["go"]
+path_suffixes = ["go", "golang"]
 line_comments = ["// "]
 block_comment = { start = "/* ", prefix = "", end = " */", tab_size = 0 }
 autoclose_before = ";:.,=}])>"

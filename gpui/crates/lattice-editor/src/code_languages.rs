@@ -13,9 +13,11 @@
 
 use std::{borrow::Cow, future::Future, path::Path, sync::Arc};
 
-use futures::FutureExt as _;
-use gpui::App;
-use language::{Language, LanguageConfig, LanguageQueries, LanguageRegistry, LoadedLanguage};
+use futures::{FutureExt as _, StreamExt as _};
+use gpui::{App, Entity};
+use language::{
+    Buffer, Language, LanguageConfig, LanguageQueries, LanguageRegistry, LoadedLanguage,
+};
 use tree_sitter_language::LanguageFn;
 
 /// A code language: its config, highlight query and grammar.
@@ -129,6 +131,30 @@ pub fn load_for_path(
     })?;
     let loaded = registry.load_language(id);
     Some(async move { loaded.await.ok()?.ok() })
+}
+
+/// Reparse `buffer` each time the registry gains a language while one of
+/// its injections (a Markdown fence, an HTML `<script>`) names a language
+/// not built yet. Zed leaves such a block pending and starts building its
+/// language, but reparses it only on the buffer's next edit; Zed's project
+/// does this on registry changes (`lsp_store.rs`), which Lattice does not
+/// use. The watch ends once the buffer is gone.
+pub fn reparse_on_load(buffer: &Entity<Buffer>, cx: &mut App) {
+    let mut changes = crate::markdown::registry(cx).subscribe();
+    let buffer = buffer.downgrade();
+    cx.spawn(async move |cx| {
+        while changes.next().await.is_some() {
+            let reparsed = buffer.update(cx, |buffer, cx| {
+                if buffer.contains_unknown_injections() {
+                    buffer.reparse(cx, false);
+                }
+            });
+            if reparsed.is_err() {
+                break;
+            }
+        }
+    })
+    .detach();
 }
 
 #[cfg(test)]

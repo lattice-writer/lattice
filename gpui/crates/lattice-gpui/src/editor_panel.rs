@@ -310,6 +310,7 @@ impl EditorPanel {
             buffer.set_language_registry(registry);
             buffer.set_language(language, cx);
         });
+        lattice_editor::code_languages::reparse_on_load(&buffer, cx);
         let languaged = started.elapsed();
         let lattice = cx.new(|cx| LatticeEditor::new(buffer.clone(), window, cx));
         let editor = lattice.read(cx).editor().clone();
@@ -524,7 +525,7 @@ impl EditorPanel {
         this.paint_highlights(cx);
         this.paint_conflicts(cx);
         if code_file {
-            this.load_code_language(cx);
+            this.set_code_language(cx);
         }
         this
     }
