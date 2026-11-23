@@ -14,7 +14,8 @@ import { createContext, useContext, useLayoutEffect, useRef, useState, type Reac
 import { useLingui } from "@lingui/react/macro";
 import { InputRule } from "@tiptap/core";
 import type { NodeType } from "@tiptap/pm/model";
-import { NodeSelection, TextSelection } from "@tiptap/pm/state";
+import { NodeSelection, Plugin, TextSelection } from "@tiptap/pm/state";
+import type { EditorView } from "@tiptap/pm/view";
 import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
 import katex from "katex";
 import "katex/dist/katex.min.css";
@@ -263,6 +264,32 @@ function FormulaPopover({ open, onOutside, anchor, title, children }: {
     </Popover>
   );
 }
+
+/**
+ * A press on an inline formula selects it, and its field opens. Left to the
+ * browser, the press puts the native selection inside the atom: ProseMirror
+ * reads that as the formula selected, so the field opens and takes focus on
+ * mousedown, then the click's mouseup selects the node again and focuses the
+ * surface, which dismisses the field and leaves the node's DOM range, from
+ * the text before the formula through it, as the surface's selection. Shift
+ * extends the selection as usual; a press on the formula already selected
+ * keeps its field.
+ */
+function pressOnFormula(view: EditorView, event: MouseEvent): boolean {
+  if (event.button !== 0 || event.shiftKey || !view.editable) return false;
+  const formula = (event.target as Element | null)?.closest?.(".lx-md-math");
+  if (!formula || !view.dom.contains(formula)) return false;
+  const position = view.posAtDOM(formula, 0);
+  if (view.state.doc.nodeAt(position)?.type.name !== "latticeMath") return false;
+  event.preventDefault();
+  const { selection } = view.state;
+  if (selection instanceof NodeSelection && selection.from === position) return true;
+  view.focus();
+  view.dispatch(view.state.tr.setSelection(NodeSelection.create(view.state.doc, position)));
+  return true;
+}
+
+export const inlineFormulaPress = () => new Plugin({ props: { handleDOMEvents: { mousedown: pressOnFormula } } });
 
 /** Typing the closing `$` of `$x+y$` turns the formula into a math atom (R-INL-2). */
 export const inlineMathInputRule = (type: NodeType) => new InputRule({

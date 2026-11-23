@@ -170,8 +170,42 @@ describe("a live preview session", () => {
   it("reports rtex stopping on its own", async () => {
     const session = new LivePreviewSession("/project", "main.tex");
     await session.start();
-    reply({ event: "SessionExited", session: 7, stderr: "lualatex not found" });
-    expect(session.getSnapshot()).toMatchObject({ phase: "error", detail: "lualatex not found" });
+    reply({ event: "SessionExited", session: 7, stderr: "lualatex not found", code: null, signal: 9 });
+    expect(session.getSnapshot()).toMatchObject({ phase: "exited", detail: "lualatex not found", exit: { code: null, signal: 9 } });
+    session.dispose();
+  });
+
+  it("counts a host that no longer has its rtex as an exit, and sends it nothing more", async () => {
+    vi.mocked(invoke).mockImplementation(async (command: string, args?: unknown) => {
+      if (command === "live_preview_start") {
+        events = (args as Record<string, unknown>).onEvent as typeof events;
+        return 7;
+      }
+      if (command === "live_preview_send") throw "The live preview has stopped.";
+      return null;
+    });
+    const session = new LivePreviewSession("/project", "main.tex");
+    await session.start();
+    await flush();
+    expect(session.getSnapshot()).toMatchObject({ phase: "exited", detail: "The live preview has stopped.", exit: null });
+    const sends = vi.mocked(invoke).mock.calls.filter(([command]) => command === "live_preview_send").length;
+    session.noteText("main.tex", "a", "");
+    await flush();
+    expect(vi.mocked(invoke).mock.calls.filter(([command]) => command === "live_preview_send").length).toBe(sends + 1);
+    session.dispose();
+  });
+
+  it("waits for the document to compile when its first pass fails, then goes live", async () => {
+    const session = new LivePreviewSession("/project", "main.tex");
+    await session.start();
+    const layout = (state: string) => reply({
+      event: "LayoutUpdate", compile: { state }, convergence: { state: "Converged" }, pages_changed: [], pages_total: 1,
+      placements: [], versions: { source_revision: 1, layout_version: 1 },
+    });
+    layout("Failed");
+    expect(session.getSnapshot().phase).toBe("uncompiled");
+    layout("Ok");
+    expect(session.getSnapshot().phase).toBe("live");
     session.dispose();
   });
 });

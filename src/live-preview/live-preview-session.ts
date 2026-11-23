@@ -12,6 +12,7 @@
  * which revision of the files each build compiled (`buildStarted`,
  * `baseShown`), so edits the PDF on screen already holds stop being painted.
  */
+import { t } from "@lingui/core/macro";
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { applyModelOp, LivePreviewAssets, type FallbackSource, type PdfDocument } from "./live-preview-assets";
 import { PreviewModel, type ModelOp, type ModelSnapshot } from "./rtex-model";
@@ -22,10 +23,16 @@ import type { Command, LayoutUpdateEvent, ParagraphUpdateEvent, Reply, RtexEvent
  * Where the session is. `starting`: rtex is loading the preamble.
  * `first-layout`: typesetting the whole document for the first time.
  * `live`: paragraphs follow typing. `paused`: rtex could not load the
- * preamble for live typing; whole-document passes still run. `error`: rtex
- * stopped, or its first pass failed.
+ * preamble for live typing; whole-document passes still run.
+ * `uncompiled`: the first whole-document pass stopped on a TeX error; rtex
+ * keeps running and lays the document out once it compiles. `exited`: rtex
+ * is gone (it exited, or the host no longer has it), and only a new session
+ * brings live preview back (use-live-preview.ts starts one).
  */
-type LivePreviewPhase = "starting" | "first-layout" | "live" | "paused" | "error";
+type LivePreviewPhase = "starting" | "first-layout" | "live" | "paused" | "uncompiled" | "exited";
+
+/** How rtex ended, when it ended on its own: its exit code, or the signal that ended it. */
+type RtexExit = Readonly<{ code: number | null; signal: number | null }>;
 
 export type LivePreviewSnapshot = Readonly<{
   phase: LivePreviewPhase;
@@ -33,11 +40,13 @@ export type LivePreviewSnapshot = Readonly<{
   layoutPending: boolean;
   /** rtex's words when it stopped or failed. */
   detail: string | null;
+  /** How rtex ended (`exited`); null while it runs or when the host lost it. */
+  exit: RtexExit | null;
   /** A quiet build (quiet-builds.ts) is bringing the full PDF up to date: running, or its PDF loading. */
   rebuilding: boolean;
 }>;
 
-const INITIAL: LivePreviewSnapshot = { phase: "starting", layoutPending: false, detail: null, rebuilding: false };
+const INITIAL: LivePreviewSnapshot = { phase: "starting", layoutPending: false, detail: null, exit: null, rebuilding: false };
 
 /** What a mirror of the session starts from (live-preview-mirror.ts). */
 export type LivePreviewMirrorStart = {
@@ -52,6 +61,48 @@ export type LivePreviewMirrorStart = {
 export type LivePreviewModelChange = { change: ModelOp; fallback: string | null };
 
 const EVENT_CMDS = new Set(["edit", "set_document"]);
+
+/** Automatic restarts allowed within RESTART_WINDOW_MS before live preview stays stopped. */
+export const MAX_RESTARTS = 3;
+const RESTART_WINDOW_MS = 5 * 60_000;
+
+/** Live preview stopped for good after rtex kept exiting, and why (use-live-preview.ts's `failed` state). */
+export type GaveUp = { kind: "failed"; message: string };
+
+/**
+ * Watch `session` for rtex exiting on its own and decide, once, what follows:
+ * `restart` when fewer than MAX_RESTARTS restarts (`restarts`, timestamps
+ * shared across the project's sessions, newest last) fall within five
+ * minutes, else `giveUp` with why. Only the first exit counts: later
+ * snapshot changes of the dead session (a build still reporting to it) must
+ * neither count the crash again nor, minutes later, restart it.
+ */
+export function watchRestarts(
+  session: LivePreviewSession, restarts: number[], restart: () => void, giveUp: (stopped: GaveUp) => void,
+): void {
+  const unsubscribe = session.subscribe(() => {
+    const snapshot = session.getSnapshot();
+    if (snapshot.phase !== "exited") return;
+    unsubscribe();
+    const now = Date.now();
+    const recent = restarts.filter((at) => now - at < RESTART_WINDOW_MS);
+    restarts.splice(0, restarts.length, ...recent);
+    if (restarts.length < MAX_RESTARTS) {
+      restarts.push(now);
+      restart();
+    } else {
+      const times = restarts.length + 1;
+      const signal = snapshot.exit?.signal;
+      const code = snapshot.exit?.code;
+      const message = [
+        t`rtex stopped ${times} times in five minutes. Click to restart it.`,
+        signal != null ? t`rtex was ended by signal ${signal}.` : code != null ? t`rtex exited with status ${code}.` : null,
+        snapshot.detail,
+      ].filter(Boolean).join("\n\n");
+      giveUp({ kind: "failed", message });
+    }
+  });
+}
 
 export class LivePreviewSession {
   readonly model = new PreviewModel();
@@ -335,7 +386,10 @@ export class LivePreviewSession {
           projectRoot: this.projectRoot, session: this.session, commands: batch.map((command) => JSON.stringify(command)),
         });
       } catch (reason) {
-        this.updateSnapshot({ phase: "error", detail: String(reason) });
+        // The host has no rtex for this session any more: it exited, or was
+        // stopped under it. Nothing more reaches it.
+        this.queue.length = 0;
+        this.updateSnapshot({ phase: "exited", detail: String(reason) });
         break;
       }
     }
@@ -439,7 +493,9 @@ export class LivePreviewSession {
         this.awaitLayout();
         break;
       case "SessionExited":
-        this.updateSnapshot({ phase: "error", detail: event.stderr || null });
+        this.updateSnapshot({
+          phase: "exited", detail: event.stderr || null, exit: { code: event.code ?? null, signal: event.signal ?? null },
+        });
         this.markPages(this.change({ op: "drop" }));
         break;
       default:
@@ -449,8 +505,9 @@ export class LivePreviewSession {
 
   private onLayout(event: LayoutUpdateEvent): void {
     if (event.compile.state === "Failed") {
-      // rtex keeps the previous layout; before the first one there is nothing to show.
-      if (!this.model.hasLayout) this.updateSnapshot({ phase: "error", detail: null });
+      // rtex keeps the previous layout; before the first one there is nothing
+      // to show until an edit makes the document compile.
+      if (!this.model.hasLayout) this.updateSnapshot({ phase: "uncompiled", detail: null });
       return;
     }
     const dirty = this.change({
@@ -512,8 +569,11 @@ export class LivePreviewSession {
 
   private updateSnapshot(patch: Partial<LivePreviewSnapshot>): void {
     const next = { ...this.snapshot, ...patch };
-    const { phase, layoutPending, detail, rebuilding } = this.snapshot;
-    if (next.phase === phase && next.layoutPending === layoutPending && next.detail === detail && next.rebuilding === rebuilding) return;
+    const { phase, layoutPending, detail, exit, rebuilding } = this.snapshot;
+    if (
+      next.phase === phase && next.layoutPending === layoutPending && next.detail === detail && next.exit === exit
+      && next.rebuilding === rebuilding
+    ) return;
     this.snapshot = next;
     for (const listener of [...this.listeners]) listener();
   }

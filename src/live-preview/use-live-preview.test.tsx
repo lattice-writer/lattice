@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
 import type { ProjectSnapshot } from "../app-types";
 import { persistLivePreviewEnabled } from "../settings/app-settings";
+import { MAX_RESTARTS } from "./live-preview-session";
 import { useLivePreview, type LivePreviewInstall } from "./use-live-preview";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -13,13 +14,35 @@ vi.mock("@tauri-apps/api/core", () => ({
 }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(async () => () => {}) }));
 const started = vi.hoisted(() => [] as string[]);
-vi.mock("./live-preview-chunk", () => ({
+/** Each session made, so a test can have its rtex exit. */
+const sessions = vi.hoisted(() => [] as Array<{ exit: (signal: number) => void; report: () => void; dispose: () => void }>);
+vi.mock("./live-preview-chunk", async () => ({
+  watchRestarts: (await vi.importActual<typeof import("./live-preview-session")>("./live-preview-session")).watchRestarts,
   LivePreviewSession: class {
-    constructor(root: string, main: string) { started.push(main === "main.tex" ? root : `${root}:${main}`); }
+    private snapshot = { phase: "live", layoutPending: false, detail: null as string | null, exit: null as unknown, rebuilding: false };
+    private readonly listeners = new Set<() => void>();
+    constructor(root: string, main: string) {
+      started.push(main === "main.tex" ? root : `${root}:${main}`);
+      sessions.push(this);
+    }
     start = vi.fn(async () => {});
     dispose = vi.fn();
     noteText = vi.fn();
     noteFilesChanged = vi.fn();
+    subscribe = (listener: () => void) => {
+      this.listeners.add(listener);
+      return () => this.listeners.delete(listener);
+    };
+    getSnapshot = () => this.snapshot;
+    exit(signal: number) {
+      this.snapshot = { ...this.snapshot, phase: "exited", detail: "rtex: out of memory", exit: { code: null, signal } };
+      for (const listener of [...this.listeners]) listener();
+    }
+    /** Another snapshot change after the exit, as a build still reporting to the session makes. */
+    report() {
+      this.snapshot = { ...this.snapshot, rebuilding: !this.snapshot.rebuilding };
+      for (const listener of [...this.listeners]) listener();
+    }
   },
 }));
 
@@ -47,6 +70,7 @@ const commands = () => vi.mocked(invoke).mock.calls.map(([command]) => command);
 beforeEach(() => {
   localStorage.clear();
   started.length = 0;
+  sessions.length = 0;
   install = { ...READY };
   download = async () => ({ ...install, installed: true });
   // jsdom has no idle callbacks; run the deferred download on the next task.
@@ -140,4 +164,83 @@ it("turning it off sticks across reopening, and removing rtex turns the default 
   const chosen = open("/papers/b");
   act(() => chosen.result.current.setEnabled(true));
   expect(chosen.result.current.enabled).toBe(true);
+});
+
+
+it("starts rtex again when it exits on its own, instead of staying stopped", async () => {
+  const { result } = open("/papers/lua");
+  await waitFor(() => expect(result.current.state.kind).toBe("running"));
+  act(() => sessions[0].exit(9));
+  await waitFor(() => expect(started).toHaveLength(2));
+  await waitFor(() => expect(result.current.state.kind).toBe("running"));
+  expect((sessions[0] as unknown as { dispose: ReturnType<typeof vi.fn> }).dispose).toHaveBeenCalled();
+});
+
+it("stays stopped with the reason when rtex keeps exiting, until the writer restarts it", async () => {
+  const { result } = open("/papers/lua");
+  for (let restart = 0; restart < MAX_RESTARTS; restart++) {
+    await waitFor(() => expect(result.current.state.kind).toBe("running"));
+    act(() => sessions[restart].exit(9));
+    await waitFor(() => expect(started).toHaveLength(restart + 2));
+  }
+  await waitFor(() => expect(result.current.state.kind).toBe("running"));
+  act(() => sessions[MAX_RESTARTS].exit(9));
+  await waitFor(() => expect(result.current.state).toMatchObject({ kind: "failed" }));
+  const message = (result.current.state as { message: string }).message;
+  expect(message).toContain(`rtex stopped ${MAX_RESTARTS + 1} times`);
+  expect(message).toContain("signal 9");
+  expect(message).toContain("rtex: out of memory");
+  expect(started).toHaveLength(MAX_RESTARTS + 1);
+  act(() => result.current.retry());
+  await waitFor(() => expect(result.current.state.kind).toBe("running"));
+  expect(started).toHaveLength(MAX_RESTARTS + 2);
+  act(() => sessions[MAX_RESTARTS + 1].exit(9));
+  await waitFor(() => expect(started).toHaveLength(MAX_RESTARTS + 3));
+});
+
+it("counts an exit once, and once stopped stays stopped: a later report neither restarts nor counts it", async () => {
+  const now = vi.spyOn(Date, "now");
+  let clock = 1_000_000;
+  now.mockImplementation(() => clock);
+  try {
+    const { result } = open("/papers/lua");
+    await waitFor(() => expect(result.current.state.kind).toBe("running"));
+    act(() => {
+      sessions[0].exit(9);
+      sessions[0].report();
+    });
+    await waitFor(() => expect(started).toHaveLength(2));
+    for (let restart = 1; restart < MAX_RESTARTS; restart++) {
+      await waitFor(() => expect(result.current.state.kind).toBe("running"));
+      act(() => sessions[restart].exit(9));
+      await waitFor(() => expect(started).toHaveLength(restart + 2));
+    }
+    await waitFor(() => expect(result.current.state.kind).toBe("running"));
+    const last = sessions[MAX_RESTARTS];
+    act(() => last.exit(9));
+    await waitFor(() => expect(result.current.state.kind).toBe("failed"));
+    expect(last.dispose).toHaveBeenCalled();
+    expect(result.current.buildHooks.current).toBeNull();
+    clock += 6 * 60_000;
+    act(() => last.report());
+    await act(async () => {});
+    expect(result.current.state.kind).toBe("failed");
+    expect(started).toHaveLength(MAX_RESTARTS + 1);
+  } finally {
+    now.mockRestore();
+  }
+});
+
+it("starts a project opened after another's crashes with no restart history", async () => {
+  const { result, rerender } = open("/papers/a");
+  for (let restart = 0; restart < MAX_RESTARTS; restart++) {
+    await waitFor(() => expect(result.current.state.kind).toBe("running"));
+    act(() => sessions[restart].exit(9));
+    await waitFor(() => expect(started).toHaveLength(restart + 2));
+  }
+  rerender({ snapshot: project("/papers/b") });
+  await waitFor(() => expect(started.at(-1)).toBe("/papers/b"));
+  await waitFor(() => expect(result.current.state.kind).toBe("running"));
+  act(() => sessions.at(-1)!.exit(9));
+  await waitFor(() => expect(started.filter((root) => root === "/papers/b")).toHaveLength(2));
 });

@@ -11,6 +11,11 @@
  * it downloads nothing, and a failed download leaves the normal build alone:
  * neither shows over the PDF, only in Settings. Leaving the project,
  * switching its engine or turning it off stops rtex.
+ *
+ * rtex that exits on its own (it crashed, macOS ended it, or the host lost
+ * it) is started again at once, so a writer sees "Starting live preview…"
+ * rather than a preview that stays stopped. A fourth exit within five
+ * minutes ends that: the pill says why, and clicking it starts over.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Channel, invoke } from "@tauri-apps/api/core";
@@ -36,6 +41,7 @@ export type LivePreviewState =
   | { kind: "downloading"; progress: number }
   | { kind: "starting" }
   | { kind: "running"; session: LivePreviewSession }
+  /** rtex could not start, or kept exiting after being started again. */
   | { kind: "failed"; message: string }
   /** Not a Mac, or no working LuaLaTeX: nothing downloaded. */
   | { kind: "unavailable" }
@@ -64,6 +70,8 @@ export function useLivePreview({ project, activeFile, source, savedSource }: {
   const enabled = enabledFor.root === root ? enabledFor.enabled : Boolean(root && loadLivePreviewEnabled(root));
   if (enabledFor.root !== root) setEnabledFor({ root, enabled });
   const [attempt, setAttempt] = useState(0);
+  /** When rtex was last started again on its own for `root`, newest last. */
+  const restarts = useRef<{ root: string | null; at: number[] }>({ root: null, at: [] });
   /** Each run's state under the key of the run it belongs to: another run's is not shown. */
   const [run, setRun] = useState<{ key: string; state: LivePreviewState }>({ key: "", state: OFF });
   /** The running session, for the build pipeline's calls; null otherwise. */
@@ -110,9 +118,17 @@ export function useLivePreview({ project, activeFile, source, savedSource }: {
       }
       if (cancelled) return;
       setState({ kind: "starting" });
-      const { LivePreviewSession } = await loadLivePreviewModule();
+      const { LivePreviewSession, watchRestarts } = await loadLivePreviewModule();
       if (cancelled) return;
-      session = new LivePreviewSession(root, mainFile);
+      const running = new LivePreviewSession(root, mainFile);
+      session = running;
+      if (restarts.current.root !== root) restarts.current = { root, at: [] };
+      watchRestarts(running, restarts.current.at, () => setAttempt((count) => count + 1), (stopped) => {
+        // Stop rtex's leftover engines, and the build pipeline's reports to it.
+        running.dispose();
+        buildHooks.current = null;
+        setState(stopped);
+      });
       buildHooks.current = session;
       // The perf lab's harness reads the session (src/platform/perf-lab-harness.ts).
       if (import.meta.env.VITE_PERF_LAB) Object.assign(window, { __latticeLiveSession: session });
@@ -150,7 +166,10 @@ export function useLivePreview({ project, activeFile, source, savedSource }: {
     persistLivePreviewEnabled(root, next);
     setEnabledFor({ root, enabled: next });
   }, [root]);
-  const retry = useCallback(() => setAttempt((count) => count + 1), []);
+  const retry = useCallback(() => {
+    restarts.current.at.length = 0;
+    setAttempt((count) => count + 1);
+  }, []);
   /** Turn live preview off everywhere and delete rtex and its build folders. */
   const remove = useCallback(async () => {
     disableLivePreviewEverywhere();

@@ -353,7 +353,11 @@ impl Run {
         // key's character (U+F700–U+F703) mid-word adds nothing to the file.
         let placed = self.markdown_type(cx, island, " quo").await?;
         cx.update(|cx| island.read(cx).insert_text("\u{F700}\u{F701}\u{F702}\u{F703}", cx));
-        self.pause(cx, Duration::from_millis(100)).await;
+        // A pause past the page's 200 ms publication delay: the word reaches
+        // the buffer as two edits over 300 ms apart, which the buffer's own
+        // grouping would split, and ⌘Z below undoes it at once only as the
+        // page groups it (`undo-group.ts`).
+        self.pause(cx, Duration::from_millis(250)).await;
         let native = self.native(cx)?;
         for character in "kka".chars() {
             native::send_key(native, character, false)?;
@@ -432,11 +436,17 @@ impl Run {
                 std::fs::read_to_string(path).is_ok_and(|text| text.contains("plum"))
             })
             .await;
-        native::send_key_equivalent(native, 'z')?;
-        self.wait_for(cx, Duration::from_secs(10), |_, _| {
-            std::fs::read_to_string(path).is_ok_and(|text| !text.contains("plum"))
-        })
-        .await;
+        // The menu bar's key equivalents go only to the active app's key
+        // window, so the press is made in a foreground section; outside one
+        // it passed only when an earlier step had left the app active.
+        {
+            let _front = self.foreground(cx, "markdown menu undo").await?;
+            native::send_key_equivalent(native, 'z')?;
+            self.wait_for(cx, Duration::from_secs(10), |_, _| {
+                std::fs::read_to_string(path).is_ok_and(|text| !text.contains("plum"))
+            })
+            .await;
+        }
         self.pause(cx, Duration::from_millis(1500)).await;
         let text = std::fs::read_to_string(path).unwrap_or_default();
         steps.check(

@@ -31,11 +31,15 @@ pub(crate) mod status;
 mod type1;
 mod virtual_font;
 
-use std::{path::PathBuf, time::Duration};
+use std::{
+    path::PathBuf,
+    time::{Duration, Instant},
+};
 
 use futures::{StreamExt as _, channel::mpsc};
 use gpui::{App, AppContext as _, Context, Entity, EventEmitter, Subscription, Task};
 use lattice_core::{live_preview, models::FileNode};
+use lattice_i18n::t;
 
 pub use model::Dirty;
 use session::Session;
@@ -98,8 +102,18 @@ pub struct LivePreview {
     removing: bool,
     remove_error: Option<String>,
     run: Option<Task<()>>,
+    /// When rtex was last started again on its own, newest last.
+    restarts: Vec<Instant>,
     _project: Option<Subscription>,
 }
+
+/// Automatic restarts allowed within `RESTART_WINDOW` before live preview
+/// stays stopped and says why: rtex that exits on its own (it crashed, macOS
+/// ended it, or it can no longer be written to) is started again at once, so
+/// the writer sees "Starting live preview…" rather than a preview that stays
+/// stopped, but a crash loop is not run forever.
+pub const MAX_RESTARTS: usize = 3;
+const RESTART_WINDOW: Duration = Duration::from_secs(5 * 60);
 
 impl EventEmitter<LivePreviewEvent> for LivePreview {}
 
@@ -131,6 +145,7 @@ impl LivePreview {
             removing: false,
             remove_error: None,
             run: None,
+            restarts: Vec::new(),
             _project: None,
         }
     }
@@ -220,6 +235,10 @@ impl LivePreview {
         });
         let changed =
             available != self.available || enabled != self.enabled || target != self.target;
+        if target != self.target {
+            // Another project's or document's rtex starts with no history.
+            self.restarts.clear();
+        }
         self.available = available;
         self.enabled = enabled;
         self.target = target;
@@ -358,8 +377,61 @@ impl LivePreview {
         }
     }
 
+    /// A session whose rtex is gone: start a new one, or once rtex has
+    /// exited `MAX_RESTARTS` times within `RESTART_WINDOW`, stop and say why.
+    fn restart_if_exited(&mut self, cx: &mut Context<Self>) {
+        let Some(snapshot) = self
+            .snapshot()
+            .filter(|snapshot| snapshot.phase == Phase::Exited)
+            .cloned()
+        else {
+            return;
+        };
+        let now = Instant::now();
+        self.restarts
+            .retain(|at| now.duration_since(*at) < RESTART_WINDOW);
+        if self.restarts.len() < MAX_RESTARTS {
+            self.restarts.push(now);
+            self.attempt += 1;
+            self.run_key = None;
+            self.reconfigure(cx);
+            return;
+        }
+        let times = self.restarts.len() + 1;
+        let exit = snapshot
+            .exit
+            .and_then(|exit| match (exit.signal, exit.code) {
+                (Some(signal), _) => {
+                    Some(t!("rtex was ended by signal {signal}.", signal = signal).to_string())
+                }
+                (None, Some(code)) => {
+                    Some(t!("rtex exited with status {code}.", code = code).to_string())
+                }
+                (None, None) => None,
+            });
+        let message = [
+            Some(
+                t!(
+                    "rtex stopped {times} times in five minutes. Click to restart it.",
+                    times = times
+                )
+                .to_string(),
+            ),
+            exit,
+            snapshot.detail,
+        ]
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>()
+        .join("\n\n");
+        self.run = None;
+        self.stop_session(cx);
+        self.set_state(State::Failed(message), cx);
+    }
+
     /// The pill's restart, and Settings' Retry.
     pub fn retry(&mut self, cx: &mut Context<Self>) {
+        self.restarts.clear();
         self.attempt += 1;
         self.run_key = None;
         self.reconfigure(cx);

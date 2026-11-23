@@ -241,7 +241,12 @@ export async function createAppSizeReport(workspace = process.cwd()) {
 // locally). Raised by 17 bytes when the eager links (Report a Problem, the
 // release pages, the user guide) moved to lattice-writer/lattice, seven
 // characters longer than leo1oel (1,471,542 -> 1,471,559 bytes locally).
-const EAGER_JS_BUDGET_BYTES = Math.floor(1.4 * 1024 * 1024) + 3_553;
+// Raised by 220 bytes for live preview restarting rtex that exits on its own
+// (LATA-69): the hook that runs at startup keeps each project's restart
+// history and stops a session it gave up on, and the pill learned the
+// "waiting for the document to compile" state; the restart policy itself
+// loads with the session (1,471,475 -> 1,471,779 bytes locally).
+const EAGER_JS_BUDGET_BYTES = Math.floor(1.4 * 1024 * 1024) + 3_773;
 // A perf-lab build (VITE_PERF_LAB=1, scripts/perf-lab.mjs) compiles in the
 // lab's hooks (~0.3 KB eager on 2026-11-04). They never ship, so they must not
 // spend the release budget: a release at its limit would fail every lab build.

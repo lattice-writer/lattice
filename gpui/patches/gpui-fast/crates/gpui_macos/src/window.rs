@@ -406,6 +406,19 @@ pub(crate) unsafe fn set_active_window_cursor_style(style: CursorStyle) {
                 invalidateCursorRectsForView: window_state.native_view.as_ptr()
             ];
         }
+        // GPUI is asked for its cursor only while it holds the pointer. Where
+        // its view leaves the cursor to a native view, no cursor rect applies
+        // it, so a drag or a captured press over a webview sets it here.
+        let view = window_state.native_view.as_ptr();
+        let window: *mut AnyObject = msg_send![view, window];
+        if !window.is_null() {
+            let location: NSPoint = msg_send![window, mouseLocationOutsideOfEventStream];
+            let point: NSPoint =
+                msg_send![view, convertPoint: location, fromView: ptr::null_mut::<AnyObject>()];
+            if crate::fast::composition::in_cursor_hole(&window_state, point) {
+                let _: () = msg_send![ns_cursor(style), set];
+            }
+        }
     }
 }
 
@@ -2597,17 +2610,14 @@ fn add_mouse_tracking_area(native_view: &NSView) {
     native_view.addTrackingArea(&tracking_area);
 }
 
-extern "C" fn reset_cursor_rects(this: &AnyObject, _: Sel) {
-    // SAFETY: AppKit invokes cursor-rect updates on the main thread for GPUIView instances,
-    // whose WINDOW_STATE_IVAR is initialized when the view is created. The cursor registered
-    // below is a valid NSCursor.
+/// AppKit's cursor for `style`.
+///
+/// # Safety
+///
+/// Called on the AppKit main thread.
+unsafe fn ns_cursor(style: CursorStyle) -> *mut AnyObject {
     unsafe {
-        let _: () = msg_send![super(this, class!(NSView)), resetCursorRects];
-
-        let window_state = get_window_state(this);
-        let cursor_style = window_state.lock().cursor_style;
-
-        let cursor: *mut AnyObject = match cursor_style {
+        match style {
             CursorStyle::Arrow => msg_send![class!(NSCursor), arrowCursor],
             CursorStyle::IBeam => msg_send![class!(NSCursor), IBeamCursor],
             CursorStyle::Crosshair => msg_send![class!(NSCursor), crosshairCursor],
@@ -2641,10 +2651,26 @@ extern "C" fn reset_cursor_rects(this: &AnyObject, _: Sel) {
             CursorStyle::DragLink => msg_send![class!(NSCursor), dragLinkCursor],
             CursorStyle::DragCopy => msg_send![class!(NSCursor), dragCopyCursor],
             CursorStyle::ContextualMenu => msg_send![class!(NSCursor), contextualMenuCursor],
-        };
+        }
+    }
+}
+
+extern "C" fn reset_cursor_rects(this: &AnyObject, _: Sel) {
+    // SAFETY: AppKit invokes cursor-rect updates on the main thread for GPUIView instances,
+    // whose WINDOW_STATE_IVAR is initialized when the view is created. The cursor registered
+    // below is a valid NSCursor.
+    unsafe {
+        let _: () = msg_send![super(this, class!(NSView)), resetCursorRects];
+
+        let window_state = get_window_state(this);
+        let cursor_style = window_state.lock().cursor_style;
+
+        let cursor = ns_cursor(cursor_style);
 
         let bounds: NSRect = msg_send![this, bounds];
-        let _: () = msg_send![this, addCursorRect: bounds, cursor: cursor];
+        for rect in crate::fast::composition::window_cursor_rects(&window_state.lock(), bounds) {
+            let _: () = msg_send![this, addCursorRect: rect, cursor: cursor];
+        }
     }
 }
 

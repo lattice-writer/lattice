@@ -19,7 +19,7 @@ import { CodeBlockView } from "./views/code-block-view";
 import { ComponentView } from "./views/component-views";
 import { FootnoteDefinitionView, FootnoteNumbering, FootnoteReferenceView } from "./views/footnote-views";
 import { ImageFigures, ImageView } from "./views/image-view";
-import { InlineMathView, MathBlockView, inlineMathInputRule } from "./views/math-views";
+import { InlineMathView, MathBlockView, inlineFormulaPress, inlineMathInputRule } from "./views/math-views";
 import { RawBlockView } from "./views/raw-block-view";
 
 export { MathMacrosContext } from "./views/math-views";
@@ -36,6 +36,7 @@ export function engineNodeViews(options: { ime: ImeGuard }): AnyExtension[] {
       addInputRules() {
         return [inlineMathInputRule(this.type)];
       },
+      addProseMirrorPlugins: () => [inlineFormulaPress()],
     }),
     MathBlock.extend({ addNodeView: () => ReactNodeViewRenderer(MathBlockView) }),
     LatticeImage.extend({ addNodeView: () => ReactNodeViewRenderer(ImageView, { as: "span" }) }).configure({ inline: true, allowBase64: true }),

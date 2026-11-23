@@ -44,15 +44,26 @@ mod loading;
 /// Where the session is. `Starting`: rtex is loading the preamble.
 /// `FirstLayout`: typesetting the whole document for the first time.
 /// `Live`: paragraphs follow typing. `Paused`: rtex could not load the
-/// preamble for live typing; whole-document passes still run. `Error`: rtex
-/// stopped, or its first pass failed.
+/// preamble for live typing; whole-document passes still run.
+/// `Uncompiled`: the first whole-document pass stopped on a TeX error; rtex
+/// keeps running and lays the document out once it compiles. `Exited`: rtex
+/// is gone (it exited, or can no longer be written to), and only a new
+/// session brings live preview back (`LivePreview::restart_if_exited`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Phase {
     Starting,
     FirstLayout,
     Live,
     Paused,
-    Error,
+    Uncompiled,
+    Exited,
+}
+
+/// How rtex ended, when it ended on its own.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RtexExit {
+    pub code: Option<i32>,
+    pub signal: Option<i32>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -63,6 +74,9 @@ pub struct Snapshot {
     pub layout_pending: bool,
     /// rtex's words when it stopped or failed.
     pub detail: Option<String>,
+    /// How rtex ended (`Exited`); `None` while it runs or when it could no
+    /// longer be written to.
+    pub exit: Option<RtexExit>,
     /// A quiet build is bringing the full PDF up to date: running, or its
     /// PDF loading.
     pub rebuilding: bool,
@@ -74,6 +88,7 @@ impl Default for Snapshot {
             phase: Phase::Starting,
             layout_pending: false,
             detail: None,
+            exit: None,
             rebuilding: false,
         }
     }
@@ -457,9 +472,11 @@ impl Session {
     ) {
         self.sending = false;
         if let Err(error) = result {
+            // rtex no longer reads what is sent: it exited, or was stopped
+            // under this session.
             self.queue.clear();
             self.update_snapshot(cx, |snapshot| {
-                snapshot.phase = Phase::Error;
+                snapshot.phase = Phase::Exited;
                 snapshot.detail = Some(error);
             });
         }
@@ -572,10 +589,15 @@ impl Session {
             Message::Layout(layout) => self.on_layout(*layout, cx),
             Message::Paragraph(paragraph) => self.on_paragraph(*paragraph, cx),
             Message::BackgroundScheduled => self.await_layout(None, cx),
-            Message::SessionExited { stderr } => {
+            Message::SessionExited {
+                stderr,
+                code,
+                signal,
+            } => {
                 self.update_snapshot(cx, |snapshot| {
-                    snapshot.phase = Phase::Error;
+                    snapshot.phase = Phase::Exited;
                     snapshot.detail = (!stderr.trim().is_empty()).then_some(stderr);
+                    snapshot.exit = Some(RtexExit { code, signal });
                 });
                 mark(cx, self.model.drop_overlays(None));
             }
@@ -635,10 +657,10 @@ impl Session {
     fn on_layout(&mut self, event: LayoutUpdate, cx: &mut Context<LivePreview>) {
         if matches!(event.compile, protocol::CompileStatus::Failed) {
             // rtex keeps the previous layout; before the first one there is
-            // nothing to show.
+            // nothing to show until an edit makes the document compile.
             if !self.model.has_layout() {
                 self.update_snapshot(cx, |snapshot| {
-                    snapshot.phase = Phase::Error;
+                    snapshot.phase = Phase::Uncompiled;
                     snapshot.detail = None;
                 });
             }
@@ -744,6 +766,7 @@ impl LivePreview {
         if let Some(session) = self.session_mut() {
             session.receive_message(message, cx);
         }
+        self.restart_if_exited(cx);
         self.flush(cx);
     }
 
@@ -774,6 +797,7 @@ impl LivePreview {
                 if let Some(session) = this.session_with(id) {
                     session.batch_written(written, cx);
                 }
+                this.restart_if_exited(cx);
                 this.flush(cx);
             })
             .ok();

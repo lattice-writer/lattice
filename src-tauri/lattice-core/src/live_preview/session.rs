@@ -9,7 +9,7 @@ use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Component, Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
 static NEXT_SESSION: AtomicU64 = AtomicU64::new(1);
@@ -43,7 +43,10 @@ pub(super) fn build_dir(root: &Path, main: &Path) -> Option<PathBuf> {
 /// A running `rtex serve` for one project.
 pub struct Session {
     id: u64,
-    child: Option<Child>,
+    /// Shared with the event thread, which reads how rtex ended once its
+    /// output closes; taken by [`Session::stop`], so an exit Lattice asked
+    /// for is not reported as one of rtex's own.
+    child: Arc<Mutex<Option<Child>>>,
     stdin: Option<ChildStdin>,
     build_dir: PathBuf,
 }
@@ -51,7 +54,8 @@ pub struct Session {
 impl Session {
     /// Start rtex on `main_file` (relative to `root`). Every line it prints is
     /// sent to `events` as it arrives, and a final
-    /// `{"event":"SessionExited",…}` when it stops on its own.
+    /// `{"event":"SessionExited",…}` when it stops on its own: the last lines
+    /// of its stderr, and its exit `code` or the `signal` that ended it.
     pub fn start(
         root: &Path, main_file: &str, events: Arc<dyn Sink<StreamBody>>,
     ) -> Result<Self, String> {
@@ -75,9 +79,11 @@ impl Session {
         let tail = Arc::new(Mutex::new(StderrTail::default()));
         let tail_reader = Arc::clone(&tail);
         std::thread::spawn(move || read_stderr(stderr, &tail_reader));
-        std::thread::spawn(move || forward_events(stdout, &*events, id, &tail));
+        let child = Arc::new(Mutex::new(Some(child)));
+        let watched = Arc::clone(&child);
+        std::thread::spawn(move || forward_events(stdout, &*events, id, &tail, &watched));
         log::info!(target: "lattice::live-preview", "Started rtex session {id} for {}", root.display());
-        Ok(Self { id, child: Some(child), stdin, build_dir })
+        Ok(Self { id, child, stdin, build_dir })
     }
 
     pub fn id(&self) -> u64 {
@@ -120,7 +126,7 @@ impl Session {
         if let Some(mut stdin) = self.stdin.take() {
             let _ = stdin.write_all(b"{\"cmd\":\"quit\"}\n").and_then(|()| stdin.flush());
         }
-        let mut child = self.child.take()?;
+        let mut child = self.child.lock().unwrap_or_else(PoisonError::into_inner).take()?;
         let id = self.id;
         Some(move || {
             let deadline = Instant::now() + Duration::from_secs(1);
@@ -209,6 +215,7 @@ fn read_stderr(stderr: impl Read, tail: &Mutex<StderrTail>) {
 /// by whoever owns it.
 fn forward_events(
     stdout: impl Read, events: &dyn Sink<StreamBody>, id: u64, tail: &Mutex<StderrTail>,
+    child: &Mutex<Option<Child>>,
 ) {
     let mut reader = BufReader::new(stdout);
     let mut line = String::new();
@@ -233,9 +240,45 @@ fn forward_events(
     }
     // Give stderr a moment to deliver the reason rtex stopped.
     std::thread::sleep(Duration::from_millis(100));
+    let Some((code, signal)) = exit_status(child) else {
+        // Stopped by its owner: nobody waits for word of it.
+        return;
+    };
     let stderr = tail.lock().map(|tail| tail.text()).unwrap_or_default();
-    let exited = serde_json::json!({ "event": "SessionExited", "session": id, "stderr": stderr });
+    log::warn!(
+        target: "lattice::live-preview",
+        "rtex session {id} exited on its own (code {code:?}, signal {signal:?}): {stderr}"
+    );
+    let exited = serde_json::json!({
+        "event": "SessionExited", "session": id, "stderr": stderr, "code": code, "signal": signal,
+    });
     let _ = events.send(StreamBody::Json(exited.to_string()));
+}
+
+/// How the child ended, as its exit code or the signal that ended it, waiting
+/// up to a second for it to finish after closing its output. `None` when
+/// [`Session::stop`] took it first.
+fn exit_status(child: &Mutex<Option<Child>>) -> Option<(Option<i32>, Option<i32>)> {
+    let deadline = Instant::now() + Duration::from_secs(1);
+    loop {
+        let mut slot = child.lock().unwrap_or_else(PoisonError::into_inner);
+        let status = match slot.as_mut()?.try_wait() {
+            Ok(Some(status)) => Some(status),
+            Ok(None) if Instant::now() < deadline => None,
+            // Still running with its output closed, or unreadable: report
+            // the exit without a status.
+            Ok(None) | Err(_) => return Some((None, None)),
+        };
+        if let Some(status) = status {
+            #[cfg(unix)]
+            let signal = std::os::unix::process::ExitStatusExt::signal(&status);
+            #[cfg(not(unix))]
+            let signal = None;
+            return Some((status.code(), signal));
+        }
+        drop(slot);
+        std::thread::sleep(Duration::from_millis(25));
+    }
 }
 
 #[cfg(test)]
@@ -360,6 +403,58 @@ mod tests {
         assert_ne!(a, other_main);
         assert!(!a.starts_with("/projects/a"));
         assert_eq!(build_dir(Path::new("/projects/a"), main), Some(a));
+    }
+
+    /// The lines a fake rtex's output reaches the window as.
+    #[cfg(unix)]
+    fn forwarded(script: &str, stop_first: bool) -> Vec<serde_json::Value> {
+        let mut child = Command::new("sh")
+            .args(["-c", script])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let stdout = child.stdout.take().unwrap();
+        let tail = Mutex::new(StderrTail::default());
+        read_stderr(child.stderr.take().unwrap(), &tail);
+        let child = Mutex::new(Some(child));
+        if stop_first {
+            let mut stopped = child.lock().unwrap().take().unwrap();
+            let _ = stopped.wait();
+        }
+        let lines = Mutex::new(Vec::new());
+        let sink = |body: StreamBody| {
+            if let StreamBody::Json(line) = body {
+                lines.lock().unwrap().push(serde_json::from_str(&line).unwrap());
+            }
+            Ok(())
+        };
+        forward_events(stdout, &sink, 3, &tail, &child);
+        lines.into_inner().unwrap()
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn an_exit_of_its_own_reports_the_signal_and_the_stderr_tail() {
+        let lines = forwarded(
+            r#"echo '{"event":"EngineState"}'; echo 'out of memory' >&2; kill -9 $$"#,
+            false,
+        );
+        assert_eq!(lines.len(), 2, "{lines:?}");
+        let exited = &lines[1];
+        assert_eq!(exited["event"], "SessionExited");
+        assert_eq!(exited["session"], 3);
+        assert_eq!(exited["signal"], 9);
+        assert!(exited["code"].is_null(), "{exited}");
+        assert_eq!(exited["stderr"], "out of memory");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn an_exit_code_is_reported_and_a_requested_stop_is_not() {
+        let lines = forwarded("exit 3", false);
+        assert_eq!(lines.last().unwrap()["code"], 3, "{lines:?}");
+        assert!(forwarded("exit 0", true).is_empty());
     }
 
     #[test]

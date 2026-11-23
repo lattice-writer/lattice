@@ -322,6 +322,9 @@ pub enum Message {
     /// (lattice-core's `live_preview/session.rs`).
     SessionExited {
         stderr: String,
+        /// rtex's exit code, or the signal that ended it, when known.
+        code: Option<i32>,
+        signal: Option<i32>,
     },
     /// An event the session does not act on (`Diagnostics`, `PdfExported`).
     OtherEvent(String),
@@ -391,6 +394,14 @@ pub fn parse(line: &str) -> Option<Message> {
         "BackgroundScheduled" => Message::BackgroundScheduled,
         "SessionExited" => Message::SessionExited {
             stderr: string(value.get("stderr")),
+            code: value
+                .get("code")
+                .and_then(Value::as_i64)
+                .map(|code| code as i32),
+            signal: value
+                .get("signal")
+                .and_then(Value::as_i64)
+                .map(|signal| signal as i32),
         },
         _ => Message::OtherEvent(event),
     })

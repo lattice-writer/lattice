@@ -5881,8 +5881,11 @@ impl Window {
     }
 
     fn reset_cursor_style(&self, cx: &mut App) {
-        // Set the cursor only if we're the active window.
-        if self.is_window_hovered() {
+        // Set the cursor only if we're the active window, and leave it to a
+        // webview under the pointer: GPUI's style changing there rebuilds the
+        // window's cursor rects, and AppKit then puts its default arrow over
+        // the page's own cursor until the page changes cursor again.
+        if self.is_window_hovered() && !crate::fast::composition::native_owns_cursor(self, cx) {
             // A drag can start before the next paint records its cursor in the frame.
             let style = cx
                 .active_drag_cursor_style()

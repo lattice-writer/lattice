@@ -3,8 +3,8 @@
 //! into the scratch HOME and starts it, the pill says each stage, a LuaLaTeX
 //! build gives the base PDF, typing into a paragraph paints it over its page
 //! within moments, the save's build waits for the pause and runs quietly (no
-//! spinner on the Build button), its PDF takes over and the paint goes, and
-//! Settings' switch turns it off. The project's engine and text are put back
+//! spinner on the Build button), its PDF takes over and the paint goes, rtex
+//! killed mid-session comes back by itself, and Settings' switch turns it off. The project's engine and text are put back
 //! after.
 
 use std::time::{Duration, Instant};
@@ -358,6 +358,40 @@ impl Run {
                 "chip_spun": chip_spun,
                 "handed_over": handed_over,
             }),
+        );
+
+        // rtex killed mid-session, as macOS does to a process under memory
+        // pressure: Lattice starts a new session by itself (its phase passes
+        // through Starting) and the preview is live again, rather than
+        // staying "Live preview stopped".
+        let killed = std::process::Command::new("pkill")
+            .args([
+                "-KILL",
+                "-f",
+                &format!("rtex serve --project {}", root.display()),
+            ])
+            .status()
+            .is_ok_and(|status| status.success());
+        let mut states: Vec<String> = Vec::new();
+        let recovered = self
+            .wait_for(cx, STARTS_WITHIN, |_, cx| {
+                let preview = preview.read(cx);
+                let name = state_name(preview);
+                if states.last() != Some(&name) {
+                    states.push(name);
+                }
+                states.len() > 1 && preview.is_live()
+            })
+            .await;
+        steps.check(
+            "rtex killed mid-session starts again by itself and the preview is live again",
+            killed
+                && recovered
+                && states
+                    .iter()
+                    .any(|state| state.to_lowercase().contains("starting"))
+                && !states.iter().any(|state| state.starts_with("failed")),
+            json!({ "killed": killed, "states": states }),
         );
 
         // Settings' switch turns it off for the project, and the pill goes.
