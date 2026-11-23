@@ -244,3 +244,22 @@ it("starts a project opened after another's crashes with no restart history", as
   act(() => sessions.at(-1)!.exit(9));
   await waitFor(() => expect(started.filter((root) => root === "/papers/b")).toHaveLength(2));
 });
+
+it("reinstalling deletes rtex, downloads it again and starts a new session, live preview staying on", async () => {
+  install = { ...READY, installed: true };
+  vi.mocked(invoke).mockImplementation(async (command: string) => {
+    if (command === "live_preview_status") return install;
+    if (command === "live_preview_install") return (install = { ...install, installed: true });
+    if (command === "live_preview_remove") return (install = { ...install, installed: false });
+    return null;
+  });
+  const { result } = open("/papers/lua");
+  await waitFor(() => expect(result.current.state.kind).toBe("running"));
+  await act(async () => { await result.current.reinstall(); });
+  await waitFor(() => expect(started).toHaveLength(2));
+  await waitFor(() => expect(result.current.state.kind).toBe("running"));
+  expect(sessions[0].dispose).toHaveBeenCalled();
+  expect(commands()).toEqual(["live_preview_status", "live_preview_remove", "live_preview_status", "live_preview_install"]);
+  expect(result.current.enabled).toBe(true);
+});
+

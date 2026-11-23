@@ -255,7 +255,7 @@ function LiveProjectPdf({
                     </span>
                   </div>
                 )
-                : livePreview ? <LivePreviewStatus state={livePreview.state} onRetry={livePreview.retry} /> : null}
+                : livePreview ? <LivePreviewStatus state={livePreview.state} onRetry={livePreview.retry} onReinstall={livePreview.reinstall} /> : null}
               onPageChange={pdf.onPdfPageChange}
               toolbarAction={pdfWindow?.onOpen && { label: t`Open in separate window`, icon: SquareArrowOutUpRight, run: pdfWindow.onOpen }}
               initialViewState={initialViewState}

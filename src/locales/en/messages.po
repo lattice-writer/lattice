@@ -769,8 +769,8 @@ msgid "{label} at {place}. Click to jump there"
 msgstr "{label} at {place}. Click to jump there"
 
 #: src/live-preview/live-preview-status.tsx
-msgid "{label}. Restart live preview"
-msgstr "{label}. Restart live preview"
+msgid "{label}. {actionLabel}"
+msgstr "{label}. {actionLabel}"
 
 #: src/papers/linked-library-sheet.tsx
 msgid "{library} is up to date."
@@ -4184,8 +4184,8 @@ msgid "Click to keep the original"
 msgstr "Click to keep the original"
 
 #: src/live-preview/live-preview-status.tsx
-msgid "Click to restart live preview, or turn it off in Settings › Editor & builds."
-msgstr "Click to restart live preview, or turn it off in Settings › Editor & builds."
+msgid "Click to reinstall live preview: rtex downloads again and lays the document out from scratch. You can also turn it off in Settings › Editor & builds."
+msgstr "Click to reinstall live preview: rtex downloads again and lays the document out from scratch. You can also turn it off in Settings › Editor & builds."
 
 #: src/telemetry/app-notify.ts
 msgid "Clipboard"
@@ -13520,6 +13520,10 @@ msgstr "Regex"
 msgid "Regular expression"
 msgstr "Regular expression"
 
+#: src/live-preview/live-preview-status.tsx
+msgid "Reinstall live preview"
+msgstr "Reinstall live preview"
+
 #: src/canvas/annotation-review.tsx
 #: src/editor/markdown/engine/chrome/review-chrome.tsx
 #: src/history/review-mode-bar.tsx
@@ -14132,6 +14136,10 @@ msgstr "Restart Lattice"
 #: src/telemetry/app-updater.tsx
 msgid "Restart Lattice now?"
 msgstr "Restart Lattice now?"
+
+#: src/live-preview/live-preview-status.tsx
+msgid "Restart live preview"
+msgstr "Restart live preview"
 
 #: src/app/native-app-dialog.tsx
 #: src/settings/settings-dialog.tsx

@@ -769,8 +769,8 @@ msgid "{label} at {place}. Click to jump there"
 msgstr "{label} 在 {place}，点击跳转"
 
 #: src/live-preview/live-preview-status.tsx
-msgid "{label}. Restart live preview"
-msgstr "{label}。重新启动实时预览"
+msgid "{label}. {actionLabel}"
+msgstr "{label}。{actionLabel}"
 
 #: src/papers/linked-library-sheet.tsx
 msgid "{library} is up to date."
@@ -4184,8 +4184,8 @@ msgid "Click to keep the original"
 msgstr "点击保留原文"
 
 #: src/live-preview/live-preview-status.tsx
-msgid "Click to restart live preview, or turn it off in Settings › Editor & builds."
-msgstr "点击可重新启动实时预览，也可在 设置 › 编辑编译 中关闭。"
+msgid "Click to reinstall live preview: rtex downloads again and lays the document out from scratch. You can also turn it off in Settings › Editor & builds."
+msgstr "点击可重新安装实时预览：rtex 会重新下载，并从头排版文档。也可在 设置 › 编辑编译 中关闭。"
 
 #: src/telemetry/app-notify.ts
 msgid "Clipboard"
@@ -13520,6 +13520,10 @@ msgstr "高级匹配"
 msgid "Regular expression"
 msgstr "高级匹配（正则）"
 
+#: src/live-preview/live-preview-status.tsx
+msgid "Reinstall live preview"
+msgstr "重新安装实时预览"
+
 #: src/canvas/annotation-review.tsx
 #: src/editor/markdown/engine/chrome/review-chrome.tsx
 #: src/history/review-mode-bar.tsx
@@ -14132,6 +14136,10 @@ msgstr "重启 Lattice"
 #: src/telemetry/app-updater.tsx
 msgid "Restart Lattice now?"
 msgstr "现在重启 Lattice？"
+
+#: src/live-preview/live-preview-status.tsx
+msgid "Restart live preview"
+msgstr "重新启动实时预览"
 
 #: src/app/native-app-dialog.tsx
 #: src/settings/settings-dialog.tsx

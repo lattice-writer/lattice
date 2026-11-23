@@ -463,6 +463,24 @@ impl LivePreview {
         self.remove_error.as_deref()
     }
 
+    /// Delete rtex and its build folders and start again, which downloads it
+    /// afresh: what a first layout that never comes offers. Live preview
+    /// stays on.
+    pub fn reinstall(&mut self, cx: &mut Context<Self>) {
+        self.run = None;
+        self.stop_session(cx);
+        self.set_state(State::Starting, cx);
+        cx.spawn(async move |this, cx| {
+            if let Err(error) = cx.background_spawn(async { live_preview::remove() }).await {
+                // A download still under way, or files macOS would not
+                // delete: the start below checks what is installed again.
+                log::warn!(target: "lattice::live-preview", "Reinstall could not remove rtex: {error}");
+            }
+            this.update(cx, |this, cx| this.retry(cx)).ok();
+        })
+        .detach();
+    }
+
     /// Turn live preview off everywhere and delete rtex and its build
     /// folders.
     pub fn remove(&mut self, cx: &mut Context<Self>) {

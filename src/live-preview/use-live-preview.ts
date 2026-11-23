@@ -170,6 +170,22 @@ export function useLivePreview({ project, activeFile, source, savedSource }: {
     restarts.current.at.length = 0;
     setAttempt((count) => count + 1);
   }, []);
+  /**
+   * Delete rtex and its build folders and start again, which downloads it
+   * afresh: what a first layout that never comes offers. Live preview stays
+   * on.
+   */
+  const reinstall = useCallback(async () => {
+    try {
+      await invoke<LivePreviewInstall>("live_preview_remove");
+    } catch (reason) {
+      // A download still under way, or files macOS would not delete: the
+      // next start checks what is installed again.
+      console.warn("[live-preview] reinstall could not remove rtex", reason);
+    }
+    restarts.current.at.length = 0;
+    setAttempt((count) => count + 1);
+  }, []);
   /** Turn live preview off everywhere and delete rtex and its build folders. */
   const remove = useCallback(async () => {
     disableLivePreviewEverywhere();
@@ -180,8 +196,8 @@ export function useLivePreview({ project, activeFile, source, savedSource }: {
   // One identity while nothing here changes: the PDF panel and Settings take
   // it, and typing re-renders App on every keystroke.
   return useMemo(
-    () => ({ available, enabled, state, setEnabled, retry, remove, buildHooks }),
-    [available, enabled, remove, retry, setEnabled, state],
+    () => ({ available, enabled, state, setEnabled, retry, reinstall, remove, buildHooks }),
+    [available, enabled, reinstall, remove, retry, setEnabled, state],
   );
 }
 

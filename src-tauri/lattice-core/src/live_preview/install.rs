@@ -46,6 +46,13 @@ const ARCHIVE_ROOT: &str = "rtex-0.0.6-aarch64-apple-darwin";
 #[cfg(not(target_arch = "aarch64"))]
 const ARCHIVE_ROOT: &str = "rtex-0.0.6-x86_64-apple-darwin";
 
+/// The SHA-256 of every file the release unpacked, written beside them once
+/// the archive matched the pin. rtex runs only while every file still matches
+/// it: a file changed or cut short since, or an install an older Lattice left
+/// without one, counts as not installed and downloads again, rather than
+/// running an engine that never lays the document out.
+const MANIFEST: &str = "lattice-files.sha256";
+
 /// Where the verified release lives: `bin/rtex`, and `share/rtex/tex` beside
 /// it, where rtex looks for its TeX and Lua support files.
 fn install_dir() -> Option<PathBuf> {
@@ -59,13 +66,46 @@ pub(super) fn installed_executable() -> Option<PathBuf> {
 }
 
 fn is_complete(dir: &Path) -> bool {
-    let executable = dir.join("bin/rtex");
-    let regular = |path: &Path| {
-        fs::symlink_metadata(path).is_ok_and(|metadata| metadata.file_type().is_file())
+    fs::metadata(dir.join("bin/rtex")).is_ok_and(|metadata| executable_permissions(&metadata))
+        && matches_manifest(dir)
+}
+
+/// Every file `MANIFEST` lists is a plain file with its digest, and the
+/// executable and the serve script are among them.
+fn matches_manifest(dir: &Path) -> bool {
+    let Ok(manifest) = fs::read_to_string(dir.join(MANIFEST)) else {
+        return false;
     };
-    regular(&executable)
-        && fs::metadata(&executable).is_ok_and(|metadata| executable_permissions(&metadata))
-        && regular(&dir.join("share/rtex/tex/rtex-serve.lua"))
+    let mut required = ["bin/rtex", "share/rtex/tex/rtex-serve.lua"].map(|path| (path, false));
+    for line in manifest.lines() {
+        let Some((digest, relative)) = line.split_once("  ") else {
+            return false;
+        };
+        let path = dir.join(relative);
+        let regular =
+            fs::symlink_metadata(&path).is_ok_and(|metadata| metadata.file_type().is_file());
+        if !regular || fs::read(&path).map(crate::util::sha256_hex).ok().as_deref() != Some(digest)
+        {
+            return false;
+        }
+        for (wanted, seen) in &mut required {
+            *seen |= relative == *wanted;
+        }
+    }
+    required.iter().all(|(_, seen)| *seen)
+}
+
+/// Record the digest of each of `files` (relative to `dir`) in `MANIFEST`.
+fn write_manifest(dir: &Path, files: &[PathBuf]) -> Result<(), String> {
+    let mut manifest = String::new();
+    for relative in files {
+        let bytes = fs::read(dir.join(relative))
+            .map_err(|error| format!("Could not read {}: {error}", relative.display()))?;
+        let relative = relative.to_string_lossy().replace('\\', "/");
+        manifest.push_str(&format!("{}  {relative}\n", crate::util::sha256_hex(bytes)));
+    }
+    fs::write(dir.join(MANIFEST), manifest)
+        .map_err(|error| format!("Could not record the installed rtex: {error}"))
 }
 
 #[derive(Clone, Serialize)]
@@ -210,7 +250,8 @@ pub fn install(on_progress: &dyn Sink<InstallProgress>) -> Result<InstallStatus,
         let unpacked = staging.join("release");
         fs::create_dir(&unpacked)
             .map_err(|error| format!("Could not unpack the rtex archive: {error}"))?;
-        extract_release(&archive, &unpacked, ARCHIVE_ROOT)?;
+        let files = extract_release(&archive, &unpacked, ARCHIVE_ROOT)?;
+        write_manifest(&unpacked, &files)?;
         if !is_complete(&unpacked) {
             return Err("The rtex archive did not contain the live preview engine.".to_string());
         }
@@ -270,8 +311,12 @@ pub fn remove() -> Result<InstallStatus, String> {
 /// Unpack `bin/rtex`, `share/rtex/tex/**` and `LICENSE` from `archive_root/`
 /// into `destination`. The C library, headers and readme are left out, and
 /// anything that is not a plain file or folder, or that would land outside
-/// `destination`, is refused.
-fn extract_release(archive: &Path, destination: &Path, archive_root: &str) -> Result<(), String> {
+/// `destination`, is refused. Returns the files unpacked, relative to
+/// `destination`.
+fn extract_release(
+    archive: &Path, destination: &Path, archive_root: &str,
+) -> Result<Vec<PathBuf>, String> {
+    let mut unpacked = Vec::new();
     let file = fs::File::open(archive)
         .map_err(|error| format!("Could not read the rtex archive: {error}"))?;
     let mut archive = tar::Archive::new(flate2::read::GzDecoder::new(file));
@@ -319,8 +364,9 @@ fn extract_release(archive: &Path, destination: &Path, archive_root: &str) -> Re
         #[cfg(unix)]
         fs::set_permissions(&target, fs::Permissions::from_mode(mode))
             .map_err(|error| format!("Could not unpack {}: {error}", relative.display()))?;
+        unpacked.push(relative.to_path_buf());
     }
-    Ok(())
+    Ok(unpacked)
 }
 
 fn executable_permissions(metadata: &fs::Metadata) -> bool {
@@ -400,7 +446,10 @@ mod tests {
         );
         let out = dir.join("out");
         fs::create_dir(&out).unwrap();
-        extract_release(&path, &out, root).unwrap();
+        let files = extract_release(&path, &out, root).unwrap();
+        // Unverified until the manifest records what was unpacked.
+        assert!(!is_complete(&out));
+        write_manifest(&out, &files).unwrap();
         assert!(is_complete(&out));
         assert!(out.join("share/rtex/tex/latex/rtex-capture.sty").is_file());
         assert!(out.join("LICENSE").is_file());
@@ -408,6 +457,36 @@ mod tests {
         assert!(!out.join("README.md").exists());
         #[cfg(unix)]
         assert_eq!(fs::metadata(out.join("bin/rtex")).unwrap().permissions().mode() & 0o777, 0o755);
+    }
+
+    /// The user's live preview stayed on "First layout…" until Remove and a
+    /// fresh download: a release whose files no longer match what was
+    /// verified, or one an older Lattice installed without a manifest, now
+    /// counts as not installed and downloads again.
+    #[test]
+    fn a_release_changed_since_it_was_verified_is_not_installed() {
+        let dir = TempDir::new("rtex-tampered");
+        let root = ARCHIVE_ROOT;
+        let path = archive(
+            &dir,
+            &[
+                (&format!("{root}/bin/rtex"), b"#!/bin/sh\n"),
+                (&format!("{root}/share/rtex/tex/rtex-serve.lua"), b"lua"),
+                (&format!("{root}/share/rtex/tex/rtex-bg.lua"), b"background pass"),
+            ],
+            None,
+        );
+        let out = dir.join("out");
+        fs::create_dir(&out).unwrap();
+        let files = extract_release(&path, &out, root).unwrap();
+        write_manifest(&out, &files).unwrap();
+        assert!(is_complete(&out));
+        fs::write(out.join("share/rtex/tex/rtex-bg.lua"), b"backgr").unwrap();
+        assert!(!is_complete(&out));
+        fs::write(out.join("share/rtex/tex/rtex-bg.lua"), b"background pass").unwrap();
+        assert!(is_complete(&out));
+        fs::remove_file(out.join(MANIFEST)).unwrap();
+        assert!(!is_complete(&out));
     }
 
     #[test]

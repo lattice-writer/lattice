@@ -12,7 +12,7 @@ beforeEach(() => { vi.mocked(invoke).mockReset().mockResolvedValue(READY); });
 
 function settings(state: LivePreviewState, overrides: Partial<LivePreview> = {}) {
   const livePreview = {
-    available: true, enabled: true, state, setEnabled: vi.fn(), retry: vi.fn(), remove: vi.fn(), buildHooks: { current: null },
+    available: true, enabled: true, state, setEnabled: vi.fn(), retry: vi.fn(), reinstall: vi.fn(), remove: vi.fn(), buildHooks: { current: null },
     ...overrides,
   } as LivePreview;
   render(<LivePreviewSettings livePreview={livePreview} />);

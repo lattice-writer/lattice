@@ -398,8 +398,9 @@ impl Run {
 
         // A document that keeps LuaLaTeX busy (a loop here; a first run
         // listing its fonts looks the same) never gets its first layout: past
-        // the bound the pill says so and offers a restart, rather than
-        // spinning on "First layout…" for good.
+        // the bound the pill says so and offers to reinstall rtex, rather
+        // than spinning on "First layout…" for good. The reinstall downloads
+        // rtex again and the preview comes back.
         let main = cx
             .update(|cx| project.read(cx).main_document().map(|main| root.join(main)))
             .context("the project has a main document")?;
@@ -424,7 +425,10 @@ impl Run {
                 {
                     labels.push(label);
                 }
-                pill.is_some_and(|pill| pill.restartable && pill.tone == status::Tone::Pending)
+                pill.is_some_and(|pill| {
+                    pill.action == Some(status::PillAction::Reinstall)
+                        && pill.tone == status::Tone::Pending
+                })
             })
             .await;
         self.snapshot(cx, "live-preview-overdue").await;
@@ -438,20 +442,33 @@ impl Run {
         cx.update(|cx| {
             preview.update(cx, |preview, cx| {
                 preview.first_layout_timeout = bound;
-                preview.retry(cx);
+                preview.reinstall(cx);
             })
         });
+        let mut reinstall_states: Vec<String> = Vec::new();
         let restarted = self
-            .wait_for(cx, STARTS_WITHIN, |_, cx| preview.read(cx).is_live())
+            .wait_for(cx, STARTS_WITHIN, |_, cx| {
+                let name = state_name(preview.read(cx));
+                if reinstall_states.last() != Some(&name) {
+                    reinstall_states.push(name);
+                }
+                preview.read(cx).is_live()
+            })
             .await;
         steps.check(
-            "a document that never gets its first layout says so after the bound instead of spinning, and a restart brings the preview back",
+            "a document that never gets its first layout says so after the bound instead of spinning, and reinstalling rtex brings the preview back",
             overdue
                 && restarted
                 && build_stopped
+                && reinstall_states.iter().any(|state| state == "downloading")
                 && labels.iter().any(|label| label == "First layout…")
                 && labels.last().is_some_and(|label| label == "Live preview is taking long"),
-            json!({ "labels": labels, "restarted": restarted, "build_stopped": build_stopped }),
+            json!({
+                "labels": labels,
+                "restarted": restarted,
+                "build_stopped": build_stopped,
+                "reinstall_states": reinstall_states,
+            }),
         );
 
         // Settings' switch turns it off for the project, and the pill goes.
