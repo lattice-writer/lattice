@@ -62,6 +62,23 @@ main blockquote { margin: 12px 0; padding: 2px 16px; border-left: 3px solid var(
 <li><strong>Export ZIP…</strong> writes the whole project, which Overleaf can import.</li>
 <li>The PDF panel&#39;s menu saves the compiled PDF.</li>
 </ul>
+<h2 id="typst-documents">Typst documents</h2>
+<p>The native Lattice app also writes and builds <a href="https://typst.app">Typst</a> documents (<code>.typ</code> files). A <code>.typ</code> file opens with syntax highlighting straight away. The Typst compiler is a separate one-time download, so the app stays small for writers who never use Typst.</p>
+<ul>
+<li><p><strong>Download Typst support:</strong> the first time you build a Typst document, or it starts compiling as you type, Lattice asks to download Typst support, a one-time download of about 22 MB. <strong>Download</strong> fetches it (on Macs with Apple silicon), checks its signature and runs the build. <strong>Not now</strong> leaves the file as it was, with highlighting only; typing doesn&#39;t ask again until you restart Lattice, and the next build asks again. After an app update, Lattice downloads the matching version on its own. <strong>Settings › Editor &amp; builds › Typst support</strong> downloads it, removes it, or downloads it again.</p>
+</li>
+<li><p><strong>Start one:</strong> choose <strong>Blank Typst document</strong> when you create a project, or <strong>New Typst file</strong> in the Project panel&#39;s <code>+</code> menu. A folder you open that has a <code>main.typ</code> (or another <code>.typ</code> that includes the rest) and no LaTeX document builds that file.</p>
+</li>
+<li><p><strong>Build and preview:</strong> <code>⌘S</code>, the build button and automatic builds work as they do for LaTeX. Typst also compiles as you type: a moment after you stop, the PDF shows your edit, unsaved, and keeps its page and scroll position.</p>
+</li>
+<li><p><strong>Errors:</strong> the build button and the problems panel show Typst&#39;s errors and warnings with their file and line. Click one to jump to it.</p>
+</li>
+<li><p><strong>Fonts and packages:</strong> your system fonts are available, plus the fonts Typst bundles (Libertinus Serif, New Computer Modern, DejaVu Sans Mono). <code>#import &quot;@preview/…&quot;</code> downloads the package from Typst Universe the first time; after that it works offline.</p>
+</li>
+<li><p><strong>In a LaTeX project</strong>, a <code>.typ</code> file you build compiles on its own, and the LaTeX paper stays the document other builds compile.</p>
+</li>
+</ul>
+<p>Clicking between the source and the PDF (SyncTeX), Overleaf sync and the Visual editor are LaTeX-only for now.</p>
 </main>
 </div>
 </body>

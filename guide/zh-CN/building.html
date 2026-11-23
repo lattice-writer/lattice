@@ -62,6 +62,23 @@ main blockquote { margin: 12px 0; padding: 2px 16px; border-left: 3px solid var(
 <li><strong>导出 ZIP…</strong> 导出整个项目，Overleaf 可以直接导入。</li>
 <li>PDF 面板的菜单可以保存编译好的 PDF。</li>
 </ul>
+<h2 id="typst-文档">Typst 文档</h2>
+<p>原生版 Lattice 也能编写和编译 <a href="https://typst.app">Typst</a> 文档（<code>.typ</code> 文件）。<code>.typ</code> 文件打开即有语法高亮。Typst 编译器需要另外下载一次，这样不用 Typst 的用户也不会多占空间。</p>
+<ul>
+<li><p><strong>下载 Typst 支持</strong>：第一次编译 Typst 文档，或开始边写边编译时，Lattice 会询问是否下载 Typst 支持，这是一次性下载，约 22 MB。选择 <strong>下载</strong> 会下载它（搭载 Apple 芯片的 Mac）、校验签名后继续编译。选择 <strong>以后再说</strong> 则保持原样，文件只有语法高亮；在重新打开 Lattice 之前，输入时不会再询问，下次编译时会再次询问。应用更新后，Lattice 会自动下载对应版本。<strong>设置 › 编辑编译 › Typst 支持</strong> 中可以下载、移除或重新下载。</p>
+</li>
+<li><p><strong>新建</strong>：创建项目时选择 <strong>Blank Typst document</strong>，或在项目面板的 <code>+</code> 菜单中选择 <strong>新建 Typst</strong>。打开的文件夹如果没有 LaTeX 文档、但有 <code>main.typ</code>（或引入其他文件的那个 <code>.typ</code>），就会编译这个文件。</p>
+</li>
+<li><p><strong>编译与预览</strong>：<code>⌘S</code>、编译按钮和自动编译与 LaTeX 相同。Typst 还会边写边编译：停止输入片刻后，PDF 就会显示刚才未保存的修改，并保持原来的页码和滚动位置。</p>
+</li>
+<li><p><strong>错误</strong>：编译按钮和问题面板显示 Typst 的错误与警告，并标明文件和行号，点击即可跳到对应行。</p>
+</li>
+<li><p><strong>字体与包</strong>：可以使用系统字体，以及 Typst 自带的字体（Libertinus Serif、New Computer Modern、DejaVu Sans Mono）。<code>#import &quot;@preview/…&quot;</code> 第一次使用时会从 Typst Universe 下载包，之后离线也能用。</p>
+</li>
+<li><p><strong>在 LaTeX 项目中</strong>编译某个 <code>.typ</code> 文件时，只单独编译它，其他编译仍然编译原来的 LaTeX 论文。</p>
+</li>
+</ul>
+<p>源码与 PDF 之间的点击跳转（SyncTeX）、Overleaf 同步和可视化编辑器目前只支持 LaTeX。</p>
 </main>
 </div>
 </body>
