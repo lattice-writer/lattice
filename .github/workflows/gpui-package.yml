@@ -163,6 +163,7 @@ jobs:
           node scripts/gpui-bundle.mjs \
             --flavor "$FLAVOR" \
             --binary gpui/target/release/lattice-gpui \
+            --typst-helper gpui/target/release/lattice-typst \
             --out "$RUNNER_TEMP/gpui-bundle"
           app="$(find "$RUNNER_TEMP/gpui-bundle" -maxdepth 1 -name '*.app' -print -quit)"
           test -n "$app"
@@ -203,6 +204,16 @@ jobs:
             test -s "$archive.sig"
           done
 
+          # The Typst helper the app downloads on first use: signed with the
+          # Developer ID and the hardened runtime, and its archive with the
+          # updater key.
+          helper_archive="$(find "$RUNNER_TEMP/gpui-bundle" -maxdepth 1 -name 'Lattice-typst_*_aarch64.tar.gz' -print -quit)"
+          test -s "$helper_archive.sig"
+          helper_dir="$(mktemp -d "$RUNNER_TEMP/gpui-typst.XXXXXX")"
+          tar -xzf "$helper_archive" -C "$helper_dir"
+          codesign --verify --strict --verbose=2 "$helper_dir/lattice-typst"
+          codesign --display --verbose=2 "$helper_dir/lattice-typst" 2>&1 | grep -q 'flags=.*runtime'
+
       - uses: actions/upload-artifact@v7
         with:
           name: lattice-gpui-macos-aarch64-${{ inputs.flavor }}
@@ -211,6 +222,8 @@ jobs:
             ${{ runner.temp }}/gpui-bundle/*.zip
             ${{ runner.temp }}/gpui-bundle/*.app.tar.gz
             ${{ runner.temp }}/gpui-bundle/*.app.tar.gz.sig
+            ${{ runner.temp }}/gpui-bundle/Lattice-typst_*_aarch64.tar.gz
+            ${{ runner.temp }}/gpui-bundle/Lattice-typst_*_aarch64.tar.gz.sig
             ${{ runner.temp }}/gpui-bundle/latest*.json
           if-no-files-found: error
           retention-days: 14

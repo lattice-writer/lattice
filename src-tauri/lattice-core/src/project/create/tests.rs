@@ -261,6 +261,22 @@ fn the_ieee_and_acm_templates_start_with_a_sample_bibliography_in_their_style() 
 }
 
 #[test]
+fn the_typst_starter_is_a_main_typ_with_its_title_and_an_empty_bibliography() {
+    let parent = Fixture::empty("typst-starter");
+    assert_eq!(Venue::parse("typst"), Ok(Venue::Typst));
+    let root = create_with_venue(&parent.root, "My Typst notes", Venue::Typst).unwrap();
+    let manifest = read_manifest(&root).unwrap();
+    assert_eq!(manifest.venue, "typst");
+    assert_eq!(manifest.root_documents[0].path, "main.typ");
+    assert!(manifest.root_documents[0].is_default);
+    let source = read(&root, "main.typ");
+    assert!(source.starts_with("#let title = \"My Typst notes\"\n"), "{source}");
+    assert_eq!(typst_title(r#"My "Typst" \ notes"#), r#"My \"Typst\" \\ notes"#);
+    assert!(!root.join("main.tex").exists());
+    assert_eq!(read(&root, "references.bib"), "");
+}
+
+#[test]
 fn the_chinese_article_keeps_its_chinese_title_and_builds_with_xelatex() {
     let parent = Fixture::empty("chinese-article");
     assert_eq!(Venue::parse("ctexart"), Ok(Venue::ChineseArticle));

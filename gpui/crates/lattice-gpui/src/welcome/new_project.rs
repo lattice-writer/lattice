@@ -33,7 +33,7 @@ use lattice_ui::{
 /// The templates a new project starts from, in the order the app lists
 /// them, each with its name as the select shows it
 /// (`src/project/project-venues.ts`).
-pub const VENUES: [(&str, &str); 14] = [
+pub const VENUES: [(&str, &str); 15] = [
     ("blank", "Blank article"),
     ("chinese-article", "Chinese article (ctexart)"),
     ("neurips", "NeurIPS 2026 (preprint)"),
@@ -48,6 +48,8 @@ pub const VENUES: [(&str, &str); 14] = [
     ("acm", "ACM paper (acmart)"),
     ("thuthesis", "Tsinghua University thesis (ThuThesis)"),
     ("ustcthesis", "USTC thesis (ustcthesis)"),
+    // The native app's alone: the Tauri app cannot build Typst.
+    ("typst", "Blank Typst document"),
 ];
 const DEFAULT_VENUE: usize = 2;
 

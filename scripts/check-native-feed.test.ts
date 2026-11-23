@@ -1,6 +1,10 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { checkNativeManifest, nativeFiles } from "./check-native-feed.mjs";
-import { FLAVORS, updaterManifest } from "./gpui-bundle.mjs";
+import { checkNativeManifest, checkTypstHelper, nativeFiles } from "./check-native-feed.mjs";
+import { FLAVORS, typstHelperFiles, updaterManifest } from "./gpui-bundle.mjs";
+import { throwawayMinisign } from "./lib/throwaway-minisign.mjs";
 
 // The manifest gpui-bundle.mjs writes for the native app is the one
 // release.yml checks before it publishes it as latest-native.json.
@@ -47,5 +51,25 @@ describe("the native feed", () => {
     expect(() => checkNativeManifest(elsewhere, check)).toThrow(/is not v1.2.3's/);
     expect(() => checkNativeManifest(manifest, { ...check, signature: "other" })).toThrow(/another signature/);
     expect(() => checkNativeManifest(manifest, { ...check, signature: " " })).toThrow(/Empty/);
+  });
+});
+
+describe("the Typst helper's files", () => {
+  it("are this version's archive and signature, verified against the updater key", () => {
+    const directory = mkdtempSync(path.join(os.tmpdir(), "typst-feed-"));
+    try {
+      const key = throwawayMinisign();
+      const { archive, signature } = typstHelperFiles("1.2.3");
+      const helper = Buffer.from("the helper");
+      expect(() => checkTypstHelper(directory, "1.2.3", key.publicKey)).toThrow(/missing or empty/);
+      writeFileSync(path.join(directory, archive), helper);
+      writeFileSync(path.join(directory, signature), key.signFile(helper));
+      expect(checkTypstHelper(directory, "1.2.3", key.publicKey)).toEqual([path.join(directory, archive), path.join(directory, signature)]);
+      expect(() => checkTypstHelper(directory, "1.2.3", throwawayMinisign(Buffer.from("fedcba9876543210", "hex")).publicKey)).toThrow();
+      writeFileSync(path.join(directory, signature), key.signFile(Buffer.from("another helper")));
+      expect(() => checkTypstHelper(directory, "1.2.3", key.publicKey)).toThrow(/does not match/);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });

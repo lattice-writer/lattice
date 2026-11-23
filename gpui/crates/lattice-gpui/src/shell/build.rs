@@ -6,12 +6,20 @@
 //! unattended build of a failing document nothing changed in restates its
 //! errors (lattice-core's `build::unchanged`), and a build that finds no TeX
 //! opens setup.
+//!
+//! A Typst root document goes to lattice-typst's compiler instead of
+//! latexmk, through the same pipeline: the open `.typ` buffers are its
+//! overlay, so it compiles what is on screen. Typst compiles in milliseconds,
+//! so its preview follows the typing: a short pause after an edit to a `.typ`
+//! file runs a live build, which saves nothing and redraws the PDF in place.
 
 use std::{collections::HashMap, time::Duration};
 
 use futures::{StreamExt as _, channel::mpsc, channel::oneshot};
 use gpui::{App, AppContext as _, AsyncWindowContext, Context, Entity, WeakEntity, Window};
 use lattice_core::latex::{self, BuildResult, BuildStep, BuildSteps};
+use lattice_core::project::is_typst_path;
+use lattice_core::typst_wire::Reply;
 use lattice_i18n::{n, t, tr};
 use lattice_ui::components::ToastLevel;
 
@@ -32,6 +40,9 @@ const NO_DOCUMENT: &str = n!(
     "This project has no LaTeX document to build yet. Add a .tex file, or \
      set one as the root document in project settings."
 );
+
+/// How long typing in a `.typ` file pauses before its live build runs.
+const TYPST_LIVE_PAUSE: Duration = Duration::from_millis(150);
 
 /// How long a build runs before Lattice says so and offers to stop it.
 const SLOW_BUILD: Duration = Duration::from_secs(10 * 60);
@@ -58,6 +69,9 @@ pub(super) struct BuildRequest {
     pub(super) quiet: bool,
     /// It waited behind another build (the log's trigger "queued").
     queued: bool,
+    /// Typst's live preview: compile the open buffers as they are, saving
+    /// nothing.
+    live: bool,
 }
 
 impl BuildRequest {
@@ -86,9 +100,20 @@ impl BuildRequest {
         }
     }
 
+    /// Typst's live build, after a pause in typing: quiet, unattended, and
+    /// from the buffers.
+    fn typst_live() -> Self {
+        Self {
+            live: true,
+            quiet: true,
+            ..Self::automatic()
+        }
+    }
+
     /// The build queued behind a running one stands for both asks.
     fn merge(self, other: Self) -> Self {
         Self {
+            live: self.live && other.live,
             force: self.force || other.force,
             clean: self.clean || other.clean,
             unattended: self.unattended && other.unattended,
@@ -156,19 +181,31 @@ impl Shell {
             .take()
             .or_else(|| open_document.map(|(path, _)| path));
         let editors = self.open_editors();
-        let saves = Self::save_dirty(&editors, cx);
+        let saves = if request.live {
+            Vec::new()
+        } else {
+            Self::save_dirty(&editors, cx)
+        };
         let saved: HashMap<String, String> = editors
             .iter()
             .filter_map(|editor| {
                 let editor = editor.read(cx);
                 let relative = editor.relative().to_ascii_lowercase();
-                (relative.ends_with(".tex") || relative.ends_with(".bib")).then(|| {
+                (relative.ends_with(".tex")
+                    || relative.ends_with(".bib")
+                    || is_typst_path(&relative))
+                .then(|| {
                     (
                         editor.relative().to_string(),
                         editor.editor().read(cx).text(cx),
                     )
                 })
             })
+            .collect();
+        let overlay: HashMap<String, String> = saved
+            .iter()
+            .filter(|(path, _)| is_typst_path(path))
+            .map(|(path, text)| (path.clone(), text.clone()))
             .collect();
         let root = project.read(cx).root().to_path_buf();
         let mut files = Vec::new();
@@ -213,6 +250,9 @@ impl Shell {
         crate::build::tex_setup::reminder::building(cx.entity_id(), true, cx);
         self.build_trace = Some(oplog::start(request, cx));
         let live_preview = self.live_preview.clone();
+        // Typst documents compile in the helper Typst support installs
+        // (`crate::typst`); without it, the build asks to download it.
+        let typst = crate::typst::binary(cx);
         self.build_task = Some(cx.spawn_in(window, async move |this, cx| {
             for save in saves {
                 if let Err(error) = save.await {
@@ -255,15 +295,28 @@ impl Shell {
                 let root = root.clone();
                 async move {
                     let before = fingerprint_pdfs(&root, &candidates);
-                    let result = latex::build(
-                        &root,
-                        request.force,
-                        request.unattended,
-                        &active,
-                        open_document.as_deref(),
-                        &steps,
-                        aux_files,
-                    );
+                    let mut needs_typst = false;
+                    let result = match latex::choose_document(&root, open_document.as_deref()) {
+                        Ok((document, one_off)) if is_typst_path(&document) => Ok(match &typst {
+                            Some(binary) => crate::typst::helper::build(
+                                binary, &root, &document, &overlay, one_off,
+                            ),
+                            None => {
+                                needs_typst = true;
+                                Reply::failed(t!("Typst support isn’t installed").to_string())
+                                    .into_build(&root, &document, one_off)
+                            }
+                        }),
+                        _ => latex::build(
+                            &root,
+                            request.force,
+                            request.unattended,
+                            &active,
+                            open_document.as_deref(),
+                            &steps,
+                            aux_files,
+                        ),
+                    };
                     result.map(|result| {
                         let pdf = root.join(&result.root_document).with_extension("pdf");
                         let rewritten = rewrote(&pdf, &before);
@@ -279,6 +332,7 @@ impl Shell {
                             rewritten,
                             sources,
                             live,
+                            needs_typst,
                         }
                     })
                 }
@@ -291,20 +345,45 @@ impl Shell {
                 build_panel.update(cx, |panel, cx| panel.steps(latest, cx));
             }
             let outcome = build.await;
+            let needs_typst = matches!(&outcome, Ok(finished) if finished.needs_typst);
             this.update_in(cx, |this, window, cx| {
                 this.finish_build(&project, revision, request, Some(outcome), window, cx)
             })
             .ok();
+            // The build could not compile a Typst document: ask to download
+            // Typst support, and build again once it is installed.
+            if needs_typst {
+                let window = cx.window_handle();
+                cx.update(|_, cx| {
+                    crate::typst::require(
+                        request.live,
+                        move |cx| {
+                            window
+                                .update(cx, |_, window, cx| {
+                                    this.update(cx, |this, cx| this.run_build(request, window, cx))
+                                })
+                                .ok();
+                        },
+                        cx,
+                    )
+                })
+                .ok();
+            }
         }));
         cx.notify();
     }
 
-    /// The .tex in the editor the writer was last in, and whether it holds
-    /// `\documentclass`: such a file builds even when the manifest names no
-    /// document, as lattice-core adopts it, as Overleaf does.
+    /// The .tex or .typ in the editor the writer was last in, and whether it
+    /// holds `\documentclass` (a .typ always builds): such a file builds even
+    /// when the manifest names no document, as lattice-core adopts it, as
+    /// Overleaf does.
     pub(super) fn open_document(&self, cx: &App) -> Option<(String, bool)> {
         let editor = self.active_editor()?;
         let editor = editor.read(cx);
+        // Any Typst file compiles: it has no document class to look for.
+        if is_typst_path(editor.relative()) {
+            return Some((editor.relative().to_string(), true));
+        }
         editor
             .relative()
             .to_ascii_lowercase()
@@ -371,6 +450,7 @@ impl Shell {
                 rewritten,
                 sources,
                 live,
+                ..
             })) => {
                 let cancelled = result
                     .diagnostics
@@ -566,6 +646,19 @@ impl Shell {
         self.quiet_builds.set_timer(timer);
     }
 
+    /// An edit to a `.typ` file: its live build runs once typing pauses for
+    /// [`TYPST_LIVE_PAUSE`]; each edit before then restarts the wait.
+    pub(super) fn schedule_typst_live(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.typst_live = Some(cx.spawn_in(window, async move |this, cx| {
+            cx.background_executor().timer(TYPST_LIVE_PAUSE).await;
+            this.update_in(cx, |this, window, cx| {
+                this.typst_live = None;
+                this.run_build(BuildRequest::typst_live(), window, cx);
+            })
+            .ok();
+        }));
+    }
+
     fn fire_quiet_build(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let quiet = self.live_on_tex(cx);
         log::info!("the waiting build runs, quiet: {quiet}");
@@ -658,6 +751,8 @@ pub(super) struct Finished {
     sources: HashMap<String, String>,
     /// The live preview's token for the files the build read.
     live: Option<(u64, usize)>,
+    /// A Typst document Typst support is not installed for.
+    needs_typst: bool,
 }
 
 #[cfg(test)]

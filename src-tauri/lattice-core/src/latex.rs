@@ -71,6 +71,22 @@ pub use aux_files::AuxFiles;
 #[cfg(all(test, unix))]
 pub(crate) use build::begin_active as begin_for_test;
 pub use build::{abort, build, classify_build_error, clean, is_running, ActiveBuild};
+
+/// What [`build`] answers for a Typst root document: the native app compiles
+/// those itself (`lattice-typst`), and latexmk cannot.
+pub const TYPST_NATIVE_ONLY: &str =
+    "Typst documents build in Lattice's native app. Open this project there to compile it.";
+
+/// The document a build with `open_document` in the editor compiles, chosen
+/// and recorded as [`build`] would (the manifest default it writes, a
+/// one-off it remembers), and whether it is a one-off. The native app asks
+/// first to send a Typst document to its own compiler.
+pub fn choose_document(root: &Path, open_document: Option<&str>) -> Result<(String, bool), String> {
+    compile_root::choose_compile_root(root, open_document)?;
+    let manifest = project::read_manifest(root)?;
+    let document = compiled_document(root, &manifest)?;
+    Ok((document, compile_root::is_one_off_root(root)))
+}
 pub(crate) use build_log::{is_pass_noise_warning, unwrap_log_lines};
 pub use build_steps::{BuildStep, BuildSteps};
 pub use changes::{

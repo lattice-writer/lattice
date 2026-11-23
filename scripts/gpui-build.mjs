@@ -29,8 +29,9 @@
  *      a `cargo test` fails as soon as one test runs past the per-test limit
  *      (300 s, `LATTICE_GPUI_TEST_TIMEOUT_SECONDS`; scripts/lib/test-timeout.mjs)
  *      rather than holding the lock while it loops;
- *   4. after a `cargo build` of the GPUI workspace, copies `lattice-gpui` back
- *      into this checkout.
+ *   4. after a `cargo build` of the GPUI workspace, copies `lattice-gpui` (and
+ *      the Typst helper `lattice-typst`, when it was built) back into this
+ *      checkout.
  *
  * Validation runs (the no-mistakes pipeline's run worktrees, `pnpm signoff`)
  * send every cargo command that compiles through here, whether build, check,
@@ -228,17 +229,24 @@ async function main() {
 
     if ((cargoArgs[0] === "build" || cargoArgs[0] === "b") && !elsewhere) {
       const profile = profileDir(cargoArgs);
-      const built = path.join(gpui, "target", profile, "lattice-gpui");
-      if (!existsSync(built)) throw new Error(`${built} is missing after the build`);
-      const dest = path.join(repo, "gpui", "target", profile, "lattice-gpui");
-      mkdirSync(path.dirname(dest), { recursive: true });
-      // Through a temporary name: a running copy of the old binary keeps its
-      // file, and nothing ever sees a half-copied one.
-      const temporary = `${dest}.gpui-build-tmp`;
-      copyFileSync(built, temporary);
-      chmodSync(temporary, 0o755);
-      renameSync(temporary, dest);
-      console.log(`gpui-build: ${dest}`);
+      // The app, and the Typst helper beside it when the build made one
+      // (a plain build does: both are default members; script/e2e installs it).
+      for (const name of ["lattice-gpui", "lattice-typst"]) {
+        const built = path.join(gpui, "target", profile, name);
+        if (!existsSync(built)) {
+          if (name === "lattice-gpui") throw new Error(`${built} is missing after the build`);
+          continue;
+        }
+        const dest = path.join(repo, "gpui", "target", profile, name);
+        mkdirSync(path.dirname(dest), { recursive: true });
+        // Through a temporary name: a running copy of the old binary keeps its
+        // file, and nothing ever sees a half-copied one.
+        const temporary = `${dest}.gpui-build-tmp`;
+        copyFileSync(built, temporary);
+        chmodSync(temporary, 0o755);
+        renameSync(temporary, dest);
+        console.log(`gpui-build: ${dest}`);
+      }
     }
   } finally {
     releaseGpuiLock();

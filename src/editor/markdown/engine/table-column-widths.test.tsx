@@ -11,7 +11,7 @@ import type { Editor } from "@tiptap/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { VisualMarkdownEditorProps } from "../visual-editor-props";
 import { LatticeVisualMarkdownEditor } from "./lattice-visual-editor";
-import { MIN_COLUMN_WIDTH, type SavedTable, type TableColumnWidths } from "./table-column-widths";
+import { MIN_COLUMN_WIDTH, MIN_ROW_HEIGHT, type SavedTable, type TableColumnWidths } from "./table-column-widths";
 
 type Props = VisualMarkdownEditorProps;
 
@@ -45,13 +45,15 @@ function keeper(tables: SavedTable[] = []) {
 }
 
 /**
- * jsdom lays nothing out: every cell is drawn 100px wide from x = 0, and a
- * table laid out as wide as its content (the fit's measure) 180px.
+ * jsdom lays nothing out: every cell is drawn 100px wide and 20px high from
+ * (0, 0), and a table laid out as wide as its content (the fit's measure)
+ * 180px.
  */
 beforeEach(() => {
   vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockImplementation(function (this: HTMLElement) {
     return this.closest("table")?.style.width === "max-content" ? 180 : 100;
   });
+  vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(20);
   vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(() => new DOMRect(0, 0, 100, 20));
 });
 
@@ -61,6 +63,9 @@ afterEach(() => {
 });
 
 const header = (table: HTMLTableElement) => table.querySelector("th")!;
+const bodyCell = (table: HTMLTableElement) => table.querySelector("td")!;
+const rowHeights = (table: HTMLTableElement) => [...table.rows].map((row) => row.style.height);
+const pressRow = (table: HTMLTableElement, detail = 1) => fireEvent.mouseDown(bodyCell(table), { clientX: 50, clientY: 18, button: 0, detail });
 const pressBorder = (table: HTMLTableElement, detail = 1) => fireEvent.mouseDown(header(table), { clientX: 98, button: 0, detail });
 
 describe("table column widths", () => {
@@ -194,6 +199,24 @@ describe("table column widths", () => {
     expect(host.onChange).not.toHaveBeenCalled();
   });
 
+  it("drops a column drag's overlay once the host keeps it, so a later list from the host is drawn", async () => {
+    const host = keeper();
+    const { rerender } = renderEditor({ tableColumnWidths: host });
+    await waitFor(() => expect(tables()).toHaveLength(2));
+    pressBorder(tableNamed("Model"));
+    fireEvent.mouseMove(window, { clientX: 148 });
+    fireEvent.mouseUp(window, { clientX: 148 });
+    const kept = host.onChange.mock.lastCall![0];
+    expect(kept).toEqual([{ index: 0, signature: SIG_A, widths: [150, 100] }]);
+    rerender({ tableColumnWidths: { ...host, tables: kept } });
+    await waitFor(() => expect(colWidths(tableNamed("Model"))).toEqual(["150px", "100px"]));
+    // An edit while the host keeps the drag: the overlay has served its turn.
+    const { editor } = surface();
+    act(() => { editor.view.dispatch(editor.state.tr.insertText("!", editor.state.doc.content.size - 2)); });
+    rerender({ text: doc(A, "Between, edited.", B), tableColumnWidths: { ...host, tables: [] } });
+    await waitFor(() => expect(tableNamed("Model")).not.toHaveAttribute("data-sized"));
+  });
+
   it("fits a column to its content on a double-click on its border", async () => {
     const host = keeper([{ index: 0, signature: SIG_A, widths: [60, 90] }]);
     renderEditor({ tableColumnWidths: host });
@@ -293,5 +316,62 @@ describe("table column widths", () => {
     expect(host.onChange).toHaveBeenLastCalledWith([{ index: 1, signature: SIG_A, widths: [160, 100] }]);
     expect(tableNamed("One")).not.toHaveAttribute("data-sized");
     expect(colWidths(tableNamed("Model"))).toEqual(["160px", "100px"]);
+  });
+  it("drags a row's bottom border to set its least height, saved by row index, and gives it back its content's height on a double-click", async () => {
+    const host = keeper();
+    const { rerender } = renderEditor({ tableColumnWidths: host });
+    await waitFor(() => expect(tables()).toHaveLength(2));
+    const frame = document.querySelector(".lx-md-editor")!;
+    fireEvent.mouseMove(bodyCell(tableNamed("Model")), { clientX: 50, clientY: 18 });
+    expect(frame).toHaveAttribute("data-row-resize");
+    expect(frame).not.toHaveAttribute("data-column-resize");
+    fireEvent.mouseMove(bodyCell(tableNamed("Model")), { clientX: 50, clientY: 10 });
+    expect(frame).not.toHaveAttribute("data-row-resize");
+
+    pressRow(tableNamed("Model"));
+    fireEvent.mouseMove(window, { clientY: 48 });
+    expect(rowHeights(tableNamed("Model"))).toEqual(["", "50px"]);
+    fireEvent.mouseMove(window, { clientY: -400 });
+    expect(rowHeights(tableNamed("Model"))).toEqual(["", `${MIN_ROW_HEIGHT}px`]);
+    fireEvent.mouseMove(window, { clientY: 38 });
+    fireEvent.mouseUp(window, { clientY: 38 });
+    const next = host.onChange.mock.lastCall![0];
+    expect(next).toEqual([{ index: 0, signature: SIG_A, widths: [], heights: [null, 40] }]);
+    expect(tableNamed("Model")).not.toHaveAttribute("data-sized");
+
+    rerender({ tableColumnWidths: { ...host, tables: next } });
+    await waitFor(() => expect(rowHeights(tableNamed("Model"))).toEqual(["", "40px"]));
+    pressRow(tableNamed("Model"), 2);
+    expect(host.onChange).toHaveBeenLastCalledWith([]);
+    expect(rowHeights(tableNamed("Model"))).toEqual(["", ""]);
+  });
+
+  it("draws a table's saved heights only while its row count is the one they were saved for", async () => {
+    const host = keeper([{ index: 0, signature: SIG_A, widths: [], heights: [null, 40] }]);
+    const { rerender } = renderEditor({ tableColumnWidths: host });
+    await waitFor(() => expect(rowHeights(tableNamed("Model"))).toEqual(["", "40px"]));
+    rerender({ text: TABLES.replace("| Base | 1 |", "| Base | 1 |\n| Next | 2 |") });
+    await waitFor(() => expect(tableNamed("Model").rows).toHaveLength(3));
+    expect(rowHeights(tableNamed("Model"))).toEqual(["", "", ""]);
+    rerender({ text: TABLES });
+    await waitFor(() => expect(rowHeights(tableNamed("Model"))).toEqual(["", "40px"]));
+    expect(host.onChange).not.toHaveBeenCalled();
+  });
+
+  it("keeps a table's row heights when one of its columns is resized, and its widths when a row is", async () => {
+    const host = keeper([{ index: 0, signature: SIG_A, widths: [], heights: [null, 40] }]);
+    const { rerender } = renderEditor({ tableColumnWidths: host });
+    await waitFor(() => expect(rowHeights(tableNamed("Model"))).toEqual(["", "40px"]));
+    pressBorder(tableNamed("Model"));
+    fireEvent.mouseMove(window, { clientX: 148 });
+    fireEvent.mouseUp(window, { clientX: 148 });
+    const next = host.onChange.mock.lastCall![0];
+    expect(next).toEqual([{ index: 0, signature: SIG_A, widths: [150, 100], heights: [null, 40] }]);
+    rerender({ tableColumnWidths: { ...host, tables: next } });
+    await waitFor(() => expect(colWidths(tableNamed("Model"))).toEqual(["150px", "100px"]));
+    pressRow(tableNamed("Model"));
+    fireEvent.mouseMove(window, { clientY: 28 });
+    fireEvent.mouseUp(window, { clientY: 28 });
+    expect(host.onChange).toHaveBeenLastCalledWith([{ index: 0, signature: SIG_A, widths: [150, 100], heights: [null, 50] }]);
   });
 });

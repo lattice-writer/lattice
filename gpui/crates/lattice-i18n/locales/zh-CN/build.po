@@ -14,13 +14,61 @@ msgstr "正在编译 {document}…"
 msgid "Checking the LaTeX tools…"
 msgstr "正在检查 LaTeX 工具…"
 
+#: lattice-gpui/src/typst.rs
+msgid "Couldn’t download Typst support"
+msgstr "无法下载 Typst 支持"
+
+#: lattice-gpui/src/typst.rs
+msgid "Couldn’t remove Typst support"
+msgstr "无法移除 Typst 支持"
+
 #: lattice-gpui/src/build/sequence.rs
 msgid "Ctrl+S, or Shift-click for a clean rebuild"
 msgstr "Ctrl+S，按住 Shift 点击则从头编译"
 
+#: lattice-gpui/src/typst.rs
+msgid "Downloading Typst support…"
+msgstr "正在下载 Typst 支持…"
+
+#: lattice-gpui/src/typst.rs
+msgid "Lattice compiles Typst with a component it downloads once. Until then, Typst files open with highlighting only. Settings › Editor & builds can remove it."
+msgstr "Lattice 通过一个只需下载一次的组件编译 Typst。在此之前，Typst 文件只有语法高亮。可在“设置 › 编辑编译”中移除它。"
+
+#: lattice-gpui/src/typst.rs
+msgid "Lattice publishes Typst support for Macs with Apple silicon."
+msgstr "Lattice 为搭载 Apple 芯片的 Mac 提供 Typst 支持。"
+
 #: lattice-gpui/src/build/card.rs
 msgid "Not built yet. Press {0} to build"
 msgstr "尚未编译。按 {0} 开始编译"
+
+#: lattice-gpui/src/typst.rs
+msgid "Remove Typst support?"
+msgstr "移除 Typst 支持？"
+
+#: lattice-gpui/src/typst.rs
+msgid "Typst files keep their highlighting. The next Typst build asks to download it again."
+msgstr "Typst 文件仍保留语法高亮。下次编译 Typst 时会再询问是否下载。"
+
+#: lattice-gpui/src/typst.rs
+msgid "Typst support is installed"
+msgstr "Typst 支持已安装"
+
+#: lattice-gpui/src/typst.rs
+msgid "Typst support isn’t available on this computer"
+msgstr "此电脑不支持 Typst"
+
+#: lattice-gpui/src/shell/build.rs
+msgid "Typst support isn’t installed"
+msgstr "尚未安装 Typst 支持"
+
+#: lattice-gpui/src/typst.rs
+msgid "Typst support needs a one-time download (~{size} MB). Download now?"
+msgstr "Typst 支持需要一次性下载（约 {size} MB）。现在下载吗？"
+
+#: lattice-gpui/src/typst.rs
+msgid "Typst support needs a one-time download. Download now?"
+msgstr "Typst 支持需要一次性下载。现在下载吗？"
 
 #: lattice-gpui/src/build/sequence.rs
 msgid "yesterday"

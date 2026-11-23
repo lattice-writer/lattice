@@ -1,9 +1,11 @@
-//! The column widths a Markdown file's tables were given in its visual
-//! editor (a column border dragged or double-clicked there,
-//! `table-column-widths.ts` in the engine), kept across launches and never
-//! in the file: per project, by the file's project-relative path, a list of
-//! saved tables, each with the signature that names it (its column count and
-//! header text) and the index it was saved at. Which drawn table takes which
+//! The column widths and row heights a Markdown file's tables were given in
+//! its visual editor (a column's or a row's border dragged or double-clicked
+//! there, `table-column-widths.ts` in the engine), kept across launches and
+//! never in the file: per project, by the file's project-relative path, a
+//! list of saved tables, each with the signature that names it (its column
+//! count and header text), the index it was saved at, its columns' widths
+//! (none while only rows were sized) and, once a row was sized, a height or
+//! null for each row by its index. Which drawn table takes which
 //! entry is the page's to decide; the host keeps the list the page last
 //! handed over (`md:table-widths`) and gives it back when the file opens
 //! (`doc:open`'s `tableWidths`).
@@ -40,28 +42,33 @@ pub const MAX_ROOTS: usize = 64;
 const MAX_TABLES: usize = 64;
 /// The most columns a table's widths are kept for.
 const MAX_COLUMNS: usize = 256;
+/// The most rows a table's heights are kept for (the page's `MAX_ROWS`).
+const MAX_ROWS: usize = 4096;
 /// The longest signature kept, in bytes.
 const MAX_SIGNATURE: usize = 4096;
 
 const WRITE_AFTER: Duration = Duration::from_millis(250);
 
-/// One table's widths in CSS pixels, with what names it.
+/// One table's widths and row heights in CSS pixels, with what names it. A
+/// row of no height is at its content's.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SavedTable {
     pub index: u32,
     pub signature: String,
     pub widths: Vec<f32>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub heights: Vec<Option<f32>>,
 }
 
 impl SavedTable {
     fn valid(&self) -> bool {
+        let size = |size: &f32| size.is_finite() && *size > 0.;
         self.signature.len() <= MAX_SIGNATURE
-            && !self.widths.is_empty()
+            && (!self.widths.is_empty() || self.heights.iter().any(Option::is_some))
             && self.widths.len() <= MAX_COLUMNS
-            && self
-                .widths
-                .iter()
-                .all(|width| width.is_finite() && *width > 0.)
+            && self.heights.len() <= MAX_ROWS
+            && self.widths.iter().all(size)
+            && self.heights.iter().flatten().all(size)
     }
 }
 
@@ -234,7 +241,7 @@ pub fn flush() {
     if let Some(file) = store.file.clone()
         && let Err(error) = write_json(&file, &store.widths)
     {
-        log::warn!("could not save the Markdown tables' column widths: {error:#}");
+        log::warn!("could not save the Markdown tables' sizes: {error:#}");
     }
 }
 
@@ -247,6 +254,43 @@ mod tests {
             index,
             signature: signature.to_string(),
             widths: widths.to_vec(),
+            heights: Vec::new(),
+        }
+    }
+
+    fn rows(index: u32, signature: &str, heights: &[Option<f32>]) -> SavedTable {
+        SavedTable {
+            heights: heights.to_vec(),
+            ..table(index, signature, &[])
+        }
+    }
+
+    #[test]
+    fn row_heights_are_kept_beside_widths_or_alone_and_read_back_from_json() {
+        let root = Path::new("/p");
+        let mut all = TableWidths::default();
+        let alone = rows(0, "2|a|b", &[None, Some(40.)]);
+        let both = SavedTable {
+            heights: vec![Some(30.), None],
+            ..table(1, "1|c", &[80.])
+        };
+        all.set(root, "a.md", vec![alone.clone(), both.clone()]);
+        assert_eq!(all.of(root, "a.md"), Some([alone, both].as_slice()));
+        let json = serde_json::to_string(&all).unwrap();
+        assert_eq!(serde_json::from_str::<TableWidths>(&json).unwrap(), all);
+        let widths_only = serde_json::to_value(table(0, "1|a", &[80.])).unwrap();
+        assert!(
+            widths_only.get("heights").is_none(),
+            "an entry with no row heights is written as before"
+        );
+        for bad in [
+            rows(2, "1|d", &[None, None]),
+            rows(2, "1|d", &[Some(0.)]),
+            rows(2, "1|d", &[Some(f32::NAN)]),
+            rows(2, "1|d", &vec![Some(20.); MAX_ROWS + 1]),
+        ] {
+            all.set(root, "b.md", vec![bad]);
+            assert_eq!(all.of(root, "b.md"), None);
         }
     }
 

@@ -1,0 +1,28 @@
+[package]
+name = "lattice-typst"
+version = "0.1.0"
+description = "Lattice's Typst helper, which the native app downloads on first use and keeps running: a World over the project folder and the editor's unsaved buffers, system and bundled fonts, Typst Universe packages, and each compile's result over stdio as lattice-core's typst_wire."
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+# The Typst compiler and its PDF export (Apache-2.0), in a long-running
+# helper rather than the `typst` CLI, so the live preview compiles the
+# buffers as typed and reuses the last compile's work (comemo's memoization)
+# on every keystroke. The helper is its own download (src/main.rs): the
+# native app's binary does not link any of this.
+typst.workspace = true
+typst-pdf.workspace = true
+# The paged document a compile makes (`PagedDocument`), which `typst` does
+# not re-export.
+typst-layout.workspace = true
+typst-kit.workspace = true
+comemo.workspace = true
+lattice-core.workspace = true
+log.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+tempfile = "3"

@@ -1,3 +1,7 @@
+#: lattice-gpui/src/file_tree/new_entries.rs
+msgid "New Typst file"
+msgstr "新建 Typst"
+
 #: lattice-gpui/src/file_tree.rs
 #: lattice-gpui/src/shell/arrange.rs
 msgid "Open a LaTeX project folder to start"

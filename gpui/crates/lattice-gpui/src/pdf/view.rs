@@ -438,6 +438,13 @@ impl PdfView {
         }));
     }
 
+    /// The digest of the PDF on screen, which changes once a rebuild's bytes
+    /// are loaded, for a scenario timing an edit to its pages.
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    pub fn shown_digest(&self) -> Option<&str> {
+        self.shown_digest.as_deref()
+    }
+
     /// Show nothing, for a project without a built PDF.
     pub fn close(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self._open_task = None;

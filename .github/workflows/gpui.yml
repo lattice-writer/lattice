@@ -199,6 +199,10 @@ jobs:
           project="$RUNNER_TEMP/e2e-project"
           out="$RUNNER_TEMP/e2e-macos.json"
           cp -R fixtures/e2e "$project"
+          # Typst support from a stand-in release on disk, as script/e2e
+          # makes it (scenario/e2e/typst.rs installs it from there).
+          node ../scripts/typst-helper-fake-release.mjs target/release/lattice-typst "$RUNNER_TEMP/typst-release"
+          export LATTICE_E2E_TYPST_RELEASE="$RUNNER_TEMP/typst-release"
           # As on Windows: the builds, cleans and notices in the job's log.
           LATTICE_GPUI_LOG=info target/release/lattice-gpui "$project" --scenario e2e --out "$out"
           cat "$out"
@@ -369,6 +373,12 @@ jobs:
           Copy-Item -Recurse fixtures/e2e $project
           $env:LATTICE_GPUI_LOG = "info"
           $env:RUST_BACKTRACE = "1"
+          # Typst support from a stand-in release on disk, as script/e2e
+          # makes it on a Mac (scenario/e2e/typst.rs installs it from there).
+          $typst = Join-Path $env:RUNNER_TEMP "typst-release"
+          node ../scripts/typst-helper-fake-release.mjs target/release/lattice-typst.exe $typst
+          if ($LASTEXITCODE -ne 0) { throw "could not make the stand-in Typst release" }
+          $env:LATTICE_E2E_TYPST_RELEASE = $typst
           $app = Start-Process -FilePath target/release/lattice-gpui.exe `
             -ArgumentList $project, "--scenario", "e2e", "--out", $out `
             -NoNewWindow -PassThru

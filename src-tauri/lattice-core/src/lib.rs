@@ -83,6 +83,7 @@ pub mod texcount;
 pub mod texlab;
 pub mod themes;
 mod ttl_cache;
+pub mod typst_wire;
 pub mod util;
 mod web_metadata;
 pub mod wide_event;

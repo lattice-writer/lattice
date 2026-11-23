@@ -36,6 +36,7 @@ actions!(
         TogglePdfDarkPages,
         NewLatexFileInProject,
         NewMarkdownFileInProject,
+        NewTypstFileInProject,
         NewFolderInProject,
         ImportFilesIntoProject,
         NewSpreadsheetInProject,
@@ -59,6 +60,9 @@ fn entry_command(entry: NewEntry) -> Command {
             Section::Project,
             NewMarkdownFileInProject,
         ),
+        NewEntry::Typst => {
+            Command::new("new-typst", label, Section::Project, NewTypstFileInProject)
+        }
         NewEntry::Folder => Command::new("new-folder", label, Section::Project, NewFolderInProject),
         NewEntry::Import => Command::new(
             "new-import",
@@ -263,6 +267,11 @@ pub(super) const PART: Part = Part {
                     this.new_entry(NewEntry::Markdown, window, cx)
                 },
             ))
+            .on_action(
+                cx.listener(|this: &mut Shell, _: &NewTypstFileInProject, window, cx| {
+                    this.new_entry(NewEntry::Typst, window, cx)
+                }),
+            )
             .on_action(
                 cx.listener(|this: &mut Shell, _: &NewFolderInProject, window, cx| {
                     this.new_entry(NewEntry::Folder, window, cx)

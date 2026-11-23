@@ -15,6 +15,7 @@ members = [
     "crates/lattice-gpui",
     "crates/lattice-i18n",
     "crates/lattice-settings",
+    "crates/lattice-typst",
     "crates/lattice-ui",
     "crates/lattice-webview",
     "crates/trellis",
@@ -22,7 +23,9 @@ members = [
 # Vendored, patched upstream crates (patches/README.md): path dependencies
 # through `[patch]` below, never workspace members.
 exclude = ["patches"]
-default-members = ["crates/lattice-gpui"]
+# The app and the Typst helper it downloads on first use: a plain
+# `cargo build --release` makes both, as the release packages both.
+default-members = ["crates/lattice-gpui", "crates/lattice-typst"]
 
 [workspace.package]
 edition = "2024"
@@ -107,6 +110,21 @@ tree-sitter-rust = "0.24.2"
 tree-sitter-toml-ng = "0.7.0"
 tree-sitter-typescript = "0.23.2"
 tree-sitter-yaml = "0.7.2"
+# Typst source highlighting (MIT): uben0's tree-sitter-typst grammar as
+# Codebook publishes it, on tree-sitter-language like the LaTeX grammar above
+# (uben0's own crate still pins tree-sitter 0.20).
+codebook-tree-sitter-typst = "0.12.2"
+# Typst documents, compiled by the lattice-typst helper the app downloads on
+# first use (never linked into lattice-gpui): the compiler, its PDF export
+# and the kit's fonts, packages and clock, all Apache-2.0. The kit's
+# downloader is left out (it links OpenSSL); packages come down through
+# lattice-core's HTTP client instead. comemo is the compiler's memoization,
+# direct for its cache eviction.
+typst = "0.15.1"
+typst-pdf = "0.15.1"
+typst-layout = "0.15.1"
+typst-kit = { version = "0.15.1", default-features = false, features = ["embedded-fonts", "scan-fonts", "system-packages", "datetime"] }
+comemo = "0.5.1"
 futures = "0.3"
 image = { version = "0.25", default-features = false }
 # Lattice's domain logic, shared with the Tauri app (`../src-tauri/lattice-core`,

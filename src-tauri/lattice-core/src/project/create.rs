@@ -118,7 +118,27 @@ pub enum Venue {
     Blank,
     /// A blank `ctexart` article: Chinese text, headings, dates and numbering.
     ChineseArticle,
+    /// A minimal Typst document (`main.typ`), which only the native app
+    /// compiles (`lattice-typst`); the Tauri app does not list it.
+    Typst,
 }
+
+/// The Typst starter: a title, numbered headings and pages, and where the
+/// bibliography goes.
+const TYPST_STARTER: &[u8] = b"#let title = \"LATTICE_PROJECT_TITLE\"
+#set document(title: title)
+#set page(paper: \"a4\", numbering: \"1\")
+#set heading(numbering: \"1.\")
+
+#align(center, text(17pt, weight: \"bold\", title))
+
+= Introduction
+Write here. Maths goes between dollars, $E = m c^2$, and a label such as
+<intro> after a heading lets you refer to it with @intro.
+
+// Once references.bib has entries, cite them with @key and list them:
+// #bibliography(\"references.bib\")
+";
 
 impl Venue {
     pub fn parse(value: &str) -> Result<Self, String> {
@@ -137,6 +157,7 @@ impl Venue {
             "ustcthesis" => Ok(Self::Ustcthesis),
             "blank" => Ok(Self::Blank),
             "chinese-article" | "ctexart" => Ok(Self::ChineseArticle),
+            "typst" => Ok(Self::Typst),
             other => Err(format!(
                 "Unknown venue “{other}”. Choose neurips, icml, iclr, acl, cvpr, cvpr-rebuttal, aaai, ieee-conference, ieee-journal, acm, thuthesis, ustcthesis, blank, or chinese-article."
             )),
@@ -159,6 +180,7 @@ impl Venue {
             Self::Ustcthesis => "ustcthesis",
             Self::Blank => "blank",
             Self::ChineseArticle => "chinese-article",
+            Self::Typst => "typst",
         }
     }
 
@@ -179,7 +201,8 @@ impl Venue {
             | Self::Thuthesis
             | Self::Ustcthesis
             | Self::Blank
-            | Self::ChineseArticle => None,
+            | Self::ChineseArticle
+            | Self::Typst => None,
         }
     }
 
@@ -206,6 +229,8 @@ impl Venue {
             | Self::Acm => "pdf",
             Self::Thuthesis | Self::Ustcthesis | Self::ChineseArticle => "xelatex",
             Self::Blank => "lualatex",
+            // Never runs: a Typst root goes to the native app's compiler.
+            Self::Typst => "pdf",
         }
     }
 
@@ -231,6 +256,15 @@ impl Venue {
             Self::Ustcthesis => USTCTHESIS_TEMPLATE,
             Self::Blank => &[("main.tex", b"\\documentclass{article}\n\\begin{document}\n\\title{LATTICE_PROJECT_TITLE}\n\\maketitle\n\n\\end{document}\n")],
             Self::ChineseArticle => &[("main.tex", b"\\documentclass{ctexart}\n\\begin{document}\n\\title{LATTICE_PROJECT_TITLE}\n\\maketitle\n\n\\end{document}\n")],
+            Self::Typst => &[("main.typ", TYPST_STARTER)],
+        }
+    }
+
+    /// The document a new project builds.
+    fn main_document(self) -> &'static str {
+        match self {
+            Self::Typst => "main.typ",
+            _ => "main.tex",
         }
     }
 
@@ -256,7 +290,7 @@ fn default_manifest_with_venue(name: &str, venue: Venue) -> ProjectManifest {
         project_id: Uuid::new_v4().to_string(),
         name: name.to_string(),
         root_documents: vec![RootDocument {
-            path: "main.tex".to_string(),
+            path: venue.main_document().to_string(),
             name: "Main paper".to_string(),
             is_default: true,
             chosen: false,
@@ -299,6 +333,10 @@ pub fn create_with_venue(parent: &Path, name: &str, venue: Venue) -> Result<Path
         if *relative == "main.tex" {
             let body = std::str::from_utf8(contents).map_err(err)?;
             fs::write(path, body.replace("LATTICE_PROJECT_TITLE", &title)).map_err(err)?;
+        } else if *relative == "main.typ" {
+            let body = std::str::from_utf8(contents).map_err(err)?;
+            fs::write(path, body.replace("LATTICE_PROJECT_TITLE", &typst_title(name)))
+                .map_err(err)?;
         } else {
             fs::write(path, contents).map_err(err)?;
         }
@@ -440,6 +478,16 @@ fn latex_title(name: &str, any_script: bool) -> String {
             _ => character.to_string(),
         })
         .collect()
+}
+
+/// The project name inside a Typst string: any script (Typst brings its own
+/// fonts for Latin and finds the system's for the rest), backslashes and
+/// quotes escaped.
+fn typst_title(name: &str) -> String {
+    match name.trim() {
+        "" => "Untitled research".to_string(),
+        title => title.replace('\\', "\\\\").replace('"', "\\\""),
+    }
 }
 
 pub(super) fn default_brief(name: &str) -> String {

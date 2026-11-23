@@ -39,12 +39,17 @@
  * Usage:
  *   node scripts/gpui-bundle.mjs [--flavor beta|main] [--binary PATH]
  *     [--out DIR] [--skip-islands] [--skip-runtimes] [--no-dmg] [--feed URL]
+ *     [--typst-helper PATH]
  *     --flavor         beta (default): Lattice Beta; main: Lattice
  *     --skip-islands   reuse gpui/islands/dist
  *     --skip-runtimes  reuse the staged src-tauri/synara-runtime and
  *                      presentation-runtime as they are
  *     --feed URL       where the manifest and the archive are published
  *                      (default: the flavor's, FLAVORS below)
+ *     --typst-helper PATH  also package the Typst helper (gpui/target/release/
+ *                      lattice-typst): signed and notarized as the app is,
+ *                      packed as Lattice-typst_<version>_aarch64.tar.gz with
+ *                      its minisign .sig beside the app's files
  */
 import { execFileSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
@@ -97,6 +102,18 @@ export const FLAVORS = {
 };
 export const EXECUTABLE = "lattice-gpui";
 
+/**
+ * The Typst helper the native app downloads on first use
+ * (gpui/crates/lattice-gpui/src/typst/install.rs names it the same way):
+ * the archive holds the one binary at its root, and its .sig is the Tauri
+ * updater key's, which the app checks it against.
+ */
+export const TYPST_HELPER = "lattice-typst";
+export function typstHelperFiles(version) {
+  const archive = `Lattice-typst_${version}_aarch64.tar.gz`;
+  return { archive, signature: `${archive}.sig` };
+}
+
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const tauri = path.join(repo, "src-tauri");
 const entitlements = path.join(tauri, "Entitlements.plist");
@@ -142,6 +159,41 @@ export function updaterManifest({ version, signature, url, pubDate = new Date().
   return { version, notes, pub_date: pubDate, platforms: { "darwin-aarch64": entry, "darwin-aarch64-app": { ...entry } } };
 }
 
+/**
+ * The Typst helper as the app downloads it: signed with the hardened runtime
+ * and notarized like the app (a bare binary has no ticket to staple; Gatekeeper
+ * looks the notarization up online), then packed and signed with the updater
+ * key. Returns the files made.
+ */
+function packageTypstHelper({ binary, out, version, identity, key }) {
+  if (!existsSync(binary)) throw new Error(`no Typst helper at ${binary}`);
+  const { archive, signature } = typstHelperFiles(version);
+  const stage = mkdtempSync(path.join(os.tmpdir(), "gpui-typst-"));
+  try {
+    const helper = path.join(stage, TYPST_HELPER);
+    cpSync(binary, helper);
+    codesign(helper, { identity });
+    run("codesign", ["--verify", "--strict", "--verbose=2", helper]);
+    if (key) {
+      const upload = path.join(stage, "lattice-typst.notarize.zip");
+      run("ditto", ["-c", "-k", helper, upload]);
+      notarize(upload, key);
+      rmSync(upload);
+    }
+    const target = path.join(out, archive);
+    run("tar", ["-czf", target, "-C", stage, TYPST_HELPER], { env: { ...process.env, COPYFILE_DISABLE: "1" } });
+    const outputs = [target];
+    if (process.env.TAURI_SIGNING_PRIVATE_KEY) {
+      rmSync(path.join(out, signature), { force: true });
+      run(path.join(repo, "node_modules", ".bin", "tauri"), ["signer", "sign", target]);
+      outputs.push(path.join(out, signature));
+    }
+    return outputs;
+  } finally {
+    rmSync(stage, { recursive: true, force: true });
+  }
+}
+
 function notarize(file, key) {
   run("xcrun", ["notarytool", "submit", file, "--key", key.path, "--key-id", key.id, "--issuer", key.issuer, "--wait"]);
 }
@@ -156,6 +208,7 @@ async function main() {
       "skip-islands": { type: "boolean", default: false },
       "skip-runtimes": { type: "boolean", default: false },
       "no-dmg": { type: "boolean", default: false },
+      "typst-helper": { type: "string" },
     },
   });
   if (process.platform !== "darwin") throw new Error("the GPUI app bundle is built on macOS only");
@@ -296,6 +349,10 @@ async function main() {
     outputs.push(`${archive}.sig`, manifest);
   } else {
     console.log(`gpui-bundle: no TAURI_SIGNING_PRIVATE_KEY: the updater archive is unsigned and no ${flavor.manifest} is written`);
+  }
+
+  if (values["typst-helper"]) {
+    outputs.push(...packageTypstHelper({ binary: path.resolve(values["typst-helper"]), out, version, identity, key }));
   }
 
   console.log(`gpui-bundle: ${app}`);

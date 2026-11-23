@@ -14,7 +14,11 @@
 //!   widths kept;
 //! - a column added to the first table on disk draws it at its content's
 //!   widths, the second keeping its own, and nothing saved is dropped: the
-//!   column taken away again brings the first table's widths back.
+//!   column taken away again brings the first table's widths back;
+//! - the pointer on a body row's bottom border shows the row-resize cursor,
+//!   a drag down makes that row that much higher (kept by its row index
+//!   beside the table's widths, the file's bytes as they were), and a
+//!   double-click gives it its content's height back.
 
 #![cfg(target_os = "macos")]
 
@@ -61,6 +65,8 @@ Between the tables.
 const DRAG: f64 = 80.;
 /// How far the second table's border is dragged after a lost release.
 const REPRESS_DRAG: f64 = 30.;
+/// How far a row's border is dragged down, in the page's pixels.
+const ROW_DRAG: f64 = 30.;
 
 /// The page's view of a table: its first header cell's right edge (brought
 /// into view first), its columns' set widths, and the width of its frame (a
@@ -73,6 +79,28 @@ fn table_facts(index: usize) -> String {
            cols: [...table.querySelectorAll('col')].map((col) => col.style.width), sized: table.hasAttribute('data-sized'), \
            cursor: document.querySelector('.lx-md-editor')?.hasAttribute('data-column-resize') ?? false }}); }})()"
     )
+}
+
+/// The page's view of a table's first body row: a point on its bottom
+/// border (brought into view first), its height and its set height.
+fn row_facts(index: usize) -> String {
+    format!(
+        "(() => {{ const table = document.querySelectorAll('.lx-md-surface table')[{index}]; const row = table?.rows[1]; if (!row) return null; \
+         const cell = row.cells[0]; cell.scrollIntoView({{ block: 'center' }}); const r = cell.getBoundingClientRect(); \
+         return JSON.stringify({{ edge: [r.left + r.width / 2, r.bottom - 1], height: row.offsetHeight, set: row.style.height, \
+           cursor: document.querySelector('.lx-md-editor')?.hasAttribute('data-row-resize') ?? false }}); }})()"
+    )
+}
+
+/// The row heights kept for the table saved at `index`, none for a row at
+/// its content's height.
+fn heights_at(saved: &Value, index: u64) -> Vec<Option<f64>> {
+    saved
+        .as_array()
+        .and_then(|tables| tables.iter().find(|table| table["index"] == index))
+        .and_then(|table| table["heights"].as_array())
+        .map(|heights| heights.iter().map(Value::as_f64).collect())
+        .unwrap_or_default()
 }
 
 /// The widths kept for the table saved at `index` (the file's tables have
@@ -246,6 +274,77 @@ impl Run {
             "a press after a drag whose mouse-up never reached the page drags the border pressed, and leaves no resize cursor behind",
             wanted(&saved) && repressed["cursor"] == false,
             json!({ "stale": stale, "before": pressed, "after": repressed, "saved": saved }),
+        );
+
+        // Drag the first table's body row's bottom border down: the row is at
+        // least that high, kept by its index; a double-click gives it back
+        // its content's height.
+        let row = self.evaluate(cx, &island, &row_facts(0)).await;
+        let bounds = cx.update(|cx| island.read(cx).bounds(cx));
+        let mut hover = Value::Null;
+        if let Some(edge) = bounds.and_then(|bounds| to_window(bounds, &row["edge"])) {
+            native::send_mouse(native, native::Mouse::Moved, edge)?;
+            self.pause(cx, Duration::from_millis(100)).await;
+            hover = self.evaluate(cx, &island, &row_facts(0)).await;
+            // As for the column's border: the page is also given the move.
+            if hover["cursor"] != true {
+                let [x, y] = [&row["edge"][0], &row["edge"][1]].map(|v| v.as_f64().unwrap_or_default());
+                hover = self
+                    .evaluate(
+                        cx,
+                        &island,
+                        &format!(
+                            "(() => {{ const target = document.elementFromPoint({x}, {y}); \
+                             target?.dispatchEvent(new MouseEvent('mousemove', {{ bubbles: true, clientX: {x}, clientY: {y} }})); \
+                             return {}; }})()",
+                            row_facts(0)
+                        ),
+                    )
+                    .await;
+            }
+            native::send_mouse(native, native::Mouse::Down, edge)?;
+            for step in 1..=6 {
+                let dy = ROW_DRAG as f32 * step as f32 / 6.;
+                native::send_mouse(native, native::Mouse::Dragged, edge + gpui::point(gpui::px(0.), gpui::px(dy)))?;
+                self.pause(cx, Duration::from_millis(30)).await;
+            }
+            native::send_mouse(native, native::Mouse::Up, edge + gpui::point(gpui::px(0.), gpui::px(ROW_DRAG as f32)))?;
+        }
+        self.wait_for(cx, Duration::from_secs(3), |_, _| {
+            !heights_at(&table_widths::page_widths(root, FILE), 0).is_empty()
+        })
+        .await;
+        let raised = self.evaluate(cx, &island, &row_facts(0)).await;
+        let saved = kept(cx);
+        let expected = row["height"].as_f64().unwrap_or_default() + ROW_DRAG;
+        let kept_rows = heights_at(&saved, 0);
+        let unchanged = std::fs::read_to_string(&path).is_ok_and(|text| text == TABLES);
+        steps.check(
+            "a Markdown table row's bottom border dragged makes the row that much higher, kept by its index with the table's widths, and the file's bytes stay as they were",
+            raised["height"].as_f64().is_some_and(|height| (height - expected).abs() <= 2.)
+                && kept_rows.len() == 2
+                && kept_rows[0].is_none()
+                && kept_rows[1].is_some_and(|height| (height - expected).abs() <= 2.)
+                && kept_at(&saved, 0).len() == 2
+                && unchanged
+                && hover["cursor"] == true,
+            json!({ "before": row, "hover": hover, "after": raised, "expected": expected, "saved": saved, "unchanged": unchanged }),
+        );
+        if let Some(edge) = bounds.and_then(|bounds| to_window(bounds, &raised["edge"])) {
+            native::send_mouse(native, native::Mouse::Moved, edge)?;
+            self.pause(cx, Duration::from_millis(100)).await;
+            native::send_double_click(native, edge)?;
+        }
+        self.wait_for(cx, Duration::from_secs(3), |_, _| {
+            heights_at(&table_widths::page_widths(root, FILE), 0).is_empty()
+        })
+        .await;
+        let reset = self.evaluate(cx, &island, &row_facts(0)).await;
+        let saved = kept(cx);
+        steps.check(
+            "a double-click on a Markdown table row's bottom border gives the row its content's height back, the table keeping its widths",
+            reset["set"] == "" && heights_at(&saved, 0).is_empty() && kept_at(&saved, 0).len() == 2,
+            json!({ "after": reset, "saved": saved }),
         );
 
         // Closed and opened again: both tables come back at their widths.

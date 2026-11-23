@@ -7,7 +7,7 @@ This guide covers the main tasks, one page each. Lattice ships often, so the gui
 1. [Getting started](getting-started.md): install Lattice and TeX, open or create a project, the Get started checklist.
 2. [Writing](writing.md): the editor, Source and Visual, the live PDF and jumping between them.
 3. [Citations and papers](citations.md): `⌘⇧K` and `⌘⇧L`, the Papers library, Zotero.
-4. [Building and fixing errors](building.md): `⌘S`, build problems, clean rebuilds, exporting.
+4. [Building and fixing errors](building.md): `⌘S`, build problems, clean rebuilds, exporting, Typst documents.
 5. [History and Compare versions](history.md): undo any change, save versions, compare two of them.
 6. [Overleaf sync](overleaf.md): open an Overleaf project, upload one, how sync behaves.
 7. [Boards](boards.md): Excalidraw whiteboards in your project.

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { verifyUpdaterSignature } from "./add-updater-platform.mjs";
-import { FLAVORS } from "./gpui-bundle.mjs";
+import { FLAVORS, typstHelperFiles } from "./gpui-bundle.mjs";
 import { isMain, projectRoot } from "./lib/util.mjs";
 
 // Checks the native app's files (scripts/gpui-bundle.mjs --flavor main, as
@@ -44,10 +44,32 @@ export function checkNativeManifest(manifest, { tag, version, signature }) {
   }
 }
 
+/**
+ * The Typst helper's archive and .sig for `version` in `directory`, checked:
+ * both there, the signature verifying against the updater key the native
+ * app checks the download with (gpui/crates/lattice-gpui/src/typst/install.rs).
+ * Returns their paths, the archive first.
+ */
+export function checkTypstHelper(directory, version, pubkey) {
+  const { archive, signature } = typstHelperFiles(version);
+  const paths = [join(directory, archive), join(directory, signature)];
+  for (const file of paths) {
+    if (!existsSync(file) || statSync(file).size === 0) throw new Error(`The Typst helper's ${file} is missing or empty`);
+  }
+  verifyUpdaterSignature(readFileSync(paths[0]), readFileSync(paths[1], "utf8"), pubkey);
+  return paths;
+}
+
 if (isMain(import.meta.url)) {
-  const [, , tag, directory] = process.argv;
-  if (!tag || !directory) throw new Error("Usage: node scripts/check-native-feed.mjs <tag> <directory>");
+  // --typst: the Typst helper's files instead of the app's.
+  const typst = process.argv[2] === "--typst";
+  const [tag, directory] = process.argv.slice(typst ? 3 : 2);
+  if (!tag || !directory) throw new Error("Usage: node scripts/check-native-feed.mjs [--typst] <tag> <directory>");
   const config = JSON.parse(readFileSync(join(projectRoot, "src-tauri/tauri.conf.json"), "utf8"));
+  if (typst) {
+    process.stdout.write(`${checkTypstHelper(directory, config.version, config.plugins.updater.pubkey).join("\n")}\n`);
+    process.exit(0);
+  }
   const paths = Object.fromEntries(Object.entries(nativeFiles(config.version)).map(([kind, name]) => [kind, join(directory, name)]));
   for (const file of Object.values(paths)) {
     if (!existsSync(file) || statSync(file).size === 0) throw new Error(`The native app's ${file} is missing or empty`);

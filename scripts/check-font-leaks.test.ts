@@ -131,6 +131,18 @@ describe("built app check", () => {
   });
 });
 
+describe("Typst support downloads", () => {
+  it("permits the native app's Typst helper archive and its signature, and nothing else under its name", () => {
+    const root = scratchDirectory();
+    write(root, "Lattice-typst_1.2.3_aarch64.tar.gz", "the helper");
+    write(root, "Lattice-typst_1.2.3_aarch64.tar.gz.sig", "its signature");
+    write(root, "Lattice-typst_1.2.3-rc.1_aarch64.tar.gz", "a rehearsal's helper");
+    expect(checkAssets(root)).toEqual([]);
+    write(root, "Lattice-typst_1.2.3_aarch64.zip", "another package");
+    expect(checkAssets(root)).toEqual(["Lattice-typst_1.2.3_aarch64.zip is not a signed release artifact"]);
+  });
+});
+
 describe("experimental Windows downloads", () => {
   it("permits only the namespaced installer, checksum, metadata and instructions", () => {
     const root = scratchDirectory();

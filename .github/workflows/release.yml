@@ -418,6 +418,18 @@ jobs:
           gh release upload "$GITHUB_REF_NAME" "${files[@]:0:3}" --clobber
           gh release upload "$GITHUB_REF_NAME" "${files[3]}" --clobber
 
+      # The Typst helper the native app downloads on first use, under this
+      # tag where the app looks for it (gpui/crates/lattice-gpui/src/typst/
+      # install.rs). check-native-feed.mjs --typst fails the release when the
+      # archive or its .sig is missing or the signature does not verify
+      # against the updater key.
+      - name: Upload Typst support beside the native app
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(node scripts/check-native-feed.mjs --typst "$GITHUB_REF_NAME" "$RUNNER_TEMP/gpui")
+          test "${#files[@]}" -eq 2
+          gh release upload "$GITHUB_REF_NAME" "${files[@]}" --clobber
+
       # Check what the release actually offers for download: only the signed
       # artifacts, none of them a font. Failing here leaves the release a draft.
       - name: Check the release assets for font files
