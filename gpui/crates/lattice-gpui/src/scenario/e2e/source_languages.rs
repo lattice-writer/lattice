@@ -159,9 +159,17 @@ impl Run {
         let notes = root.join(NOTES);
         std::fs::write(&notes, NOTES_TEXT)?;
         let panel = self.open(cx, &notes, Some(1))?;
-        let (language, found) = self
-            .parsed_highlights(cx, &panel, &[("margin", 0), ("import", 0)])
-            .await;
+        // The fence is Markdown's raw text until Python is built and the
+        // buffer reparsed, so wait for its keyword rather than any capture.
+        let needles = [("margin", 0), ("import", 0)];
+        let (mut language, mut found) = self.parsed_highlights(cx, &panel, &needles).await;
+        for _ in 0..25 {
+            if capture(&found, "import") == Some("keyword") {
+                break;
+            }
+            self.pause(cx, Duration::from_millis(200)).await;
+            (language, found) = highlights(cx, &panel, &needles);
+        }
         self.completion_shot(cx, "source-language-markdown-css").await;
         steps.check(
             "a Markdown file's fenced css block is highlighted as CSS, and its python block as Python once Python has loaded, with no edit",
