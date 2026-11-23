@@ -53,8 +53,10 @@
  * and prints the gate's stages again with `regate=<gate sha>`.
  *
  * A change to a release path (RELEASE_PATHS: release workflows, bundle and
- * signing configuration, the updater) always runs every stage and prints no
- * trailer: GitHub runs its macOS jobs for it.
+ * signing configuration, the updater) always runs every stage, with no quick
+ * re-gate, and its trailer records the full gate (`rust gpui e2e=full
+ * webkit`), the only one CI takes for a release path. The release itself is
+ * still built and checked for real on GitHub when its tag is pushed.
  *
  * Options:
  *   --base REF   compare against REF instead of origin/main (its merge base)
@@ -223,7 +225,7 @@ async function main() {
   const tier = ciTier(files, { full: options.full || release.length > 0 });
   const needs = macosNeeds(tier, files);
   console.log(`ci:local: ${files.length} changed file(s) against ${options.base} (${mergeBase.slice(0, 9)})`);
-  if (release.length) console.log(`ci:local: release paths changed (${release.slice(0, 3).join(", ")}): the full gate runs, and GitHub runs its macOS jobs whatever the trailer says`);
+  if (release.length) console.log(`ci:local: release paths changed (${release.slice(0, 3).join(", ")}): the full gate runs, and only its full trailer lets GitHub skip the macOS jobs`);
   for (const job of JOBS) {
     const runs = tier.jobs[job];
     console.log(`  ${job.padEnd(19)} ${runs ? "CI runs" : "CI skips"}${runs ? `; here: ${LOCAL[job]}` : ""}${runs && tier.why[job].length ? `  (${tier.why[job].slice(0, 3).join(", ")})` : ""}`);
@@ -279,10 +281,6 @@ async function main() {
   }
   if (git("status", "--porcelain")) {
     console.log("ci:local: commit the change and run this again for the CI-local trailer; it names the commit's tree");
-    return;
-  }
-  if (release.length) {
-    console.log("ci:local: no CI-local trailer for release paths; push without one and let GitHub's macOS jobs run");
     return;
   }
   const tree = git("rev-parse", "HEAD^{tree}").slice(0, 12);

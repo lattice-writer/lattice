@@ -31,8 +31,12 @@
  *      can break any module, and the trailer tells GitHub its macOS job
  *      need not run, so it runs everything.
  *
- * Release paths (RELEASE_PATHS) always take the full gate, and no trailer
- * stands for them: GitHub runs its macOS jobs whatever the commit says.
+ * Release paths (RELEASE_PATHS) always take the full gate, so only a trailer
+ * that records it (`rust gpui e2e=full webkit`, written by `pnpm ci:local`
+ * for such a diff) stands for their macOS jobs; a tree-only trailer from
+ * before the stages were recorded does not. A tag still runs every job on
+ * GitHub, trailer or not (scripts/ci-tier.mjs), which is where a release is
+ * built and published.
  */
 import { execFileSync } from "node:child_process";
 import { readModules } from "./gpui-e2e-modules.mjs";
@@ -161,6 +165,11 @@ export function parseTrailer(message) {
   return cover;
 }
 
+/** Whether a trailer records every stage of the full gate, as a release path needs. */
+export function fullCover(cover) {
+  return Boolean(cover && !cover.legacy && cover.rust && cover.gpui && cover.e2e === FULL && cover.webkit);
+}
+
 /** Whether a recorded e2e stands for the one a change needs. */
 export function e2eCovered(recorded, needed) {
   if (!needed || recorded === FULL) return true;
@@ -178,7 +187,7 @@ export function coveredJobs(cover, needs) {
     let reason = null;
     if (!needs[group]) reason = null;
     else if (!cover) reason = "no CI-local trailer names this tree";
-    else if (needs.release.length) reason = `release paths changed (${needs.release.slice(0, 3).join(", ")})`;
+    else if (needs.release.length && !fullCover(cover)) reason = `release paths changed (${needs.release.slice(0, 3).join(", ")}) and the trailer does not record the full gate (rust gpui e2e=full webkit)`;
     else if (!cover[group]) reason = `the trailer records no ${group} stage`;
     else if (group === "gpui" && !e2eCovered(cover.e2e, needs.e2e)) {
       reason = needs.e2e.full ? `the change needs the whole e2e (${needs.e2e.fullBecause.slice(0, 3).join(", ")})` : `the trailer's e2e lacks ${needs.e2e.modules.filter((module) => !cover.e2e?.includes(module)).join(", ")}`;
