@@ -21,6 +21,7 @@ use std::{
         Arc, Mutex,
         atomic::{AtomicU64, Ordering},
     },
+    time::Duration,
 };
 
 use futures::{StreamExt as _, channel::mpsc};
@@ -111,8 +112,13 @@ pub struct Session {
     /// finishes the pass first), and Ready must not put "First layout…" back
     /// over it.
     first_pass_failed: bool,
+    /// `LivePreview::first_layout_timeout`, as it was when this session
+    /// started.
+    first_layout_timeout: Duration,
+    /// Counts the bound from the engine's first Ready: loading the preamble
+    /// (and the font list a first LuaLaTeX run builds) is not the layout.
+    overdue_timer: Option<Task<()>>,
     _events: Task<()>,
-    _overdue: Task<()>,
 }
 
 static NEXT_ID: AtomicU64 = AtomicU64::new(0);
@@ -170,19 +176,9 @@ impl Session {
             });
             let (id, reads) = this
                 .update(cx, |this, cx| {
-                    let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
-                    let timeout = this.first_layout_timeout;
-                    let overdue = cx.spawn(async move |this, cx| {
-                        cx.background_executor().timer(timeout).await;
-                        this.update(cx, |this, cx| {
-                            if let Some(session) = this.session_with(id) {
-                                session.first_layout_overdue(cx);
-                            }
-                        })
-                        .ok();
-                    });
                     let mut session = Session {
-                        id,
+                        id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
+                        first_layout_timeout: this.first_layout_timeout,
                         root: root.clone(),
                         rtex,
                         build_dir,
@@ -215,11 +211,12 @@ impl Session {
                         images_loading: HashSet::new(),
                         first_pass_failed: false,
                         _events: reader,
-                        _overdue: overdue,
+                        overdue_timer: None,
                     };
                     // First in the queue, ahead of any edit: the revision rtex
                     // loaded the files at, which the base PDF was built from.
                     session.enqueue(vec![Command::Status]);
+                    let id = session.id;
                     let reads: Vec<(String, u64)> = tex_files
                         .into_iter()
                         .filter(|path| is_tex(path))
@@ -494,11 +491,21 @@ impl Session {
         self.update_snapshot(cx, |snapshot| snapshot.layout_pending = pending);
     }
 
-    /// The first-layout bound passed: say so, if rtex is still on its way.
-    fn first_layout_overdue(&mut self, cx: &mut Context<LivePreview>) {
-        if self.awaiting_first_layout(self.snapshot.phase) {
-            self.update_snapshot(cx, |snapshot| snapshot.overdue = true);
-        }
+    /// Once the first-layout bound passes, say so, if rtex is still on its
+    /// way.
+    fn start_overdue_timer(&self, cx: &mut Context<LivePreview>) -> Task<()> {
+        let (id, timeout) = (self.id, self.first_layout_timeout);
+        cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(timeout).await;
+            this.update(cx, |this, cx| {
+                if let Some(session) = this.session_with(id)
+                    && session.awaiting_first_layout(session.snapshot.phase)
+                {
+                    session.update_snapshot(cx, |snapshot| snapshot.overdue = true);
+                }
+            })
+            .ok();
+        })
     }
 
     /// rtex is still on its way to a first layout: no layout yet, and no
@@ -558,6 +565,9 @@ impl Session {
                         snapshot.detail = reason;
                     }),
                     "Ready" => {
+                        if self.overdue_timer.is_none() && !self.model.has_layout() {
+                            self.overdue_timer = Some(self.start_overdue_timer(cx));
+                        }
                         let phase = ready_phase(self.model.has_layout(), self.first_pass_failed);
                         self.update_snapshot(cx, |snapshot| {
                             snapshot.phase = phase;

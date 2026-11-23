@@ -18,6 +18,7 @@
  * minutes ends that: the pill says why, and clicking it starts over.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { t } from "@lingui/core/macro";
 import { Channel, invoke } from "@tauri-apps/api/core";
 import type { ProjectSnapshot } from "../app-types";
 import { hostErrorMessage } from "../app-utils";
@@ -82,6 +83,7 @@ export function useLivePreview({ project, activeFile, source, savedSource }: {
 
   const active = Boolean(root && available && enabled && mainFile);
   const runKey = active ? `${root}\n${mainFile}\n${attempt}` : "";
+  const runKeyRef = useLatestRef(runKey);
   const state = useMemo<LivePreviewState>(
     () => (!active ? OFF : run.key === runKey ? run.state : STARTING),
     [active, run, runKey],
@@ -177,15 +179,18 @@ export function useLivePreview({ project, activeFile, source, savedSource }: {
    */
   const reinstall = useCallback(async () => {
     try {
+      // The host stops every rtex first and waits for it to be gone.
       await invoke<LivePreviewInstall>("live_preview_remove");
     } catch (reason) {
-      // A download still under way, or files macOS would not delete: the
-      // next start checks what is installed again.
-      console.warn("[live-preview] reinstall could not remove rtex", reason);
+      // A download still under way, or files macOS would not delete: say
+      // so, rather than start the same rtex again.
+      const error = hostErrorMessage(reason);
+      setRun({ key: runKeyRef.current, state: { kind: "failed", message: t`Could not reinstall live preview: ${error}` } });
+      return;
     }
     restarts.current.at.length = 0;
     setAttempt((count) => count + 1);
-  }, []);
+  }, [runKeyRef]);
   /** Turn live preview off everywhere and delete rtex and its build folders. */
   const remove = useCallback(async () => {
     disableLivePreviewEverywhere();

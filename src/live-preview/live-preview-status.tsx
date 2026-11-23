@@ -1,8 +1,8 @@
 /**
  * The live preview's state, as a small pill over the PDF: downloading rtex,
  * starting, the first layout, live, a layout catching up, or stopped; a first
- * layout that never comes says so after a minute and offers to reinstall rtex
- * (a fresh download and build folders). Its dot
+ * layout that never comes says so a minute after the preamble loaded and, if it
+ * persists, offers to reinstall rtex (a fresh download and build folders). Its dot
  * pulses while a quiet build brings the full PDF up to date. It
  * floats over the pages rather than joining the PDF toolbar, so it costs the
  * toolbar no width in a narrow panel. Live preview is on by default, so a Mac
@@ -55,9 +55,9 @@ function StatusPill({ state, snapshot, onRetry, onReinstall }: {
     actionLabel = t`Reinstall live preview`;
     label = t`Live preview is taking long`;
     detail = [
-      snapshot.phase === "starting" ? t`rtex has spent over a minute loading your preamble.` : t`rtex has spent over a minute on the first layout.`,
-      t`The first LuaLaTeX run on a Mac can take minutes to list its fonts, and something in the document can keep LuaLaTeX busy, such as a loop or a package waiting for input. The PDF still updates with each build.`,
-      t`Click to reinstall live preview: rtex downloads again and lays the document out from scratch. You can also turn it off in Settings › Editor & builds.`,
+      t`rtex loaded your preamble over a minute ago and has not laid the document out yet.`,
+      t`Something in the document may keep LuaLaTeX busy, such as a loop or a package waiting for input: that needs a fix in the document, which a reinstall will not bring. The PDF still updates with each build.`,
+      t`If it persists with a document that compiles, click to reinstall live preview: rtex downloads again and lays the document out from scratch. You can also turn it off in Settings › Editor & builds.`,
     ].join("\n\n");
   } else if (state.kind === "starting" || snapshot?.phase === "starting") {
     label = t`Starting live preview…`;

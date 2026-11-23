@@ -81,6 +81,10 @@ fn matches_manifest(dir: &Path) -> bool {
         let Some((digest, relative)) = line.split_once("  ") else {
             return false;
         };
+        // Only files inside the release: no absolute path, no `..`.
+        if Path::new(relative).components().any(|part| !matches!(part, Component::Normal(_))) {
+            return false;
+        }
         let path = dir.join(relative);
         let regular =
             fs::symlink_metadata(&path).is_ok_and(|metadata| metadata.file_type().is_file());
@@ -485,6 +489,12 @@ mod tests {
         assert!(!is_complete(&out));
         fs::write(out.join("share/rtex/tex/rtex-bg.lua"), b"background pass").unwrap();
         assert!(is_complete(&out));
+        // A manifest naming a file outside the release is not trusted.
+        let manifest = fs::read_to_string(out.join(MANIFEST)).unwrap();
+        let outside =
+            format!("{}  ../rtex.tar.gz\n", crate::util::sha256_hex(fs::read(&path).unwrap()));
+        fs::write(out.join(MANIFEST), format!("{manifest}{outside}")).unwrap();
+        assert!(!is_complete(&out));
         fs::remove_file(out.join(MANIFEST)).unwrap();
         assert!(!is_complete(&out));
     }

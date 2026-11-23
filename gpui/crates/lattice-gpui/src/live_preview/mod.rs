@@ -33,6 +33,7 @@ mod virtual_font;
 
 use std::{
     path::PathBuf,
+    sync::PoisonError,
     time::{Duration, Instant},
 };
 
@@ -467,16 +468,38 @@ impl LivePreview {
     /// afresh: what a first layout that never comes offers. Live preview
     /// stays on.
     pub fn reinstall(&mut self, cx: &mut Context<Self>) {
+        let rtex = self.session.as_ref().map(|session| session.rtex().clone());
         self.run = None;
         self.stop_session(cx);
         self.set_state(State::Starting, cx);
         cx.spawn(async move |this, cx| {
-            if let Err(error) = cx.background_spawn(async { live_preview::remove() }).await {
+            let removed = cx
+                .background_spawn(async move {
+                    // rtex and its LuaLaTeX gone first, as the Tauri host
+                    // does: a running one keeps its files from deletion.
+                    if let Some(rtex) = rtex {
+                        rtex.lock()
+                            .unwrap_or_else(PoisonError::into_inner)
+                            .stop_now();
+                    }
+                    live_preview::remove()
+                })
+                .await;
+            this.update(cx, |this, cx| match removed {
+                Ok(status) => {
+                    this.install = Some(status);
+                    this.retry(cx);
+                }
                 // A download still under way, or files macOS would not
-                // delete: the start below checks what is installed again.
-                log::warn!(target: "lattice::live-preview", "Reinstall could not remove rtex: {error}");
-            }
-            this.update(cx, |this, cx| this.retry(cx)).ok();
+                // delete: say so, rather than start the same rtex again.
+                Err(error) => this.set_state(
+                    State::Failed(
+                        t!("Could not reinstall live preview: {error}", error = error).to_string(),
+                    ),
+                    cx,
+                ),
+            })
+            .ok();
         })
         .detach();
     }

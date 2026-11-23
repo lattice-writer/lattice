@@ -45,11 +45,11 @@ export type LivePreviewSnapshot = Readonly<{
   /** A quiet build (quiet-builds.ts) is bringing the full PDF up to date: running, or its PDF loading. */
   rebuilding: boolean;
   /**
-   * FIRST_LAYOUT_TIMEOUT_MS passed with no layout yet while rtex is still
-   * starting or on its first pass. rtex has no bound of its own: a document
-   * that loops, or a first LuaLaTeX run building its font list, keeps it
-   * there, and the pill offers a restart rather than spinning. A layout that
-   * arrives later still takes over.
+   * FIRST_LAYOUT_TIMEOUT_MS, counted from the engine's first Ready, passed
+   * with no layout yet. rtex has no bound of its own: a document that loops
+   * keeps it there, and the pill says so and offers to reinstall rtex if it
+   * persists, rather than spinning. A layout that arrives later still takes
+   * over.
    */
   overdue: boolean;
 }>;
@@ -58,7 +58,11 @@ const INITIAL: LivePreviewSnapshot = {
   phase: "starting", layoutPending: false, detail: null, exit: null, rebuilding: false, overdue: false,
 };
 
-/** How long rtex may take from starting to its first layout before the pill says so. */
+/**
+ * How long rtex may take from its engine's first Ready to its first layout
+ * before the pill says so: loading the preamble (and the font list a first
+ * LuaLaTeX run builds) is not the layout.
+ */
 export const FIRST_LAYOUT_TIMEOUT_MS = 60_000;
 
 /** The phases that wait for rtex's first layout. */
@@ -193,10 +197,6 @@ export class LivePreviewSession {
    * changing them (or names none) sends rtex nothing.
    */
   async start(texFiles: readonly string[] = []): Promise<void> {
-    this.overdueTimer = setTimeout(() => {
-      this.overdueTimer = null;
-      if (this.awaitingFirstLayout(this.snapshot.phase)) this.updateSnapshot({ overdue: true });
-    }, FIRST_LAYOUT_TIMEOUT_MS);
     const events = new Channel<RtexEvent | Reply>();
     events.onmessage = (message) => {
       if (!this.disposed) this.receive(message);
@@ -509,6 +509,11 @@ export class LivePreviewSession {
         this.generation = event.engine_generation;
         if (event.state === "Failed") this.updateSnapshot({ phase: "paused", detail: event.reason });
         else if (event.state === "Ready") {
+          if (this.overdueTimer === null && !this.model.hasLayout) {
+            this.overdueTimer = setTimeout(() => {
+              if (this.awaitingFirstLayout(this.snapshot.phase)) this.updateSnapshot({ overdue: true });
+            }, FIRST_LAYOUT_TIMEOUT_MS);
+          }
           const phase = this.model.hasLayout ? "live" : this.firstPassFailed ? "uncompiled" : "first-layout";
           this.updateSnapshot({ phase, detail: null });
         }

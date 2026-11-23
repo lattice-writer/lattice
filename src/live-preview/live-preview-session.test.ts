@@ -227,11 +227,14 @@ describe("a live preview session", () => {
     session.dispose();
   });
 
-  it("says so when no first layout comes within a minute, and goes live if one comes after", async () => {
+  it("says so when no first layout comes within a minute of the engine's Ready, and goes live if one comes after", async () => {
     vi.useFakeTimers();
     const session = new LivePreviewSession("/project", "main.tex");
     await session.start();
     engine("Starting");
+    // Loading the preamble does not count.
+    vi.advanceTimersByTime(2 * FIRST_LAYOUT_TIMEOUT_MS);
+    expect(session.getSnapshot()).toMatchObject({ phase: "starting", overdue: false });
     engine("Ready");
     vi.advanceTimersByTime(FIRST_LAYOUT_TIMEOUT_MS - 1);
     expect(session.getSnapshot()).toMatchObject({ phase: "first-layout", overdue: false });
@@ -256,6 +259,7 @@ describe("a live preview session", () => {
     failed.dispose();
     const exited = new LivePreviewSession("/project", "main.tex");
     await exited.start();
+    engine("Ready");
     reply({ event: "SessionExited", session: 7, stderr: "", code: 1, signal: null });
     vi.advanceTimersByTime(FIRST_LAYOUT_TIMEOUT_MS);
     expect(exited.getSnapshot()).toMatchObject({ phase: "exited", overdue: false });

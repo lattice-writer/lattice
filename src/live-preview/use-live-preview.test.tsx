@@ -263,3 +263,20 @@ it("reinstalling deletes rtex, downloads it again and starts a new session, live
   expect(result.current.enabled).toBe(true);
 });
 
+
+it("says why when reinstalling cannot remove rtex, rather than starting the same one again", async () => {
+  install = { ...READY, installed: true };
+  vi.mocked(invoke).mockImplementation(async (command: string) => {
+    if (command === "live_preview_status") return install;
+    if (command === "live_preview_remove") throw "rtex is still downloading. Remove it once the download finishes.";
+    return null;
+  });
+  const { result } = open("/papers/lua");
+  await waitFor(() => expect(result.current.state.kind).toBe("running"));
+  await act(async () => { await result.current.reinstall(); });
+  expect(result.current.state).toEqual({
+    kind: "failed", message: "Could not reinstall live preview: rtex is still downloading. Remove it once the download finishes.",
+  });
+  expect(started).toHaveLength(1);
+});
+

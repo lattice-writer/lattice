@@ -5,8 +5,9 @@
 //! within moments, the save's build waits for the pause and runs quietly (no
 //! spinner on the Build button), its PDF takes over and the paint goes, rtex
 //! killed mid-session comes back by itself, a document that never gets its
-//! first layout says so and offers a restart, and Settings' switch turns it off. The project's engine and text are put back
-//! after.
+//! first layout says so and offers to reinstall rtex, which downloads it
+//! again, and Settings' switch turns it off. The project's engine and text
+//! are put back after.
 
 use std::time::{Duration, Instant};
 

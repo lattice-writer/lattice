@@ -4183,10 +4183,6 @@ msgstr "Click to copy the LaTeX command"
 msgid "Click to keep the original"
 msgstr "Click to keep the original"
 
-#: src/live-preview/live-preview-status.tsx
-msgid "Click to reinstall live preview: rtex downloads again and lays the document out from scratch. You can also turn it off in Settings › Editor & builds."
-msgstr "Click to reinstall live preview: rtex downloads again and lays the document out from scratch. You can also turn it off in Settings › Editor & builds."
-
 #: src/telemetry/app-notify.ts
 msgid "Clipboard"
 msgstr "Clipboard"
@@ -5103,6 +5099,10 @@ msgstr "Could not record Overleaf's {scopedPermission} permission locally ({deta
 #: src/platform/host-errors-overleaf.ts
 msgid "Could not record the sync base for {path}: {error}"
 msgstr "Could not record the sync base for {path}: {error}"
+
+#: src/live-preview/use-live-preview.ts
+msgid "Could not reinstall live preview: {error}"
+msgstr "Could not reinstall live preview: {error}"
 
 #. placeholder {0}: entry.path
 #. placeholder {1}: hostErrorMessage(reason)
@@ -7870,6 +7870,10 @@ msgstr "IEEE journal article ({name})"
 #: src/editor/latex/latex-vocabulary.ts
 msgid "If and only if"
 msgstr "If and only if"
+
+#: src/live-preview/live-preview-status.tsx
+msgid "If it persists with a document that compiles, click to reinstall live preview: rtex downloads again and lays the document out from scratch. You can also turn it off in Settings › Editor & builds."
+msgstr "If it persists with a document that compiles, click to reinstall live preview: rtex downloads again and lays the document out from scratch. You can also turn it off in Settings › Editor & builds."
 
 #: src/overleaf/overleaf-pasted-link.tsx
 msgid "If someone shared it with you, accept their invitation or open their share link once on Overleaf. If they shared it with another account, sign in with that one in Settings → Overleaf."
@@ -14583,12 +14587,8 @@ msgid "rtex exited with status {code}."
 msgstr "rtex exited with status {code}."
 
 #: src/live-preview/live-preview-status.tsx
-msgid "rtex has spent over a minute loading your preamble."
-msgstr "rtex has spent over a minute loading your preamble."
-
-#: src/live-preview/live-preview-status.tsx
-msgid "rtex has spent over a minute on the first layout."
-msgstr "rtex has spent over a minute on the first layout."
+msgid "rtex loaded your preamble over a minute ago and has not laid the document out yet."
+msgstr "rtex loaded your preamble over a minute ago and has not laid the document out yet."
 
 #: src/live-preview/live-preview-session.ts
 msgid "rtex stopped {times} times in five minutes. Click to restart it."
@@ -15621,6 +15621,10 @@ msgstr "Some sources unavailable"
 #: src/app/overleaf-sync-warnings.ts
 msgid "Someone edited the Overleaf project while {files} uploaded. An upload replaces the whole file, so it may have overwritten their latest typing there. Check the file's history on Overleaf to bring back anything missing."
 msgstr "Someone edited the Overleaf project while {files} uploaded. An upload replaces the whole file, so it may have overwritten their latest typing there. Check the file's history on Overleaf to bring back anything missing."
+
+#: src/live-preview/live-preview-status.tsx
+msgid "Something in the document may keep LuaLaTeX busy, such as a loop or a package waiting for input: that needs a fix in the document, which a reinstall will not bring. The PDF still updates with each build."
+msgstr "Something in the document may keep LuaLaTeX busy, such as a loop or a package waiting for input: that needs a fix in the document, which a reinstall will not bring. The PDF still updates with each build."
 
 #: src/papers/bib-visual-editor.tsx
 #: src/project/paper-list-toolbar.tsx
@@ -17143,10 +17147,6 @@ msgstr "The files already read as {name}."
 #: src/app/remove-reference-action.ts
 msgid "The first is at {path}:{line}."
 msgstr "The first is at {path}:{line}."
-
-#: src/live-preview/live-preview-status.tsx
-msgid "The first LuaLaTeX run on a Mac can take minutes to list its fonts, and something in the document can keep LuaLaTeX busy, such as a loop or a package waiting for input. The PDF still updates with each build."
-msgstr "The first LuaLaTeX run on a Mac can take minutes to list its fonts, and something in the document can keep LuaLaTeX busy, such as a loop or a package waiting for input. The PDF still updates with each build."
 
 #: src/platform/host-errors-workspace.ts
 msgid "The folder is not empty."

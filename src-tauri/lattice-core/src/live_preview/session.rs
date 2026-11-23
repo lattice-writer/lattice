@@ -122,6 +122,15 @@ impl Session {
         }
     }
 
+    /// [`Session::stop_and_wait`] through a shared handle: the GPUI app
+    /// holds its session behind a mutex, and its reinstall deletes rtex only
+    /// once the processes are gone.
+    pub fn stop_now(&mut self) {
+        if let Some(finish) = self.shutdown() {
+            finish();
+        }
+    }
+
     fn shutdown(&mut self) -> Option<impl FnOnce() + Send + 'static> {
         if let Some(mut stdin) = self.stdin.take() {
             let _ = stdin.write_all(b"{\"cmd\":\"quit\"}\n").and_then(|()| stdin.flush());

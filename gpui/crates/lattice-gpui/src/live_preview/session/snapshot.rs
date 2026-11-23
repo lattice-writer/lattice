@@ -40,12 +40,11 @@ pub struct Snapshot {
     /// A quiet build is bringing the full PDF up to date: running, or its
     /// PDF loading.
     pub rebuilding: bool,
-    /// The first-layout bound (`LivePreview::first_layout_timeout`) passed
-    /// with no layout yet while rtex is still starting or on its first pass.
-    /// rtex has no bound of its own: a document that loops, or a first
-    /// LuaLaTeX run building its font list, keeps it there, and the pill
-    /// offers a restart rather than spinning. A layout that arrives later
-    /// still takes over.
+    /// The first-layout bound (`LivePreview::first_layout_timeout`, counted
+    /// from the engine's first Ready) passed with no layout yet. rtex has no
+    /// bound of its own: a document that loops keeps it there, and the pill
+    /// says so and offers to reinstall rtex if it persists, rather than
+    /// spinning. A layout that arrives later still takes over.
     pub overdue: bool,
 }
 
