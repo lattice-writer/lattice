@@ -61,8 +61,14 @@ impl Run {
         }
         #[cfg(not(target_os = "macos"))]
         {
-            let keystroke = gpui::Keystroke::parse(&format!("ctrl-{character}"))
-                .map_err(|error| anyhow::anyhow!("{error}"))?;
+            let keystroke = gpui::Keystroke {
+                modifiers: gpui::Modifiers {
+                    control: true,
+                    ..Default::default()
+                },
+                key: character.to_string(),
+                key_char: None,
+            };
             self.with_window(cx, move |_, window, cx| {
                 window.dispatch_event(
                     gpui::PlatformInput::KeyDown(gpui::KeyDownEvent {
