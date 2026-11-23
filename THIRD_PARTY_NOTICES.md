@@ -421,7 +421,7 @@ Nothing on disk says what the terms are. Each needs to be looked up upstream.
 
 - `khroma@2.1.0` (npm) — ships `license`
 
-### Declared a license but shipped no license text (12)
+### Declared a license but shipped no license text (11)
 
 The SPDX identifier is known, but the package contains no `LICENSE`,
 `COPYING` or `NOTICE` file, so the copyright line those licenses require us
@@ -435,14 +435,13 @@ repository and found none, the line says what it found instead.
 - `r-efi@6.0.0` (crates) — declared `MIT OR Apache-2.0 OR LGPL-2.1-or-later` — upstream: https://github.com/r-efi/r-efi has no license file on the path to `/`, at the release or on its default branch
 - `selectors@0.36.1` (crates) — declared `MPL-2.0` — upstream: https://github.com/servo/stylo has no license file on the path to `selectors`, at the release or on its default branch
 - `selectors@0.38.0` (crates) — declared `MPL-2.0` — upstream: https://github.com/servo/stylo has no license file on the path to `selectors`, at the release or on its default branch
-- `@radix-ui/react-popover@1.1.6` (npm) — declared `MIT`
 - `fastdom@1.0.12` (npm) — declared `MIT` — upstream: https://github.com/wilsonpage/fastdom has no license file on the path to `/` of its default branch, and no commit or tag identifies the release
 - `ot-json1@1.0.2` (npm) — declared `ISC` — upstream: https://github.com/josephg/json1 has no license file on the path to `/` of its default branch, and no commit or tag identifies the release
 - `ot-text-unicode@4.0.0` (npm) — declared `ISC` — upstream: https://github.com/ottypes/text has no license file on the path to `/` of its default branch, and no commit or tag identifies the release
 - `strictdom@1.0.1` (npm) — declared `MIT` — upstream: https://github.com/wilsonpage/strictdom has no license file on the path to `/`, at the release or on its default branch
 - `unicount@1.1.0` (npm) — declared `ISC` — upstream: https://github.com/josephg/unicount has no license file on the path to `/`, at the release or on its default branch
 
-## License texts recovered from upstream — npm and crates (151)
+## License texts recovered from upstream — npm and crates (152)
 
 These packages declare a license but their published artifact omits the
 text — usually a crate in a workspace whose LICENSE sits at the repository
@@ -578,6 +577,7 @@ tag identifies the release or the release commit had no license file; the
 - `@radix-ui/react-focus-scope@1.1.2` — [`LICENSE`](https://github.com/radix-ui/primitives/blob/e1bdb77ea2445407b239558f2902c2e1950586fe/LICENSE) at `e1bdb77ea244`
 - `@radix-ui/react-id@1.0.0` — [`LICENSE`](https://github.com/radix-ui/primitives/blob/eb3a2b7091293e27df8f9ba906632d8daa3d81a3/LICENSE) — *default branch*
 - `@radix-ui/react-id@1.1.0` — [`LICENSE`](https://github.com/radix-ui/primitives/blob/704069ee4c40c3b6f342c104dff5ad873ee39c43/LICENSE) at `704069ee4c40`
+- `@radix-ui/react-popover@1.1.6` — [`LICENSE`](https://github.com/radix-ui/primitives/blob/e1bdb77ea2445407b239558f2902c2e1950586fe/LICENSE) at `e1bdb77ea244`
 - `@radix-ui/react-popper@1.2.2` — [`LICENSE`](https://github.com/radix-ui/primitives/blob/e1bdb77ea2445407b239558f2902c2e1950586fe/LICENSE) at `e1bdb77ea244`
 - `@radix-ui/react-portal@1.1.4` — [`LICENSE`](https://github.com/radix-ui/primitives/blob/e1bdb77ea2445407b239558f2902c2e1950586fe/LICENSE) at `e1bdb77ea244`
 - `@radix-ui/react-presence@1.0.0` — [`LICENSE`](https://github.com/radix-ui/primitives/blob/eb3a2b7091293e27df8f9ba906632d8daa3d81a3/LICENSE) — *default branch*
@@ -713,11 +713,11 @@ parent package listed beside it.
 
 ### License texts (80 distinct texts across 790 packages)
 
-#### 1. MIT (+1 other declarations) — 308 package(s), from `license`
+#### 1. MIT (+1 other declarations) — 309 package(s), from `license`
 
 <details><summary>Packages sharing this text</summary>
 
-`@antfu/install-pkg@2.1.0`, `@babel/runtime@7.29.7`, `@base-ui/react@1.6.0`, `@base-ui/utils@0.3.1`, `@braintree/sanitize-url@6.0.2`, `@braintree/sanitize-url@7.1.2`, `@codemirror/autocomplete@6.20.3`, `@codemirror/commands@6.10.4`, `@codemirror/lang-angular@0.1.4`, `@codemirror/lang-cpp@6.0.3`, `@codemirror/lang-css@6.3.1`, `@codemirror/lang-go@6.0.1`, `@codemirror/lang-html@6.4.12`, `@codemirror/lang-java@6.0.2`, `@codemirror/lang-javascript@6.2.5`, `@codemirror/lang-jinja@6.0.1`, `@codemirror/lang-json@6.0.2`, `@codemirror/lang-less@6.0.2`, `@codemirror/lang-liquid@6.3.2`, `@codemirror/lang-markdown@6.5.2`, `@codemirror/lang-php@6.0.2`, `@codemirror/lang-python@6.2.1`, `@codemirror/lang-rust@6.0.2`, `@codemirror/lang-sass@6.0.2`, `@codemirror/lang-sql@6.10.0`, `@codemirror/lang-vue@0.1.3`, `@codemirror/lang-wast@6.0.2`, `@codemirror/lang-xml@6.1.0`, `@codemirror/lang-yaml@6.1.3`, `@codemirror/language-data@6.5.2`, `@codemirror/language@6.12.4`, `@codemirror/legacy-modes@6.5.3`, `@codemirror/lint@6.9.7`, `@codemirror/search@6.7.1`, `@codemirror/state@6.7.1`, `@codemirror/view@6.43.8`, `@excalidraw/excalidraw@0.18.1`, `@excalidraw/laser-pointer@1.3.1`, `@excalidraw/mermaid-to-excalidraw@2.2.2`, `@excalidraw/random-username@1.1.0`, `@flatten-js/interval-tree@1.1.3`, `@iconify/types@2.0.0`, `@iconify/utils@3.1.7`, `@jest/schemas@29.6.3`, `@jest/types@29.6.3`, `@js-sdsl/ordered-map@4.4.2`, `@lezer/common@1.5.2`, `@lezer/cpp@1.1.6`, `@lezer/css@1.3.5`, `@lezer/generator@1.8.0`, `@lezer/go@1.0.1`, `@lezer/highlight@1.2.3`, `@lezer/html@1.3.13`, `@lezer/java@1.1.3`, `@lezer/javascript@1.5.4`, `@lezer/json@1.0.3`, `@lezer/lr@1.4.10`, `@lezer/markdown@1.7.2`, `@lezer/php@1.0.5`, `@lezer/python@1.1.19`, `@lezer/rust@1.0.2`, `@lezer/sass@1.1.0`, `@lezer/xml@1.0.6`, `@lezer/yaml@1.0.4`, `@marijn/find-cluster-break@1.0.3`, `@oxc-project/types@0.144.0`, `@pdfslick/core@4.0.2`, `@radix-ui/number@1.1.3`, `@radix-ui/primitive@1.0.0`, `@radix-ui/primitive@1.1.1`, `@radix-ui/primitive@1.1.7`, `@radix-ui/react-accessible-icon@1.1.13`, `@radix-ui/react-accordion@1.2.18`, `@radix-ui/react-alert-dialog@1.1.21`, `@radix-ui/react-arrow@1.1.13`, `@radix-ui/react-arrow@1.1.2`, `@radix-ui/react-aspect-ratio@1.1.13`, `@radix-ui/react-avatar@1.2.4`, `@radix-ui/react-checkbox@1.3.9`, `@radix-ui/react-collapsible@1.1.18`, `@radix-ui/react-collection@1.0.1`, `@radix-ui/react-collection@1.1.13`, `@radix-ui/react-compose-refs@1.0.0`, `@radix-ui/react-compose-refs@1.1.1`, `@radix-ui/react-compose-refs@1.1.4`, `@radix-ui/react-context-menu@2.3.5`, `@radix-ui/react-context@1.0.0`, `@radix-ui/react-context@1.1.1`, `@radix-ui/react-context@1.2.1`, `@radix-ui/react-dialog@1.1.21`, `@radix-ui/react-direction@1.0.0`, `@radix-ui/react-direction@1.1.3`, `@radix-ui/react-dismissable-layer@1.1.17`, `@radix-ui/react-dismissable-layer@1.1.5`, `@radix-ui/react-dropdown-menu@2.1.22`, `@radix-ui/react-focus-guards@1.1.1`, `@radix-ui/react-focus-guards@1.1.5`, `@radix-ui/react-focus-scope@1.1.14`, `@radix-ui/react-focus-scope@1.1.2`, `@radix-ui/react-form@0.1.14`, `@radix-ui/react-hover-card@1.1.21`, `@radix-ui/react-id@1.0.0`, `@radix-ui/react-id@1.1.0`, `@radix-ui/react-id@1.1.3`, `@radix-ui/react-label@2.1.13`, `@radix-ui/react-menu@2.1.22`, `@radix-ui/react-menubar@1.1.22`, `@radix-ui/react-navigation-menu@1.2.20`, `@radix-ui/react-one-time-password-field@0.1.14`, `@radix-ui/react-password-toggle-field@0.1.9`, `@radix-ui/react-popover@1.1.21`, `@radix-ui/react-popper@1.2.2`, `@radix-ui/react-popper@1.3.5`, `@radix-ui/react-portal@1.1.15`, `@radix-ui/react-portal@1.1.4`, `@radix-ui/react-presence@1.0.0`, `@radix-ui/react-presence@1.1.2`, `@radix-ui/react-presence@1.1.9`, `@radix-ui/react-primitive@1.0.1`, `@radix-ui/react-primitive@2.0.2`, `@radix-ui/react-primitive@2.1.8`, `@radix-ui/react-progress@1.1.14`, `@radix-ui/react-radio-group@1.4.5`, `@radix-ui/react-roving-focus@1.0.2`, `@radix-ui/react-roving-focus@1.1.17`, `@radix-ui/react-scroll-area@1.2.16`, `@radix-ui/react-select@2.3.5`, `@radix-ui/react-separator@1.1.13`, `@radix-ui/react-slider@1.4.5`, `@radix-ui/react-slot@1.0.1`, `@radix-ui/react-slot@1.1.2`, `@radix-ui/react-slot@1.3.1`, `@radix-ui/react-switch@1.3.5`, `@radix-ui/react-tabs@1.0.2`, `@radix-ui/react-tabs@1.1.19`, `@radix-ui/react-toast@1.2.21`, `@radix-ui/react-toggle-group@1.1.17`, `@radix-ui/react-toggle@1.1.16`, `@radix-ui/react-toolbar@1.1.17`, `@radix-ui/react-tooltip@1.2.14`, `@radix-ui/react-use-callback-ref@1.0.0`, `@radix-ui/react-use-callback-ref@1.1.0`, `@radix-ui/react-use-callback-ref@1.1.3`, `@radix-ui/react-use-controllable-state@1.0.0`, `@radix-ui/react-use-controllable-state@1.1.0`, `@radix-ui/react-use-controllable-state@1.2.5`, `@radix-ui/react-use-effect-event@0.0.4`, `@radix-ui/react-use-escape-keydown@1.1.0`, `@radix-ui/react-use-escape-keydown@1.1.4`, `@radix-ui/react-use-is-hydrated@0.1.2`, `@radix-ui/react-use-layout-effect@1.0.0`, `@radix-ui/react-use-layout-effect@1.1.0`, `@radix-ui/react-use-layout-effect@1.1.3`, `@radix-ui/react-use-previous@1.1.3`, `@radix-ui/react-use-rect@1.1.0`, `@radix-ui/react-use-rect@1.1.3`, `@radix-ui/react-use-size@1.1.0`, `@radix-ui/react-use-size@1.1.3`, `@radix-ui/react-visually-hidden@1.2.9`, `@radix-ui/rect@1.1.0`, `@radix-ui/rect@1.1.3`, `@replit/codemirror-emacs@6.1.0`, `@replit/codemirror-vim-core@0.1.0`, `@replit/codemirror-vim@6.4.0`, `@rolldown/pluginutils@1.0.1`, `@shikijs/core@4.3.1`, `@shikijs/engine-javascript@4.3.1`, `@shikijs/engine-oniguruma@4.3.1`, `@shikijs/langs@4.3.1`, `@shikijs/langs@4.4.3`, `@shikijs/primitive@4.3.1`, `@shikijs/themes@4.3.1`, `@shikijs/themes@4.4.3`, `@shikijs/transformers@4.3.1`, `@shikijs/types@4.3.1`, `@shikijs/types@4.4.3`, `@tailwindcss/node@4.3.3`, `@tailwindcss/oxide@4.3.3`, `@tailwindcss/vite@4.3.3`, `@tauri-apps/api@2.11.1` (`Apache-2.0 OR MIT`), `@tiptap/core@3.33.1`, `@tiptap/extension-blockquote@3.33.1`, `@tiptap/extension-bold@3.33.1`, `@tiptap/extension-bubble-menu@3.33.1`, `@tiptap/extension-bullet-list@3.33.1`, `@tiptap/extension-code-block@3.33.1`, `@tiptap/extension-code@3.33.1`, `@tiptap/extension-document@3.33.1`, `@tiptap/extension-dropcursor@3.33.1`, `@tiptap/extension-floating-menu@3.33.1`, `@tiptap/extension-gapcursor@3.33.1`, `@tiptap/extension-hard-break@3.33.1`, `@tiptap/extension-heading@3.33.1`, `@tiptap/extension-highlight@3.33.1`, `@tiptap/extension-horizontal-rule@3.33.1`, `@tiptap/extension-image@3.33.1`, `@tiptap/extension-italic@3.33.1`, `@tiptap/extension-link@3.33.1`, `@tiptap/extension-list-item@3.33.1`, `@tiptap/extension-list-keymap@3.33.1`, `@tiptap/extension-list@3.33.1`, `@tiptap/extension-ordered-list@3.33.1`, `@tiptap/extension-paragraph@3.33.1`, `@tiptap/extension-strike@3.33.1`, `@tiptap/extension-table@3.33.1`, `@tiptap/extension-text@3.33.1`, `@tiptap/extension-underline@3.33.1`, `@tiptap/extensions@3.33.1`, `@tiptap/pm@3.33.1`, `@tiptap/react@3.33.1`, `@tiptap/starter-kit@3.33.1`, `@tiptap/suggestion@3.33.1`, `@univerjs/icons@1.4.0`, `@upsetjs/venn.js@2.0.0`, `ansi-regex@5.0.1`, `ansi-styles@4.3.0`, `ansi-styles@5.2.0`, `aria-hidden@1.2.6`, `binary-extensions@2.3.0`, `brace-expansion@1.1.21`, `brace-expansion@2.1.7`, `camelcase@6.3.0`, `canvas-roundrect-polyfill@0.0.1`, `chalk@4.1.2`, `cjk-regex@3.4.0`, `clsx@1.1.1`, `clsx@2.1.1`, `cose-base@1.0.3`, `cose-base@2.2.0`, `cuelume@0.2.2`, `dayjs@1.11.21`, `detect-node-es@1.1.0`, `es-toolkit@1.53.2`, `escalade@3.2.0`, `escape-string-regexp@5.0.0`, `fast-equals@5.4.1`, `frimousse@0.3.0`, `get-nonce@1.0.1`, `hachure-fill@0.5.2`, `has-flag@4.0.0`, `immutable@4.3.9`, `is-binary-path@2.1.0`, `is-fullwidth-code-point@3.0.0`, `is-plain-obj@4.1.0`, `isarray@1.0.0`, `jest-get-type@29.6.3`, `jest-validate@29.7.0`, `jiti@2.7.0`, `jotai@2.11.0`, `js-sha256@0.10.1`, `layout-base@1.0.2`, `layout-base@2.0.1`, `leven@3.1.0`, `lilconfig@3.1.3`, `oniguruma-parser@0.12.2`, `oniguruma-to-es@4.3.6`, `open-color@1.9.1`, `package-manager-detector@1.9.0`, `path-data-parser@0.1.0`, `path-key@3.1.1`, `perfect-freehand@1.2.0`, `points-on-curve@0.2.0`, `points-on-curve@1.0.1`, `points-on-path@0.2.1`, `pretty-format@29.7.0`, `prop-types@15.8.1`, `radix-ui@1.6.5`, `rbush@4.0.1`, `react-dom@19.2.7`, `react-is@16.13.1`, `react-is@18.3.1`, `react-remove-scroll-bar@2.3.8`, `react-remove-scroll@2.7.2`, `react-style-singleton@2.2.3`, `react@19.2.7`, `readdirp@3.6.0`, `regex-recursion@6.0.2`, `regex-utilities@2.3.0`, `regex@6.1.0`, `regexp-util@2.0.3`, `roughjs@4.6.4`, `roughjs@4.6.6`, `safer-buffer@2.1.2`, `scheduler@0.27.0`, `shebang-command@2.0.0`, `shebang-regex@3.0.0`, `shiki@4.3.1`, `sonner@2.0.8`, `string-width@4.2.3`, `strip-ansi@6.0.1`, `stylis@4.4.0`, `supports-color@7.2.0`, `tailwind-merge@2.6.0`, `tailwind-merge@3.6.0`, `tailwindcss@4.3.3`, `tinyexec@1.3.1`, `tinyglobby@0.2.17`, `ts-dedent@2.3.0`, `tunnel-rat@0.1.2`, `undici-types@8.3.0`, `unicode-regex@4.2.0`, `use-callback-ref@1.3.3`, `use-sidecar@1.1.3`, `use-sync-external-store@1.6.0`, `wrap-ansi@7.0.0`, `yargs@17.7.3`, `zustand@4.5.7`, `zustand@5.0.15`
+`@antfu/install-pkg@2.1.0`, `@babel/runtime@7.29.7`, `@base-ui/react@1.6.0`, `@base-ui/utils@0.3.1`, `@braintree/sanitize-url@6.0.2`, `@braintree/sanitize-url@7.1.2`, `@codemirror/autocomplete@6.20.3`, `@codemirror/commands@6.10.4`, `@codemirror/lang-angular@0.1.4`, `@codemirror/lang-cpp@6.0.3`, `@codemirror/lang-css@6.3.1`, `@codemirror/lang-go@6.0.1`, `@codemirror/lang-html@6.4.12`, `@codemirror/lang-java@6.0.2`, `@codemirror/lang-javascript@6.2.5`, `@codemirror/lang-jinja@6.0.1`, `@codemirror/lang-json@6.0.2`, `@codemirror/lang-less@6.0.2`, `@codemirror/lang-liquid@6.3.2`, `@codemirror/lang-markdown@6.5.2`, `@codemirror/lang-php@6.0.2`, `@codemirror/lang-python@6.2.1`, `@codemirror/lang-rust@6.0.2`, `@codemirror/lang-sass@6.0.2`, `@codemirror/lang-sql@6.10.0`, `@codemirror/lang-vue@0.1.3`, `@codemirror/lang-wast@6.0.2`, `@codemirror/lang-xml@6.1.0`, `@codemirror/lang-yaml@6.1.3`, `@codemirror/language-data@6.5.2`, `@codemirror/language@6.12.4`, `@codemirror/legacy-modes@6.5.3`, `@codemirror/lint@6.9.7`, `@codemirror/search@6.7.1`, `@codemirror/state@6.7.1`, `@codemirror/view@6.43.8`, `@excalidraw/excalidraw@0.18.1`, `@excalidraw/laser-pointer@1.3.1`, `@excalidraw/mermaid-to-excalidraw@2.2.2`, `@excalidraw/random-username@1.1.0`, `@flatten-js/interval-tree@1.1.3`, `@iconify/types@2.0.0`, `@iconify/utils@3.1.7`, `@jest/schemas@29.6.3`, `@jest/types@29.6.3`, `@js-sdsl/ordered-map@4.4.2`, `@lezer/common@1.5.2`, `@lezer/cpp@1.1.6`, `@lezer/css@1.3.5`, `@lezer/generator@1.8.0`, `@lezer/go@1.0.1`, `@lezer/highlight@1.2.3`, `@lezer/html@1.3.13`, `@lezer/java@1.1.3`, `@lezer/javascript@1.5.4`, `@lezer/json@1.0.3`, `@lezer/lr@1.4.10`, `@lezer/markdown@1.7.2`, `@lezer/php@1.0.5`, `@lezer/python@1.1.19`, `@lezer/rust@1.0.2`, `@lezer/sass@1.1.0`, `@lezer/xml@1.0.6`, `@lezer/yaml@1.0.4`, `@marijn/find-cluster-break@1.0.3`, `@oxc-project/types@0.144.0`, `@pdfslick/core@4.0.2`, `@radix-ui/number@1.1.3`, `@radix-ui/primitive@1.0.0`, `@radix-ui/primitive@1.1.1`, `@radix-ui/primitive@1.1.7`, `@radix-ui/react-accessible-icon@1.1.13`, `@radix-ui/react-accordion@1.2.18`, `@radix-ui/react-alert-dialog@1.1.21`, `@radix-ui/react-arrow@1.1.13`, `@radix-ui/react-arrow@1.1.2`, `@radix-ui/react-aspect-ratio@1.1.13`, `@radix-ui/react-avatar@1.2.4`, `@radix-ui/react-checkbox@1.3.9`, `@radix-ui/react-collapsible@1.1.18`, `@radix-ui/react-collection@1.0.1`, `@radix-ui/react-collection@1.1.13`, `@radix-ui/react-compose-refs@1.0.0`, `@radix-ui/react-compose-refs@1.1.1`, `@radix-ui/react-compose-refs@1.1.4`, `@radix-ui/react-context-menu@2.3.5`, `@radix-ui/react-context@1.0.0`, `@radix-ui/react-context@1.1.1`, `@radix-ui/react-context@1.2.1`, `@radix-ui/react-dialog@1.1.21`, `@radix-ui/react-direction@1.0.0`, `@radix-ui/react-direction@1.1.3`, `@radix-ui/react-dismissable-layer@1.1.17`, `@radix-ui/react-dismissable-layer@1.1.5`, `@radix-ui/react-dropdown-menu@2.1.22`, `@radix-ui/react-focus-guards@1.1.1`, `@radix-ui/react-focus-guards@1.1.5`, `@radix-ui/react-focus-scope@1.1.14`, `@radix-ui/react-focus-scope@1.1.2`, `@radix-ui/react-form@0.1.14`, `@radix-ui/react-hover-card@1.1.21`, `@radix-ui/react-id@1.0.0`, `@radix-ui/react-id@1.1.0`, `@radix-ui/react-id@1.1.3`, `@radix-ui/react-label@2.1.13`, `@radix-ui/react-menu@2.1.22`, `@radix-ui/react-menubar@1.1.22`, `@radix-ui/react-navigation-menu@1.2.20`, `@radix-ui/react-one-time-password-field@0.1.14`, `@radix-ui/react-password-toggle-field@0.1.9`, `@radix-ui/react-popover@1.1.21`, `@radix-ui/react-popover@1.1.6`, `@radix-ui/react-popper@1.2.2`, `@radix-ui/react-popper@1.3.5`, `@radix-ui/react-portal@1.1.15`, `@radix-ui/react-portal@1.1.4`, `@radix-ui/react-presence@1.0.0`, `@radix-ui/react-presence@1.1.2`, `@radix-ui/react-presence@1.1.9`, `@radix-ui/react-primitive@1.0.1`, `@radix-ui/react-primitive@2.0.2`, `@radix-ui/react-primitive@2.1.8`, `@radix-ui/react-progress@1.1.14`, `@radix-ui/react-radio-group@1.4.5`, `@radix-ui/react-roving-focus@1.0.2`, `@radix-ui/react-roving-focus@1.1.17`, `@radix-ui/react-scroll-area@1.2.16`, `@radix-ui/react-select@2.3.5`, `@radix-ui/react-separator@1.1.13`, `@radix-ui/react-slider@1.4.5`, `@radix-ui/react-slot@1.0.1`, `@radix-ui/react-slot@1.1.2`, `@radix-ui/react-slot@1.3.1`, `@radix-ui/react-switch@1.3.5`, `@radix-ui/react-tabs@1.0.2`, `@radix-ui/react-tabs@1.1.19`, `@radix-ui/react-toast@1.2.21`, `@radix-ui/react-toggle-group@1.1.17`, `@radix-ui/react-toggle@1.1.16`, `@radix-ui/react-toolbar@1.1.17`, `@radix-ui/react-tooltip@1.2.14`, `@radix-ui/react-use-callback-ref@1.0.0`, `@radix-ui/react-use-callback-ref@1.1.0`, `@radix-ui/react-use-callback-ref@1.1.3`, `@radix-ui/react-use-controllable-state@1.0.0`, `@radix-ui/react-use-controllable-state@1.1.0`, `@radix-ui/react-use-controllable-state@1.2.5`, `@radix-ui/react-use-effect-event@0.0.4`, `@radix-ui/react-use-escape-keydown@1.1.0`, `@radix-ui/react-use-escape-keydown@1.1.4`, `@radix-ui/react-use-is-hydrated@0.1.2`, `@radix-ui/react-use-layout-effect@1.0.0`, `@radix-ui/react-use-layout-effect@1.1.0`, `@radix-ui/react-use-layout-effect@1.1.3`, `@radix-ui/react-use-previous@1.1.3`, `@radix-ui/react-use-rect@1.1.0`, `@radix-ui/react-use-rect@1.1.3`, `@radix-ui/react-use-size@1.1.0`, `@radix-ui/react-use-size@1.1.3`, `@radix-ui/react-visually-hidden@1.2.9`, `@radix-ui/rect@1.1.0`, `@radix-ui/rect@1.1.3`, `@replit/codemirror-emacs@6.1.0`, `@replit/codemirror-vim-core@0.1.0`, `@replit/codemirror-vim@6.4.0`, `@rolldown/pluginutils@1.0.1`, `@shikijs/core@4.3.1`, `@shikijs/engine-javascript@4.3.1`, `@shikijs/engine-oniguruma@4.3.1`, `@shikijs/langs@4.3.1`, `@shikijs/langs@4.4.3`, `@shikijs/primitive@4.3.1`, `@shikijs/themes@4.3.1`, `@shikijs/themes@4.4.3`, `@shikijs/transformers@4.3.1`, `@shikijs/types@4.3.1`, `@shikijs/types@4.4.3`, `@tailwindcss/node@4.3.3`, `@tailwindcss/oxide@4.3.3`, `@tailwindcss/vite@4.3.3`, `@tauri-apps/api@2.11.1` (`Apache-2.0 OR MIT`), `@tiptap/core@3.33.1`, `@tiptap/extension-blockquote@3.33.1`, `@tiptap/extension-bold@3.33.1`, `@tiptap/extension-bubble-menu@3.33.1`, `@tiptap/extension-bullet-list@3.33.1`, `@tiptap/extension-code-block@3.33.1`, `@tiptap/extension-code@3.33.1`, `@tiptap/extension-document@3.33.1`, `@tiptap/extension-dropcursor@3.33.1`, `@tiptap/extension-floating-menu@3.33.1`, `@tiptap/extension-gapcursor@3.33.1`, `@tiptap/extension-hard-break@3.33.1`, `@tiptap/extension-heading@3.33.1`, `@tiptap/extension-highlight@3.33.1`, `@tiptap/extension-horizontal-rule@3.33.1`, `@tiptap/extension-image@3.33.1`, `@tiptap/extension-italic@3.33.1`, `@tiptap/extension-link@3.33.1`, `@tiptap/extension-list-item@3.33.1`, `@tiptap/extension-list-keymap@3.33.1`, `@tiptap/extension-list@3.33.1`, `@tiptap/extension-ordered-list@3.33.1`, `@tiptap/extension-paragraph@3.33.1`, `@tiptap/extension-strike@3.33.1`, `@tiptap/extension-table@3.33.1`, `@tiptap/extension-text@3.33.1`, `@tiptap/extension-underline@3.33.1`, `@tiptap/extensions@3.33.1`, `@tiptap/pm@3.33.1`, `@tiptap/react@3.33.1`, `@tiptap/starter-kit@3.33.1`, `@tiptap/suggestion@3.33.1`, `@univerjs/icons@1.4.0`, `@upsetjs/venn.js@2.0.0`, `ansi-regex@5.0.1`, `ansi-styles@4.3.0`, `ansi-styles@5.2.0`, `aria-hidden@1.2.6`, `binary-extensions@2.3.0`, `brace-expansion@1.1.21`, `brace-expansion@2.1.7`, `camelcase@6.3.0`, `canvas-roundrect-polyfill@0.0.1`, `chalk@4.1.2`, `cjk-regex@3.4.0`, `clsx@1.1.1`, `clsx@2.1.1`, `cose-base@1.0.3`, `cose-base@2.2.0`, `cuelume@0.2.2`, `dayjs@1.11.21`, `detect-node-es@1.1.0`, `es-toolkit@1.53.2`, `escalade@3.2.0`, `escape-string-regexp@5.0.0`, `fast-equals@5.4.1`, `frimousse@0.3.0`, `get-nonce@1.0.1`, `hachure-fill@0.5.2`, `has-flag@4.0.0`, `immutable@4.3.9`, `is-binary-path@2.1.0`, `is-fullwidth-code-point@3.0.0`, `is-plain-obj@4.1.0`, `isarray@1.0.0`, `jest-get-type@29.6.3`, `jest-validate@29.7.0`, `jiti@2.7.0`, `jotai@2.11.0`, `js-sha256@0.10.1`, `layout-base@1.0.2`, `layout-base@2.0.1`, `leven@3.1.0`, `lilconfig@3.1.3`, `oniguruma-parser@0.12.2`, `oniguruma-to-es@4.3.6`, `open-color@1.9.1`, `package-manager-detector@1.9.0`, `path-data-parser@0.1.0`, `path-key@3.1.1`, `perfect-freehand@1.2.0`, `points-on-curve@0.2.0`, `points-on-curve@1.0.1`, `points-on-path@0.2.1`, `pretty-format@29.7.0`, `prop-types@15.8.1`, `radix-ui@1.6.5`, `rbush@4.0.1`, `react-dom@19.2.7`, `react-is@16.13.1`, `react-is@18.3.1`, `react-remove-scroll-bar@2.3.8`, `react-remove-scroll@2.7.2`, `react-style-singleton@2.2.3`, `react@19.2.7`, `readdirp@3.6.0`, `regex-recursion@6.0.2`, `regex-utilities@2.3.0`, `regex@6.1.0`, `regexp-util@2.0.3`, `roughjs@4.6.4`, `roughjs@4.6.6`, `safer-buffer@2.1.2`, `scheduler@0.27.0`, `shebang-command@2.0.0`, `shebang-regex@3.0.0`, `shiki@4.3.1`, `sonner@2.0.8`, `string-width@4.2.3`, `strip-ansi@6.0.1`, `stylis@4.4.0`, `supports-color@7.2.0`, `tailwind-merge@2.6.0`, `tailwind-merge@3.6.0`, `tailwindcss@4.3.3`, `tinyexec@1.3.1`, `tinyglobby@0.2.17`, `ts-dedent@2.3.0`, `tunnel-rat@0.1.2`, `undici-types@8.3.0`, `unicode-regex@4.2.0`, `use-callback-ref@1.3.3`, `use-sidecar@1.1.3`, `use-sync-external-store@1.6.0`, `wrap-ansi@7.0.0`, `yargs@17.7.3`, `zustand@4.5.7`, `zustand@5.0.15`
 
 </details>
 
@@ -21674,15 +21674,16 @@ DEALINGS IN THE SOFTWARE.
 
 The prepare script additionally stages these notices by hand: `src-tauri/synara-runtime/licenses/Node-LICENSE.txt`, `src-tauri/synara-runtime/licenses/Synara-MIT.txt`.
 
-**193 packages.**
+**238 packages.**
 
 | Declared license | Packages |
 | --- | --- |
-| `MIT` | 167 |
+| `MIT` | 207 |
 | `ISC` | 10 |
-| `Apache-2.0` | 5 |
-| `BSD-3-Clause` | 4 |
-| `apache-2.0` | 3 |
+| `Apache-2.0` | 6 |
+| `BSD-3-Clause` | 5 |
+| `apache-2.0` | 4 |
+| `0BSD` | 2 |
 | `BSD-2-Clause` | 1 |
 | `SEE LICENSE IN LICENSE.md` | 1 |
 | `SEE LICENSE IN README.md` | 1 |
@@ -21709,29 +21710,44 @@ These are the packages this generator could **not** attribute from what is
 installed on disk. They are listed rather than omitted: an unattributed
 dependency in a shipped binary is a gap, not a rounding error.
 
-#### Declared a license but shipped no license text (5)
+#### Declared a license but shipped no license text (1)
 
 The SPDX identifier is known, but the package contains no `LICENSE`,
 `COPYING` or `NOTICE` file, so the copyright line those licenses require us
-to reproduce is not available from the artifact we distribute.
+to reproduce is not available from the artifact we distribute. Where
+`pnpm notices --fetch-upstream` looked for the text in the package's
+repository and found none, the line says what it found instead.
 
-- `@msgpackr-extract/msgpackr-extract-darwin-arm64@3.0.4` (sidecar) — declared `MIT`
-- `@xterm/headless@6.0.0` (sidecar) — declared `MIT`
-- `kubernetes-types@1.30.0` (sidecar) — declared `Apache-2.0`
-- `lru_map@0.4.1` (sidecar) — declared `MIT`
-- `standardwebhooks@1.1.1` (sidecar) — declared `MIT`
+- `kubernetes-types@1.30.0` (sidecar) — declared `Apache-2.0` — upstream: https://github.com/silverlyra/kubernetes-types has no license file on the path to `/`, at the release or on its default branch
 
-### License texts (25 distinct texts across 193 packages)
+### License texts recovered from upstream — the Synara sidecar (4)
 
-#### 1. MIT — 74 package(s), from `license`
+These packages declare a license but their published artifact omits the
+text — usually a crate in a workspace whose LICENSE sits at the repository
+root, which `cargo package` does not include. The verbatim file was taken
+from the package's Git repository at the commit it was published from and
+is kept in `licenses/upstream/`; it is reproduced in the license texts
+below like any other notice. An entry marked *default branch* was taken
+from the repository's current default branch instead, because no commit or
+tag identifies the release or the release commit had no license file; the
+`source.json` beside the file says which.
+
+- `@msgpackr-extract/msgpackr-extract-darwin-arm64@3.0.7` — [`LICENSE`](https://github.com/kriszyp/msgpackr-extract/blob/c7ff49b038c24ac19463dc90ed4420255ede0219/LICENSE) at `c7ff49b038c2`
+- `@xterm/headless@6.0.0` — [`LICENSE`](https://github.com/xtermjs/xterm.js/blob/f447274f430fd22513f6adbf9862d19524471c04/LICENSE) at `f447274f430f`
+- `lru_map@0.4.1` — [`LICENSE.txt`](https://github.com/rsms/js-lru/blob/5373f60c42259bca06a99d2bb10d872ebe4ae72b/LICENSE.txt) — *default branch*
+- `standardwebhooks@1.3.0` — [`LICENSE`](https://github.com/standard-webhooks/standard-webhooks/blob/daee8284cfe9d4e435ec16e3e68a8f30084d6aaf/LICENSE) at `daee8284cfe9`
+
+### License texts (32 distinct texts across 238 packages)
+
+#### 1. MIT — 90 package(s), from `license`
 
 <details><summary>Packages sharing this text</summary>
 
-`@babel/runtime@7.29.10`, `@effect/platform-node-shared@4.0.0-beta.25`, `@effect/platform-node@4.0.0-beta.25`, `@effect/sql-sqlite-bun@4.0.0-beta.25`, `@hono/node-server@1.19.17`, `@modelcontextprotocol/sdk@1.29.0`, `@shikijs/core@4.5.0`, `@shikijs/engine-javascript@4.5.0`, `@shikijs/engine-oniguruma@4.5.0`, `@shikijs/primitive@4.5.0`, `@shikijs/transformers@4.5.0`, `@shikijs/types@4.5.0`, `@standard-schema/spec@1.1.0`, `ajv-formats@3.0.1`, `bibtex-tidy@1.15.1`, `bundle-name@4.1.1`, `call-bind-apply-helpers@1.0.2`, `call-bound@1.0.4`, `default-browser-id@5.0.1`, `default-browser@5.5.1`, `define-lazy-prop@3.0.0`, `dunder-proto@1.0.1`, `effect@4.0.0-beta.25`, `es-define-property@1.0.1`, `es-errors@1.3.0`, `es-object-atoms@1.1.2`, `eventsource-parser@3.1.1`, `express-rate-limit@8.7.1`, `fast-check@4.10.2`, `fast-deep-equal@3.1.3`, `find-my-way-ts@0.1.6`, `get-intrinsic@1.3.0`, `get-proto@1.0.1`, `gopd@1.2.0`, `has-symbols@1.1.0`, `hasown@2.0.4`, `hono@4.13.13`, `is-docker@3.0.0`, `is-inside-container@1.0.0`, `is-wsl@3.1.1`, `json-schema-to-ts@3.1.1`, `json-schema-traverse@1.0.0`, `math-intrinsics@1.1.0`, `merge-descriptors@2.0.0`, `mime@4.1.1`, `msgpackr-extract@3.0.4`, `msgpackr@1.12.1`, `multipasta@0.2.8`, `object-inspect@1.13.4`, `oniguruma-parser@0.12.2`, `oniguruma-to-es@4.3.6`, `open@10.2.0`, `path-key@3.1.1`, `pkce-challenge@5.0.1`, `pure-rand@8.4.2`, `regex-recursion@6.0.2`, `regex-utilities@2.3.0`, `regex@6.1.0`, `run-applescript@7.1.0`, `safer-buffer@2.1.2`, `shebang-command@2.0.0`, `shebang-regex@3.0.0`, `shiki@4.5.0`, `side-channel-list@1.0.1`, `side-channel-map@1.0.1`, `side-channel-weakmap@1.0.2`, `side-channel@1.1.1`, `standard-as-callback@2.1.0`, `toidentifier@1.0.1`, `ts-algebra@2.0.0`, `undici-types@8.9.0`, `undici@7.30.1`, `wsl-utils@0.1.0`, `zod@4.3.6`
+`@babel/runtime@7.29.15`, `@effect/platform-node-shared@4.0.0-beta.25`, `@effect/platform-node@4.0.0-beta.25`, `@effect/sql-sqlite-bun@4.0.0-beta.25`, `@hono/node-server@1.19.19`, `@modelcontextprotocol/sdk@1.29.0`, `@msgpackr-extract/msgpackr-extract-darwin-arm64@3.0.7`, `@peculiar/asn1-asym-key@2.11.1`, `@peculiar/asn1-cms@2.11.1`, `@peculiar/asn1-csr@2.11.1`, `@peculiar/asn1-ecc@2.11.1`, `@peculiar/asn1-pfx@2.11.1`, `@peculiar/asn1-pkcs8@2.11.1`, `@peculiar/asn1-pkcs9@2.11.1`, `@peculiar/asn1-rsa@2.11.1`, `@peculiar/asn1-schema@2.11.1`, `@peculiar/asn1-x509-attr@2.11.1`, `@peculiar/asn1-x509-post-quantum@2.11.1`, `@peculiar/asn1-x509@2.11.1`, `@peculiar/utils@2.0.3`, `@peculiar/x509@2.1.0`, `@shikijs/core@4.6.0`, `@shikijs/engine-javascript@4.6.0`, `@shikijs/engine-oniguruma@4.6.0`, `@shikijs/primitive@4.6.0`, `@shikijs/types@4.6.0`, `@standard-schema/spec@1.1.0`, `ajv-formats@3.0.1`, `bibtex-tidy@1.15.1`, `bundle-name@4.1.1`, `call-bind-apply-helpers@1.0.2`, `call-bound@1.0.4`, `default-browser-id@5.0.1`, `default-browser@5.5.1`, `define-lazy-prop@3.0.0`, `dunder-proto@1.0.1`, `effect@4.0.0-beta.25`, `es-define-property@1.0.1`, `es-errors@1.3.0`, `es-object-atoms@1.1.2`, `eventsource-parser@3.1.1`, `express-rate-limit@8.7.5`, `fast-check@4.11.0`, `fast-deep-equal@3.1.3`, `find-my-way-ts@0.1.6`, `get-intrinsic@1.3.0`, `get-proto@1.0.1`, `gopd@1.2.0`, `has-symbols@1.1.0`, `hasown@2.0.4`, `hono@4.13.20`, `is-docker@3.0.0`, `is-inside-container@1.0.0`, `is-wsl@3.1.1`, `json-schema-to-ts@3.1.1`, `json-schema-traverse@1.0.0`, `math-intrinsics@1.1.0`, `merge-descriptors@2.0.0`, `mime@4.1.2`, `msgpackr-extract@3.0.7`, `msgpackr@1.12.1`, `multipasta@0.2.9`, `object-inspect@1.14.0`, `oniguruma-parser@0.12.2`, `oniguruma-to-es@4.3.6`, `open@10.2.0`, `path-key@3.1.1`, `pkce-challenge@5.0.2`, `pure-rand@8.4.2`, `pvtsutils@1.3.6`, `regex-recursion@6.0.2`, `regex-utilities@2.3.0`, `regex@6.1.0`, `run-applescript@7.1.0`, `safer-buffer@2.1.2`, `shebang-command@2.0.0`, `shebang-regex@3.0.0`, `shiki@4.6.0`, `side-channel-list@1.0.1`, `side-channel-map@1.0.1`, `side-channel-weakmap@1.0.2`, `side-channel@1.1.1`, `standard-as-callback@2.1.0`, `toidentifier@1.0.1`, `ts-algebra@2.0.0`, `undici-types@8.9.0`, `undici@7.30.2`, `undici@8.10.2`, `wsl-utils@0.1.0`, `zod@4.3.6`
 
 </details>
 
-Copyright notices (45):
+Copyright notices (50):
 
 ```text
 Copyright (c) 2013 James Halliday
@@ -21743,11 +21759,14 @@ Copyright (c) 2017 Evgeny Poberezkin
 Copyright (c) 2017 Nicolas DUBIEN
 Copyright (c) 2017 Peter West
 Copyright (c) 2017-2019 Tomas Della Vedova
+Copyright (c) 2017-2024 Peculiar Ventures, LLC
+Copyright (c) 2017-2026 Peculiar Ventures, LLC
 Copyright (c) 2018 Nicolas DUBIEN
 Copyright (c) 2018 Nikita Skovoroda <chalkerx@gmail.com>
 Copyright (c) 2018 Zihua Li
 Copyright (c) 2019
 Copyright (c) 2019 Jordan Harband
+Copyright (c) 2020
 Copyright (c) 2020 Evgeny Poberezkin
 Copyright (c) 2020 Jordan Harband
 Copyright (c) 2020 Kris Zyp
@@ -21758,6 +21777,7 @@ Copyright (c) 2022 - present, Yusuke Wada and Hono contributors
 Copyright (c) 2022 Jordan Harband
 Copyright (c) 2023 Anthony Fu <https://github.com/antfu>
 Copyright (c) 2023 Effectful Technologies Inc
+Copyright (c) 2023 Peculiar Ventures, LLC
 Copyright (c) 2023 Robert Kieffer
 Copyright (c) 2023-present The Contributors
 Copyright (c) 2024 Anthropic, PBC
@@ -21776,6 +21796,7 @@ Copyright (c) Jonathan Ong <me@jongleberry.com>
 Copyright (c) Jordan Harband and contributors
 Copyright (c) Kevin Mårtensson <kevinmartensson@gmail.com> (github.com/kevva)
 Copyright (c) Matteo Collina and Undici contributors
+Copyright (c) Peculiar Ventures. All rights reserved.
 Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)
 Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com)
 Copyright 2023 Nathan Friedly, Vedant K
@@ -21795,11 +21816,11 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-#### 2. MIT — 57 package(s), from `LICENSE`
+#### 2. MIT — 79 package(s), from `LICENSE`
 
 <details><summary>Packages sharing this text</summary>
 
-`accepts@2.0.0`, `body-parser@2.3.0`, `bytes@3.1.2`, `ccount@2.0.1`, `character-entities-html4@2.1.0`, `character-entities-legacy@3.0.0`, `comma-separated-tokens@2.0.3`, `content-disposition@2.0.1`, `content-type@1.0.5`, `content-type@2.1.0`, `cookie-signature@1.2.2`, `cookie@0.7.2`, `cors@2.8.6`, `debug@4.4.3`, `depd@2.0.0`, `devlop@1.1.0`, `encodeurl@2.0.0`, `escape-html@1.0.3`, `etag@1.8.1`, `express@5.3.0`, `finalhandler@2.1.1`, `forwarded@0.2.0`, `fresh@2.0.0`, `hast-util-to-html@9.0.5`, `hast-util-whitespace@3.0.0`, `html-void-elements@3.0.0`, `mdast-util-to-hast@13.2.1`, `media-typer@1.1.1`, `micromark-util-character@2.1.1`, `micromark-util-encode@2.0.1`, `micromark-util-sanitize-uri@2.0.1`, `micromark-util-symbol@2.0.1`, `micromark-util-types@2.0.3`, `mime-db@1.54.0`, `mime-types@3.0.2`, `negotiator@1.1.0`, `on-finished@2.4.1`, `parseurl@1.3.3`, `property-information@7.2.0`, `proxy-addr@2.0.8`, `range-parser@1.3.0`, `router@2.2.0`, `send@1.2.1`, `serve-static@2.2.1`, `space-separated-tokens@2.0.2`, `stringify-entities@4.0.4`, `trim-lines@3.0.1`, `type-is@2.1.0`, `unist-util-is@6.0.1`, `unist-util-position@5.0.0`, `unist-util-stringify-position@4.0.0`, `unist-util-visit-parents@6.0.2`, `unist-util-visit@5.1.0`, `unpipe@1.0.0`, `vary@1.1.2`, `vfile-message@4.0.3`, `zwitch@2.0.4`
+`accepts@2.0.0`, `body-parser@2.4.0`, `bytes@3.1.2`, `ccount@2.0.1`, `character-entities-html4@2.1.0`, `character-entities-legacy@3.0.0`, `character-entities@2.0.2`, `comma-separated-tokens@2.0.3`, `content-disposition@2.0.1`, `content-type@1.0.5`, `content-type@2.1.0`, `cookie-signature@1.2.2`, `cookie@0.7.2`, `cors@2.8.6`, `debug@4.4.3`, `decode-named-character-reference@1.3.0`, `depd@2.0.0`, `devlop@1.1.0`, `encodeurl@2.0.3`, `escape-html@1.0.3`, `etag@1.8.1`, `express@5.3.0`, `finalhandler@2.1.1`, `forwarded@0.2.0`, `fresh@2.0.0`, `hast-util-to-html@9.0.5`, `hast-util-to-html@9.0.7`, `hast-util-whitespace@3.0.0`, `html-void-elements@3.0.0`, `mdast-util-from-markdown@2.1.0`, `mdast-util-to-hast@13.2.2`, `mdast-util-to-string@4.0.0`, `media-typer@1.1.1`, `micromark-core-commonmark@2.0.4`, `micromark-factory-destination@2.0.1`, `micromark-factory-label@2.0.1`, `micromark-factory-space@2.1.0`, `micromark-factory-title@2.0.1`, `micromark-factory-whitespace@2.0.1`, `micromark-util-character@2.1.1`, `micromark-util-chunked@2.0.1`, `micromark-util-classify-character@2.0.1`, `micromark-util-combine-extensions@2.0.1`, `micromark-util-decode-numeric-character-reference@2.0.2`, `micromark-util-decode-string@2.0.1`, `micromark-util-edit-map@1.0.0`, `micromark-util-encode@2.0.1`, `micromark-util-html-tag-name@2.0.1`, `micromark-util-normalize-identifier@2.0.1`, `micromark-util-resolve-all@2.0.1`, `micromark-util-sanitize-uri@2.0.1`, `micromark-util-subtokenize@2.1.0`, `micromark-util-symbol@2.0.1`, `micromark-util-types@2.0.3`, `micromark@4.0.3`, `mime-db@1.54.0`, `mime-types@3.0.2`, `negotiator@1.1.0`, `on-finished@2.4.2`, `parseurl@1.3.3`, `property-information@7.2.0`, `proxy-addr@2.0.8`, `range-parser@1.3.0`, `router@2.3.0`, `send@1.2.1`, `serve-static@2.2.1`, `space-separated-tokens@2.0.2`, `stringify-entities@4.0.5`, `trim-lines@3.0.1`, `type-is@2.1.0`, `unist-util-is@6.0.1`, `unist-util-position@5.0.0`, `unist-util-stringify-position@4.0.0`, `unist-util-visit-parents@6.1.0`, `unist-util-visit@5.2.0`, `unpipe@1.0.0`, `vary@1.1.2`, `vfile-message@4.0.4`, `zwitch@2.0.4`
 
 </details>
 
@@ -21882,7 +21903,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 <details><summary>Packages sharing this text</summary>
 
-`@ioredis/commands@1.10.0`, `@shikijs/vscode-textmate@10.0.2`, `ajv@8.20.0`, `cross-spawn@7.0.6`, `dequal@2.0.3`, `ee-first@1.1.1`, `http-errors@2.0.1`, `ioredis@5.11.1`, `jose@6.2.12`, `ms@2.1.3`, `node-addon-api@7.1.1`, `node-gyp-build-optional-packages@5.2.2`, `object-assign@4.1.1`, `path-to-regexp@8.4.2`, `raw-body@3.0.2`, `redis-errors@1.2.0`, `redis-parser@3.0.0`, `require-from-string@2.0.2`, `statuses@2.0.2`, `uuid@13.0.2`
+`@ioredis/commands@1.10.0`, `@shikijs/vscode-textmate@10.1.0`, `ajv@8.20.0`, `cross-spawn@7.0.6`, `dequal@2.0.3`, `ee-first@1.1.1`, `http-errors@2.0.1`, `ioredis@5.11.1`, `jose@6.2.18`, `ms@2.1.3`, `node-addon-api@7.1.1`, `node-gyp-build-optional-packages@5.2.2`, `object-assign@4.1.1`, `path-to-regexp@8.4.2`, `raw-body@3.0.2`, `redis-errors@1.2.0`, `redis-parser@3.0.0`, `require-from-string@2.0.2`, `statuses@2.0.2`, `uuid@13.0.2`
 
 </details>
 
@@ -21938,28 +21959,33 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-#### 4. MIT — 7 package(s), from `LICENSE`
+#### 4. MIT — 8 package(s), from `licenses/upstream/npm/@xterm/headless@6.0.0/LICENSE`
 
 <details><summary>Packages sharing this text</summary>
 
-`@anthropic-ai/sdk@0.100.1`, `function-bind@1.1.2`, `iconv-lite@0.7.3`, `ip-address@10.7.4`, `ipaddr.js@1.9.1`, `is-promise@4.0.0`, `toml@3.0.0`
+`@anthropic-ai/sdk@0.100.1`, `@xterm/headless@6.0.0`, `function-bind@1.1.2`, `iconv-lite@0.7.3`, `ip-address@10.7.6`, `ipaddr.js@1.9.1`, `is-promise@4.0.0`, `toml@3.0.0`
 
 </details>
 
-Copyright notices (7):
+Copyright notices (10):
 
 ```text
 Copyright (C) 2011 by Beau Gunderson
 Copyright (C) 2011-2017 whitequark <whitequark@whitequark.org>
 Copyright (c) 2011 Alexander Shtuchkin
 Copyright (c) 2012 Michelle Tilley
+Copyright (c) 2012-2013, Christopher Jeffrey (https://github.com/chjj/)
 Copyright (c) 2013 Raynos.
 Copyright (c) 2014 Forbes Lindesay
+Copyright (c) 2014-2016, SourceLair Private Company (https://www.sourcelair.com)
+Copyright (c) 2017-2019, The xterm.js authors (https://github.com/xtermjs/xterm.js)
 Copyright 2023 Anthropic, PBC.
 ```
 
 ```text
-Copyright (C) 2011-2017 whitequark <whitequark@whitequark.org>
+Copyright (c) 2017-2019, The xterm.js authors (https://github.com/xtermjs/xterm.js)
+Copyright (c) 2014-2016, SourceLair Private Company (https://www.sourcelair.com)
+Copyright (c) 2012-2013, Christopher Jeffrey (https://github.com/chjj/)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -22014,11 +22040,11 @@ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
 IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ```
 
-#### 6. apache-2.0 — 3 package(s), from `LICENSE.md`
+#### 6. apache-2.0 — 4 package(s), from `LICENSE.md`
 
 <details><summary>Packages sharing this text</summary>
 
-`@pierre/diffs@1.5.2`, `@pierre/theme@2.0.0`, `@pierre/theming@1.0.1`
+`@pierre/diffs@1.6.4`, `@pierre/highlights@0.4.0`, `@pierre/theme@2.0.0`, `@pierre/theming@1.0.2`
 
 </details>
 
@@ -22222,11 +22248,40 @@ CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 ```
 
-#### 7. BSD-3-Clause — 2 package(s), from `LICENSE.md`
+#### 7. 0BSD — 2 package(s), from `LICENSE.txt`
 
 <details><summary>Packages sharing this text</summary>
 
-`diff@9.0.0`, `qs@6.16.1`
+`tslib@1.14.1`, `tslib@2.9.1`
+
+</details>
+
+Copyright notices (1):
+
+```text
+Copyright (c) Microsoft Corporation.
+```
+
+```text
+Copyright (c) Microsoft Corporation.
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+PERFORMANCE OF THIS SOFTWARE.
+```
+
+#### 8. BSD-3-Clause — 2 package(s), from `LICENSE.md`
+
+<details><summary>Packages sharing this text</summary>
+
+`diff@9.0.0`, `qs@6.17.1`
 
 </details>
 
@@ -22269,7 +22324,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-#### 8. SEE LICENSE IN LICENSE.md (+1 other declarations) — 2 package(s), from `LICENSE.md`
+#### 9. SEE LICENSE IN LICENSE.md (+1 other declarations) — 2 package(s), from `LICENSE.md`
 
 <details><summary>Packages sharing this text</summary>
 
@@ -22287,7 +22342,268 @@ Copyright notices (1):
 © Anthropic PBC. All rights reserved. Use is subject to the Legal Agreements outlined here: https://code.claude.com/docs/en/legal-and-compliance.
 ```
 
-#### 9. ISC — 2 package(s), from `LICENSE`
+#### 10. Apache-2.0 (+1 other declarations) — 2 package(s), from `licenses/upstream/npm/standardwebhooks@1.3.0/LICENSE`
+
+<details><summary>Packages sharing this text</summary>
+
+`denque@2.1.0`, `standardwebhooks@1.3.0` (`MIT`)
+
+</details>
+
+Copyright notices (5):
+
+```text
+(c) You must retain, in the Source form of any Derivative Works
+Copyright 2018-present Invertase Limited
+Copyright [yyyy] [name of copyright owner]
+copyright license to reproduce, prepare Derivative Works of,
+copyright notice that is included in or attached to the work
+```
+
+```text
+Apache License
+                           Version 2.0, January 2004
+                        http://www.apache.org/licenses/
+
+   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+
+   1. Definitions.
+
+      "License" shall mean the terms and conditions for use, reproduction,
+      and distribution as defined by Sections 1 through 9 of this document.
+
+      "Licensor" shall mean the copyright owner or entity authorized by
+      the copyright owner that is granting the License.
+
+      "Legal Entity" shall mean the union of the acting entity and all
+      other entities that control, are controlled by, or are under common
+      control with that entity. For the purposes of this definition,
+      "control" means (i) the power, direct or indirect, to cause the
+      direction or management of such entity, whether by contract or
+      otherwise, or (ii) ownership of fifty percent (50%) or more of the
+      outstanding shares, or (iii) beneficial ownership of such entity.
+
+      "You" (or "Your") shall mean an individual or Legal Entity
+      exercising permissions granted by this License.
+
+      "Source" form shall mean the preferred form for making modifications,
+      including but not limited to software source code, documentation
+      source, and configuration files.
+
+      "Object" form shall mean any form resulting from mechanical
+      transformation or translation of a Source form, including but
+      not limited to compiled object code, generated documentation,
+      and conversions to other media types.
+
+      "Work" shall mean the work of authorship, whether in Source or
+      Object form, made available under the License, as indicated by a
+      copyright notice that is included in or attached to the work
+      (an example is provided in the Appendix below).
+
+      "Derivative Works" shall mean any work, whether in Source or Object
+      form, that is based on (or derived from) the Work and for which the
+      editorial revisions, annotations, elaborations, or other modifications
+      represent, as a whole, an original work of authorship. For the purposes
+      of this License, Derivative Works shall not include works that remain
+      separable from, or merely link (or bind by name) to the interfaces of,
+      the Work and Derivative Works thereof.
+
+      "Contribution" shall mean any work of authorship, including
+      the original version of the Work and any modifications or additions
+      to that Work or Derivative Works thereof, that is intentionally
+      submitted to Licensor for inclusion in the Work by the copyright owner
+      or by an individual or Legal Entity authorized to submit on behalf of
+      the copyright owner. For the purposes of this definition, "submitted"
+      means any form of electronic, verbal, or written communication sent
+      to the Licensor or its representatives, including but not limited to
+      communication on electronic mailing lists, source code control systems,
+      and issue tracking systems that are managed by, or on behalf of, the
+      Licensor for the purpose of discussing and improving the Work, but
+      excluding communication that is conspicuously marked or otherwise
+      designated in writing by the copyright owner as "Not a Contribution."
+
+      "Contributor" shall mean Licensor and any individual or Legal Entity
+      on behalf of whom a Contribution has been received by Licensor and
+      subsequently incorporated within the Work.
+
+   2. Grant of Copyright License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      copyright license to reproduce, prepare Derivative Works of,
+      publicly display, publicly perform, sublicense, and distribute the
+      Work and such Derivative Works in Source or Object form.
+
+   3. Grant of Patent License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      (except as stated in this section) patent license to make, have made,
+      use, offer to sell, sell, import, and otherwise transfer the Work,
+      where such license applies only to those patent claims licensable
+      by such Contributor that are necessarily infringed by their
+      Contribution(s) alone or by combination of their Contribution(s)
+      with the Work to which such Contribution(s) was submitted. If You
+      institute patent litigation against any entity (including a
+      cross-claim or counterclaim in a lawsuit) alleging that the Work
+      or a Contribution incorporated within the Work constitutes direct
+      or contributory patent infringement, then any patent licenses
+      granted to You under this License for that Work shall terminate
+      as of the date such litigation is filed.
+
+   4. Redistribution. You may reproduce and distribute copies of the
+      Work or Derivative Works thereof in any medium, with or without
+      modifications, and in Source or Object form, provided that You
+      meet the following conditions:
+
+      (a) You must give any other recipients of the Work or
+          Derivative Works a copy of this License; and
+
+      (b) You must cause any modified files to carry prominent notices
+          stating that You changed the files; and
+
+      (c) You must retain, in the Source form of any Derivative Works
+          that You distribute, all copyright, patent, trademark, and
+          attribution notices from the Source form of the Work,
+          excluding those notices that do not pertain to any part of
+          the Derivative Works; and
+
+      (d) If the Work includes a "NOTICE" text file as part of its
+          distribution, then any Derivative Works that You distribute must
+          include a readable copy of the attribution notices contained
+          within such NOTICE file, excluding those notices that do not
+          pertain to any part of the Derivative Works, in at least one
+          of the following places: within a NOTICE text file distributed
+          as part of the Derivative Works; within the Source form or
+          documentation, if provided along with the Derivative Works; or,
+          within a display generated by the Derivative Works, if and
+          wherever such third-party notices normally appear. The contents
+          of the NOTICE file are for informational purposes only and
+          do not modify the License. You may add Your own attribution
+          notices within Derivative Works that You distribute, alongside
+          or as an addendum to the NOTICE text from the Work, provided
+          that such additional attribution notices cannot be construed
+          as modifying the License.
+
+      You may add Your own copyright statement to Your modifications and
+      may provide additional or different license terms and conditions
+      for use, reproduction, or distribution of Your modifications, or
+      for any such Derivative Works as a whole, provided Your use,
+      reproduction, and distribution of the Work otherwise complies with
+      the conditions stated in this License.
+
+   5. Submission of Contributions. Unless You explicitly state otherwise,
+      any Contribution intentionally submitted for inclusion in the Work
+      by You to the Licensor shall be under the terms and conditions of
+      this License, without any additional terms or conditions.
+      Notwithstanding the above, nothing herein shall supersede or modify
+      the terms of any separate license agreement you may have executed
+      with Licensor regarding such Contributions.
+
+   6. Trademarks. This License does not grant permission to use the trade
+      names, trademarks, service marks, or product names of the Licensor,
+      except as required for reasonable and customary use in describing the
+      origin of the Work and reproducing the content of the NOTICE file.
+
+   7. Disclaimer of Warranty. Unless required by applicable law or
+      agreed to in writing, Licensor provides the Work (and each
+      Contributor provides its Contributions) on an "AS IS" BASIS,
+      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+      implied, including, without limitation, any warranties or conditions
+      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
+      PARTICULAR PURPOSE. You are solely responsible for determining the
+      appropriateness of using or redistributing the Work and assume any
+      risks associated with Your exercise of permissions under this License.
+
+   8. Limitation of Liability. In no event and under no legal theory,
+      whether in tort (including negligence), contract, or otherwise,
+      unless required by applicable law (such as deliberate and grossly
+      negligent acts) or agreed to in writing, shall any Contributor be
+      liable to You for damages, including any direct, indirect, special,
+      incidental, or consequential damages of any character arising as a
+      result of this License or out of the use or inability to use the
+      Work (including but not limited to damages for loss of goodwill,
+      work stoppage, computer failure or malfunction, or any and all
+      other commercial damages or losses), even if such Contributor
+      has been advised of the possibility of such damages.
+
+   9. Accepting Warranty or Additional Liability. While redistributing
+      the Work or Derivative Works thereof, You may choose to offer,
+      and charge a fee for, acceptance of support, warranty, indemnity,
+      or other liability obligations and/or rights consistent with this
+      License. However, in accepting such obligations, You may act only
+      on Your own behalf and on Your sole responsibility, not on behalf
+      of any other Contributor, and only if You agree to indemnify,
+      defend, and hold each Contributor harmless for any liability
+      incurred by, or claims asserted against, such Contributor by reason
+      of your accepting any such warranty or additional liability.
+
+   END OF TERMS AND CONDITIONS
+
+   APPENDIX: How to apply the Apache License to your work.
+
+      To apply the Apache License to your work, attach the following
+      boilerplate notice, with the fields enclosed by brackets "[]"
+      replaced with your own identifying information. (Don't include
+      the brackets!)  The text should be enclosed in the appropriate
+      comment syntax for the file format. We also recommend that a
+      file or class name and description of purpose be included on the
+      same "printed page" as the copyright notice for easier
+      identification within third-party archives.
+
+   Copyright [yyyy] [name of copyright owner]
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+```
+
+#### 11. MIT — 2 package(s), from `licenses/upstream/npm/lru_map@0.4.1/LICENSE.txt`
+
+<details><summary>Packages sharing this text</summary>
+
+`eventsource@3.0.7`, `lru_map@0.4.1`
+
+</details>
+
+Copyright notices (2):
+
+```text
+Copyright (c) 2010-2020 Rasmus Andersson <https://rsms.me/>
+Copyright (c) EventSource GitHub organisation
+```
+
+```text
+The MIT License
+
+Copyright (c) 2010-2020 Rasmus Andersson <https://rsms.me/>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+```
+
+#### 12. ISC — 2 package(s), from `LICENSE`
 
 <details><summary>Packages sharing this text</summary>
 
@@ -22321,11 +22637,11 @@ OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE.
 ```
 
-#### 10. BSD-3-Clause — 1 package(s), from `LICENSE`
+#### 13. BSD-3-Clause — 1 package(s), from `LICENSE`
 
 <details><summary>Packages sharing this text</summary>
 
-`fast-uri@3.1.8`
+`fast-uri@3.1.9`
 
 </details>
 
@@ -22369,7 +22685,48 @@ The complete list of contributors can be found at:
 - https://github.com/garycourt/uri-js/graphs/contributors
 ```
 
-#### 11. Apache-2.0 — 1 package(s), from `LICENSE`
+#### 14. MIT — 1 package(s), from `LICENSE`
+
+<details><summary>Packages sharing this text</summary>
+
+`pvutils@1.2.0`
+
+</details>
+
+Copyright notices (1):
+
+```text
+Copyright (c) 2016-2019, Peculiar Ventures
+```
+
+```text
+MIT License
+
+Copyright (c) 2016-2019, Peculiar Ventures
+All rights reserved.
+
+Author 2016-2019, Yury Strozhevsky
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+#### 15. Apache-2.0 — 1 package(s), from `LICENSE`
 
 <details><summary>Packages sharing this text</summary>
 
@@ -22590,11 +22947,11 @@ Apache License
    limitations under the License.
 ```
 
-#### 12. MIT — 1 package(s), from `LICENSE`
+#### 16. MIT — 1 package(s), from `LICENSE`
 
 <details><summary>Packages sharing this text</summary>
 
-`ws@8.22.0`
+`ws@8.23.0`
 
 </details>
 
@@ -22630,7 +22987,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-#### 13. Apache-2.0 — 1 package(s), from `LICENSE`
+#### 17. Apache-2.0 — 1 package(s), from `LICENSE`
 
 <details><summary>Packages sharing this text</summary>
 
@@ -22840,7 +23197,138 @@ Apache License
    limitations under the License.
 ```
 
-#### 14. ISC — 1 package(s), from `LICENSE`
+#### 18. MIT — 1 package(s), from `license`
+
+<details><summary>Packages sharing this text</summary>
+
+`import-meta-resolve@4.2.0`
+
+</details>
+
+Copyright notices (3):
+
+```text
+Copyright (c) Titus Wormer <mailto:tituswormer@gmail.com>
+Copyright Joyent, Inc. and other Node contributors. All rights reserved.
+Copyright Node.js contributors. All rights reserved.
+```
+
+```text
+(The MIT License)
+
+Copyright (c) Titus Wormer <mailto:tituswormer@gmail.com>
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+'Software'), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+---
+
+This is a derivative work based on:
+<https://github.com/nodejs/node>.
+Which is licensed:
+
+"""
+Copyright Node.js contributors. All rights reserved.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to
+deal in the Software without restriction, including without limitation the
+rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+sell copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+IN THE SOFTWARE.
+"""
+
+This license applies to parts of Node.js originating from the
+https://github.com/joyent/node repository:
+
+"""
+Copyright Joyent, Inc. and other Node contributors. All rights reserved.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to
+deal in the Software without restriction, including without limitation the
+rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+sell copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+IN THE SOFTWARE.
+"""
+```
+
+#### 19. MIT — 1 package(s), from `LICENSE`
+
+<details><summary>Packages sharing this text</summary>
+
+`tsyringe@4.10.0`
+
+</details>
+
+Copyright notices (1):
+
+```text
+Copyright (c) Microsoft Corporation. All rights reserved.
+```
+
+```text
+MIT License
+
+    Copyright (c) Microsoft Corporation. All rights reserved.
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE
+```
+
+#### 20. ISC — 1 package(s), from `LICENSE`
 
 <details><summary>Packages sharing this text</summary>
 
@@ -22871,267 +23359,184 @@ OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
 CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ```
 
-#### 15. Apache-2.0 — 1 package(s), from `LICENSE`
+#### 21. apache-2.0 — 1 package(s), from `NOTICE.md`
 
 <details><summary>Packages sharing this text</summary>
 
-`denque@2.1.0`
+`@pierre/highlights@0.4.0`
 
 </details>
 
 Copyright notices (4):
 
 ```text
-(c) You must retain, in the Source form of any Derivative Works
-Copyright 2018-present Invertase Limited
-copyright license to reproduce, prepare Derivative Works of,
-copyright notice that is included in or attached to the work
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+Copyright (c) 2024 Colin Lienard
+Copyright (c) 2026 alanisme
+Copyright notices retained from the sources:
 ```
+
+````text
+# Bundled theme licenses
+
+Community themes are pruned copies of pinned Zed theme files or conversions of
+the pinned Shiki TextMate files listed below. Theme names and appearances are
+normalized to Shiki's catalog.
+
+## Sources
+
+Terminal palettes use the same pinned sources as the themes below. Exceptions:
+
+- Horizon's original repository is unavailable. Its palette comes from the
+  [Zed Horizon 0.0.1 archive](https://api.zed.dev/extensions/horizon/0.0.1/download).
+- Andromeeda's two null black entries and both Horizon themes' four null black
+  and white entries use their inherited
+  [Zed defaults at `ce48461`](https://github.com/zed-industries/zed/blob/ce48461eaadd16c65c31f835511ab96bd3b6e746/crates/theme/src/default_colors.rs).
+- LaserWave leaves ten terminal colors undefined; Slack Dark leaves all 16
+  undefined. These entries use the dark palette in
+  [VS Code at `3623f17`](https://github.com/microsoft/vscode/blob/3623f170559712f7ee16f59dfbd87c885b6a2b31/src/vs/workbench/contrib/terminal/common/terminalColorRegistry.ts).
+- Pierre's palettes come from
+  [its Zed theme](https://github.com/pierrecomputer/pierre/blob/861ce3c61e1cfeaf283d83e95a3767479e75bfee/packages/theme/zed/themes/pierre.json).
+  The vibrant variants preserve the Display P3 values in
+  [Pierre Dark Vibrant](https://github.com/pierrecomputer/pierre/blob/861ce3c61e1cfeaf283d83e95a3767479e75bfee/packages/theme/themes/pierre-dark-vibrant.json)
+  and
+  [Pierre Light Vibrant](https://github.com/pierrecomputer/pierre/blob/861ce3c61e1cfeaf283d83e95a3767479e75bfee/packages/theme/themes/pierre-light-vibrant.json).
+
+Dracula's `ffffffff` bright white value is normalized to `#ffffffff`.
+
+The Zed version is the extension version published in the
+[Zed registry](https://github.com/zed-industries/extensions) at
+`ab756766c27fca3de3d275149f6937105f464dec`. "Built in" means the theme ships
+with Zed itself. GitHub-only sources have no marketplace version.
+
+| Highlights themes                                                                      | Pinned source                                                                                                                                                                                 | Zed version                    |
+| -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| `andromeeda`                                                                           | [ChocolateNao/andromeda-zed `23f6768`](https://github.com/ChocolateNao/andromeda-zed/blob/23f67684252059f46b508ae71964ad6085df552a/themes/andromeda.json)                                     | `andromeda` 0.1.2              |
+| `aurora-x`                                                                             | [iamrajjoshi/aurora `83477d4`](https://github.com/iamrajjoshi/aurora/blob/83477d4b4abc4aeca9465d9b1b56409e2cd6da97/themes/aurora.json)                                                        | `aurora-theme` 0.0.1           |
+| `ayu-dark`, `ayu-light`, `ayu-mirage`                                                  | [Zed Ayu `ce48461`](https://github.com/zed-industries/zed/blob/ce48461eaadd16c65c31f835511ab96bd3b6e746/assets/themes/ayu/ayu.json)                                                           | Built in                       |
+| `catppuccin-*`                                                                         | [catppuccin/zed `b54cb81`](https://github.com/catppuccin/zed/blob/b54cb81708d06912d50e6bb9fd2fd2103b9dda25/themes/catppuccin-mauve.json)                                                      | `catppuccin` 0.2.25            |
+| `dark-plus`, `light-plus`, `monokai`, `red`, `solarized-*`                             | [alanisme/vscode-themes-for-zed `ea65e4d`](https://github.com/alanisme/vscode-themes-for-zed/tree/ea65e4df055035888b6bd0b0c68c6986c3ce4699/themes)                                            | `vscode-classic-themes` 0.4.1  |
+| `dracula`                                                                              | [dracula/zed `92f4605`](https://github.com/dracula/zed/blob/92f46057151693648bd3acac1e0c138696f34433/themes/dracula.json)                                                                     | `dracula` 1.1.2                |
+| `everforest-dark`, `everforest-light`                                                  | [albertsko/zed-everforest `1f1c84e`](https://github.com/albertsko/zed-everforest/blob/1f1c84e081f6dcaaac7105812032086608ca7a44/themes/everforest-regular.json)                                | `everforest` 0.2.0             |
+| `github-dark`, `github-light`                                                          | [meocoder31099/Github-Classic-Theme-Zed `751146a`](https://github.com/meocoder31099/Github-Classic-Theme-Zed/blob/751146a4387066dd4e2fb7ee4ff91ab089d7c7dd/themes/github-classic.json)        | `github-classic` 0.0.3         |
+| `github-dark-default`                                                                  | [MordFustang21/zed-github-dark `dbbd661`](https://github.com/MordFustang21/zed-github-dark/blob/dbbd66167753686ff3ff627208e15f7e27a9b1f9/themes/dark-default.json)                            | `github-dark-default` 1.0.10   |
+| `github-dark-dimmed`, `github-light-default`, and both `github-*-high-contrast` themes | [PyaeSoneAungRgn/github-zed-theme `89ae5f9`](https://github.com/PyaeSoneAungRgn/github-zed-theme/blob/89ae5f92ca0bc5b96b721b69e41db83aa482cfd6/themes/github_theme.json)                      | `github-theme` 0.1.8           |
+| `gruvbox-*`                                                                            | [Zed Gruvbox `ce48461`](https://github.com/zed-industries/zed/blob/ce48461eaadd16c65c31f835511ab96bd3b6e746/assets/themes/gruvbox/gruvbox.json)                                               | Built in                       |
+| `horizon`, `horizon-bright`                                                            | [ayn2op/zed-horizon `b3cf502`](https://github.com/ayn2op/zed-horizon/blob/b3cf5022a583455f2e815c4c58996ce6dc3082f5/themes/horizon.json)                                                       | `horizon` 0.0.1                |
+| `houston`                                                                              | [rudolfjs/houston-zed `2830d5c`](https://github.com/rudolfjs/houston-zed/blob/2830d5c55d80b2c2bce44b184f2370f814509f1f/themes/houston.json)                                                   | GitHub only; manifest 0.2.0    |
+| `kanagawa-*`                                                                           | [ethangilmore/zed-kanagawa `45b4295`](https://github.com/ethangilmore/zed-kanagawa/blob/45b4295e708a5720d75514013a20a00917d50cc5/themes/Kanagawa.json)                                        | `kanagawa-themes` 0.1.2        |
+| `material-theme*`                                                                      | [Codextor/zed-material-theme `e4145b6`](https://github.com/Codextor/zed-material-theme/blob/e4145b69351b773ba8c9c8b0c44e7d89faacbfee/themes/material-theme.json)                              | `material-theme` 0.0.1         |
+| `min-dark`, `min-light`                                                                | [phibr0/zed-min-theme `0efe9ac`](https://github.com/phibr0/zed-min-theme/blob/0efe9ac439bd27ceb19d6506ed4986d9f348e216/themes/min-theme.json)                                                 | `min-theme` 0.2.2              |
+| `night-owl`, `night-owl-light`                                                         | [elGusto/night-owlz `29b5fed`](https://github.com/elGusto/night-owlz/blob/29b5fedfee923b2598d97520962215d26d51d67d/themes/NightOwl.json)                                                      | `night-owlz` 0.0.5             |
+| `nord`                                                                                 | [mikasius/zed-nord-theme `d0b459c`](https://github.com/mikasius/zed-nord-theme/blob/d0b459c49797aec598622bed992537e4a83688da/themes/nord.json)                                                | `nord` 0.1.7                   |
+| `one-dark-pro`                                                                         | [hadez8877/one-dark-pro-enhanced `0411a00`](https://github.com/hadez8877/one-dark-pro-enhanced/blob/0411a00f702b609746a29c49e2796d6993e9f461/themes/oneDark-Pro.json)                         | `one-dark-pro-enhanced` 0.0.12 |
+| `one-light`                                                                            | [Stelath/zed-atom-one-theme `ed0513f`](https://github.com/Stelath/zed-atom-one-theme/blob/ed0513f0655ec72ffcfd33e87e31fb0a06c28948/themes/one-light.json)                                     | `atom-one-theme` 0.1.0         |
+| `plastic`                                                                              | [ibnuh/zed-plastic-theme `98c34dc`](https://github.com/ibnuh/zed-plastic-theme/blob/98c34dc4b59c65d64a9410aa25e4f66be0918cf8/themes/plastic.json)                                             | `plastic-theme` 1.0.0          |
+| `rose-pine*`                                                                           | [rose-pine/zed `2c7b4ee`](https://github.com/rose-pine/zed/tree/2c7b4ee61c78334f8f1e9960d1d9e44d447ee9ef/themes)                                                                              | `rose-pine-theme` 1.5.0        |
+| `snazzy-light`                                                                         | [seyhajin/zed-snazzy-light `1d54608`](https://github.com/seyhajin/zed-snazzy-light/blob/1d54608af795053e47d4151612c56b49aff6ed9b/themes/snazzy-light.json)                                    | `snazzy-light` 0.1.0           |
+| `synthwave-84`                                                                         | [hydepwns/synthwave84-zed `332a002`](https://github.com/hydepwns/synthwave84-zed/blob/332a002eb64bece661585607fd59d3f9b4250acf/themes/synthwave84.json)                                       | `synthwave84` 0.2.0            |
+| `tokyo-night`                                                                          | [ssaunderss/zed-tokyo-night `6d731d0`](https://github.com/ssaunderss/zed-tokyo-night/blob/6d731d0724a6fa487f9031cbb4f8db0b80769568/themes/tokyo-night.json)                                   | `tokyo-night` 0.8.0            |
+| `vesper`                                                                               | [bdsqqq/vesper-zed `4ae700c`](https://github.com/bdsqqq/vesper-zed/blob/4ae700c4a2a279c722bdd6c63409a701b4a3236e/themes/vesper-dark.json)                                                     | `vesper` 0.0.2                 |
+| `vitesse-black`, `vitesse-dark`, `vitesse-light`                                       | [colinlienard/zed-vitesse-theme-refined `a2b193e`](https://github.com/colinlienard/zed-vitesse-theme-refined/blob/a2b193ec9e5d36a05de4385b127c94597b025b46/themes/vitesse-theme-refined.json) | `vitesse-theme-refined` 0.5.0  |
+
+No suitable licensed Zed port was available for `dracula-soft`, `laserwave`,
+`poimandres`, `slack-dark`, or `slack-ochin`. Those files use the corresponding
+sources from
+[`tm-themes@1.12.10`](https://github.com/shikijs/textmate-grammars-themes/blob/950dad95387e73a8b2ae36aed2ef19b8a4419f10/packages/tm-themes/index.js),
+converted with
+[Zed's scope mapping](https://github.com/zed-industries/zed/blob/ce48461eaadd16c65c31f835511ab96bd3b6e746/crates/theme_importer/src/vscode/syntax.rs).
+
+Missing syntax captures in the other community ports are supplemented from their
+corresponding TextMate themes at the same `tm-themes@1.12.10` pin. Existing Zed
+palette choices are retained. Pierre and the Aurora substitute use colors from
+their own palettes for missing captures.
+
+The Zed registry's `aurora-theme` is an MIT-licensed substitute, not an Aurora X
+port. The original Aurora X source is GPL-3.0-only; bundling it would require
+GPL-3.0 distribution terms, contrary to this package's Apache-2.0-only policy.
+
+## MIT themes
+
+Copyright notices retained from the sources:
+
+- Andromeda: Copyright (c) 2017 <eliverlara@gmail.com>; Zed port Copyright (c)
+  2025 Andrey L.
+- Aurora: Copyright (c) 2026 Raj Joshi
+- Ayu: Copyright (c) 2016 Ike Ku
+- Catppuccin: Copyright (c) 2021 Catppuccin
+- Dracula: Copyright (c) 2016 Dracula Theme; Zed port Copyright (c) 2023 Dracula
+  Theme
+- Everforest: Copyright (c) 2020 sainnhe; Zed port Copyright (c) 2025 Albert
+  Skonieczny
+- GitHub Classic: Copyright (c) 2020 Primer; Zed port Copyright (c) 2021
+  Catppuccin
+- GitHub Theme: Copyright (c) 2020 Primer; Zed port Copyright (c) 2025 Pyae Sone
+  Aung
+- Gruvbox: the original palette is by Pavel Pertsev. Zed's theme-local MIT
+  license contains the unfilled line `Copyright (c) <YEAR> <COPYRIGHT HOLDER>`
+- Horizon: Copyright (c) 2018 Jonathan Olaleye; Zed port Copyright (c) 2024
+  Ayyan
+- Houston: Copyright (c) 2022 The Astro Technology Company; Copyright (c) 2026
+  github.com/rudolfjs
+- Kanagawa: Copyright (c) 2021 Tommaso Laurenzi; Zed port Copyright (c) 2024
+  Ethan Gilmore
+- LaserWave: Copyright (c) 2019 Jared Jones
+- Min: Copyright (c) 2018-2021 Miguel Solorio; Zed port Copyright (c) 2024
+  Phillip
+- Night Owl: Copyright (c) 2018 Sarah Drasner
+- Nord: Copyright (c) 2016-present Sven Greb <development@svengreb.de>
+  (https://www.svengreb.de); Zed port Copyright (c) 2025 Sergei Metlenkin
+- One Dark Pro: Copyright (c) 2013-2022 Binaryify; Zed port Copyright (c) 2025
+  /devs/hadez
+- One Light: Copyright (c) 2015 Mahmoud Ali; Zed port Copyright (c) 2026 Alex
+- Plastic: Copyright (c) 2017-present, Will Stone; Zed port Copyright (c) 2026
+  Ibnuh
+- Poimandres: Copyright (c) 2023 drcmda
+- Rosé Pine: Copyright (c) Rosé Pine
+- Slack: Copyright (c) 2017 Felipe Mendes
+- Snazzy Light: Copyright (c) 2020 Florian Reuschel; Zed port Copyright (c) 2026
+  Christophe TES
+- Synthwave84: Copyright (c) 2019 Robb Owen; Zed port Copyright (c) 2025 DROO
+- TextMate theme collection: Copyright (c) 2021 Pine Wu; Copyright (c) 2023
+  Anthony Fu
+- Tokyo Night: Copyright (c) 2018-present Enkia; Zed port Copyright (c) 2024
+  Austin Saunders
+- Vesper: Copyright (c) 2023 Rauno Freiberg; Zed port Copyright (c) 2024 Igor
+  Bedesqui
+- Vitesse: Copyright (c) 2020 Primer; Copyright (c) 2021 Anthony Fu; Zed port
+  Copyright (c) 2024 Colin Lienard
+- VS Code Classics: Copyright (c) 2015 - present Microsoft Corporation; Zed port
+  Copyright (c) 2026 alanisme
 
 ```text
-Apache License
-                           Version 2.0, January 2004
-                        http://www.apache.org/licenses/
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
 
-   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-   1. Definitions.
-
-      "License" shall mean the terms and conditions for use, reproduction,
-      and distribution as defined by Sections 1 through 9 of this document.
-
-      "Licensor" shall mean the copyright owner or entity authorized by
-      the copyright owner that is granting the License.
-
-      "Legal Entity" shall mean the union of the acting entity and all
-      other entities that control, are controlled by, or are under common
-      control with that entity. For the purposes of this definition,
-      "control" means (i) the power, direct or indirect, to cause the
-      direction or management of such entity, whether by contract or
-      otherwise, or (ii) ownership of fifty percent (50%) or more of the
-      outstanding shares, or (iii) beneficial ownership of such entity.
-
-      "You" (or "Your") shall mean an individual or Legal Entity
-      exercising permissions granted by this License.
-
-      "Source" form shall mean the preferred form for making modifications,
-      including but not limited to software source code, documentation
-      source, and configuration files.
-
-      "Object" form shall mean any form resulting from mechanical
-      transformation or translation of a Source form, including but
-      not limited to compiled object code, generated documentation,
-      and conversions to other media types.
-
-      "Work" shall mean the work of authorship, whether in Source or
-      Object form, made available under the License, as indicated by a
-      copyright notice that is included in or attached to the work
-      (an example is provided in the Appendix below).
-
-      "Derivative Works" shall mean any work, whether in Source or Object
-      form, that is based on (or derived from) the Work and for which the
-      editorial revisions, annotations, elaborations, or other modifications
-      represent, as a whole, an original work of authorship. For the purposes
-      of this License, Derivative Works shall not include works that remain
-      separable from, or merely link (or bind by name) to the interfaces of,
-      the Work and Derivative Works thereof.
-
-      "Contribution" shall mean any work of authorship, including
-      the original version of the Work and any modifications or additions
-      to that Work or Derivative Works thereof, that is intentionally
-      submitted to Licensor for inclusion in the Work by the copyright owner
-      or by an individual or Legal Entity authorized to submit on behalf of
-      the copyright owner. For the purposes of this definition, "submitted"
-      means any form of electronic, verbal, or written communication sent
-      to the Licensor or its representatives, including but not limited to
-      communication on electronic mailing lists, source code control systems,
-      and issue tracking systems that are managed by, or on behalf of, the
-      Licensor for the purpose of discussing and improving the Work, but
-      excluding communication that is conspicuously marked or otherwise
-      designated in writing by the copyright owner as "Not a Contribution."
-
-      "Contributor" shall mean Licensor and any individual or Legal Entity
-      on behalf of whom a Contribution has been received by Licensor and
-      subsequently incorporated within the Work.
-
-   2. Grant of Copyright License. Subject to the terms and conditions of
-      this License, each Contributor hereby grants to You a perpetual,
-      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
-      copyright license to reproduce, prepare Derivative Works of,
-      publicly display, publicly perform, sublicense, and distribute the
-      Work and such Derivative Works in Source or Object form.
-
-   3. Grant of Patent License. Subject to the terms and conditions of
-      this License, each Contributor hereby grants to You a perpetual,
-      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
-      (except as stated in this section) patent license to make, have made,
-      use, offer to sell, sell, import, and otherwise transfer the Work,
-      where such license applies only to those patent claims licensable
-      by such Contributor that are necessarily infringed by their
-      Contribution(s) alone or by combination of their Contribution(s)
-      with the Work to which such Contribution(s) was submitted. If You
-      institute patent litigation against any entity (including a
-      cross-claim or counterclaim in a lawsuit) alleging that the Work
-      or a Contribution incorporated within the Work constitutes direct
-      or contributory patent infringement, then any patent licenses
-      granted to You under this License for that Work shall terminate
-      as of the date such litigation is filed.
-
-   4. Redistribution. You may reproduce and distribute copies of the
-      Work or Derivative Works thereof in any medium, with or without
-      modifications, and in Source or Object form, provided that You
-      meet the following conditions:
-
-      (a) You must give any other recipients of the Work or
-          Derivative Works a copy of this License; and
-
-      (b) You must cause any modified files to carry prominent notices
-          stating that You changed the files; and
-
-      (c) You must retain, in the Source form of any Derivative Works
-          that You distribute, all copyright, patent, trademark, and
-          attribution notices from the Source form of the Work,
-          excluding those notices that do not pertain to any part of
-          the Derivative Works; and
-
-      (d) If the Work includes a "NOTICE" text file as part of its
-          distribution, then any Derivative Works that You distribute must
-          include a readable copy of the attribution notices contained
-          within such NOTICE file, excluding those notices that do not
-          pertain to any part of the Derivative Works, in at least one
-          of the following places: within a NOTICE text file distributed
-          as part of the Derivative Works; within the Source form or
-          documentation, if provided along with the Derivative Works; or,
-          within a display generated by the Derivative Works, if and
-          wherever such third-party notices normally appear. The contents
-          of the NOTICE file are for informational purposes only and
-          do not modify the License. You may add Your own attribution
-          notices within Derivative Works that You distribute, alongside
-          or as an addendum to the NOTICE text from the Work, provided
-          that such additional attribution notices cannot be construed
-          as modifying the License.
-
-      You may add Your own copyright statement to Your modifications and
-      may provide additional or different license terms and conditions
-      for use, reproduction, or distribution of Your modifications, or
-      for any such Derivative Works as a whole, provided Your use,
-      reproduction, and distribution of the Work otherwise complies with
-      the conditions stated in this License.
-
-   5. Submission of Contributions. Unless You explicitly state otherwise,
-      any Contribution intentionally submitted for inclusion in the Work
-      by You to the Licensor shall be under the terms and conditions of
-      this License, without any additional terms or conditions.
-      Notwithstanding the above, nothing herein shall supersede or modify
-      the terms of any separate license agreement you may have executed
-      with Licensor regarding such Contributions.
-
-   6. Trademarks. This License does not grant permission to use the trade
-      names, trademarks, service marks, or product names of the Licensor,
-      except as required for reasonable and customary use in describing the
-      origin of the Work and reproducing the content of the NOTICE file.
-
-   7. Disclaimer of Warranty. Unless required by applicable law or
-      agreed to in writing, Licensor provides the Work (and each
-      Contributor provides its Contributions) on an "AS IS" BASIS,
-      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
-      implied, including, without limitation, any warranties or conditions
-      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
-      PARTICULAR PURPOSE. You are solely responsible for determining the
-      appropriateness of using or redistributing the Work and assume any
-      risks associated with Your exercise of permissions under this License.
-
-   8. Limitation of Liability. In no event and under no legal theory,
-      whether in tort (including negligence), contract, or otherwise,
-      unless required by applicable law (such as deliberate and grossly
-      negligent acts) or agreed to in writing, shall any Contributor be
-      liable to You for damages, including any direct, indirect, special,
-      incidental, or consequential damages of any character arising as a
-      result of this License or out of the use or inability to use the
-      Work (including but not limited to damages for loss of goodwill,
-      work stoppage, computer failure or malfunction, or any and all
-      other commercial damages or losses), even if such Contributor
-      has been advised of the possibility of such damages.
-
-   9. Accepting Warranty or Additional Liability. While redistributing
-      the Work or Derivative Works thereof, You may choose to offer,
-      and charge a fee for, acceptance of support, warranty, indemnity,
-      or other liability obligations and/or rights consistent with this
-      License. However, in accepting such obligations, You may act only
-      on Your own behalf and on Your sole responsibility, not on behalf
-      of any other Contributor, and only if You agree to indemnify,
-      defend, and hold each Contributor harmless for any liability
-      incurred by, or claims asserted against, such Contributor by reason
-      of your accepting any such warranty or additional liability.
-
-   END OF TERMS AND CONDITIONS
-
-   APPENDIX: How to apply the Apache License to your work.
-
-      To apply the Apache License to your work, attach the following
-      boilerplate notice, with the fields enclosed by brackets "[]"
-      replaced with your own identifying information. (Don't include
-      the brackets!)  The text should be enclosed in the appropriate
-      comment syntax for the file format. We also recommend that a
-      file or class name and description of purpose be included on the
-      same "printed page" as the copyright notice for easier
-      identification within third-party archives.
-
-   Copyright 2018-present Invertase Limited
-
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
-
-       http://www.apache.org/licenses/LICENSE-2.0
-
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-#### 16. MIT — 1 package(s), from `LICENSE`
+## Apache-2.0 themes
 
-<details><summary>Packages sharing this text</summary>
+`github-dark-default` and the Material themes are Apache-2.0. The Material
+themes retain Copyright 2017 Mattia Astorino. `github-dark-default` also derives
+from the MIT-licensed GitHub/Primer theme credited above. Highlights extracts
+individual themes and prunes unused Zed style properties. The full Apache-2.0
+text is included in the package's [`LICENSE.md`](./LICENSE.md).
+````
 
-`eventsource@3.0.7`
-
-</details>
-
-Copyright notices (1):
-
-```text
-Copyright (c) EventSource GitHub organisation
-```
-
-```text
-The MIT License
-
-Copyright (c) EventSource GitHub organisation
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-"Software"), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
-LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
-WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-```
-
-#### 17. Unlicense — 1 package(s), from `LICENSE`
+#### 22. Unlicense — 1 package(s), from `LICENSE`
 
 <details><summary>Packages sharing this text</summary>
 
@@ -23166,7 +23571,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org>
 ```
 
-#### 18. ISC — 1 package(s), from `LICENSE`
+#### 23. ISC — 1 package(s), from `LICENSE`
 
 <details><summary>Packages sharing this text</summary>
 
@@ -23196,7 +23601,73 @@ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
 THIS SOFTWARE.
 ```
 
-#### 19. MIT — 1 package(s), from `LICENSE`
+#### 24. Apache-2.0 — 1 package(s), from `LICENSE`
+
+<details><summary>Packages sharing this text</summary>
+
+`reflect-metadata@0.2.2`
+
+</details>
+
+```text
+Apache License
+
+Version 2.0, January 2004
+
+http://www.apache.org/licenses/
+
+TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+
+1. Definitions.
+
+"License" shall mean the terms and conditions for use, reproduction, and distribution as defined by Sections 1 through 9 of this document.
+
+"Licensor" shall mean the copyright owner or entity authorized by the copyright owner that is granting the License.
+
+"Legal Entity" shall mean the union of the acting entity and all other entities that control, are controlled by, or are under common control with that entity. For the purposes of this definition, "control" means (i) the power, direct or indirect, to cause the direction or management of such entity, whether by contract or otherwise, or (ii) ownership of fifty percent (50%) or more of the outstanding shares, or (iii) beneficial ownership of such entity.
+
+"You" (or "Your") shall mean an individual or Legal Entity exercising permissions granted by this License.
+
+"Source" form shall mean the preferred form for making modifications, including but not limited to software source code, documentation source, and configuration files.
+
+"Object" form shall mean any form resulting from mechanical transformation or translation of a Source form, including but not limited to compiled object code, generated documentation, and conversions to other media types.
+
+"Work" shall mean the work of authorship, whether in Source or Object form, made available under the License, as indicated by a copyright notice that is included in or attached to the work (an example is provided in the Appendix below).
+
+"Derivative Works" shall mean any work, whether in Source or Object form, that is based on (or derived from) the Work and for which the editorial revisions, annotations, elaborations, or other modifications represent, as a whole, an original work of authorship. For the purposes of this License, Derivative Works shall not include works that remain separable from, or merely link (or bind by name) to the interfaces of, the Work and Derivative Works thereof.
+
+"Contribution" shall mean any work of authorship, including the original version of the Work and any modifications or additions to that Work or Derivative Works thereof, that is intentionally submitted to Licensor for inclusion in the Work by the copyright owner or by an individual or Legal Entity authorized to submit on behalf of the copyright owner. For the purposes of this definition, "submitted" means any form of electronic, verbal, or written communication sent to the Licensor or its representatives, including but not limited to communication on electronic mailing lists, source code control systems, and issue tracking systems that are managed by, or on behalf of, the Licensor for the purpose of discussing and improving the Work, but excluding communication that is conspicuously marked or otherwise designated in writing by the copyright owner as "Not a Contribution."
+
+"Contributor" shall mean Licensor and any individual or Legal Entity on behalf of whom a Contribution has been received by Licensor and subsequently incorporated within the Work.
+
+2. Grant of Copyright License. Subject to the terms and conditions of this License, each Contributor hereby grants to You a perpetual, worldwide, non-exclusive, no-charge, royalty-free, irrevocable copyright license to reproduce, prepare Derivative Works of, publicly display, publicly perform, sublicense, and distribute the Work and such Derivative Works in Source or Object form.
+
+3. Grant of Patent License. Subject to the terms and conditions of this License, each Contributor hereby grants to You a perpetual, worldwide, non-exclusive, no-charge, royalty-free, irrevocable (except as stated in this section) patent license to make, have made, use, offer to sell, sell, import, and otherwise transfer the Work, where such license applies only to those patent claims licensable by such Contributor that are necessarily infringed by their Contribution(s) alone or by combination of their Contribution(s) with the Work to which such Contribution(s) was submitted. If You institute patent litigation against any entity (including a cross-claim or counterclaim in a lawsuit) alleging that the Work or a Contribution incorporated within the Work constitutes direct or contributory patent infringement, then any patent licenses granted to You under this License for that Work shall terminate as of the date such litigation is filed.
+
+4. Redistribution. You may reproduce and distribute copies of the Work or Derivative Works thereof in any medium, with or without modifications, and in Source or Object form, provided that You meet the following conditions:
+
+You must give any other recipients of the Work or Derivative Works a copy of this License; and
+
+You must cause any modified files to carry prominent notices stating that You changed the files; and
+
+You must retain, in the Source form of any Derivative Works that You distribute, all copyright, patent, trademark, and attribution notices from the Source form of the Work, excluding those notices that do not pertain to any part of the Derivative Works; and
+
+If the Work includes a "NOTICE" text file as part of its distribution, then any Derivative Works that You distribute must include a readable copy of the attribution notices contained within such NOTICE file, excluding those notices that do not pertain to any part of the Derivative Works, in at least one of the following places: within a NOTICE text file distributed as part of the Derivative Works; within the Source form or documentation, if provided along with the Derivative Works; or, within a display generated by the Derivative Works, if and wherever such third-party notices normally appear. The contents of the NOTICE file are for informational purposes only and do not modify the License. You may add Your own attribution notices within Derivative Works that You distribute, alongside or as an addendum to the NOTICE text from the Work, provided that such additional attribution notices cannot be construed as modifying the License. You may add Your own copyright statement to Your modifications and may provide additional or different license terms and conditions for use, reproduction, or distribution of Your modifications, or for any such Derivative Works as a whole, provided Your use, reproduction, and distribution of the Work otherwise complies with the conditions stated in this License.
+
+5. Submission of Contributions. Unless You explicitly state otherwise, any Contribution intentionally submitted for inclusion in the Work by You to the Licensor shall be under the terms and conditions of this License, without any additional terms or conditions. Notwithstanding the above, nothing herein shall supersede or modify the terms of any separate license agreement you may have executed with Licensor regarding such Contributions.
+
+6. Trademarks. This License does not grant permission to use the trade names, trademarks, service marks, or product names of the Licensor, except as required for reasonable and customary use in describing the origin of the Work and reproducing the content of the NOTICE file.
+
+7. Disclaimer of Warranty. Unless required by applicable law or agreed to in writing, Licensor provides the Work (and each Contributor provides its Contributions) on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. You are solely responsible for determining the appropriateness of using or redistributing the Work and assume any risks associated with Your exercise of permissions under this License.
+
+8. Limitation of Liability. In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall any Contributor be liable to You for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising as a result of this License or out of the use or inability to use the Work (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if such Contributor has been advised of the possibility of such damages.
+
+9. Accepting Warranty or Additional Liability. While redistributing the Work or Derivative Works thereof, You may choose to offer, and charge a fee for, acceptance of support, warranty, indemnity, or other liability obligations and/or rights consistent with this License. However, in accepting such obligations, You may act only on Your own behalf and on Your sole responsibility, not on behalf of any other Contributor, and only if You agree to indemnify, defend, and hold each Contributor harmless for any liability incurred by, or claims asserted against, such Contributor by reason of your accepting any such warranty or additional liability.
+
+END OF TERMS AND CONDITIONS
+```
+
+#### 25. MIT — 1 package(s), from `LICENSE`
 
 <details><summary>Packages sharing this text</summary>
 
@@ -23234,7 +23705,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-#### 20. BSD-2-Clause — 1 package(s), from `LICENSE.md`
+#### 26. BSD-2-Clause — 1 package(s), from `LICENSE.md`
 
 <details><summary>Packages sharing this text</summary>
 
@@ -23302,7 +23773,7 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-#### 21. apache-2.0 — 1 package(s), from `NOTICE.md`
+#### 27. apache-2.0 — 1 package(s), from `NOTICE.md`
 
 <details><summary>Packages sharing this text</summary>
 
@@ -23352,7 +23823,55 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 ````
 
-#### 22. MIT — 1 package(s), from `license`
+#### 28. BSD-3-Clause — 1 package(s), from `LICENSE`
+
+<details><summary>Packages sharing this text</summary>
+
+`asn1js@3.1.0`
+
+</details>
+
+Copyright notices (2):
+
+```text
+Copyright (c) 2014, GMO GlobalSign
+Copyright (c) 2015-2022, Peculiar Ventures
+```
+
+```text
+Copyright (c) 2014, GMO GlobalSign
+Copyright (c) 2015-2022, Peculiar Ventures
+All rights reserved.
+
+Author 2014-2019, Yury Strozhevsky
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+* Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above copyright notice, this
+  list of conditions and the following disclaimer in the documentation and/or
+  other materials provided with the distribution.
+
+* Neither the name of the copyright holder nor the names of its
+  contributors may be used to endorse or promote products derived from
+  this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
+
+#### 29. MIT — 1 package(s), from `license`
 
 <details><summary>Packages sharing this text</summary>
 
@@ -23390,7 +23909,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-#### 23. MIT — 1 package(s), from `LICENSE`
+#### 30. MIT — 1 package(s), from `LICENSE`
 
 <details><summary>Packages sharing this text</summary>
 
@@ -23474,7 +23993,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-#### 24. BSD-3-Clause — 1 package(s), from `LICENSE`
+#### 31. BSD-3-Clause — 1 package(s), from `LICENSE`
 
 <details><summary>Packages sharing this text</summary>
 
@@ -23515,7 +24034,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-#### 25. Apache-2.0 — 1 package(s), from `LICENSE`
+#### 32. Apache-2.0 — 1 package(s), from `LICENSE`
 
 <details><summary>Packages sharing this text</summary>
 
