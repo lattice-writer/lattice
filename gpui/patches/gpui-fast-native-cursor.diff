@@ -1,25 +1,34 @@
 diff --git a/gpui-fast/crates/gpui/src/fast/composition.rs b/gpui-fast/crates/gpui/src/fast/composition.rs
-index 444dbd96..e154c7c9 100644
+index 444dbd9..600b646 100644
 --- a/gpui-fast/crates/gpui/src/fast/composition.rs
 +++ b/gpui-fast/crates/gpui/src/fast/composition.rs
-@@ -1565,6 +1565,15 @@ fn native_mouse(window: &Window, event: &dyn Any) -> bool {
+@@ -1565,6 +1565,24 @@ fn native_mouse(window: &Window, event: &dyn Any) -> bool {
      native_target(window, false).is_some()
  }
  
 +/// Whether the pointer is over a native view that takes it (a webview), so
 +/// that the view, not GPUI, sets the cursor there. A drag or a captured
-+/// hitbox keeps GPUI's cursor, as it keeps GPUI's pointer events.
++/// hitbox keeps GPUI's cursor, as it keeps GPUI's pointer events, and so does
++/// a surface GPUI forwards input to: its windowless consumer sets no cursor.
 +pub(crate) fn native_owns_cursor(window: &Window, cx: &crate::App) -> bool {
 +    !cx.has_active_drag()
 +        && window.captured_hitbox.is_none()
-+        && native_target(window, false).is_some()
++        && native_target(window, false).is_some_and(|surface| {
++            !window
++                .fast_composition
++                .0
++                .borrow()
++                .platform_surfaces
++                .get(&surface)
++                .is_some_and(|native| native.input_forwarding())
++        })
 +}
 +
  pub(crate) fn bubble_mouse(window: &Window, event: &dyn Any, cx: &crate::App) -> bool {
      cx.propagate_event && (cx.has_active_drag() || !native_mouse(window, event))
  }
 diff --git a/gpui-fast/crates/gpui/src/window.rs b/gpui-fast/crates/gpui/src/window.rs
-index bf972228..cb4671de 100644
+index bf97222..cb4671d 100644
 --- a/gpui-fast/crates/gpui/src/window.rs
 +++ b/gpui-fast/crates/gpui/src/window.rs
 @@ -5881,8 +5881,11 @@ impl Window {
@@ -37,7 +46,7 @@ index bf972228..cb4671de 100644
              let style = cx
                  .active_drag_cursor_style()
 diff --git a/gpui-fast/crates/gpui_macos/src/fast/composition.rs b/gpui-fast/crates/gpui_macos/src/fast/composition.rs
-index c05bad1d..09163835 100644
+index c05bad1..80bee50 100644
 --- a/gpui-fast/crates/gpui_macos/src/fast/composition.rs
 +++ b/gpui-fast/crates/gpui_macos/src/fast/composition.rs
 @@ -75,6 +75,9 @@ pub(crate) struct MacComposition {
@@ -66,7 +75,7 @@ index c05bad1d..09163835 100644
  }
  
  /// The bounds of the shown native views stacked under the GPUI surface
-@@ -950,9 +955,201 @@ pub(crate) fn set_composition_order(
+@@ -950,9 +955,208 @@ pub(crate) fn set_composition_order(
              let _: () = msg_send![view, setFrame: frame];
          }
      }
@@ -195,8 +204,15 @@ index c05bad1d..09163835 100644
 +/// too, so the page's own cursor (the I-beam over text, a column's resize
 +/// cursor) was put back to GPUI's at once ([`window_cursor_rects`] leaves
 +/// these holes out).
++///
++/// A window with no native view has no holes, so it skips the walk over the
++/// view tree that every composed frame would otherwise pay.
 +pub(crate) fn refresh_cursor_holes(state: &mut MacWindowState) {
-+    let holes = cursor_holes(&cursor_layers(state));
++    let holes = if state.fast_composition.native_views.is_empty() {
++        Vec::new()
++    } else {
++        cursor_holes(&cursor_layers(state))
++    };
 +    let unchanged = holes.len() == state.fast_composition.cursor_holes.len()
 +        && holes
 +            .iter()
@@ -268,7 +284,7 @@ index c05bad1d..09163835 100644
  /// Creates the overlay view and renderer of a GPUI surface, the size of the
  /// window's view.
  unsafe fn create_gpui_surface(
-@@ -1075,7 +1272,7 @@ impl PlatformSurfaceAttachment for MacNativeSurface {
+@@ -1075,7 +1279,7 @@ impl PlatformSurfaceAttachment for MacNativeSurface {
              .window_state
              .upgrade()
              .context("native surface window has been released")?;
@@ -277,7 +293,7 @@ index c05bad1d..09163835 100644
          unsafe {
              let native_view = window_state.native_view.as_ptr();
              let parent: Id = msg_send![self.view.as_ptr(), superview];
-@@ -1088,6 +1285,7 @@ impl PlatformSurfaceAttachment for MacNativeSurface {
+@@ -1088,6 +1292,7 @@ impl PlatformSurfaceAttachment for MacNativeSurface {
              let frame: NSRect = msg_send![native_view, convertRect: window_frame, toView: parent];
              let _: () = msg_send![self.view.as_ptr(), setFrame: frame];
          }
@@ -285,7 +301,7 @@ index c05bad1d..09163835 100644
          self.bounds.set(bounds);
          Ok(())
      }
-@@ -1104,6 +1302,9 @@ impl PlatformSurfaceAttachment for MacNativeSurface {
+@@ -1104,6 +1309,9 @@ impl PlatformSurfaceAttachment for MacNativeSurface {
          unsafe {
              let _: () = msg_send![self.view.as_ptr(), setHidden: Bool::new(!visible)];
          }
@@ -296,7 +312,7 @@ index c05bad1d..09163835 100644
      }
  
 diff --git a/gpui-fast/crates/gpui_macos/src/fast/composition_tests.rs b/gpui-fast/crates/gpui_macos/src/fast/composition_tests.rs
-index 19322742..f64272dd 100644
+index 1932274..f64272d 100644
 --- a/gpui-fast/crates/gpui_macos/src/fast/composition_tests.rs
 +++ b/gpui-fast/crates/gpui_macos/src/fast/composition_tests.rs
 @@ -1,4 +1,4 @@
@@ -370,7 +386,7 @@ index 19322742..f64272dd 100644
 +    assert_eq!(area(&under), 200. * 100.);
 +}
 diff --git a/gpui-fast/crates/gpui_macos/src/window.rs b/gpui-fast/crates/gpui_macos/src/window.rs
-index 90eb52c7..28c2c27b 100644
+index 90eb52c..28c2c27 100644
 --- a/gpui-fast/crates/gpui_macos/src/window.rs
 +++ b/gpui-fast/crates/gpui_macos/src/window.rs
 @@ -406,6 +406,19 @@ pub(crate) unsafe fn set_active_window_cursor_style(style: CursorStyle) {
