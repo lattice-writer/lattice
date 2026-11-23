@@ -29,6 +29,7 @@ import {
   archiveName, checkRows, leftOutLine, pendingRows, summaryLine,
   type ArxivCheck, type ArxivOptions, type CheckState,
 } from "./arxiv-export";
+import { showInFileManager } from "../platform/file-manager-label";
 
 type SheetState =
   | { phase: "checking"; check?: ArxivCheck }
@@ -123,7 +124,7 @@ export default function ArxivExportDialog({ projectRoot, projectName, save, buil
       return;
     }
     notifySuccess(t`Export for arXiv`, t`Exported ${fileName}`, {
-      primaryAction: { label: t`Show in Finder`, onClick: () => revealItemInDir(zipPath) },
+      primaryAction: { label: t(showInFileManager()), onClick: () => revealItemInDir(zipPath) },
     });
     onClose();
   };

@@ -20,6 +20,7 @@ import type { PaperLineHit, PaperTextMatch } from "./paper-library-search";
 import { useTrellisController } from "../trellis/trellis-controller";
 import { openToTheSide } from "../trellis/open-beside";
 import { PaperTextHits } from "./paper-text-hits";
+import { showInFileManager } from "../platform/file-manager-label";
 
 export type PaperFetchState = "loading" | "success";
 
@@ -271,7 +272,7 @@ export function PaperRow(props: PaperRowProps) {
             )}
             {readable && (
               <ContextMenuItem onSelect={() => props.onReveal(revealPath)}>
-                <FolderOpen size={14} />{t`Show in Finder`}
+                <FolderOpen size={14} />{t(showInFileManager())}
               </ContextMenuItem>
             )}
           </ContextMenuContent>

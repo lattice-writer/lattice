@@ -40,6 +40,7 @@ import { notifyCopied } from "../telemetry/app-notify";
 import { useTrellisController } from "../trellis/trellis-controller";
 import { baseName } from "../lib/base-name";
 import { deletesProtectedPath } from "./deletion-protection";
+import { showInFileManager } from "../platform/file-manager-label";
 
 // @pierre/trees virtualizes by a numeric item height, so this mirrors the
 // design-system `--row-height-tree` (28px, the compact control height).
@@ -401,7 +402,7 @@ export function ProjectFileTree(props: ProjectFileTreeProps) {
       },
       // The path as the project names it, as a \input or \includegraphics takes it.
       { icon: Copy, label: t`Copy relative path`, run: () => void writeText(path).then(() => notifyCopied(t`Path copied`)) },
-      { icon: FolderOpen, label: t`Show in Finder`, run: () => props.onReveal(path) },
+      { icon: FolderOpen, label: t(showInFileManager()), run: () => props.onReveal(path) },
       { ...hiddenFilesAction, group: true },
       refreshAction,
     ];

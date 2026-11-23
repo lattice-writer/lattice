@@ -2647,8 +2647,8 @@ msgid "At the limit"
 msgstr "刚好到上限"
 
 #: src/app/report-problem.ts
-msgid "Attach the file shown in Finder to the bug report."
-msgstr "请将访达中显示的文件附加到问题报告。"
+msgid "Attach the file shown in its folder to the bug report."
+msgstr "请将在文件夹中显示的文件附加到问题报告。"
 
 #: src/papers/literature-discovery-panel.tsx
 msgid "Attention Is All You Need, diffusion, …"
@@ -5210,16 +5210,16 @@ msgstr "无法搜索 TeX Live 组件仓库：{error}"
 
 #: src/app/file-open-failure.ts
 #: src/app/use-project-tree.ts
-msgid "Could not show that item in Finder. {message}"
-msgstr "无法在访达中显示。{message}"
+msgid "Could not show that item. {message}"
+msgstr "无法显示该项目。{message}"
 
 #: src/platform/host-errors-workspace.ts
-msgid "Could not show the diagnostic log in Finder: {error}"
-msgstr "无法在访达中显示诊断日志：{error}"
+msgid "Could not show the diagnostic log: {error}"
+msgstr "无法显示诊断日志：{error}"
 
 #: src/platform/host-errors-themes.ts
-msgid "Could not show the themes folder in Finder: {error}"
-msgstr "无法在访达中显示主题文件夹：{error}"
+msgid "Could not show the themes folder: {error}"
+msgstr "无法显示主题文件夹：{error}"
 
 #: src/platform/host-errors-setup.ts
 msgid "Could not start {program}: {error}"
@@ -15362,12 +15362,15 @@ msgstr "显示大纲"
 msgid "Show hidden files"
 msgstr "显示隐藏文件"
 
-#: src/app/file-open-failure.ts
-#: src/history/export-changes-dialog.tsx
-#: src/project/arxiv-export-dialog.tsx
-#: src/project/journal-export.ts
-#: src/project/paper-row.tsx
-#: src/project/project-file-tree.tsx
+#: src/platform/file-manager-label.ts
+msgid "Show in File Explorer"
+msgstr "在文件资源管理器中显示"
+
+#: src/platform/file-manager-label.ts
+msgid "Show in File Manager"
+msgstr "在文件管理器中显示"
+
+#: src/platform/file-manager-label.ts
 msgid "Show in Finder"
 msgstr "在访达中显示"
 

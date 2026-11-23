@@ -12,6 +12,7 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { hostErrorMessage } from "../app-utils";
 import { i18n } from "../i18n";
 import { notifyError, notifyInfo, notifySuccess } from "../telemetry/app-notify";
+import { showInFileManager } from "../platform/file-manager-label";
 
 type JournalExport = {
   folder: string;
@@ -46,7 +47,7 @@ export async function exportForJournal(projectRoot: string, save: () => Promise<
       detail: result.problems.join("\n"),
       timeoutMs: result.problems.length ? 0 : undefined,
       primaryAction: {
-        label: i18n._(msg`Show in Finder`),
+        label: i18n._(showInFileManager()),
         onClick: () => { void revealItemInDir(result.folder).catch(() => undefined); },
       },
     });

@@ -1,6 +1,6 @@
 // Help ▸ Report a Problem… (and the palette's "Report a problem"): save the
 // log export Settings › Logs › Export makes by default — redacted, operation
-// metadata and counts only — show it in Finder, and open a new bug report
+// metadata and counts only — show it in the file manager, and open a new bug report
 // with the Lattice and macOS versions filled in.
 //
 // The issue page is public and its address travels through the browser's
@@ -66,7 +66,7 @@ async function fileReport(): Promise<void> {
     level: "info",
     source: i18n._(msg`Report a problem`),
     title: i18n._(msg`Diagnostic log saved`),
-    detail: i18n._(msg`Attach the file shown in Finder to the bug report.`),
+    detail: i18n._(msg`Attach the file shown in its folder to the bug report.`),
   });
   await openUrl(newIssueUrl(report));
 }

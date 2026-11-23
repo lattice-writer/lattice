@@ -33,6 +33,6 @@ pub async fn save_problem_report(
     .await?;
     app.opener()
         .reveal_item_in_dir(&path)
-        .map_err(|error| format!("Could not show the diagnostic log in Finder: {error}"))?;
+        .map_err(|error| format!("Could not show the diagnostic log: {error}"))?;
     Ok(report)
 }
