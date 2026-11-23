@@ -460,6 +460,10 @@ impl Shell {
         let Some(editor) = self.active_editor() else {
             return;
         };
+        if lattice_core::project::is_typst_path(&document) {
+            self.forward_sync_typst(Some(document), window, cx);
+            return;
+        }
         let Some(root) = self.root(cx) else {
             return;
         };

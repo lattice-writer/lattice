@@ -89,6 +89,7 @@ mod tab_policy;
 mod terminal_flow;
 mod tools_flow;
 pub mod trellis_layout;
+mod typst_sync;
 pub mod views;
 mod welcome_flow;
 pub mod windows;

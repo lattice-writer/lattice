@@ -18,7 +18,9 @@ use gpui::AsyncApp;
 use serde_json::json;
 
 use super::Steps;
-use crate::scenario::Run;
+use crate::{native, scenario::Run};
+
+const PART: &str = "== Included part\nThe included sentence sits here, on a line of its own.\n";
 
 const NOTES: &str = "#set page(width: 12cm, height: 9cm)\n#set heading(numbering: \"1.\")\n= Typst notes <notes>\nSee @notes, and $integral_0^1 x dif x = 1/2$.\n\n#lorem(120)\n";
 
@@ -205,9 +207,91 @@ impl Run {
         log::info!("typst e2e: edit to pixels {} ms", to_pixels.as_millis());
         self.snapshot(cx, "typst-live").await;
 
+        self.typst_jumps(cx, steps, root, &source, &buffer).await?;
+
         self.close_panel(cx, &editor).await?;
         std::fs::remove_file(&source).ok();
         std::fs::remove_file(&pdf).ok();
+        Ok(())
+    }
+
+    /// Source ↔ PDF without SyncTeX: the notes include a second file,
+    /// unsaved, and Jump to PDF from that file's second line marks it on the
+    /// last page; a double-click on the mark comes back to that line.
+    async fn typst_jumps(
+        &self,
+        cx: &mut AsyncApp,
+        steps: &mut Steps,
+        root: &std::path::Path,
+        source: &std::path::Path,
+        buffer: &gpui::Entity<language::Buffer>,
+    ) -> Result<()> {
+        let part = root.join("notes-part.typ");
+        std::fs::write(&part, PART)?;
+        let builds = cx.update(|cx| self.shell.read(cx).build_panel().read(cx).builds());
+        cx.update(|cx| {
+            buffer.update(cx, |buffer, cx| {
+                let end = buffer.len();
+                buffer.edit([(end..end, "#include \"notes-part.typ\"\n")], None, cx)
+            })
+        });
+        let included = self
+            .wait_for(cx, Duration::from_secs(20), |shell, cx| {
+                let shell = shell.read(cx);
+                let panel = shell.build_panel().read(cx);
+                !shell.building() && panel.builds() > builds && panel.succeeded() == Some(true)
+            })
+            .await;
+
+        let part_editor = self.open(cx, &part, Some(2))?;
+        self.pause(cx, Duration::from_millis(300)).await;
+        // What ⌘⇧J, Jump to PDF and the PDF toolbar's locate button run.
+        self.with_window(cx, |shell, window, cx| {
+            shell.update(cx, |shell, cx| shell.forward_sync(&crate::shell::ForwardSync, window, cx))
+        })?;
+        let marked = self
+            .wait_for(cx, Duration::from_secs(20), |shell, cx| {
+                shell.read(cx).pdf().read(cx).sync_mark(cx).is_some_and(|(_, scroll)| !scroll)
+            })
+            .await;
+        let (mark, pages) = cx.update(|cx| {
+            let pdf = self.shell.read(cx).pdf().read(cx);
+            (pdf.sync_mark(cx).map(|(page, _)| page), pdf.page_count(cx))
+        });
+        steps.check(
+            "Typst: Jump to PDF from an included file's line marks it in the PDF, compiled from unsaved text",
+            included && marked && pages > 0 && mark == Some(pages - 1),
+            json!({ "included": included, "mark": mark.map(|page| page + 1), "pages": pages }),
+        );
+        self.snapshot(cx, "typst-jump-to-pdf").await;
+
+        // Somewhere else first, so the jump back is seen to land.
+        self.open(cx, source, Some(1))?;
+        self.pause(cx, Duration::from_millis(400)).await;
+        let center = cx.update(|cx| self.shell.read(cx).pdf().read(cx).sync_mark_center(cx));
+        let landed = match center {
+            Some(center) => {
+                native::send_double_click(self.native(cx)?, center)?;
+                self.wait_for(cx, Duration::from_secs(20), |shell, cx| {
+                    shell
+                        .read(cx)
+                        .active_editor_path(cx)
+                        .is_some_and(|path| path.ends_with("notes-part.typ"))
+                })
+                .await
+            }
+            None => false,
+        };
+        let row = self.cursor_row(cx, &part_editor);
+        steps.check(
+            "Typst: a double-click in the PDF puts the cursor on its line in the included file",
+            landed && row == 1,
+            json!({ "at": center.map(|c| [f32::from(c.x), f32::from(c.y)]), "row": row + 1 }),
+        );
+        self.snapshot(cx, "typst-jump-to-source").await;
+
+        self.close_panel(cx, &part_editor).await?;
+        std::fs::remove_file(&part).ok();
         Ok(())
     }
 }
@@ -220,6 +304,8 @@ pub(super) const MODULE: super::registry::Module = super::registry::Module {
     setup: false,
     covers: &[
         "gpui/crates/lattice-typst/",
+        "gpui/crates/lattice-gpui/src/typst/",
+        "gpui/crates/lattice-gpui/src/shell/typst_sync.rs",
         "gpui/crates/lattice-editor/languages/typst/",
     ],
     run: |run, cx, steps, fixture| Box::pin(run.typst(cx, steps, &fixture.root)),

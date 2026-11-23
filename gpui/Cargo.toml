@@ -123,6 +123,9 @@ codebook-tree-sitter-typst = "0.12.2"
 typst = "0.15.1"
 typst-pdf = "0.15.1"
 typst-layout = "0.15.1"
+# Source <-> PDF jumps over the compiled document (`jump_from_click`,
+# `jump_from_cursor`), Apache-2.0, in the helper only.
+typst-ide = "0.15.1"
 typst-kit = { version = "0.15.1", default-features = false, features = ["embedded-fonts", "scan-fonts", "system-packages", "datetime"] }
 comemo = "0.5.1"
 futures = "0.3"

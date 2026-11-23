@@ -31,6 +31,11 @@ impl Shell {
             let editor = editor.read(cx);
             (editor.relative().to_string(), editor.cursor())
         };
+        // Typst has no SyncTeX map: its helper answers (`typst_sync`).
+        if lattice_core::project::is_typst_path(&relative) {
+            self.forward_sync_typst(None, window, cx);
+            return;
+        }
         if self.project.is_none() || self.parts.get::<PdfSync>().locating {
             return;
         }
@@ -155,6 +160,16 @@ impl Shell {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        // A Typst document's PDF has no SyncTeX map: its helper answers
+        // (`typst_sync`).
+        let typst = match &document {
+            Some(document) => lattice_core::project::is_typst_path(document),
+            None => self.typst_live_document().is_some(),
+        };
+        if typst {
+            self.inverse_sync_typst(generation, document, page, x, y, window, cx);
+            return;
+        }
         let Some(root) = self.root(cx) else {
             return;
         };

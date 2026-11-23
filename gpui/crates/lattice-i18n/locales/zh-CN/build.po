@@ -89,3 +89,11 @@ msgstr "{count} 分钟前"
 #: lattice-gpui/src/build/sequence.rs
 msgid "⌘S, or ⇧-click for a clean rebuild"
 msgstr "⌘S，按住 ⇧ 点击则从头编译"
+
+#: lattice-gpui/src/shell/typst_sync.rs
+msgid "Build the Typst document first, so Lattice can match the PDF to its source."
+msgstr "请先编译 Typst 文档，Lattice 才能将 PDF 与源码对应。"
+
+#: lattice-gpui/src/shell/typst_sync.rs
+msgid "No Typst source was found for this place in the PDF."
+msgstr "在 PDF 的这个位置找不到对应的 Typst 源码。"

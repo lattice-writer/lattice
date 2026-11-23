@@ -6,20 +6,23 @@
 //! (`gpui/crates/lattice-typst`). It keeps its compiler session between
 //! builds, so a live compile after a keystroke re-lays out only what changed.
 //! The two speak JSON, one object per line: the helper says [`Hello`] when it
-//! starts, then answers each [`Request`] on stdin with a [`Reply`] on stdout.
+//! starts, then answers each [`Request`] on stdin with one line on stdout: a
+//! [`Reply`] to a compile, a [`Jump`] to a jump between source and PDF.
 //! The helper ships with the app's version and is replaced with it, so
-//! [`PROTOCOL`] only guards a helper from another build in development.
+//! [`PROTOCOL`] guards a helper from another build in development, and one
+//! left in this version's folder by a build before the jumps (protocol 1):
+//! the app takes it as outdated and downloads its own again.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use crate::latex::{BuildResult, BuildStep};
+use crate::latex::{BuildResult, BuildStep, PdfSyncTarget};
 use crate::models::Diagnostic;
 
 /// The wire format's version; a helper that says another one is not used.
-pub const PROTOCOL: u32 = 1;
+pub const PROTOCOL: u32 = 2;
 
 /// The helper's first line.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -34,15 +37,85 @@ impl Hello {
     }
 }
 
+/// What the app asks of the helper, one per line.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Request {
+    Compile(Compile),
+    /// From a point in the PDF to its source: answered with a
+    /// [`Jump`] of a [`SourceSpot`].
+    JumpFromClick(ClickJump),
+    /// From a caret in a source to the PDF: answered with a [`Jump`] of
+    /// every place the text there was laid out, first to last page.
+    JumpFromCursor(CursorJump),
+}
+
 /// Compile `document` (relative to `root`), reading `overlay`'s text
 /// (project-relative path → the editor's buffer) in place of those files.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct Request {
+pub struct Compile {
     pub root: PathBuf,
     pub document: String,
     #[serde(default)]
     pub overlay: HashMap<String, String>,
 }
+
+/// A click at (`x`, `y`) PDF points from the top-left corner of the
+/// 1-based `page` of `document`'s PDF. The jumps look in the last document
+/// the helper compiled successfully, which may be older than the text now
+/// on screen: `overlay` is the editor's unsaved text, as a compile takes it,
+/// and the place found in the compiled text is carried onto it.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ClickJump {
+    pub root: PathBuf,
+    pub document: String,
+    #[serde(default)]
+    pub overlay: HashMap<String, String>,
+    pub page: u32,
+    pub x: f64,
+    pub y: f64,
+}
+
+/// The caret at the 1-based `line` and `column` (in characters) of `path`
+/// (project-relative), as the editor shows it now (`overlay`, as in
+/// [`ClickJump`]).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct CursorJump {
+    pub root: PathBuf,
+    pub document: String,
+    #[serde(default)]
+    pub overlay: HashMap<String, String>,
+    pub path: String,
+    pub line: u32,
+    pub column: u32,
+}
+
+/// A place in a project file: the 1-based `line` and `column` (in
+/// characters), as the editor counts them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SourceSpot {
+    pub path: String,
+    pub line: u32,
+    pub column: u32,
+}
+
+/// A jump's answer.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Jump<T> {
+    To(T),
+    /// The point or the caret has no counterpart: a margin, a line of code,
+    /// text in a package, a file the document does not read.
+    Nowhere,
+    /// The helper holds no compiled document of `root` and `document`: it
+    /// started since the PDF was written, or compiled another one since.
+    NotCompiled,
+}
+
+/// Where the source at the caret is in the PDF.
+pub type PdfJump = Jump<Vec<PdfSyncTarget>>;
+/// Where the point clicked in the PDF comes from.
+pub type SourceJump = Jump<SourceSpot>;
 
 /// One diagnostic as the helper reports it: a [`Diagnostic`] without the
 /// catalog code and parameters, which Typst's messages never carry.
@@ -195,6 +268,47 @@ mod tests {
         assert_eq!(result.diagnostics[0].file.as_deref(), Some("notes.typ"));
         assert_eq!(result.diagnostics[0].line, Some(4));
         assert_eq!(Reply::from_build(&result).diagnostics, reply.diagnostics);
+    }
+
+    #[test]
+    fn requests_and_jumps_cross_the_wire_tagged_by_what_they_ask() {
+        let click = Request::JumpFromClick(ClickJump {
+            root: "/p".into(),
+            document: "main.typ".into(),
+            overlay: HashMap::from([("one.typ".to_string(), "Text.".to_string())]),
+            page: 2,
+            x: 72.5,
+            y: 100.0,
+        });
+        let line = serde_json::to_string(&click).unwrap();
+        assert!(line.starts_with(r#"{"jumpFromClick":{"#), "{line}");
+        let Request::JumpFromClick(back) = serde_json::from_str(&line).unwrap() else {
+            panic!("{line}");
+        };
+        assert_eq!((back.page, back.x, back.y), (2, 72.5, 100.0));
+        assert_eq!(back.overlay["one.typ"], "Text.");
+
+        let compile: Request =
+            serde_json::from_str(r#"{"compile":{"root":"/p","document":"main.typ"}}"#).unwrap();
+        assert!(matches!(compile, Request::Compile(Compile { overlay, .. }) if overlay.is_empty()));
+        // A request of protocol 1 (the bare compile) is not one of these.
+        assert!(serde_json::from_str::<Request>(r#"{"root":"/p","document":"main.typ"}"#).is_err());
+
+        let jump =
+            SourceJump::To(SourceSpot { path: "chapters/one.typ".into(), line: 3, column: 5 });
+        let line = serde_json::to_string(&jump).unwrap();
+        assert_eq!(serde_json::from_str::<SourceJump>(&line).unwrap(), jump);
+        let places =
+            PdfJump::To(vec![PdfSyncTarget { page: 1, x: 1.0, y: 2.0, width: 3.0, height: 4.0 }]);
+        let line = serde_json::to_string(&places).unwrap();
+        assert!(line.contains(r#""page":1"#), "{line}");
+        assert!(
+            matches!(serde_json::from_str::<PdfJump>(&line).unwrap(), Jump::To(places) if places.len() == 1)
+        );
+        for nothing in [SourceJump::Nowhere, SourceJump::NotCompiled] {
+            let line = serde_json::to_string(&nothing).unwrap();
+            assert_eq!(serde_json::from_str::<SourceJump>(&line).unwrap(), nothing);
+        }
     }
 
     #[test]

@@ -25,17 +25,15 @@ pub(crate) struct PdfSync {
 
 impl Shell {
     /// Tell every compiled PDF whether Reveal cursor in PDF can jump now
-    /// (the caret is in a .tex file), and the live one whether a jump is
+    /// (the caret is in a .tex or .typ file), and the live one whether a jump is
     /// being located: a root document's tab never spins, for its own jump
     /// or the live PDF's (`use-document-surfaces.tsx` gives document tabs
     /// `canForwardSync` and no `locatingPdf`).
     pub(super) fn refresh_reveal(&mut self, cx: &mut Context<Self>) {
         let enabled = self.active_editor().is_some_and(|editor| {
-            editor
-                .read(cx)
-                .relative()
-                .to_ascii_lowercase()
-                .ends_with(".tex")
+            let relative = editor.read(cx).relative();
+            relative.to_ascii_lowercase().ends_with(".tex")
+                || lattice_core::project::is_typst_path(relative)
         });
         let locating = self.parts.get::<PdfSync>().locating;
         let panels = std::iter::once((self.pdf.clone(), locating)).chain(

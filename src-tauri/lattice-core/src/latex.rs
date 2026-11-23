@@ -26,7 +26,7 @@
 use crate::models::{Diagnostic, ProjectManifest, RootDocument};
 use crate::{commands, project};
 use compile_root::compiled_document;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -268,7 +268,7 @@ pub struct BuildResult {
     pub aux_folder: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PdfSyncTarget {
     pub page: u32,

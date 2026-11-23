@@ -97,6 +97,9 @@ impl Shell {
             overleaf_linked: self.overleaf.read(cx).link().is_some(),
             overleaf_syncing: self.overleaf.read(cx).syncing(),
             latex_source: self.latex_source_in_front(cx),
+            typst_source: self.active_editor().is_some_and(|editor| {
+                lattice_core::project::is_typst_path(editor.read(cx).relative())
+            }),
             revisable_annotations: self.revisable_annotations(cx),
             text_editor: self.text_editor_in_front(cx),
             document_views: self.active_editor().and_then(|editor| {

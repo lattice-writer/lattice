@@ -102,7 +102,7 @@ impl BuildRequest {
 
     /// Typst's live build, after a pause in typing: quiet, unattended, and
     /// from the buffers.
-    fn typst_live() -> Self {
+    pub(super) fn typst_live() -> Self {
         Self {
             live: true,
             quiet: true,
@@ -300,7 +300,13 @@ impl Shell {
                         Ok((document, one_off)) if is_typst_path(&document) => Ok(match &typst {
                             Some(binary) => crate::typst::helper::build(
                                 binary, &root, &document, &overlay, one_off,
-                            ),
+                            )
+                            .unwrap_or_else(|failure| {
+                                // A helper from before this version's wire
+                                // protocol: download this version's again.
+                                needs_typst = failure.outdated;
+                                Reply::failed(failure.message).into_build(&root, &document, one_off)
+                            }),
                             None => {
                                 needs_typst = true;
                                 Reply::failed(t!("Typst support isn’t installed").to_string())

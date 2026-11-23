@@ -155,6 +155,9 @@ pub struct CommandContext {
     pub overleaf_syncing: bool,
     /// The editor in front is a LaTeX source (Insert table's `latexSource`).
     pub latex_source: bool,
+    /// The editor in front is a Typst source, which its helper maps to the
+    /// PDF as SyncTeX maps a LaTeX one.
+    pub typst_source: bool,
     /// How many annotations a revision round would ask about now.
     pub revisable_annotations: usize,
     /// A text editor is in front (Go to line's and Go to symbol's
@@ -295,8 +298,9 @@ pub fn commands(context: &CommandContext) -> Vec<Command> {
                     .not_recent(),
             );
         }
-        // Only from a LaTeX source, which SyncTeX maps to the PDF.
-        if context.latex_source {
+        // Only from a source the PDF can be matched to: LaTeX through
+        // SyncTeX, Typst through its helper.
+        if context.latex_source || context.typst_source {
             out.push(Command::new(
                 "sync-pdf",
                 t!("Jump to PDF"),
