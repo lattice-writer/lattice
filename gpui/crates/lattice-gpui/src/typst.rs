@@ -14,7 +14,8 @@
 //! version. Settings › Editor & builds removes it or downloads it again.
 //!
 //! `LATTICE_TYPST_HELPER` names a helper to use as installed (a local
-//! build, for development and the e2e, which then needs no network).
+//! build, for development and the e2e, which then needs no network); a
+//! release build reads it only in a scripted run.
 
 pub mod helper;
 pub mod install;
@@ -50,6 +51,9 @@ pub struct TypstSupport {
     phase: Phase,
     /// Not now, this session: typing compiles nothing until a build asks.
     declined: bool,
+    /// A download failed this session: typing stops fetching (and saying
+    /// so) on every pause, and a build asks again instead of fetching.
+    fetch_failed: bool,
     /// What runs once the helper is installed: the compiles that asked.
     waiting: Vec<Box<dyn FnOnce(&mut App)>>,
     _task: Option<Task<()>>,
@@ -74,7 +78,7 @@ pub fn init(scripted: bool, cx: &mut App) {
         })
         .join("typst");
     let dev = std::env::var_os("LATTICE_TYPST_HELPER")
-        .filter(|path| !path.is_empty())
+        .filter(|path| !path.is_empty() && (cfg!(debug_assertions) || scripted))
         .map(PathBuf::from);
     cx.set_global(TypstSupport {
         folder,
@@ -82,6 +86,7 @@ pub fn init(scripted: bool, cx: &mut App) {
         source: install::source(),
         phase: Phase::Idle,
         declined: false,
+        fetch_failed: false,
         waiting: Vec::new(),
         _task: None,
     });
@@ -100,9 +105,9 @@ pub fn binary(cx: &App) -> Option<PathBuf> {
 /// its question may still be asked.
 pub fn live_compiles(cx: &App) -> bool {
     binary(cx).is_some()
-        || cx
-            .try_global::<TypstSupport>()
-            .is_some_and(|support| !support.declined && support.phase == Phase::Idle)
+        || cx.try_global::<TypstSupport>().is_some_and(|support| {
+            !support.declined && !support.fetch_failed && support.phase == Phase::Idle
+        })
 }
 
 /// What Settings shows.
@@ -131,6 +136,7 @@ pub fn use_source(source: install::Source, cx: &mut App) {
         support.source = Some(source);
         support.dev = None;
         support.declined = false;
+        support.fetch_failed = false;
     }
 }
 
@@ -153,7 +159,7 @@ pub fn require(typing: bool, then: impl FnOnce(&mut App) + 'static, cx: &mut App
         }
         return;
     }
-    if typing && support.declined {
+    if typing && (support.declined || support.fetch_failed) {
         return;
     }
     let Some(source) = support.source.clone() else {
@@ -165,7 +171,7 @@ pub fn require(typing: bool, then: impl FnOnce(&mut App) + 'static, cx: &mut App
         return;
     };
     support.waiting.push(Box::new(then));
-    if install::installed_before(&support.folder) {
+    if install::installed_before(&support.folder) && !support.fetch_failed {
         download(cx);
         return;
     }
@@ -262,6 +268,7 @@ pub fn download(cx: &mut App) {
             let waiting = support_mut(cx)
                 .map(|support| {
                     support.phase = Phase::Idle;
+                    support.fetch_failed = installed.is_err();
                     std::mem::take(&mut support.waiting)
                 })
                 .unwrap_or_default();
