@@ -47,9 +47,9 @@ main blockquote { margin: 12px 0; padding: 2px 16px; border-left: 3px solid var(
 </ul>
 <h2 id="1-make-the-folder">1. Make the folder</h2>
 <pre><code class="language-sh">mkdir hello &amp;&amp; cd hello
-curl -fsSLO https://raw.githubusercontent.com/leo1oel/lattice/main/plugin-sdk/lattice-plugin.mjs
+curl -fsSLO https://raw.githubusercontent.com/lattice-writer/lattice/main/plugin-sdk/lattice-plugin.mjs
 </code></pre>
-<p><code>lattice-plugin.mjs</code> is the SDK: one MIT-licensed file with no dependencies that speaks the protocol for you. It lives in your folder because a plugin can read only its own folder. TypeScript types for it are in <a href="https://github.com/leo1oel/lattice/tree/main/plugin-sdk">plugin-sdk</a> (<code>index.d.ts</code> and <code>api.d.ts</code>).</p>
+<p><code>lattice-plugin.mjs</code> is the SDK: one MIT-licensed file with no dependencies that speaks the protocol for you. It lives in your folder because a plugin can read only its own folder. TypeScript types for it are in <a href="https://github.com/lattice-writer/lattice/tree/main/plugin-sdk">plugin-sdk</a> (<code>index.d.ts</code> and <code>api.d.ts</code>).</p>
 <h2 id="2-write-the-manifest">2. Write the manifest</h2>
 <p>Create <code>lattice-plugin.toml</code>:</p>
 <pre><code class="language-toml">schema = 1
@@ -208,7 +208,7 @@ definePlugin({
 <ul>
 <li><a href="plugin-reference.html">Plugin manifest and API</a>: every permission, host call, result and action.</li>
 <li><a href="plugin-publishing.html">Publishing a plugin</a>: pack Hello, list it in the plugin market, and ship updates.</li>
-<li>Two real plugins to copy: <a href="https://github.com/leo1oel/lattice/tree/main/examples/plugins/bib-check">bib-check</a> (diagnostics for <code>.bib</code> files) and <a href="https://github.com/leo1oel/lattice/tree/main/examples/plugins/zotero-search">zotero-search</a> (search Zotero and cite).</li>
+<li>Two real plugins to copy: <a href="https://github.com/lattice-writer/lattice/tree/main/examples/plugins/bib-check">bib-check</a> (diagnostics for <code>.bib</code> files) and <a href="https://github.com/lattice-writer/lattice/tree/main/examples/plugins/zotero-search">zotero-search</a> (search Zotero and cite).</li>
 </ul>
 </main>
 </div>

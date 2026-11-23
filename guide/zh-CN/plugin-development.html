@@ -47,9 +47,9 @@ main blockquote { margin: 12px 0; padding: 2px 16px; border-left: 3px solid var(
 </ul>
 <h2 id="1-新建文件夹">1. 新建文件夹</h2>
 <pre><code class="language-sh">mkdir hello &amp;&amp; cd hello
-curl -fsSLO https://raw.githubusercontent.com/leo1oel/lattice/main/plugin-sdk/lattice-plugin.mjs
+curl -fsSLO https://raw.githubusercontent.com/lattice-writer/lattice/main/plugin-sdk/lattice-plugin.mjs
 </code></pre>
-<p><code>lattice-plugin.mjs</code> 就是 SDK：一个 MIT 许可、没有依赖的文件，替你处理通信协议。它要放在你的文件夹里，因为插件只能读取自己的文件夹。它的 TypeScript 类型在 <a href="https://github.com/leo1oel/lattice/tree/main/plugin-sdk">plugin-sdk</a> 里（<code>index.d.ts</code> 和 <code>api.d.ts</code>）。</p>
+<p><code>lattice-plugin.mjs</code> 就是 SDK：一个 MIT 许可、没有依赖的文件，替你处理通信协议。它要放在你的文件夹里，因为插件只能读取自己的文件夹。它的 TypeScript 类型在 <a href="https://github.com/lattice-writer/lattice/tree/main/plugin-sdk">plugin-sdk</a> 里（<code>index.d.ts</code> 和 <code>api.d.ts</code>）。</p>
 <h2 id="2-编写清单文件">2. 编写清单文件</h2>
 <p>新建 <code>lattice-plugin.toml</code>：</p>
 <pre><code class="language-toml">schema = 1
@@ -208,7 +208,7 @@ definePlugin({
 <ul>
 <li><a href="plugin-reference.html">插件清单与 API</a>：所有权限、Lattice 调用、结果和操作。</li>
 <li><a href="plugin-publishing.html">发布插件</a>：打包 Hello，上架插件市场，发布更新。</li>
-<li>两个可以照抄的真实插件：<a href="https://github.com/leo1oel/lattice/tree/main/examples/plugins/bib-check">bib-check</a>（检查 <code>.bib</code> 文件的问题）和 <a href="https://github.com/leo1oel/lattice/tree/main/examples/plugins/zotero-search">zotero-search</a>（搜索 Zotero 并插入引用）。</li>
+<li>两个可以照抄的真实插件：<a href="https://github.com/lattice-writer/lattice/tree/main/examples/plugins/bib-check">bib-check</a>（检查 <code>.bib</code> 文件的问题）和 <a href="https://github.com/lattice-writer/lattice/tree/main/examples/plugins/zotero-search">zotero-search</a>（搜索 Zotero 并插入引用）。</li>
 </ul>
 </main>
 </div>

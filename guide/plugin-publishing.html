@@ -107,7 +107,7 @@ git push origin v0.1.0
 <p>The plugin can also live in a subfolder of a bigger repository; the entry&#39;s <code>path</code> then names that folder.</p>
 <h2 id="2-pack-it-and-get-its-hash">2. Pack it and get its hash</h2>
 <p>Pack a clean checkout of the tag with Lattice&#39;s pack script:</p>
-<pre><code class="language-sh">curl -fsSLO https://raw.githubusercontent.com/leo1oel/lattice/main/plugin-sdk/scripts/pack-plugin.mjs
+<pre><code class="language-sh">curl -fsSLO https://raw.githubusercontent.com/lattice-writer/lattice/main/plugin-sdk/scripts/pack-plugin.mjs
 git clone --quiet --depth 1 --branch v0.1.0 https://github.com/yourname/lattice-hello release
 node pack-plugin.mjs release dist/hello-0.1.0.zip
 </code></pre>

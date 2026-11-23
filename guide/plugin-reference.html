@@ -38,7 +38,7 @@ main blockquote { margin: 12px 0; padding: 2px 16px; border-left: 3px solid var(
 <nav><ol><li><a href="index.html">Lattice User Guide</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="writing.html">Writing</a></li><li><a href="citations.html">Citations and papers</a></li><li><a href="building.html">Building and fixing errors</a></li><li><a href="history.html">History and Compare versions</a></li><li><a href="overleaf.html">Overleaf sync</a></li><li><a href="boards.html">Boards</a></li><li><a href="agent.html">The Agent</a></li><li><a href="plugins-and-themes.html">Plugins and themes</a></li><li><a href="workspaces.html">Panels and workspaces</a></li><li><a href="settings-and-shortcuts.html">Settings and shortcuts</a></li><li><a href="troubleshooting.html">Troubleshooting</a></li><li><a href="plugin-development.html">Your first plugin</a></li><li><a href="plugin-reference.html" aria-current="page">Plugin manifest and API</a></li><li><a href="plugin-publishing.html">Publishing a plugin</a></li><li><a href="theme-development.html">Making a theme</a></li></ol></nav>
 <main>
 <h1 id="plugin-manifest-and-api">Plugin manifest and API</h1>
-<p>This page lists what a plugin can declare, ask for, call and return, with the rules the plugin market adds. The complete protocol, with every field and error code, is <a href="https://github.com/leo1oel/lattice/blob/main/docs/plugins.md">docs/plugins.md</a>; the schema it is generated from is <a href="https://github.com/leo1oel/lattice/blob/main/plugin-api/schema/level-1.json">plugin-api/schema/level-1.json</a>.</p>
+<p>This page lists what a plugin can declare, ask for, call and return, with the rules the plugin market adds. The complete protocol, with every field and error code, is <a href="https://github.com/lattice-writer/lattice/blob/main/docs/plugins.md">docs/plugins.md</a>; the schema it is generated from is <a href="https://github.com/lattice-writer/lattice/blob/main/plugin-api/schema/level-1.json">plugin-api/schema/level-1.json</a>.</p>
 <h2 id="the-manifest">The manifest</h2>
 <p><code>lattice-plugin.toml</code> sits at the root of the plugin folder.</p>
 <table>
@@ -252,7 +252,7 @@ const work = JSON.parse(response.body).message;
 </tbody></table>
 <p>Each action also takes an optional <code>title</code>. Lattice checks every action before showing it: paths must stay inside the project, URLs must be http or https, and BibTeX must be exactly one valid entry. Anything else is dropped.</p>
 <h2 id="compatibility">Compatibility</h2>
-<p>Plugin API levels only add things: new methods, optional fields, result kinds and action types. A plugin that declares <code>api = 1</code> keeps working on every later Lattice until level 1 is retired, which is announced at least two minor releases ahead in <a href="https://github.com/leo1oel/lattice/blob/main/docs/plugins.md#deprecation-register">docs/plugins.md</a>. Read only the fields you know, since results and contexts may gain fields.</p>
+<p>Plugin API levels only add things: new methods, optional fields, result kinds and action types. A plugin that declares <code>api = 1</code> keeps working on every later Lattice until level 1 is retired, which is announced at least two minor releases ahead in <a href="https://github.com/lattice-writer/lattice/blob/main/docs/plugins.md#deprecation-register">docs/plugins.md</a>. Read only the fields you know, since results and contexts may gain fields.</p>
 </main>
 </div>
 </body>
