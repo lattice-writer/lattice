@@ -186,6 +186,11 @@ git -C "$SYNARA_SOURCE_DIR" checkout \
 bun_bin="$PWD/node_modules/.bin/bun"
 (cd "$SYNARA_SOURCE_DIR" && "$bun_bin" install --frozen-lockfile)
 
+# Stage the runtimes once before the first run. `pnpm tauri dev` does this
+# itself before it starts Vite, but a cold staging takes several minutes (over
+# ten on Windows), longer than the 180 s Tauri waits for the dev server.
+# Later runs find them staged and go straight on.
+pnpm prepare:runtime:dev
 pnpm tauri dev
 ```
 

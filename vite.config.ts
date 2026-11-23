@@ -296,6 +296,16 @@ export default defineConfig(() => ({
     },
   },
 
+  // The dev server's dependency scan starts from index.html and does not follow
+  // `?worker&url` imports, so it met PDF.js's worker only when the first PDF
+  // opened: it then pre-bundled that ~2 MB module (over a minute on a cold
+  // Windows dev run) and reloaded the page, while the viewer's 45 s load
+  // timeout (src/pdf/use-pdf-document.ts) had already fired. Naming it here
+  // bundles it at server start instead.
+  optimizeDeps: {
+    include: ["pdfjs-dist/build/pdf.worker.mjs"],
+  },
+
   // The PDF.js worker (src/pdf/pdfjs-runtime.ts) is the only worker. PDF.js
   // starts it as a module, and its wasm loaders read `import.meta.url`.
   worker: {
