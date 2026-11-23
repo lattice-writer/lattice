@@ -32,6 +32,7 @@ mod adapter;
 pub mod annotation_revision;
 pub mod blocks;
 pub mod caret_card;
+pub mod code_languages;
 pub mod completion;
 pub mod decorations;
 pub mod folds;

@@ -1,0 +1,13 @@
+name = "R"
+grammar = "r"
+path_suffixes = ["r", "R", "Rprofile", ".Rprofile"]
+line_comments = ["# "]
+word_characters = [".", "_"]
+autoclose_before = ";:.,=}])>"
+brackets = [
+    { start = "{", end = "}", close = true, newline = true },
+    { start = "[", end = "]", close = true, newline = true },
+    { start = "(", end = ")", close = true, newline = true },
+    { start = "\"", end = "\"", close = true, newline = false, not_in = ["string", "comment"] },
+    { start = "'", end = "'", close = true, newline = false, not_in = ["string", "comment"] },
+]

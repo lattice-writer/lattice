@@ -67,7 +67,10 @@ pub(crate) fn javascript() -> Language {
     build(
         include_str!("../languages/javascript/config.toml"),
         |config| Language::new(config, Some(tree_sitter_javascript::LANGUAGE.into())),
-        include_str!("../languages/javascript/highlights.scm"),
+        concat!(
+            include_str!("../languages/javascript/highlights.scm"),
+            include_str!("../languages/javascript/highlights-jsx.scm")
+        ),
         None,
     )
 }

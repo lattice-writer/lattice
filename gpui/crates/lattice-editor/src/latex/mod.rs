@@ -102,7 +102,8 @@ pub fn is_tex_source(path: &Path) -> bool {
 /// The language for a file, by extension: LaTeX for TeX sources, Markdown
 /// for `.md` files, BibTeX for a bibliography and HTML for a `.html` file
 /// (whose buffers also need [`crate::markdown::registry`] for their
-/// injections), plain text for everything else.
+/// injections). A code file's language loads on first use
+/// ([`crate::code_languages::load_for_path`]); anything else is plain text.
 pub fn language_for_path(path: &Path, cx: &App) -> Option<Arc<Language>> {
     if crate::markdown::is_markdown(path) {
         return Some(crate::markdown::language(cx));

@@ -299,6 +299,7 @@ impl EditorPanel {
     ) -> Self {
         let started = std::time::Instant::now();
         let language = latex::language_for_path(&path, cx);
+        let code_file = language.is_none();
         let saved_text = normalize_breaks(&text);
         let buffer = cx.new(|cx| Buffer::local(text, cx));
         let buffered = started.elapsed();
@@ -522,6 +523,9 @@ impl EditorPanel {
         this.attach_review_marks(cx);
         this.paint_highlights(cx);
         this.paint_conflicts(cx);
+        if code_file {
+            this.load_code_language(cx);
+        }
         this
     }
 

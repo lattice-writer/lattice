@@ -57,6 +57,7 @@ pub(crate) fn init(latex: Arc<Language>, cx: &mut App) {
         registry.add(language);
     }
     cx.set_global(bundled);
+    crate::code_languages::register(&registry);
     registry.set_theme(cx.theme().clone());
     cx.set_global(MarkdownLanguages { markdown, registry });
 

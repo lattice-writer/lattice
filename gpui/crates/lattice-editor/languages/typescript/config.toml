@@ -1,0 +1,15 @@
+name = "TypeScript"
+grammar = "typescript"
+path_suffixes = ["ts", "mts", "cts"]
+line_comments = ["// "]
+block_comment = { start = "/* ", prefix = "", end = " */", tab_size = 0 }
+word_characters = ["$", "#"]
+autoclose_before = ";:.,=}])>"
+brackets = [
+    { start = "{", end = "}", close = true, newline = true },
+    { start = "[", end = "]", close = true, newline = true },
+    { start = "(", end = ")", close = true, newline = true },
+    { start = "\"", end = "\"", close = true, newline = false, not_in = ["string", "comment"] },
+    { start = "'", end = "'", close = true, newline = false, not_in = ["string", "comment"] },
+    { start = "`", end = "`", close = true, newline = false, not_in = ["string", "comment"] },
+]

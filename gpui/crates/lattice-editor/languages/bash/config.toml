@@ -1,0 +1,14 @@
+name = "Shell Script"
+grammar = "bash"
+path_suffixes = ["sh", "bash", "zsh", "command", ".bashrc", ".bash_profile", ".bash_aliases", ".zshrc", ".zprofile", ".zshenv", ".profile", "PKGBUILD"]
+line_comments = ["# "]
+word_characters = ["-", "_"]
+autoclose_before = ";:.,=}])>"
+brackets = [
+    { start = "{", end = "}", close = true, newline = true },
+    { start = "[", end = "]", close = true, newline = true },
+    { start = "(", end = ")", close = true, newline = true },
+    { start = "\"", end = "\"", close = true, newline = false, not_in = ["string", "comment"] },
+    { start = "'", end = "'", close = true, newline = false, not_in = ["string", "comment"] },
+    { start = "`", end = "`", close = true, newline = false, not_in = ["string", "comment"] },
+]

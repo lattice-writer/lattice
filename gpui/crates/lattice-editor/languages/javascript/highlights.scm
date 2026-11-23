@@ -16,7 +16,7 @@
   function: (identifier) @function)
 
 (class_declaration
-  name: (identifier) @type)
+  name: (_) @type)
 
 [
   (string)

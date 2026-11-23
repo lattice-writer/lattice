@@ -319,6 +319,35 @@ The Synara web client staged into the sidecar (`synara-runtime/server/dist/clien
 
 Modifications: `react-icons` converts each icon's SVG path data into a React component. Neither icon set has been otherwise changed. The licensors provide the icons as-is and make no warranties; see section 5 of the license.
 
+## Code-file highlighting grammars (the GPUI app's editor, `gpui/crates/lattice-editor/src/code_languages.rs`)
+
+The GPUI app highlights code files with these tree-sitter grammars, compiled into the app from crates.io. Lattice's highlight queries (`gpui/crates/lattice-editor/languages/<language>/highlights.scm`) are its own, adapted from each grammar's `queries/highlights.scm` under the same license. All are MIT-licensed; the license text follows the list.
+
+- `tree-sitter-python` 0.25.0: Copyright (c) 2016 Max Brunsfeld
+- `tree-sitter-typescript` 0.23.2 (TypeScript and TSX): Copyright (c) 2017 Max Brunsfeld
+- `tree-sitter-json` 0.24.8: Copyright (c) 2014 Max Brunsfeld
+- `tree-sitter-yaml` 0.7.2: Copyright (c) 2024 tree-sitter-grammars contributors; Copyright (c) 2019-2021 Ika
+- `tree-sitter-toml-ng` 0.7.0: Copyright (c) Ika <ikatyang@gmail.com>
+- `tree-sitter-bash` 0.25.1 (shell scripts, zsh included): Copyright (c) 2017 Max Brunsfeld
+- `tree-sitter-c` 0.24.2: Copyright (c) 2014 Max Brunsfeld
+- `tree-sitter-cpp` 0.23.4: Copyright (c) 2014 Max Brunsfeld
+- `tree-sitter-rust` 0.24.2: Copyright (c) 2017 Maxim Sokolov
+- `tree-sitter-go` 0.25.0: Copyright (c) 2014 Max Brunsfeld
+- `tree-sitter-java` 0.23.5: Copyright (c) 2017 Ayman Nadeem
+- `tree-sitter-r` 1.3.0: Copyright (c) 2025 tree-sitter-r authors
+- `tree-sitter-lua` 0.5.0: Copyright (c) 2021 Munif Tanjim
+- `tree-sitter-make` 1.1.1: Copyright (c) 2021 Alexandre A. Muller
+- `tree-sitter-containerfile` 0.9.2 (Dockerfiles): Copyright (c) 2026 WharfLab; Copyright (c) 2021 Camden Cheek
+- `tree-sitter-language` 0.1: Copyright (c) 2018 Max Brunsfeld
+
+Several of these crates' published archives omit the license file; the copyright lines above come from each grammar's repository.
+
+> Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+>
+> The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+>
+> THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
 ## Spelling dictionaries (downloaded on first use, not shipped)
 
 Spell checking in languages other than English reads Hunspell dictionaries with [`spellbook`](https://github.com/helix-editor/spellbook) (MPL-2.0, attributed in the generated section below). The dictionaries themselves are **not part of the app**: when a document's babel or polyglossia language first needs one, Lattice downloads that language's `index.aff`, `index.dic` and `license` from [wooorm/dictionaries](https://github.com/wooorm/dictionaries) at the revision pinned in `src-tauri/lattice-core/src/spelling/dictionaries.json`, checks each file against the SHA-256 recorded there, and keeps them in the app's data folder with the licence text they came with. Each dictionary keeps its own licence (MPL, LGPL, GPL, BSD and others; the SPDX expression is recorded per language in that file, and the app shows it before and after the download, and in Settings). The dictionaries come from LibreOffice and other upstream projects; see each language's folder in wooorm/dictionaries for its origin and authors.

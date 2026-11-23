@@ -1,0 +1,13 @@
+name = "C"
+grammar = "c"
+path_suffixes = ["c", "h"]
+line_comments = ["// "]
+block_comment = { start = "/* ", prefix = "", end = " */", tab_size = 0 }
+autoclose_before = ";:.,=}])>"
+brackets = [
+    { start = "{", end = "}", close = true, newline = true },
+    { start = "[", end = "]", close = true, newline = true },
+    { start = "(", end = ")", close = true, newline = true },
+    { start = "\"", end = "\"", close = true, newline = false, not_in = ["string", "comment"] },
+    { start = "'", end = "'", close = true, newline = false, not_in = ["string", "comment"] },
+]

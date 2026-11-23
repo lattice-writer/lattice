@@ -1,0 +1,13 @@
+name = "Python"
+grammar = "python"
+path_suffixes = ["py", "pyi", "pyw"]
+line_comments = ["# "]
+word_characters = ["_"]
+autoclose_before = ";:.,=}])>"
+brackets = [
+    { start = "{", end = "}", close = true, newline = true },
+    { start = "[", end = "]", close = true, newline = true },
+    { start = "(", end = ")", close = true, newline = true },
+    { start = "\"", end = "\"", close = true, newline = false, not_in = ["string", "comment"] },
+    { start = "'", end = "'", close = true, newline = false, not_in = ["string", "comment"] },
+]

@@ -3,8 +3,10 @@
 //! the fixture's `references.bib` opens in BibTeX, its entry type a keyword
 //! and a field name a property; a scratch `page.html` opens in HTML, a tag a
 //! type and an attribute an attribute, with its `<style>` highlighted as CSS
-//! and its `<script>` as JavaScript; and a fenced `css` block in a scratch
-//! Markdown file is CSS. The scratch files go after.
+//! and its `<script>` as JavaScript; a scratch `e2e-script.py` opens in
+//! Python, built the first time it is needed (`lattice_editor::code_languages`);
+//! and a scratch Markdown file's fenced `css` block is CSS and its `python`
+//! block Python. The scratch files go after.
 
 use std::{path::Path, time::Duration};
 
@@ -20,7 +22,9 @@ const PAGE: &str = "e2e-page.html";
 const PAGE_TEXT: &str = "<!DOCTYPE html>\n<p class=\"lead\">Hi</p>\n\
 <style>.note { color: red; }</style>\n<script>let count = 2;</script>\n";
 const NOTES: &str = "e2e-fence.md";
-const NOTES_TEXT: &str = "# Notes\n\n```css\n.note { margin: 0; }\n```\n";
+const NOTES_TEXT: &str = "# Notes\n\n```css\n.note { margin: 0; }\n```\n\n```python\nimport math\n```\n";
+const SCRIPT: &str = "e2e-script.py";
+const SCRIPT_TEXT: &str = "# Fit\ndef area(r):\n    return math.pi * r ** 2\n";
 
 /// The buffer's language, and the capture each `(needle, nth byte)` of its
 /// text is highlighted with, once the syntax has been parsed.
@@ -151,19 +155,46 @@ impl Run {
         );
         self.close_panel(cx, &panel).await?;
 
+        let script = root.join(SCRIPT);
+        std::fs::write(&script, SCRIPT_TEXT)?;
+        let panel = self.open(cx, &script, Some(1))?;
+        let (language, found) = self
+            .parsed_highlights(
+                cx,
+                &panel,
+                &[("# Fit", 0), ("def", 0), ("area", 0), ("pi", 0), ("2", 0)],
+            )
+            .await;
+        self.completion_shot(cx, "source-language-python").await;
+        steps.check(
+            "a .py file opens in Python, built on first use: a comment a comment, def a keyword, the function's name a function, an attribute a property",
+            language.as_deref() == Some("Python")
+                && capture(&found, "# Fit") == Some("comment")
+                && capture(&found, "def") == Some("keyword")
+                && capture(&found, "area") == Some("function")
+                && capture(&found, "pi") == Some("property")
+                && capture(&found, "2") == Some("number"),
+            json!({ "language": language, "captures": found }),
+        );
+        self.close_panel(cx, &panel).await?;
+
         let notes = root.join(NOTES);
         std::fs::write(&notes, NOTES_TEXT)?;
         let panel = self.open(cx, &notes, Some(1))?;
-        let (language, found) = self.parsed_highlights(cx, &panel, &[("margin", 0)]).await;
+        let (language, found) = self
+            .parsed_highlights(cx, &panel, &[("margin", 0), ("import", 0)])
+            .await;
         self.completion_shot(cx, "source-language-markdown-css").await;
         steps.check(
-            "a Markdown file's fenced css block is highlighted as CSS",
+            "a Markdown file's fenced css block is highlighted as CSS, and its python block as Python",
             language.as_deref() == Some("Markdown")
-                && capture(&found, "margin") == Some("property"),
+                && capture(&found, "margin") == Some("property")
+                && capture(&found, "import") == Some("keyword"),
             json!({ "language": language, "captures": found }),
         );
         self.close_panel(cx, &panel).await?;
         std::fs::remove_file(&page).ok();
+        std::fs::remove_file(&script).ok();
         std::fs::remove_file(&notes).ok();
         Ok(())
     }
@@ -177,6 +208,7 @@ pub(super) const MODULE: super::registry::Module = super::registry::Module {
     setup: false,
     covers: &[
         "gpui/crates/lattice-editor/src/languages.rs",
+        "gpui/crates/lattice-editor/src/code_languages.rs",
         "gpui/crates/lattice-editor/languages",
         "gpui/crates/lattice-editor/src/markdown.rs",
     ],

@@ -51,8 +51,12 @@ impl EditorPanel {
         self.spelling_moved(cx);
         self.disk = DiskVersion::Unread;
         let language = latex::language_for_path(&self.path, cx);
+        let code = language.is_none();
         self.buffer
             .update(cx, |buffer, cx| buffer.set_language(language, cx));
+        if code {
+            self.load_code_language(cx);
+        }
         let tex = latex::is_tex_source(&self.path);
         self.lattice.update(cx, |lattice, cx| {
             lattice.set_fold_source(tex.then(latex::folding::source), cx)
@@ -79,5 +83,27 @@ impl EditorPanel {
         self.offer_view_switch(cx);
         crate::crash::note_editor(self, cx);
         cx.notify();
+    }
+
+    /// Give a code file (Python, Rust, a Makefile…) its language once the
+    /// registry has built it, the first such file of a session waiting about
+    /// a frame for its query (`lattice_editor::code_languages`). A file
+    /// renamed meanwhile keeps what its new name chose.
+    pub(super) fn load_code_language(&self, cx: &mut Context<Self>) {
+        let Some(load) = lattice_editor::code_languages::load_for_path(&self.path, cx) else {
+            return;
+        };
+        let path = self.path.clone();
+        cx.spawn(async move |this, cx| {
+            let language = load.await?;
+            this.update(cx, |this, cx| {
+                if this.path == path {
+                    this.buffer
+                        .update(cx, |buffer, cx| buffer.set_language(Some(language), cx));
+                }
+            })
+            .ok()
+        })
+        .detach();
     }
 }

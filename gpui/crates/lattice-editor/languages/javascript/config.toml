@@ -1,6 +1,6 @@
 name = "JavaScript"
 grammar = "javascript"
-path_suffixes = ["js", "mjs", "cjs"]
+path_suffixes = ["js", "mjs", "cjs", "jsx"]
 line_comments = ["// "]
 block_comment = { start = "/* ", prefix = "", end = " */", tab_size = 0 }
 autoclose_before = ";:.,=}])>"
