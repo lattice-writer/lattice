@@ -37,6 +37,10 @@ pub struct PageKey {
     pub alt: bool,
     #[serde(default)]
     pub shift: bool,
+    /// The keyboard sending the key again while it is held
+    /// (`KeyboardEvent.repeat`); a page that does not say sends a press.
+    #[serde(default)]
+    pub repeat: bool,
 }
 
 impl PageKey {

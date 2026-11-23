@@ -5898,11 +5898,17 @@ impl Window {
     /// Dispatch a given keystroke as though the user had typed it.
     /// You can create a keystroke with Keystroke::parse("").
     pub fn dispatch_keystroke(&mut self, keystroke: Keystroke, cx: &mut App) -> bool {
+        self.dispatch_key_down(keystroke, false, cx)
+    }
+
+    /// [\`Self::dispatch_keystroke\`] for a key that may be held down: with
+    /// \`is_held\`, the keyboard's repeat of it.
+    pub fn dispatch_key_down(&mut self, keystroke: Keystroke, is_held: bool, cx: &mut App) -> bool {
         let keystroke = keystroke.with_simulated_ime();
         let result = self.dispatch_event(
             PlatformInput::KeyDown(KeyDownEvent {
                 keystroke: keystroke.clone(),
-                is_held: false,
+                is_held,
                 prefer_character_input: false,
             }),
             cx,
@@ -6532,8 +6538,36 @@ impl Window {
 
         // Interceptors or replayed actions may have changed whether the input handler accepts text.
         let input_preference = self.input_preference(event, cx);
+        let held = event
+            .downcast_ref::<KeyDownEvent>()
+            .is_some_and(|key_down| key_down.is_held);
         if input_preference == InputPreference::KeyBindings {
             for binding in match_result.bindings {
+                if held
+                    && cx
+                        .held_key_repeats
+                        .clone()
+                        .is_some_and(|repeats| !repeats(binding.action.as_ref()))
+                {
+                    // Taken but not run again: an action the first press
+                    // ran (or would have) holds the key; one nothing here
+                    // handles, no node on the path and no global listener,
+                    // leaves it to the next binding.
+                    let action = binding.action.as_ref();
+                    if self
+                        .rendered_frame
+                        .dispatch_tree
+                        .is_action_available(action, node_id)
+                        || cx
+                            .global_action_listeners
+                            .contains_key(&action.as_any().type_id())
+                    {
+                        cx.propagate_event = false;
+                        self.pending_input_changed(cx);
+                        return;
+                    }
+                    continue;
+                }
                 self.dispatch_action_on_node(node_id, binding.action.as_ref(), cx);
                 if !cx.propagate_event {
                     self.dispatch_keystroke_observers(

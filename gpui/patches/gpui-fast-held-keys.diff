@@ -1,0 +1,144 @@
+diff --git a/gpui-fast/crates/gpui/src/app.rs b/gpui-fast/crates/gpui/src/app.rs
+--- a/gpui-fast/crates/gpui/src/app.rs
++++ b/gpui-fast/crates/gpui/src/app.rs
+@@ -914,6 +914,7 @@ pub struct App {
+     pub(crate) event_listeners: SubscriberSet<EntityId, (TypeId, Listener)>,
+     pub(crate) keystroke_observers: SingleSubscriberSet<KeystrokeObserver>,
+     pub(crate) keystroke_interceptors: SingleSubscriberSet<KeystrokeObserver>,
++    pub(crate) held_key_repeats: Option<Rc<dyn Fn(&dyn Action) -> bool>>,
+     pub(crate) keyboard_layout_observers: SingleSubscriberSet<Handler>,
+     missing_glyph_callback: Rc<MissingGlyphCallbackSlot>,
+     pub(crate) thermal_state_observers: SingleSubscriberSet<Handler>,
+@@ -1064,6 +1065,7 @@ impl App {
+                 release_listeners: SubscriberSet::new(),
+                 keystroke_observers: SingleSubscriberSet::new(),
+                 keystroke_interceptors: SingleSubscriberSet::new(),
++                held_key_repeats: None,
+                 keyboard_layout_observers: SingleSubscriberSet::new(),
+                 missing_glyph_callback: Rc::default(),
+                 thermal_state_observers: SingleSubscriberSet::new(),
+@@ -2744,6 +2746,14 @@ impl App {
+             }))
+     }
+ 
++    /// Decide which bound actions run again while their key is held: for a
++    /// key the keyboard repeats, a binding whose action \`repeats\` refuses
++    /// still takes the key, so it is neither typed nor passed on, but runs
++    /// only on the first press. Without it every action repeats.
++    pub fn set_held_key_repeats(&mut self, repeats: impl Fn(&dyn Action) -> bool + 'static) {
++        self.held_key_repeats = Some(Rc::new(repeats));
++    }
++
+     /// Register key bindings.
+     pub fn bind_keys(&mut self, bindings: impl IntoIterator<Item = KeyBinding>) {
+         self.keymap.borrow_mut().add_bindings(bindings);
+diff --git a/gpui-fast/crates/gpui/src/key_dispatch.rs b/gpui-fast/crates/gpui/src/key_dispatch.rs
+--- a/gpui-fast/crates/gpui/src/key_dispatch.rs
++++ b/gpui-fast/crates/gpui/src/key_dispatch.rs
+@@ -1722,6 +1722,47 @@ mod tests {
+         test.read_with(cx, |test, _| assert_eq!(test.action_count.get(), 0));
+     }
+ 
++    #[crate::test]
++    fn test_held_key_runs_an_action_once_unless_it_repeats(cx: &mut TestAppContext) {
++        let (test, cx) = cx.add_window_view(|_, cx| PendingTextInputTestView::new(cx));
++        test.update_in(cx, |test, window, cx| {
++            window.focus(&test.focus_handle, cx);
++            window.activate_window();
++        });
++        cx.update(|_, cx| cx.bind_keys([KeyBinding::new("ctrl-k", TestAction, Some("Terminal"))]));
++        fn press(cx: &mut VisualTestContext, is_held: bool) -> bool {
++            cx.update(|window, cx| {
++                window
++                    .dispatch_event(
++                        PlatformInput::KeyDown(KeyDownEvent {
++                            keystroke: Keystroke::parse("ctrl-k").expect("valid keystroke"),
++                            is_held,
++                            prefer_character_input: false,
++                        }),
++                        cx,
++                    )
++                    .propagate
++            })
++        }
++
++        for is_held in [false, true, true] {
++            assert!(!press(cx, is_held));
++        }
++        test.read_with(cx, |test, _| assert_eq!(test.action_count.get(), 3));
++
++        test.update(cx, |test, _| test.action_count.set(0));
++        cx.update(|_, cx| {
++            cx.set_held_key_repeats(|action| !action.as_any().is::<TestAction>())
++        });
++        for is_held in [false, true, true] {
++            assert!(!press(cx, is_held));
++        }
++        test.read_with(cx, |test, _| {
++            assert_eq!(test.action_count.get(), 1);
++            assert_eq!(test.text.borrow().as_str(), "");
++        });
++    }
++
+     #[crate::test]
+     fn test_consumed_modifier_preserves_pending_input(cx: &mut TestAppContext) {
+         let (test, cx) = cx.add_window_view(|_, cx| PendingTextInputTestView::new(cx));
+diff --git a/gpui-fast/crates/gpui/src/window.rs b/gpui-fast/crates/gpui/src/window.rs
+--- a/gpui-fast/crates/gpui/src/window.rs
++++ b/gpui-fast/crates/gpui/src/window.rs
+@@ -5898,11 +5898,17 @@ impl Window {
+     /// Dispatch a given keystroke as though the user had typed it.
+     /// You can create a keystroke with Keystroke::parse("").
+     pub fn dispatch_keystroke(&mut self, keystroke: Keystroke, cx: &mut App) -> bool {
++        self.dispatch_key_down(keystroke, false, cx)
++    }
++
++    /// [\`Self::dispatch_keystroke\`] for a key that may be held down: with
++    /// \`is_held\`, the keyboard's repeat of it.
++    pub fn dispatch_key_down(&mut self, keystroke: Keystroke, is_held: bool, cx: &mut App) -> bool {
+         let keystroke = keystroke.with_simulated_ime();
+         let result = self.dispatch_event(
+             PlatformInput::KeyDown(KeyDownEvent {
+                 keystroke: keystroke.clone(),
+-                is_held: false,
++                is_held,
+                 prefer_character_input: false,
+             }),
+             cx,
+@@ -6532,8 +6538,36 @@ impl Window {
+ 
+         // Interceptors or replayed actions may have changed whether the input handler accepts text.
+         let input_preference = self.input_preference(event, cx);
++        let held = event
++            .downcast_ref::<KeyDownEvent>()
++            .is_some_and(|key_down| key_down.is_held);
+         if input_preference == InputPreference::KeyBindings {
+             for binding in match_result.bindings {
++                if held
++                    && cx
++                        .held_key_repeats
++                        .clone()
++                        .is_some_and(|repeats| !repeats(binding.action.as_ref()))
++                {
++                    // Taken but not run again: an action the first press
++                    // ran (or would have) holds the key; one nothing here
++                    // handles, no node on the path and no global listener,
++                    // leaves it to the next binding.
++                    let action = binding.action.as_ref();
++                    if self
++                        .rendered_frame
++                        .dispatch_tree
++                        .is_action_available(action, node_id)
++                        || cx
++                            .global_action_listeners
++                            .contains_key(&action.as_any().type_id())
++                    {
++                        cx.propagate_event = false;
++                        self.pending_input_changed(cx);
++                        return;
++                    }
++                    continue;
++                }
+                 self.dispatch_action_on_node(node_id, binding.action.as_ref(), cx);
+                 if !cx.propagate_event {
+                     self.dispatch_keystroke_observers(

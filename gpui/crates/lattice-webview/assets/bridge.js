@@ -51,6 +51,7 @@
       ctrl: !!event.ctrlKey,
       alt: !!event.altKey,
       shift: !!event.shiftKey,
+      repeat: !!event.repeat,
     });
     return true;
   };

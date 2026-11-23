@@ -14,6 +14,7 @@ use lattice_i18n::{space_mixed_script, t, tc};
 use super::trellis_layout::Preset;
 
 mod appearance;
+mod held_keys;
 mod key_labels;
 mod keymap;
 mod presets;

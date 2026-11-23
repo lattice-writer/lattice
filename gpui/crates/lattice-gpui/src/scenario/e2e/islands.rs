@@ -331,9 +331,34 @@ impl Run {
                 && relayed["prevented"] == true,
             json!({ "outcomes": outcomes }),
         );
+
+        // Held in the page: the page says which keys are the keyboard's
+        // repeats (`KeyboardEvent.repeat`), and GPUI runs the palette's
+        // toggle for the press alone (`shell/commands/held_keys.rs`).
+        let forwards = cx.update(|cx| island.read(cx).stats().shortcuts);
+        let mut open_after = Vec::new();
+        for repeat in [false, true, true, true, true] {
+            let script = format!(
+                "(() => {{ const event = new KeyboardEvent('keydown', {{ code: 'KeyK', key: 'k', \
+                 {chord}: true, repeat: {repeat}, bubbles: true, cancelable: true }}); \
+                 document.body.dispatchEvent(event); return event.defaultPrevented; }})()"
+            );
+            self.evaluate(cx, island, &script).await;
+            self.pause(cx, Duration::from_millis(150)).await;
+            open_after.push(cx.update(|cx| shell.read(cx).palette_rows(cx).is_some()));
+        }
+        let forwarded = cx.update(|cx| island.read(cx).stats().shortcuts) - forwards;
+        steps.check(
+            "⌘K / Ctrl+K held in the page opens GPUI's palette once, and its repeats keep it open",
+            forwarded == 5 && open_after.iter().all(|open| *open),
+            json!({ "forwarded": forwarded, "open_after_each_key": open_after }),
+        );
         self.with_window(cx, |shell, window, cx| {
             shell.update(cx, |shell, cx| shell.close_overlays(window, cx))
         })?;
+        // The palette's exit has played out before the next click in the
+        // page, which it would take.
+        self.pause(cx, Duration::from_millis(500)).await;
         Ok(())
     }
 

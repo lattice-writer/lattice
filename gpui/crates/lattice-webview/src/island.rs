@@ -657,11 +657,11 @@ impl Island {
                     return;
                 };
                 self.stats.shortcuts += 1;
-                // Dispatched after this update: the action may well touch
-                // the island's owner, which is being updated now.
+                // Dispatched after this update: the action may touch the
+                // island's owner, being updated now.
                 let this = cx.entity().downgrade();
                 window.defer(cx, move |window, cx| {
-                    window.dispatch_keystroke(keystroke, cx);
+                    window.dispatch_key_down(keystroke, key.repeat, cx);
                     this.update(cx, |this, cx| this.sync_native_focus(window, cx))
                         .ok();
                 });
