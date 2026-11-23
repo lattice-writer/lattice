@@ -193,6 +193,8 @@ export class SizedTableView extends TableView {
 
 const isTable = (node: PmNode) => node.type.spec.tableRole === "table";
 const same = <T,>(left: readonly T[], right: readonly T[]) => left.length === right.length && left.every((value, index) => value === right[index]);
+/** A table's row heights, none while every row is at its content's height (as `savedAfter` keeps them). */
+const setHeights = (heights: readonly (number | null)[]) => (heights.some((height) => height !== null) ? heights : []);
 const NO_SIZES: Sizes = { widths: [], heights: [] };
 const savedSizes = (entry: SavedTable | null | undefined): Sizes => (entry ? { widths: entry.widths, heights: entry.heights ?? [] } : NO_SIZES);
 
@@ -210,7 +212,7 @@ function computeState(doc: PmNode, saved: readonly SavedTable[], drawn: Overlay)
   // An overlay stays only on the table it was drawn for, until the host keeps it.
   const overlay: Overlay = Object.fromEntries(Object.entries(drawn).filter(([index, own]) => {
     const kept = savedSizes(matched[Number(index)]);
-    return signatures[Number(index)] === own.signature && !(same(kept.widths, own.widths) && same(kept.heights, own.heights));
+    return signatures[Number(index)] === own.signature && !(same(kept.widths, own.widths) && same(setHeights(kept.heights), setHeights(own.heights)));
   }));
   const decorations = nodes.flatMap((node, index) => {
     const pos = tables[index]!;
@@ -353,8 +355,8 @@ class ColumnResize {
   private indexOf(table: PmNode, signature: string): number | null {
     const state = this.state();
     const { doc } = this.view.state;
-    const same = state.tables.findIndex((pos) => doc.nodeAt(pos) === table);
-    if (same >= 0) return same;
+    const held = state.tables.findIndex((pos) => doc.nodeAt(pos) === table);
+    if (held >= 0) return held;
     const named = state.signatures.flatMap((other, index) => (other === signature ? [index] : []));
     return named.length === 1 ? named[0]! : null;
   }

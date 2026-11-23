@@ -81,8 +81,6 @@ fn table_facts(index: usize) -> String {
     )
 }
 
-/// The widths kept for the table saved at `index` (the file's tables have
-/// distinct signatures, so each is saved at its own index).
 /// The page's view of a table's first body row: a point on its bottom
 /// border (brought into view first), its height and its set height.
 fn row_facts(index: usize) -> String {
@@ -105,6 +103,8 @@ fn heights_at(saved: &Value, index: u64) -> Vec<Option<f64>> {
         .unwrap_or_default()
 }
 
+/// The widths kept for the table saved at `index` (the file's tables have
+/// distinct signatures, so each is saved at its own index).
 fn kept_at(saved: &Value, index: u64) -> Vec<f64> {
     saved
         .as_array()

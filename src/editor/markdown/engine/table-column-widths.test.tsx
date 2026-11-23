@@ -199,6 +199,24 @@ describe("table column widths", () => {
     expect(host.onChange).not.toHaveBeenCalled();
   });
 
+  it("drops a column drag's overlay once the host keeps it, so a later list from the host is drawn", async () => {
+    const host = keeper();
+    const { rerender } = renderEditor({ tableColumnWidths: host });
+    await waitFor(() => expect(tables()).toHaveLength(2));
+    pressBorder(tableNamed("Model"));
+    fireEvent.mouseMove(window, { clientX: 148 });
+    fireEvent.mouseUp(window, { clientX: 148 });
+    const kept = host.onChange.mock.lastCall![0];
+    expect(kept).toEqual([{ index: 0, signature: SIG_A, widths: [150, 100] }]);
+    rerender({ tableColumnWidths: { ...host, tables: kept } });
+    await waitFor(() => expect(colWidths(tableNamed("Model"))).toEqual(["150px", "100px"]));
+    // An edit while the host keeps the drag: the overlay has served its turn.
+    const { editor } = surface();
+    act(() => { editor.view.dispatch(editor.state.tr.insertText("!", editor.state.doc.content.size - 2)); });
+    rerender({ text: doc(A, "Between, edited.", B), tableColumnWidths: { ...host, tables: [] } });
+    await waitFor(() => expect(tableNamed("Model")).not.toHaveAttribute("data-sized"));
+  });
+
   it("fits a column to its content on a double-click on its border", async () => {
     const host = keeper([{ index: 0, signature: SIG_A, widths: [60, 90] }]);
     renderEditor({ tableColumnWidths: host });
