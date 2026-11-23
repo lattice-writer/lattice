@@ -8,9 +8,9 @@ measurements; re-run the commands rather than quoting them.
 
 ## The current pin
 
-The fork as a whole is **not** small. Measured on 2026-11-20 against upstream
+The fork as a whole is **not** small. Measured on 2026-11-23 against upstream
 `v1.6.2` (`47f8f39979a61fc16e86b214c65bf56c46284061`), the current integration changes
-**912 files, +93,607 / −7,863 lines** (about 6,700 of the added lines are the zh-CN catalogs,
+**913 files, +93,693 / −7,883 lines** (about 6,700 of the added lines are the zh-CN catalogs,
 which upstream no longer ships). It carries embedded-workspace UI, a skills manager,
 source-control and provider-health surfaces, spreadsheet and canvas tool brokers, and their
 contracts. Treat "keep it in the seam" as the goal for new work. Re-measure after each sync:
@@ -496,3 +496,7 @@ The pin moved from `90535f011` to `8be5024bd` on `amp/lattice-v1.6.2-sync`, thro
 - **History at every width** ([fork PR 40](https://github.com/leo1oel/synara/pull/40)). The embed hides the open-thread tabs so the history menu shows at every panel width.
 
 Tool calls, checkpoints and provider sessions are not imported: the classic transcript comes over as messages. The staged runtime is 187.7 MB of files on the Mac mini.
+
+### Round composer corners in the embed (fork PR 44)
+
+The pin moved from `8be5024bd` to `773204a14` on `amp/lattice-v1.6.2-sync`, through the merge commit of [fork PR 44](https://github.com/leo1oel/synara/pull/44). In the embed (`html[data-synara-embed="true"]`), the composer's shell and surface keep `corner-shape: round` in both the one-line pill and the full box, where standalone Synara draws the full box with squircle corners. WebKit on macOS 27.3 painted that squircle full box, over its backdrop-filter `::before`, as nothing: the box kept its layout but showed no text, caret or Send button once a draft grew past one line (lattice-writer/lattice#1227). A WKWebView without `corner-shape` support already drew these corners round, so the embed looks the same there. The fork's `composerEmbedCorners.browser.tsx` checks the computed corner shape in both layouts, and that standalone Synara keeps its squircle. `pnpm prepare:synara` reports the staged runtime as 179.1 MB.
