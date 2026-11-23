@@ -55,6 +55,10 @@ msgid "Remove Typst support?"
 msgstr "移除 Typst 支持？"
 
 #: lattice-gpui/src/typst.rs
+msgid "The downloaded Typst support doesn’t match this version of Lattice."
+msgstr "下载的 Typst 支持与此版本的 Lattice 不匹配。"
+
+#: lattice-gpui/src/typst.rs
 msgid "Typst files keep their highlighting. The next Typst build asks to download it again."
 msgstr "Typst 文件仍保留语法高亮。下次编译 Typst 时会再询问是否下载。"
 

@@ -126,4 +126,28 @@ fn a_hung_helper_is_killed_and_stop_never_waits() {
     )
     .unwrap_err();
     assert!(failure.outdated, "{failure:?}");
+
+    // An answer the app cannot read is a failed jump with its reason, after
+    // one fresh start, never a hang or a jump to nowhere.
+    let garbled = script(
+        dir.path(),
+        "garbled",
+        &format!("{hello}\nread line\necho 'not a jump'\nexec sleep 600"),
+    );
+    let failure = jump_from_cursor(
+        &garbled,
+        CursorJump {
+            root: dir.path().to_path_buf(),
+            document: "main.typ".into(),
+            path: "main.typ".into(),
+            line: 1,
+            column: 1,
+            ..CursorJump::default()
+        },
+    )
+    .unwrap_err();
+    assert!(
+        !failure.outdated && !failure.message.is_empty(),
+        "{failure:?}"
+    );
 }

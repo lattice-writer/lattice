@@ -292,7 +292,39 @@ fn nearest_text(frame: &Frame, click: Point) -> Option<Point> {
 /// after it (or where text was inserted) keeps its distance from the end, one
 /// before it keeps its offset, and one inside it goes to where the span
 /// starts.
+///
+/// Line endings are compared as `\n`: a file compiled from disk with CRLF
+/// and then opened reads with LF in the editor, which is no edit at all.
 pub(crate) fn carry(from: &str, to: &str, offset: usize) -> usize {
+    let mut offset = offset.min(from.len());
+    while !from.is_char_boundary(offset) {
+        offset -= 1;
+    }
+    let (from_lf, _) = without_cr(from);
+    let (to_lf, to_original) = without_cr(to);
+    let removed = from[..offset].matches("\r\n").count()
+        + usize::from(from[offset..].starts_with('\n') && from[..offset].ends_with('\r'));
+    to_original[carry_lf(&from_lf, &to_lf, offset - removed)]
+}
+
+/// `text` with the `\r` of each `\r\n` taken out, and for each byte offset
+/// in that (its length included), the offset in `text`.
+fn without_cr(text: &str) -> (String, Vec<usize>) {
+    let mut out = String::with_capacity(text.len());
+    let mut original = Vec::with_capacity(text.len() + 1);
+    for (at, character) in text.char_indices() {
+        if character == '\r' && text[at + 1..].starts_with('\n') {
+            continue;
+        }
+        original.extend((0..character.len_utf8()).map(|byte| at + byte));
+        out.push(character);
+    }
+    original.push(text.len());
+    (out, original)
+}
+
+/// [`carry`] between texts with the same line endings.
+fn carry_lf(from: &str, to: &str, offset: usize) -> usize {
     let mut offset = offset.min(from.len());
     while !from.is_char_boundary(offset) {
         offset -= 1;
@@ -377,6 +409,27 @@ mod tests {
         assert_eq!(carry("aa", "aaa", 2), 3);
         // Offsets inside a character snap to its start.
         assert_eq!(carry("é x", "é x", 1), 0);
+    }
+
+    #[test]
+    fn crlf_on_disk_and_lf_in_the_editor_are_the_same_text() {
+        let disk = "= One\r\nThe first line.\r\nThe second line.\r\n";
+        let editor = "= One\nThe first line.\nThe second line.\n";
+        let second = disk.find("second").unwrap();
+        let carried = carry(disk, editor, second);
+        assert_eq!(carried, editor.find("second").unwrap());
+        assert_eq!(line_column(editor, carried), (3, 5));
+        assert_eq!(carry(editor, disk, carried), second);
+        // With a line typed above, too.
+        let typed = format!("New.\n{editor}");
+        assert_eq!(line_column(&typed, carry(disk, &typed, second)), (4, 5));
+        // The end of a line, between its \r and \n.
+        let end = disk.find("\r\nThe second").unwrap();
+        assert_eq!(
+            carry(disk, editor, end + 1),
+            editor.find("\nThe second").unwrap()
+        );
+        assert_eq!(carry(disk, disk, end + 1), end + 1);
     }
 
     #[test]

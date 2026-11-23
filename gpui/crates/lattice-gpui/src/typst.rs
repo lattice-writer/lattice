@@ -176,6 +176,13 @@ pub fn require(typing: bool, then: impl FnOnce(&mut App) + 'static, cx: &mut App
     }
     let outdated = install::installed(&support.folder).is_some();
     if outdated && support.replaced_outdated {
+        // Downloaded again this session and still outdated: say so, rather
+        // than fetch it on every build or let a jump do nothing.
+        notices::error(
+            t!("Typst support"),
+            t!("The downloaded Typst support doesn’t match this version of Lattice."),
+            cx,
+        );
         return;
     }
     let Some(source) = support.source.clone() else {
