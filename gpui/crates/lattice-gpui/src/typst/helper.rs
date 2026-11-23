@@ -42,7 +42,8 @@ const REPLY_DEADLINE: Duration = Duration::from_secs(60);
 const REPLY_DEADLINE: Duration = Duration::from_secs(2);
 
 /// What the helper's environment keeps of Lattice's: where it may write and
-/// fetch packages from, and nothing else (no API keys).
+/// fetch packages from, the locale, and Typst's own font and package folders,
+/// and nothing else (no API keys).
 const PASSED_ENV: &[&str] = &[
     "PATH",
     "HOME",
@@ -65,6 +66,9 @@ const PASSED_ENV: &[&str] = &[
     "no_proxy",
     "SSL_CERT_FILE",
     "SSL_CERT_DIR",
+    "LANG",
+    "TYPST_FONT_PATHS",
+    "TYPST_PACKAGE_PATH",
 ];
 
 struct Running {
@@ -108,31 +112,33 @@ fn stopped(message: impl Into<String>) -> Failure {
     }
 }
 
+/// Why a read got no line: the helper's output ended (it stopped), or the
+/// deadline passed and the helper was killed.
+enum NoLine {
+    Stopped,
+    TimedOut,
+}
+
 /// The next line the helper writes, within `deadline`; on the deadline the
 /// helper is killed.
 fn read_line(
     lines: &Receiver<String>,
     child: &Mutex<Child>,
     deadline: Duration,
-    waiting_for: &str,
-) -> Result<String, Failure> {
+) -> Result<String, NoLine> {
     match lines.recv_timeout(deadline) {
         Ok(line) => Ok(line),
-        Err(RecvTimeoutError::Disconnected) => Err(stopped("Typst support stopped")),
+        Err(RecvTimeoutError::Disconnected) => Err(NoLine::Stopped),
         Err(RecvTimeoutError::Timeout) => {
             kill(child);
-            Err(Failure {
-                message: format!(
-                    "Typst support stopped responding: no {waiting_for} after {} s",
-                    deadline.as_secs()
-                ),
-                retry: false,
-            })
+            Err(NoLine::TimedOut)
         }
     }
 }
 
-fn start(binary: &Path) -> Result<Running, Failure> {
+/// Start the helper at `binary`; `stops` is `STOPS` when the caller began,
+/// and a `stop` since then (which found no child to kill yet) kills this one.
+fn start(binary: &Path, stops: u64) -> Result<Running, Failure> {
     let mut command = Command::new(binary);
     command.env_clear();
     for name in PASSED_ENV {
@@ -173,6 +179,13 @@ fn start(binary: &Path) -> Result<Running, Failure> {
         .map_err(|error| stopped(error.to_string()))?;
     let child = Arc::new(Mutex::new(child));
     *CHILD.lock().unwrap_or_else(PoisonError::into_inner) = Some(child.clone());
+    if STOPS.load(Ordering::SeqCst) != stops {
+        kill(&child);
+        return Err(Failure {
+            message: "Typst support was stopped".to_string(),
+            retry: false,
+        });
+    }
     let running = Running {
         binary: binary.to_path_buf(),
         child,
@@ -180,12 +193,18 @@ fn start(binary: &Path) -> Result<Running, Failure> {
         lines,
     };
     let line =
-        read_line(&running.lines, &running.child, HELLO_DEADLINE, "hello").map_err(|failure| {
-            Failure {
-                message: failure.message.replace("stopped", "did not start"),
-                ..failure
-            }
-        })?;
+        read_line(&running.lines, &running.child, HELLO_DEADLINE).map_err(
+            |no_line| match no_line {
+                NoLine::Stopped => stopped("Typst support did not start: it stopped"),
+                NoLine::TimedOut => Failure {
+                    message: format!(
+                        "Typst support did not start: no hello after {} s",
+                        HELLO_DEADLINE.as_secs()
+                    ),
+                    retry: false,
+                },
+            },
+        )?;
     let hello: Hello = serde_json::from_str(&line)
         .map_err(|_| stopped("Typst support did not start: it said nothing Lattice understands"))?;
     if hello.protocol != PROTOCOL {
@@ -209,12 +228,28 @@ fn exchange(running: &mut Running, request: &Request) -> Result<Reply, Failure> 
         .write_all(line.as_bytes())
         .and_then(|()| running.stdin.flush())
         .map_err(|error| stopped(error.to_string()))?;
-    let answer = read_line(&running.lines, &running.child, REPLY_DEADLINE, "answer")?;
+    let answer =
+        read_line(&running.lines, &running.child, REPLY_DEADLINE).map_err(
+            |no_line| match no_line {
+                NoLine::Stopped => stopped("Typst support stopped"),
+                NoLine::TimedOut => Failure {
+                    message: format!(
+                        "Typst support stopped responding: no answer after {} s",
+                        REPLY_DEADLINE.as_secs()
+                    ),
+                    retry: false,
+                },
+            },
+        )?;
     serde_json::from_str(&answer).map_err(|error| stopped(error.to_string()))
 }
 
 /// The running helper for `binary`, started if it is not.
-fn running<'a>(slot: &'a mut Option<Running>, binary: &Path) -> Result<&'a mut Running, Failure> {
+fn running<'a>(
+    slot: &'a mut Option<Running>,
+    binary: &Path,
+    stops: u64,
+) -> Result<&'a mut Running, Failure> {
     if slot
         .as_ref()
         .is_some_and(|running| running.binary != binary)
@@ -222,7 +257,7 @@ fn running<'a>(slot: &'a mut Option<Running>, binary: &Path) -> Result<&'a mut R
         *slot = None;
     }
     if slot.is_none() {
-        *slot = Some(start(binary)?);
+        *slot = Some(start(binary, stops)?);
     }
     Ok(slot.as_mut().expect("started above"))
 }
@@ -230,8 +265,9 @@ fn running<'a>(slot: &'a mut Option<Running>, binary: &Path) -> Result<&'a mut R
 /// Start the helper ahead of the first compile, so its fonts are read by
 /// the time the writer builds.
 pub fn prewarm(binary: &Path) {
+    let stops = STOPS.load(Ordering::SeqCst);
     let mut slot = RUNNING.lock().unwrap_or_else(PoisonError::into_inner);
-    if let Err(failure) = running(&mut slot, binary) {
+    if let Err(failure) = running(&mut slot, binary, stops) {
         log::warn!("typst: {}", failure.message);
     }
 }
@@ -252,12 +288,13 @@ pub fn build(
     };
     let stops = STOPS.load(Ordering::SeqCst);
     let mut slot = RUNNING.lock().unwrap_or_else(PoisonError::into_inner);
-    let mut reply = running(&mut slot, binary).and_then(|running| exchange(running, &request));
+    let mut reply =
+        running(&mut slot, binary, stops).and_then(|running| exchange(running, &request));
     if reply.as_ref().is_err_and(|failure| failure.retry) && STOPS.load(Ordering::SeqCst) == stops {
         // A helper that stopped (it crashed, or was removed and put back)
         // gets one fresh start before the build says so.
         *slot = None;
-        reply = running(&mut slot, binary).and_then(|running| exchange(running, &request));
+        reply = running(&mut slot, binary, stops).and_then(|running| exchange(running, &request));
     }
     if reply.is_err() {
         *slot = None;

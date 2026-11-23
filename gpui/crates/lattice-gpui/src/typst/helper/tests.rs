@@ -38,7 +38,11 @@ fn a_hung_helper_is_killed_and_stop_never_waits() {
     let started = Instant::now();
     let result = compile(&silent, dir.path());
     assert!(!result.success);
-    assert!(result.log.contains("no hello"), "{}", result.log);
+    assert!(
+        result.log.contains("did not start: no hello"),
+        "{}",
+        result.log
+    );
     // The hello's deadline, and no second start: it already had its chance.
     assert!(
         started.elapsed() < HELLO_DEADLINE * 2,
@@ -71,4 +75,20 @@ fn a_hung_helper_is_killed_and_stop_never_waits() {
     assert!(!result.success);
     assert!(result.log.contains("stopped"), "{}", result.log);
     assert!(RUNNING.lock().unwrap().is_none());
+
+    // A stop while the helper is still starting (before its hello) kills it
+    // too, and the compile does not start another.
+    let root = dir.path().to_path_buf();
+    let compiling = std::thread::spawn(move || compile(&silent, &root));
+    std::thread::sleep(Duration::from_millis(300));
+    let stopping = Instant::now();
+    stop();
+    let result = compiling.join().unwrap();
+    assert!(
+        stopping.elapsed() < Duration::from_millis(500),
+        "stop and the compile took {:?}",
+        stopping.elapsed()
+    );
+    assert!(!result.success);
+    assert!(result.log.contains("did not start"), "{}", result.log);
 }

@@ -310,13 +310,25 @@ pub fn ask_remove(cx: &mut App) {
     );
 }
 
+/// Stop the helper and delete it, off the UI thread: stopping waits for
+/// the compile in progress to notice.
 pub fn remove(cx: &mut App) {
     let Some(support) = cx.try_global::<TypstSupport>() else {
         return;
     };
-    helper::stop();
-    if let Err(error) = install::remove(&support.folder) {
-        notices::error(t!("Couldn’t remove Typst support"), error, cx);
-    }
-    cx.refresh_windows();
+    let folder = support.folder.clone();
+    let removed = cx.background_spawn(async move {
+        helper::stop();
+        install::remove(&folder)
+    });
+    cx.spawn(async move |cx| {
+        let removed = removed.await;
+        cx.update(|cx| {
+            if let Err(error) = removed {
+                notices::error(t!("Couldn’t remove Typst support"), error, cx);
+            }
+            cx.refresh_windows();
+        });
+    })
+    .detach();
 }
