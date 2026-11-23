@@ -29,6 +29,7 @@ import { useWindowTitle } from "./use-native-window";
 import { useProjectTabDrag } from "./use-project-tab-drag";
 import { cn } from "@/lib/utils";
 import { baseName } from "../lib/base-name";
+import { hostPlatform, type HostPlatform } from "../platform/host-platform";
 import "./project-tab-drag.css";
 
 const loadProjectTabs = chunk(() => import("./project-tabs"));
@@ -41,6 +42,10 @@ const warmProjectMenu = () => {
   void loadProjectMenu();
   void loadProjectTabs();
 };
+// Whether the window's own controls sit inside this bar. Only macOS overlays
+// its title bar (`title_bar_style(Overlay)` in src-tauri/src/title_bar.rs, a
+// no-op elsewhere); Windows and Linux keep the native bar above the webview.
+const TRAFFIC_LIGHTS: Record<HostPlatform, boolean> = { mac: true, windows: false, linux: false };
 
 export function AppTitlebar({ project, documents, projectMenu, panelControls, canvasToolbar, focusBar }: {
   project: ProjectSnapshot;
@@ -82,8 +87,9 @@ export function AppTitlebar({ project, documents, projectMenu, panelControls, ca
   const documentTitle = documents.paper?.title ?? baseName(documents.activeTab);
   // Project first: where the system shortens a title, the project is what tells windows apart.
   useWindowTitle(documentTitle ? t`${projectName} — ${documentTitle}` : projectName);
-  // The website's demo is a page in a browser tab: no window controls to make room for.
-  const bar = cn("titlebar", import.meta.env.LATTICE_WEB_DEMO && "titlebar-without-lights");
+  // No window controls to make room for: the website's demo is a page in a
+  // browser tab, and Windows and Linux draw a native title bar above this one.
+  const bar = cn("titlebar", (import.meta.env.LATTICE_WEB_DEMO || !TRAFFIC_LIGHTS[hostPlatform()]) && "titlebar-without-lights");
   if (focusBar) {
     return (
       <header className={cn(bar, "titlebar-focus")} onMouseDown={beginWindowDrag} onDoubleClick={titleBarDoubleClick}>

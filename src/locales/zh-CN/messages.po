@@ -12623,8 +12623,8 @@ msgid "PDF preview paused"
 msgstr "PDF 已暂停"
 
 #: src/pdf/pdf-viewer.tsx
-msgid "PDF preview timed out. Click Build again, or open the PDF in Preview."
-msgstr "PDF 加载超时。请再点“编译”，或用“预览”打开"
+msgid "PDF preview timed out. Click Build again, or open the PDF in another app."
+msgstr "PDF 加载超时。请再点“编译”，或用其他应用打开"
 
 #: src/platform/host-errors-papers.ts
 msgid "PDF URL must not contain credentials"

@@ -79,8 +79,9 @@ input[type="search"]:focus-visible {
 .titlebar-sidebar { width: var(--titlebar-sidebar-width); min-width: 0; height: 100%; flex: none; display: flex; align-items: center; }
 .titlebar-navigator { width: var(--titlebar-navigator-width); height: 100%; flex: none; display: flex; align-items: center; padding-right: var(--titlebar-leading-gap); }
 .traffic-space { width: var(--titlebar-traffic-space-width); height: 100%; flex: none; }
-/* No traffic lights beside the bar: a browser tab and the website's demo have
-   none, and full screen hides them. There the switcher starts at the bar's
+/* No traffic lights beside the bar: a browser tab, the website's demo and a
+   Windows or Linux window (its native title bar sits above) have none, and
+   full screen hides them. There the switcher starts at the bar's
    own padding. In full screen AppKit shows them again only while the pointer
    holds the menu bar down, in its own bar that slides in over this one. */
 :is(.app-shell.browser-hosted, .app-shell.fullscreen, .titlebar-without-lights) .titlebar-navigator { width: var(--titlebar-navigator-width-browser); padding: 0 var(--space-4); }

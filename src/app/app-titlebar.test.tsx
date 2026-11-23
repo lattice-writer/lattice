@@ -89,6 +89,27 @@ it("names the window for its project and the document in front, then gives back 
   expect(appWindow.title).toHaveBeenCalledTimes(1);
 });
 
+it("leaves room for traffic lights only on a Mac, where the native title bar is overlaid", () => {
+  const hosts = {
+    mac: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)",
+    windows: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Edg/157.0",
+    linux: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15 (KHTML, like Gecko)",
+  };
+  const userAgent = vi.spyOn(navigator, "userAgent", "get");
+  try {
+    const withoutLights = Object.fromEntries(Object.entries(hosts).map(([host, agent]) => {
+      userAgent.mockReturnValue(agent);
+      const view = render(<AppTitlebar {...titlebarProps()} />);
+      const bar = view.container.querySelector("header")!;
+      view.unmount();
+      return [host, bar.classList.contains("titlebar-without-lights")];
+    }));
+    expect(withoutLights).toEqual({ mac: false, windows: true, linux: true });
+  } finally {
+    userAgent.mockRestore();
+  }
+});
+
 it("hands focus mode's bar the name of the document in front", () => {
   const focusBar = vi.fn((title: string) => <span>{title}</span>);
   render(<AppTitlebar {...titlebarProps({ paper: null, activeTab: "sections/method.tex" }, focusBar)} />);
