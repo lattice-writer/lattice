@@ -199,6 +199,10 @@ jobs:
           project="$RUNNER_TEMP/e2e-project"
           out="$RUNNER_TEMP/e2e-macos.json"
           cp -R fixtures/e2e "$project"
+          # Typst support from a stand-in release on disk, as script/e2e
+          # makes it (scenario/e2e/typst.rs installs it from there).
+          node ../scripts/typst-helper-fake-release.mjs target/release/lattice-typst "$RUNNER_TEMP/typst-release"
+          export LATTICE_E2E_TYPST_RELEASE="$RUNNER_TEMP/typst-release"
           # As on Windows: the builds, cleans and notices in the job's log.
           LATTICE_GPUI_LOG=info target/release/lattice-gpui "$project" --scenario e2e --out "$out"
           cat "$out"
