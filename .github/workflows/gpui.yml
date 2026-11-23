@@ -212,8 +212,8 @@ jobs:
           # A new failure, or a step of the list's flaky tier, has its module
           # run once more first, so a hosted-runner flake is reported as flaky
           # rather than failing the job. A flaky-tier step that fails both
-          # times is a warning on a branch and fails the job on main.
-          node ../scripts/gpui-e2e-verdict.mjs --platform macos --check-quit ${{ github.ref == 'refs/heads/main' && '--strict-flaky' || '' }} --rerun-app target/release/lattice-gpui --fixture fixtures/e2e "$out"
+          # times is a warning on a branch and fails the job on main and tags.
+          node ../scripts/gpui-e2e-verdict.mjs --platform macos --check-quit ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && '--strict-flaky' || '' }} --rerun-app target/release/lattice-gpui --fixture fixtures/e2e "$out"
       - if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
@@ -413,7 +413,7 @@ jobs:
       #
       # The whole scenario runs only for a change that can behave
       # differently on Windows, and for every tag, full run and push to main;
-      # a change to macOS-only code, island web code or files no step reads
+      # a change to macOS-only code or files no step reads
       # runs the smoke flow alone (scripts/windows-e2e-tier.mjs). The macOS
       # job, or the CI-local trailer that stands for it, still runs what the
       # diff picks there.
@@ -421,7 +421,7 @@ jobs:
         timeout-minutes: 65
         env:
           WINDOWS_E2E: ${{ needs.changes.outputs.windows-e2e }}
-          STRICT_FLAKY: ${{ github.ref == 'refs/heads/main' && '--strict-flaky' || '' }}
+          STRICT_FLAKY: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && '--strict-flaky' || '' }}
         run: |
           $project = Join-Path $env:RUNNER_TEMP "e2e-project"
           $out = Join-Path $env:RUNNER_TEMP "e2e-windows.json"
@@ -447,7 +447,7 @@ jobs:
           $result = Get-Content $out -Raw | ConvertFrom-Json
           # As on macOS: only a step main passes fails the job
           # (scripts/gpui-e2e-known-failures.json), and a flaky-tier step that
-          # fails twice fails it on main alone.
+          # fails twice fails it on main and tags alone.
           $verdict = @("--platform", "windows", "--rerun-app", "target/release/lattice-gpui.exe", "--fixture", "fixtures/e2e")
           if ($env:STRICT_FLAKY) { $verdict += $env:STRICT_FLAKY }
           node ../scripts/gpui-e2e-verdict.mjs @verdict $out

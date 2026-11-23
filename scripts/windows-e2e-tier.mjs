@@ -18,10 +18,12 @@
  *     (fetch-pdfium, make-fonts);
  *   - read by no scenario step on any platform: the rows of E2E_TABLE
  *     (scripts/ci-local-select.mjs) that need no module, such as Markdown,
- *     unit tests and benches;
- *   - the Tauri app's web modules the webview islands are built from
- *     (src/): platform-neutral code that the macOS e2e, on GitHub or behind
- *     a CI-local trailer, runs through the island modules.
+ *     unit tests and benches.
+ *
+ * The web modules the islands are built from (src/, gpui/islands/) need the
+ * whole scenario: on Windows they render in WebView2, which the macOS e2e
+ * (WKWebView) does not stand for. A patch diff counts by every file it
+ * touches, the old side of a removed or renamed file included.
  *
  * Anything else the GPUI job reads needs the whole scenario: the
  * platform-neutral crates, cfg(windows) code, Windows packaging, the
@@ -60,10 +62,9 @@ const readRepoFile = (file) => {
 export function smokeReason(file, read = readRepoFile) {
   if (MACOS_ONLY.test(file)) return "macOS only";
   if (NO_STEP.some((pattern) => pattern.test(file))) return "read by no e2e step";
-  if (file.startsWith("src/")) return "island web code, which the macOS e2e runs";
   if (/^gpui\/.*\.rs$/.test(file) && MACOS_CFG.test(read(file) ?? "")) return 'macOS only (#![cfg(target_os = "macos")])';
   if (/^gpui\/patches\/[^/]+\.diff$/.test(file)) {
-    const targets = [...(read(file) ?? "").matchAll(/^\+\+\+ b\/(\S+)/gm)].map((match) => `gpui/patches/${match[1]}`);
+    const targets = [...(read(file) ?? "").matchAll(/^(?:---|\+\+\+) [ab]\/(\S+)/gm)].map((match) => `gpui/patches/${match[1]}`);
     if (targets.length && targets.every((target) => target.endsWith(".md") || smokeReason(target, read)?.startsWith("macOS only"))) return "macOS only (a patch to macOS-only files)";
   }
   return null;

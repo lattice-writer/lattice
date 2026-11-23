@@ -108,9 +108,10 @@ behave differently on Windows: the platform-neutral crates, `cfg(windows)`
 code, Windows packaging, the scenario's harness and fixtures, the workflows,
 lattice-core and the design-system tokens. A change whose every GPUI input is
 macOS-only (the `gpui_macos` and `gpui_apple` patches, files named for
-macOS, a source under `#![cfg(target_os = "macos")]`, the parity report),
-island web code under `src/`, or a file no scenario step reads runs the smoke
-flow alone there. Every push to main, tag and full run takes the whole
+macOS, a source under `#![cfg(target_os = "macos")]`, the parity report) or
+a file no scenario step reads runs the smoke flow alone there. Island web code
+(`src/`, `gpui/islands/`) takes the whole scenario: it renders in WebView2 on
+Windows. Every push to main, tag and full run takes the whole
 scenario. `scripts/windows-e2e-tier.mjs` decides, and the `changes` job's
 summary says which and why; `node scripts/ci-tier.mjs` prints it for your
 branch as `windowsE2e`.
@@ -136,7 +137,7 @@ not and fail the hosted runners now and then for reasons outside the change
 (a clipboard read, the question dialog over Settings, Replace in project on
 Windows). They are rerun the same way; one that fails both times is a
 warning on a branch, listed in the job's summary, and fails the job on main
-(`--strict-flaky`), so a real regression still turns main red with the commit
+and tags (`--strict-flaky`), so a real regression still turns main red with the commit
 that caused it. Add a flaky-tier entry only with runs that show the step both
 failing and passing on the same code.
 
@@ -195,7 +196,8 @@ macOS job. For a release path only the full gate's trailer
 (`rust gpui e2e=full webkit`, which `ci:local` prints for such a diff) stands
 for the macOS jobs; a tree-only or partial trailer does not, and those jobs run
 on GitHub. A release is still built and checked for real on GitHub when its
-tag is pushed: a tag runs every job and ignores any trailer, and
+tag is pushed: a tag runs every job and ignores any trailer (so does every
+push to main), and
 `release.yml` and `gpui-package.yml` take no trailer at all.
 `pnpm ci:local --full` runs every stage and the whole e2e.
 

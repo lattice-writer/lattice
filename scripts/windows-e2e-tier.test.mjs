@@ -9,6 +9,9 @@ const files = {
   "gpui/crates/lattice-gpui/src/windows_only.rs": "#![cfg(windows)]\n",
   "gpui/patches/gpui-fast-lab-occlusion.diff": "--- a/gpui-fast/crates/gpui_macos/src/window.rs\n+++ b/gpui-fast/crates/gpui_macos/src/window.rs\n",
   "gpui/patches/gpui-fast-ime-bindings.diff": "+++ b/gpui-fast/crates/gpui/src/platform.rs\n+++ b/gpui-fast/crates/gpui_macos/src/events.rs\n",
+  "gpui/patches/gpui-fast-drop-neutral.diff": "--- a/gpui-fast/crates/gpui/src/platform.rs\n+++ /dev/null\n--- a/gpui-fast/crates/gpui_macos/src/events.rs\n+++ b/gpui-fast/crates/gpui_macos/src/events.rs\n",
+  "gpui/patches/gpui-fast-move-into-macos.diff": "--- a/gpui-fast/crates/gpui/src/fast/cursor.rs\n+++ b/gpui-fast/crates/gpui_macos/src/fast/cursor.rs\n",
+  "gpui/patches/gpui-fast-drop-macos.diff": "--- a/gpui-fast/crates/gpui_macos/src/fast/old.rs\n+++ /dev/null\n",
 };
 const read = (file) => files[file] ?? null;
 const e2eFor = (changed, options = {}) => windowsE2e(ciTier(changed, { scan }).gpuiFiles, { read, ...options }).e2e;
@@ -25,14 +28,14 @@ describe("windows-e2e-tier", () => {
       "gpui/parity/run.mjs",
       "gpui/crates/lattice-gpui/src/mac_only.rs",
       "gpui/patches/gpui-fast-lab-occlusion.diff",
+      "gpui/patches/gpui-fast-drop-macos.diff",
     ]) {
       expect(smokeReason(file, read), file).toMatch(/^macOS only/);
       expect(e2eFor([file]), file).toBe(SMOKE);
     }
   });
 
-  it("runs the smoke flow for island web code and for files no step reads", () => {
-    expect(e2eFor(["src/editor/spreadsheet/grid.ts", "src/i18n/catalog.ts"])).toBe(SMOKE);
+  it("runs the smoke flow for files no step reads", () => {
     expect(e2eFor(["gpui/README.md", "gpui/crates/lattice-editor/tests/motion.rs", "gpui/crates/lattice-gpui/src/pdf/tests.rs"])).toBe(SMOKE);
   });
 
@@ -44,6 +47,11 @@ describe("windows-e2e-tier", () => {
       "gpui/patches/gpui-component/src/native_menu/windows.rs",
       "gpui/patches/gpui-fast/crates/gpui/src/window.rs",
       "gpui/patches/gpui-fast-ime-bindings.diff",
+      "gpui/patches/gpui-fast-drop-neutral.diff",
+      "gpui/patches/gpui-fast-move-into-macos.diff",
+      "src/editor/spreadsheet/grid.ts",
+      "src/i18n/catalog.ts",
+      "gpui/islands/markdown/main.tsx",
       "gpui/script/fetch-pdfium.ps1",
       "gpui/script/e2e",
       "gpui/fixtures/e2e/main.tex",

@@ -46,7 +46,7 @@
  * a GPUI change that needs the whole e2e is covered only by `e2e=full`, one
  * that needs some modules by an e2e that ran them, and a release path only
  * by the full gate (`rust gpui e2e=full webkit`). Linux and Windows always
- * run, and a tag ignores the trailer. GPUI's Windows job runs the whole e2e
+ * run, and a push to main or a tag ignores the trailer. GPUI's Windows job runs the whole e2e
  * scenario only for a change that can behave differently on Windows, and
  * for every full run and push to main; otherwise the smoke flow
  * (scripts/windows-e2e-tier.mjs, the `windows-e2e` output).
@@ -207,6 +207,15 @@ export function localMacosPass(message, tree) {
   return Boolean(cover && tree.startsWith(cover.tree));
 }
 
+/**
+ * Whether a CI-local trailer may stand for macOS jobs in this run. Never on a
+ * push to main or a tag, where a regression is pinned to its commit, nor in a
+ * full run: those run the hosted macOS jobs whatever the message carries.
+ */
+export function trailerHonoured({ full, event, ref }) {
+  return !full && !(event === "push" && ref === "refs/heads/main") && !ref.startsWith("refs/tags/");
+}
+
 /** Whether the head commit or the branch's open pull request asks for every job. */
 export function wantsFull(message, labels = []) {
   return /^CI:\s*full\s*$/im.test(message) || labels.includes("ci:full");
@@ -253,7 +262,7 @@ function github() {
   const files = base ? git("-c", "core.quotePath=false", "diff", "--no-renames", "--name-only", base, "HEAD").split("\n").filter(Boolean) : [];
   if (!reason && event === "workflow_dispatch" && files.length === 0) reason = "a dispatch of a branch that changes nothing (a baseline)";
   const tier = ciTier(files, { full: Boolean(reason) });
-  const cover = !tier.full && localMacosPass(message, git("rev-parse", "HEAD^{tree}")) ? parseTrailer(message) : null;
+  const cover = trailerHonoured({ full: tier.full, event, ref }) && localMacosPass(message, git("rev-parse", "HEAD^{tree}")) ? parseTrailer(message) : null;
   const local = coveredJobs(cover, macosNeeds(tier, files));
   const windows = windowsE2e(tier.gpuiFiles, { full: tier.full || (event === "push" && branch === "main") });
   const groups = { rust: "Rust", gpui: "GPUI", webkit: "WebKit benchmark" };
