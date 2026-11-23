@@ -102,6 +102,20 @@ only the jobs its change needs against its merge base with `origin/main`.
 | `src/` and other frontend code | the Vitest shards, lint-and-build, and the benchmarks when the bundle's inputs changed |
 | `ci.yml`, `gpui.yml`, `.github/actions/` or `scripts/ci-tier.mjs` | that workflow's every job |
 
+GPUI's Windows job always runs the release build and every unit test, but
+the whole e2e scenario (25–40 minutes there) only for a change that can
+behave differently on Windows: the platform-neutral crates, `cfg(windows)`
+code, Windows packaging, the scenario's harness and fixtures, the workflows,
+lattice-core and the design-system tokens. A change whose every GPUI input is
+macOS-only (the `gpui_macos` and `gpui_apple` patches, files named for
+macOS, a source under `#![cfg(target_os = "macos")]`, the parity report) or
+a file no scenario step reads runs the smoke flow alone there. Island web code
+(`src/`, `gpui/islands/`) takes the whole scenario: it renders in WebView2 on
+Windows. Every push to main, tag and full run takes the whole
+scenario. `scripts/windows-e2e-tier.mjs` decides, and the `changes` job's
+summary says which and why; `node scripts/ci-tier.mjs` prints it for your
+branch as `windowsE2e`.
+
 A newer push to a branch cancels its older run. A push to main runs what that
 merge changed and is never cancelled. Everything runs for a release tag, the
 weekly schedule, a dispatch on main, `gh workflow run ci.yml --ref <branch> -f
@@ -115,6 +129,17 @@ with its platforms, the failure seen on main and the issue that owns it; the
 job lists them apart (`scripts/gpui-e2e-verdict.mjs`) and notes a listed step
 that passed. Add a step there only with the main run that shows it failing,
 and take it off once it passes on main.
+
+Any other step that fails has its module run once more on a fresh fixture,
+and a step that passes there is a flaky warning. Entries with
+`"tier": "flaky"` in the same file are steps that pass on main more often than
+not and fail the hosted runners now and then for reasons outside the change
+(a clipboard read, the question dialog over Settings, Replace in project on
+Windows). They are rerun the same way; one that fails both times is a
+warning on a branch, listed in the job's summary, and fails the job on main
+and tags (`--strict-flaky`), so a real regression still turns main red with the commit
+that caused it. Add a flaky-tier entry only with runs that show the step both
+failing and passing on the same code.
 
 Before pushing, run the same tier on your Mac:
 
@@ -132,7 +157,7 @@ that stand for them, chosen from the diff against the merge base
 | documentation only | nothing |
 | `src-tauri/` or web code only | the gate (lint, knip, tsc, i18n, notices, the related Vitest tests); rustfmt, clippy `-D warnings` and `cargo test` for the Tauri crates; the bundle budgets and the WebKit benchmark when the bundle's inputs changed. No GPUI stage. |
 | `gpui/` only | GPUI fmt, release build and unit tests, and the e2e below. No WebKit benchmark. |
-| a release path (`RELEASE_PATHS`: release workflows, `src-tauri/tauri*.conf.json`, `Info.plist`, `Entitlements.plist`, the icons, either app's updater, `fetch-pdfium`, the bundle, packaging, signing and release scripts) | everything, as `--full` does, and no trailer |
+| a release path (`RELEASE_PATHS`: release workflows, `src-tauri/tauri*.conf.json`, `Info.plist`, `Entitlements.plist`, the icons, either app's updater, `fetch-pdfium`, the bundle, packaging, signing and release scripts) | everything, as `--full` does, and a trailer that records it (`rust gpui e2e=full webkit`) |
 
 The GPUI e2e is the smoke flow (open, build, SyncTeX both ways, edits and ⌘S,
 autosave, a second window, the quit that saves) plus the modules the diff
@@ -151,7 +176,7 @@ failures alone. Either way a step that fails is rerun once with its module on
 a fresh fixture. Add a row to the table when a crate or path has a clear
 owner in the scenario.
 
-A change to `scripts/ci-local.mjs`, `scripts/ci-local-select.mjs` or `scripts/gpui-e2e-modules.mjs`, like one to `scripts/ci-tier.mjs`, runs every job.
+A change to `scripts/ci-local.mjs`, `scripts/ci-local-select.mjs`, `scripts/gpui-e2e-modules.mjs` or `scripts/windows-e2e-tier.mjs`, like one to `scripts/ci-tier.mjs`, runs every job.
 
 Rust, GPUI and benchmark stages wait while a perf measurement holds
 `/tmp/lattice-inapp-test.lock` (`$INAPP_LOCK_FILE` when set). The literature
@@ -167,9 +192,14 @@ benchmark) whose needs those stages cover for the diff; a job they do not
 cover, such as GPUI after a change that needs a module the trailer's e2e did
 not run, still runs on GitHub, and its `changes` summary says why. A trailer
 with only a tree, from before the stages were recorded, still stands for every
-macOS job. No trailer stands for a release path: CI runs its macOS jobs for
-those whatever the commit says. `pnpm ci:local --full` runs every stage and the
-whole e2e.
+macOS job. For a release path only the full gate's trailer
+(`rust gpui e2e=full webkit`, which `ci:local` prints for such a diff) stands
+for the macOS jobs; a tree-only or partial trailer does not, and those jobs run
+on GitHub. A release is still built and checked for real on GitHub when its
+tag is pushed: a tag runs every job and ignores any trailer (so does every
+push to main), and
+`release.yml` and `gpui-package.yml` take no trailer at all.
+`pnpm ci:local --full` runs every stage and the whole e2e.
 
 After merging main into a gated branch, `ci:local` re-certifies the merge
 with a quick pass when HEAD is the gated commit plus clean merges of main and

@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { FULL, coveredJobs, e2eNeeds, formatTrailer, macosNeeds, mainMergeRegate, parseTrailer } from "./ci-local-select.mjs";
+import { FULL, coveredJobs, e2eNeeds, formatTrailer, fullCover, macosNeeds, mainMergeRegate, parseTrailer } from "./ci-local-select.mjs";
 import { ciTier } from "./ci-tier.mjs";
 
 const covers = new Map([
@@ -100,12 +100,23 @@ describe("ci-local-select: the trailer", () => {
     expect(partial.gpui.reason).toMatch(/lacks pdf_notes/);
   });
 
-  it("does not take a module e2e for a change that needs the whole scenario, nor any trailer for a release path", () => {
+  it("does not take a module e2e for a change that needs the whole scenario", () => {
     const shared = needsFor(["gpui/crates/lattice-gpui/src/shell.rs"]);
     expect(coveredJobs(parseTrailer("CI-local: macos 0123456789ab gpui e2e=smoke+pdf"), shared).gpui.covered).toBe(false);
     expect(coveredJobs(parseTrailer("CI-local: macos 0123456789ab gpui e2e=full"), shared).gpui.covered).toBe(true);
-    const release = needsFor(["gpui/crates/lattice-gpui/src/updater/install.rs"]);
-    expect(coveredJobs(parseTrailer("CI-local: macos 0123456789ab"), release).gpui.reason).toMatch(/release paths/);
+  });
+
+  it("takes only the full gate's trailer for a release path", () => {
+    const release = needsFor(["gpui/crates/lattice-gpui/src/updater/install.rs", "src-tauri/tauri.conf.json"]);
+    expect(coveredJobs(parseTrailer("CI-local: macos 0123456789ab"), release).gpui.reason).toMatch(/release paths .* full gate/);
+    expect(coveredJobs(parseTrailer("CI-local: macos 0123456789ab rust gpui e2e=full"), release).rust.reason).toMatch(/release paths/);
+    expect(coveredJobs(parseTrailer("CI-local: macos 0123456789ab rust gpui e2e=smoke+pdf webkit"), release).gpui.reason).toMatch(/release paths/);
+    const full = parseTrailer(formatTrailer("0123456789ab", { rust: true, gpui: true, e2e: FULL, webkit: true }));
+    expect(fullCover(full)).toBe(true);
+    expect(coveredJobs(full, release)).toEqual({ rust: { covered: true }, gpui: { covered: true }, webkit: { covered: true } });
+    const workflow = needsFor([".github/workflows/release.yml"]);
+    expect(workflow.release).toEqual([".github/workflows/release.yml"]);
+    expect(coveredJobs(null, workflow)).toEqual({ rust: { covered: true }, gpui: { covered: true }, webkit: { covered: true } });
   });
 });
 

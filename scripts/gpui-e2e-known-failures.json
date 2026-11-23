@@ -6,7 +6,8 @@
     "The steps of scripts/gpui-e2e-quarantine.json are listed too, as flaky: they caused most red runs while passing on main more often than not.",
     "followup is the issue that owns the fix: LEO-14 for macOS, LEO-15 for Windows (a step on both platforms is under LEO-14 and fixed for both).",
     "Collected from main runs macos: 44173099111, 44154544765, 44162980527; windows: 44162980527, 44213516921, and the intermittent ones of 44229692959, 44247550879, 44272220139, 44274671758, 44276458780.",
-    "Also steps that failed in branch runs 44225936391 and 44226228810, whose GPUI sources equal main's: a hosted-runner flake looks like this."
+    "Also steps that failed in branch runs 44225936391 and 44226228810, whose GPUI sources equal main's: a hosted-runner flake looks like this.",
+    "An entry with \"tier\": \"flaky\" passes on main more often than not and fails the hosted runners now and then for a reason outside the change: the verdict reruns it with its module, a failure on both tries is a warning on a branch and fails the job on main (--strict-flaky). Add one only with the runs that show it failing and passing on the same code; take it off once its cause is fixed. Each flaky-tier entry's followup is its own issue for the real fix."
   ],
   "steps": [
     {
@@ -1434,6 +1435,87 @@
       ],
       "reason": "macOS: failed in 4 of 5 main baselines on the Mac mini's local gate (main 2e39149ce, 5c9197738, a216812a5, b3dd2c790; passed at 54bb273ac), and in both full ci:local runs of #1163 while it passed in all three islands-only runs, so intermittent in a full run; observed {\"scale\":1.0,\"page_presses\":0,\"bounds\":\"Some(Bounds { origin: Point { x: 288px, y: 86px }, size: Size { 648px × 802px } })\"}",
       "followup": "LEO-14"
+    },
+    {
+      "step": "the PDF's Copy source link copies the PDF at the passage's page, its words as the title",
+      "platforms": [
+        "macos"
+      ],
+      "tier": "flaky",
+      "reason": "macOS: reads the system clipboard right after the copy; failed twice (counted as new) in main runs 45155694987 (410b8da6) and 45111924272 (8b8cac9a), both after #1235, and in 45027802424, 45027668538, 44824982527; passed on the rerun in main runs 45065791327, 45027640822, on the same code",
+      "followup": "LEO-103"
+    },
+    {
+      "step": "Replace in project previews the matches, rewrites them on disk and the open editor shows it",
+      "platforms": [
+        "windows"
+      ],
+      "tier": "flaky",
+      "reason": "Windows: failed, then passed when its module ran again, in main run 45111924272 and branch runs 45085529303, 45061259862, 45050360152; failed in both of #1159's attempts' first passes",
+      "followup": "LEO-104"
+    },
+    {
+      "step": "Return on a question asked over Settings answers as Cancel does, as the dialog starts on Cancel",
+      "platforms": [
+        "windows"
+      ],
+      "tier": "flaky",
+      "reason": "Windows: failed, then passed on its module's rerun, in run 45061259862 (#1233's code, which does not touch the dialog)",
+      "followup": "LEO-105"
+    },
+    {
+      "step": "a click on the answer button of a question asked over Settings answers it, and Settings stays as it was",
+      "platforms": [
+        "windows"
+      ],
+      "tier": "flaky",
+      "reason": "Windows: as the Return step, the same dialog over Settings; failed, then passed on its module's rerun, in run 45061259862",
+      "followup": "LEO-106"
+    },
+    {
+      "step": "a click on the cancel button of a question asked over Settings answers it, and Settings stays as it was",
+      "platforms": [
+        "windows"
+      ],
+      "tier": "flaky",
+      "reason": "Windows: the same loop and dialog as the answer button's step (confirm_clicks.rs), listed with it",
+      "followup": "LEO-107"
+    },
+    {
+      "step": "a word typed into a cell with native keys, an input method's arrow characters committed mid-word, is saved to the .lattice-sheet as that word alone, which stays valid JSON",
+      "platforms": [
+        "macos"
+      ],
+      "tier": "flaky",
+      "reason": "macOS: failed twice (counted as new) in main run 45165846780 (89a502a2, after #1235); failed, then passed on its module's rerun, in main runs 45145008828 (76558961) and 45134410156 (1083710c)",
+      "followup": "LEO-108"
+    },
+    {
+      "step": "New terminal opens a second tab in front; a tab renames in place, and ← → move along the tabs",
+      "platforms": [
+        "macos"
+      ],
+      "tier": "flaky",
+      "reason": "macOS: failed twice (counted as new) in main run 45155694987 (410b8da6, after #1235), passed in the main runs before and after it (45147256024, 45165846780)",
+      "followup": "LEO-109"
+    },
+    {
+      "step": "⌘Z typed in the visual editor undoes the word through the buffer: the file and the page are back as they were",
+      "platforms": [
+        "macos"
+      ],
+      "tier": "flaky",
+      "reason": "macOS: after #1235's ⌘Z fix, failed then passed on its module's rerun in main runs 45165846780, 45155694987, 45145008828, 45134410156, 45101740670, and failed twice in #1241's attempt 2 (run 45161747682), whose GPUI code equals main's",
+      "followup": "LEO-110"
+    },
+    {
+      "step": "the pdf_compounds module runs to its end",
+      "platforms": [
+        "windows"
+      ],
+      "tier": "flaky",
+      "reason": "Windows: the module did not finish in main run 45101740670 (d7f09af0, after #1235) and passed in every later main run",
+      "followup": "LEO-111"
     }
   ]
 }

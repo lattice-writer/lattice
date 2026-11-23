@@ -44,8 +44,12 @@
  * skips each macOS job (Rust, GPUI, the WebKit benchmark) whose stages the
  * trailer records and whose needs they cover (scripts/ci-local-select.mjs):
  * a GPUI change that needs the whole e2e is covered only by `e2e=full`, one
- * that needs some modules by an e2e that ran them, and a release path by
- * nothing. Linux and Windows always run.
+ * that needs some modules by an e2e that ran them, and a release path only
+ * by the full gate (`rust gpui e2e=full webkit`). Linux and Windows always
+ * run, and a push to main or a tag ignores the trailer. GPUI's Windows job runs the whole e2e
+ * scenario only for a change that can behave differently on Windows, and
+ * for every full run and push to main; otherwise the smoke flow
+ * (scripts/windows-e2e-tier.mjs, the `windows-e2e` output).
  *
  * Usage:
  *   node scripts/ci-tier.mjs [--base REF] [--full]   print the tier as JSON
@@ -59,6 +63,7 @@ import { coveredJobs, macosNeeds, parseTrailer } from "./ci-local-select.mjs";
 import { changedFiles, rustIncludes } from "./gate-changed.mjs";
 import { isMain } from "./lib/util.mjs";
 import { harnessInputs } from "./perf-bench/harness-inputs.mjs";
+import { windowsE2e } from "./windows-e2e-tier.mjs";
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const git = (...args) => execFileSync("git", args, { cwd: repo, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }).trim();
@@ -67,7 +72,7 @@ export const JOBS = ["vitest", "lint-build", "perf-bench", "rust", "gpui", "lite
 const CI_JOBS = JOBS.filter((job) => job !== "gpui");
 // What decides which jobs run and which a CI-local trailer may skip: a
 // change to any of them runs everything.
-const CI_CONTROL = new Set(["scripts/ci-tier.mjs", "scripts/ci-local-select.mjs", "scripts/gpui-e2e-modules.mjs", "scripts/ci-local.mjs"]);
+const CI_CONTROL = new Set(["scripts/ci-tier.mjs", "scripts/ci-local-select.mjs", "scripts/gpui-e2e-modules.mjs", "scripts/ci-local.mjs", "scripts/windows-e2e-tier.mjs"]);
 
 // What `pnpm build` reads besides the sources tsc already checked: a change
 // to any of them can move the bundle the budgets measure.
@@ -202,6 +207,15 @@ export function localMacosPass(message, tree) {
   return Boolean(cover && tree.startsWith(cover.tree));
 }
 
+/**
+ * Whether a CI-local trailer may stand for macOS jobs in this run. Never on a
+ * push to main or a tag, where a regression is pinned to its commit, nor in a
+ * full run: those run the hosted macOS jobs whatever the message carries.
+ */
+export function trailerHonoured({ full, event, ref }) {
+  return !full && !(event === "push" && ref === "refs/heads/main") && !ref.startsWith("refs/tags/");
+}
+
 /** Whether the head commit or the branch's open pull request asks for every job. */
 export function wantsFull(message, labels = []) {
   return /^CI:\s*full\s*$/im.test(message) || labels.includes("ci:full");
@@ -248,8 +262,9 @@ function github() {
   const files = base ? git("-c", "core.quotePath=false", "diff", "--no-renames", "--name-only", base, "HEAD").split("\n").filter(Boolean) : [];
   if (!reason && event === "workflow_dispatch" && files.length === 0) reason = "a dispatch of a branch that changes nothing (a baseline)";
   const tier = ciTier(files, { full: Boolean(reason) });
-  const cover = !tier.full && localMacosPass(message, git("rev-parse", "HEAD^{tree}")) ? parseTrailer(message) : null;
+  const cover = trailerHonoured({ full: tier.full, event, ref }) && localMacosPass(message, git("rev-parse", "HEAD^{tree}")) ? parseTrailer(message) : null;
   const local = coveredJobs(cover, macosNeeds(tier, files));
+  const windows = windowsE2e(tier.gpuiFiles, { full: tier.full || (event === "push" && branch === "main") });
   const groups = { rust: "Rust", gpui: "GPUI", webkit: "WebKit benchmark" };
   const needed = Object.keys(groups).filter((group) => (group === "webkit" ? tier.jobs["perf-bench"] : tier.jobs[group]));
   const lines = [
@@ -265,6 +280,7 @@ function github() {
     "| --- | --- | --- |",
     ...(tier.vitestFiles.length ? [`Vitest runs only the tests that name a changed file: ${tier.vitestFiles.join(", ")}.`, ""] : []),
     ...JOBS.map((job) => `| ${job} | ${tier.jobs[job] ? "yes" : "no"} | ${tier.why[job].map((file) => `\`${file}\``).join(", ")} |`),
+    ...(tier.jobs.gpui ? ["", `GPUI Windows e2e: ${windows.e2e === "full" ? "the whole scenario" : "the smoke flow"} (${windows.why.join("; ")}).`] : []),
   ];
   console.log(lines.join("\n"));
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `## CI tier\n\n${lines.join("\n")}\n`);
@@ -274,6 +290,7 @@ function github() {
     "macos-local-rust": Boolean(cover) && local.rust.covered,
     "macos-local-gpui": Boolean(cover) && local.gpui.covered,
     "macos-local-webkit": Boolean(cover) && local.webkit.covered,
+    "windows-e2e": windows.e2e,
     full: tier.full,
   };
   if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, Object.entries(outputs).map(([key, value]) => `${key}=${value}\n`).join(""));
@@ -284,7 +301,8 @@ function main() {
   if (argv.includes("--github")) return github();
   const base = argv.includes("--base") ? argv[argv.indexOf("--base") + 1] : "origin/main";
   const { mergeBase, files } = changedFiles(base);
-  console.log(JSON.stringify({ base, mergeBase, files: files.length, ...ciTier(files, { full: argv.includes("--full") }) }, null, 2));
+  const tier = ciTier(files, { full: argv.includes("--full") });
+  console.log(JSON.stringify({ base, mergeBase, files: files.length, ...tier, windowsE2e: tier.jobs.gpui ? windowsE2e(tier.gpuiFiles, { full: tier.full }) : null }, null, 2));
 }
 
 if (isMain(import.meta.url)) main();

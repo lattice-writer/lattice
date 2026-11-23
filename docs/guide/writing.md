@@ -16,7 +16,8 @@ Useful while writing:
 - **Go to**: `⌘P` opens any file, `⌘G` a line, `⌘⇧O` a section or label.
 - **Outline**: the status bar's section name, or the marks at the right edge of the editor, take you through the document's structure.
 - Markdown notes, spreadsheets, HTML pages, slides and [boards](boards.md) live in the same project and open in their own editors.
-- **Markdown tables**: in the native Lattice, drag a column border in the visual editor to resize the column, or double-click it to fit the column to its content. The widths are remembered for the next time you open the file, and the `.md` file itself stays plain Markdown.
+- **Code files**: in the native Lattice, Python, TypeScript, JavaScript, Rust, Go, C and C++, Java, R, Lua, shell scripts, YAML, TOML, JSON, Makefiles, Dockerfiles and CSS open with syntax highlighting. A fenced code block in a Markdown note is highlighted in the same languages.
+- **Markdown tables**: in the native Lattice, drag a column border in the visual editor to resize the column, or double-click it to fit the column to its content. Drag a row's bottom border to make the row taller, or double-click it to give the row its content's height again. Widths and heights are remembered for the next time you open the file, and the `.md` file itself stays plain Markdown.
 - **Spreadsheets**: Control-click or right-click opens a cell's menu; `⌘`-click adds another range to the selection.
 
 Lattice saves as you type. **Saved** in the status bar shows when.

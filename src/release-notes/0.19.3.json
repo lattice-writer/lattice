@@ -1,0 +1,52 @@
+{
+  "version": "0.19.3",
+  "date": "2026-11-23",
+  "highlights": [
+    {
+      "icon": "feather",
+      "title": {
+        "en": "Typst documents",
+        "zh": "Typst 文档"
+      },
+      "body": {
+        "en": "The native Lattice now opens, highlights and builds Typst (.typ) documents, with a live preview as you type and errors you can click. The Typst compiler is a one-time download of about 22 MB, which Lattice offers the first time you build a Typst document; Settings › Editor & builds › Typst support removes it or downloads it again.",
+        "zh": "原生 Lattice 现在可以打开、高亮和编译 Typst（.typ）文档，边写边实时预览，错误可以点击跳转。Typst 编译器需要一次性下载约 22 MB，第一次编译 Typst 文档时 Lattice 会询问是否下载；在 设置 › 编辑编译 › Typst 支持 中可以移除或重新下载。"
+      }
+    },
+    {
+      "title": {
+        "en": "Highlighting for code files",
+        "zh": "代码文件语法高亮"
+      },
+      "body": {
+        "en": "In the native Lattice, Python, TypeScript and TSX, JavaScript and JSX, Rust, Go, C, C++, Java, R, Lua, shell scripts, YAML, TOML, JSON, Makefiles, Dockerfiles and CSS files open with syntax highlighting, and so do Markdown code blocks in these languages.",
+        "zh": "在原生 Lattice 中，Python、TypeScript 和 TSX、JavaScript 和 JSX、Rust、Go、C、C++、Java、R、Lua、Shell 脚本、YAML、TOML、JSON、Makefile、Dockerfile 和 CSS 文件打开即有语法高亮，Markdown 中这些语言的代码块也一样。"
+      }
+    },
+    {
+      "icon": "menu",
+      "title": {
+        "en": "Set Markdown table row heights",
+        "zh": "设置 Markdown 表格的行高"
+      },
+      "body": {
+        "en": "In the native Lattice's visual Markdown editor, drag a row's bottom border to make the row taller, or double-click the border to fit the row to its content again. Lattice remembers the heights with the column widths, and the .md file stays plain Markdown.",
+        "zh": "在原生 Lattice 的 Markdown 可视编辑器中，拖动一行的下边框可以把这一行拉高，双击边框则让这一行恢复内容高度。Lattice 会把行高和列宽一起记住，.md 文件仍是普通的 Markdown。"
+      }
+    }
+  ],
+  "fixes": [
+    {
+      "en": "On macOS 27.3, the Agent's message box no longer disappears when a draft reaches a second line, for example after Shift+Return (#1227).",
+      "zh": "在 macOS 27.3 上，AI 助手的输入框不会再在草稿换到第二行时消失，例如按 Shift+Return 之后（#1227）。"
+    },
+    {
+      "en": "Live preview no longer spins on \"First layout…\" forever, in both versions of Lattice. After a minute without a layout, its pill says live preview is taking long and offers Reinstall live preview. Lattice now checks every file of the installed live preview engine, so it downloads it once more (about 4 MB) after this update.",
+      "zh": "实时预览不会再一直停在「首次排版…」，两个版本的 Lattice 都是如此。一分钟内没有排版结果时，状态标签会提示实时预览耗时过长，并提供「重新安装实时预览」。Lattice 现在会校验已安装的实时预览引擎的每个文件，因此更新后会重新下载一次（约 4 MB）。"
+    },
+    {
+      "en": "In the native Lattice, the pointer shows the right cursor again over parts of the window that pass their input through the app, such as the I-beam over text.",
+      "zh": "在原生 Lattice 中，指针移到把输入转交给应用的区域上时，又能显示正确的光标，例如文字上的 I 形光标。"
+    }
+  ]
+}

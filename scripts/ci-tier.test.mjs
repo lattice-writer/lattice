@@ -2,7 +2,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { GPUI_INPUTS, JOBS, ciTier, localMacosPass, wantsFull } from "./ci-tier.mjs";
+import { GPUI_INPUTS, JOBS, ciTier, localMacosPass, trailerHonoured, wantsFull } from "./ci-tier.mjs";
 
 const repo = path.resolve(import.meta.dirname, "..");
 
@@ -95,5 +95,13 @@ describe("ci-tier", () => {
     expect(localMacosPass("fix: x\n\nCI-local: macos 0123456789ab\n", tree)).toBe(true);
     expect(localMacosPass("fix: x\n\nCI-local: macos fedcba987654\n", tree)).toBe(false);
     expect(localMacosPass("fix: x", tree)).toBe(false);
+  });
+
+  it("honours a CI-local trailer on a branch only, never on main, a tag or a full run", () => {
+    expect(trailerHonoured({ full: false, event: "push", ref: "refs/heads/capy/topic" })).toBe(true);
+    expect(trailerHonoured({ full: false, event: "workflow_dispatch", ref: "refs/heads/capy/topic" })).toBe(true);
+    expect(trailerHonoured({ full: false, event: "push", ref: "refs/heads/main" })).toBe(false);
+    expect(trailerHonoured({ full: false, event: "push", ref: "refs/tags/v0.19.3" })).toBe(false);
+    expect(trailerHonoured({ full: true, event: "push", ref: "refs/heads/capy/topic" })).toBe(false);
   });
 });

@@ -90,6 +90,7 @@ jobs:
     outputs:
       gpui: ${{ steps.tier.outputs.gpui }}
       macos-local-gpui: ${{ steps.tier.outputs.macos-local-gpui }}
+      windows-e2e: ${{ steps.tier.outputs.windows-e2e }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -208,9 +209,11 @@ jobs:
           cat "$out"
           # Fails on a step main passes, not on the ones main fails today
           # (scripts/gpui-e2e-known-failures.json), which it lists apart.
-          # A new failure has its module run once more first, so a hosted-runner
-          # flake is reported as flaky rather than failing the job.
-          node ../scripts/gpui-e2e-verdict.mjs --platform macos --check-quit --rerun-app target/release/lattice-gpui --fixture fixtures/e2e "$out"
+          # A new failure, or a step of the list's flaky tier, has its module
+          # run once more first, so a hosted-runner flake is reported as flaky
+          # rather than failing the job. A flaky-tier step that fails both
+          # times is a warning on a branch and fails the job on main and tags.
+          node ../scripts/gpui-e2e-verdict.mjs --platform macos --check-quit ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && '--strict-flaky' || '' }} --rerun-app target/release/lattice-gpui --fixture fixtures/e2e "$out"
       - if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
@@ -277,8 +280,10 @@ jobs:
       # failed the job on the download's timeout, so the installed tree (its
       # common install, config and data, plus the per-user formats and
       # packages it fetches on first use) is cached. The key's version is
-      # bumped by hand to pick up a newer MiKTeX; a restored tree that no
-      # longer runs falls back to a fresh install.
+      # bumped by hand to pick up a newer MiKTeX, and an older version's tree
+      # is restored until main saves the new one; a restored tree that no
+      # longer runs falls back to a fresh install. v2 is the first to hold
+      # MiKTeX's registry keys and the Computer Modern Type 1 fonts (below).
       - name: Restore MiKTeX
         id: miktex-cache
         uses: actions/cache/restore@v5
@@ -288,12 +293,23 @@ jobs:
             C:\ProgramData\MiKTeX
             ~\AppData\Local\MiKTeX
             ~\AppData\Roaming\MiKTeX
-          key: miktex-${{ runner.os }}-v1
+          key: miktex-${{ runner.os }}-v2
+          restore-keys: miktex-${{ runner.os }}-
       - name: Install MiKTeX
         id: miktex
-        timeout-minutes: 15
+        timeout-minutes: 25
         run: |
           $bin = "C:\Program Files\MiKTeX\miktex\bin\x64"
+          # MiKTeX keeps its setup in the registry as well as in these files:
+          # a tree restored without it answered "It seems that this is a fresh
+          # TeX installation. Please finish the setup" and every run installed
+          # MiKTeX again from the network (run 45123909209, among all others
+          # since the cache was added), which is where the download timeouts
+          # struck. So the keys travel in the cache too (exported below).
+          $registry = "C:\ProgramData\MiKTeX\lattice-ci-registry"
+          foreach ($file in @("$registry\hklm.reg", "$registry\hkcu.reg")) {
+            if (Test-Path $file) { reg import $file }
+          }
           $restored = $false
           if (Test-Path "$bin\latexmk.exe") {
             & "$bin\latexmk.exe" --version
@@ -305,25 +321,29 @@ jobs:
             # for minutes at a time (run 44171052878: three attempts within
             # two minutes, each "Timeout was reached" on /hello, after the
             # cache had been evicted). So each attempt names a CTAN mirror
-            # itself (/Mirror), which skips that lookup, and waits longer
-            # before the next; only the last lets MiKTeX choose.
+            # itself (/Mirror) and waits longer before the next; every fourth
+            # lets MiKTeX choose. The outage outlasted three attempts in four
+            # minutes even with a mirror named (run 45070265370: "Timeout was
+            # reached" on /hello each time), so it takes up to seven, about
+            # fourteen minutes of waiting in all, before it gives up.
             $mirrors = @(
               "https://mirrors.mit.edu/CTAN/systems/win32/miktex/tm/packages/",
               "https://ctan.math.illinois.edu/systems/win32/miktex/tm/packages/",
               "https://mirror.las.iastate.edu/tex-archive/systems/win32/miktex/tm/packages/",
               ""
             )
+            $attempts = 7
             $repository = $null
-            foreach ($attempt in 0..($mirrors.Count - 1)) {
-              $mirror = $mirrors[$attempt]
+            foreach ($attempt in 0..($attempts - 1)) {
+              $mirror = $mirrors[$attempt % $mirrors.Count]
               if ($mirror) {
                 choco install miktex --no-progress -y --execution-timeout=600 --params "/Mirror:$mirror"
               } else {
                 choco install miktex --no-progress -y --execution-timeout=600
               }
               if ($LASTEXITCODE -eq 0) { $repository = $mirror; break }
-              if ($attempt -eq $mirrors.Count - 1) { throw "choco could not install MiKTeX from any mirror" }
-              Start-Sleep -Seconds (30 * ($attempt + 1))
+              if ($attempt -eq $attempts - 1) { throw "choco could not install MiKTeX in $attempts attempts" }
+              Start-Sleep -Seconds (40 * ($attempt + 1))
             }
             $bin = @("C:\Program Files\MiKTeX\miktex\bin\x64", "$env:LOCALAPPDATA\Programs\MiKTeX\miktex\bin\x64") |
               Where-Object { Test-Path "$_\initexmf.exe" } | Select-Object -First 1
@@ -335,14 +355,39 @@ jobs:
             & "$bin\miktex.exe" --admin packages install latexmk
             & "$bin\latexmk.exe" --version
           }
+          # The live preview's font test (live_preview::resources, a TFM name
+          # through pdftex.map) needs cmr10.pfb, from amsfonts. MiKTeX's
+          # kpsewhich installs nothing on first use, so whether the tree had it
+          # depended on which test compiled a document first, and a restored
+          # tree without it failed that test (run 45081374801). It is
+          # installed here, a few tries over a minute, whichever way MiKTeX came.
+          $added = $false
+          if (-not (& "$bin\kpsewhich.exe" cmr10.pfb)) {
+            foreach ($try in 1..3) {
+              & "$bin\miktex.exe" --admin packages install amsfonts
+              if ($LASTEXITCODE -eq 0) { break }
+              if ($try -eq 3) { throw "MiKTeX could not install amsfonts" }
+              Start-Sleep -Seconds (20 * $try)
+            }
+            & "$bin\initexmf.exe" --admin --update-fndb
+            if (-not (& "$bin\kpsewhich.exe" cmr10.pfb)) { throw "cmr10.pfb is still missing after installing amsfonts" }
+            $added = $true
+          }
+          New-Item -ItemType Directory -Force $registry | Out-Null
+          foreach ($hive in @(@("HKLM", "hklm"), @("HKCU", "hkcu"))) {
+            if (Test-Path "$($hive[0]):\SOFTWARE\MiKTeX.org") { reg export "$($hive[0])\SOFTWARE\MiKTeX.org" "$registry\$($hive[1]).reg" /y }
+          }
           $bin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          "fresh=$(-not $restored)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          # Saved (from main, below) when the tree is new to this key: a fresh
+          # install, fonts added, or an older version's tree.
+          $older = "${{ steps.miktex-cache.outputs.cache-matched-key }}" -ne "${{ steps.miktex-cache.outputs.cache-primary-key }}"
+          "save=$((-not $restored) -or $added -or $older)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
       - run: cargo test --release --locked --workspace -- --include-ignored
       # After the tests, so the packages and formats the documents fetched on
       # first use are in it. Saved only from main (a tag's cache is visible to
-      # that tag alone) and only after a fresh install.
+      # that tag alone) and only when the tree is new to the key.
       - name: Save MiKTeX
-        if: ${{ !cancelled() && steps.miktex.outputs.fresh == 'True' && github.ref == 'refs/heads/main' }}
+        if: ${{ !cancelled() && steps.miktex.outputs.save == 'True' && github.ref == 'refs/heads/main' }}
         uses: actions/cache/save@v5
         with:
           path: |
@@ -365,8 +410,18 @@ jobs:
       # step's 65 minutes (the verdict's rerun of failed modules takes up to
       # 15 more), so a scenario that hangs is killed here, with its log,
       # rather than by the runner.
+      #
+      # The whole scenario runs only for a change that can behave
+      # differently on Windows, and for every tag, full run and push to main;
+      # a change to macOS-only code or files no step reads
+      # runs the smoke flow alone (scripts/windows-e2e-tier.mjs). The macOS
+      # job, or the CI-local trailer that stands for it, still runs what the
+      # diff picks there.
       - name: e2e scenario
         timeout-minutes: 65
+        env:
+          WINDOWS_E2E: ${{ needs.changes.outputs.windows-e2e }}
+          STRICT_FLAKY: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && '--strict-flaky' || '' }}
         run: |
           $project = Join-Path $env:RUNNER_TEMP "e2e-project"
           $out = Join-Path $env:RUNNER_TEMP "e2e-windows.json"
@@ -379,15 +434,23 @@ jobs:
           node ../scripts/typst-helper-fake-release.mjs target/release/lattice-typst.exe $typst
           if ($LASTEXITCODE -ne 0) { throw "could not make the stand-in Typst release" }
           $env:LATTICE_E2E_TYPST_RELEASE = $typst
+          $scenario = @($project, "--scenario", "e2e", "--out", $out)
+          if ($env:WINDOWS_E2E -eq "smoke") {
+            Write-Output "The smoke flow alone: nothing this change touches behaves differently on Windows."
+            $scenario += @("--only", "smoke")
+          }
           $app = Start-Process -FilePath target/release/lattice-gpui.exe `
-            -ArgumentList $project, "--scenario", "e2e", "--out", $out `
+            -ArgumentList $scenario `
             -NoNewWindow -PassThru
           if (-not $app.WaitForExit(2400000)) { $app.Kill(); throw "the e2e scenario did not finish in 40 minutes" }
           Get-Content $out
           $result = Get-Content $out -Raw | ConvertFrom-Json
           # As on macOS: only a step main passes fails the job
-          # (scripts/gpui-e2e-known-failures.json).
-          node ../scripts/gpui-e2e-verdict.mjs --platform windows --rerun-app target/release/lattice-gpui.exe --fixture fixtures/e2e $out
+          # (scripts/gpui-e2e-known-failures.json), and a flaky-tier step that
+          # fails twice fails it on main and tags alone.
+          $verdict = @("--platform", "windows", "--rerun-app", "target/release/lattice-gpui.exe", "--fixture", "fixtures/e2e")
+          if ($env:STRICT_FLAKY) { $verdict += $env:STRICT_FLAKY }
+          node ../scripts/gpui-e2e-verdict.mjs @verdict $out
           $newFailures = $LASTEXITCODE -ne 0
           # As on macOS: the text typed just before the scenario quit is saved.
           # The path is a verbatim one (\\?\D:\...), whose `?` Get-Content

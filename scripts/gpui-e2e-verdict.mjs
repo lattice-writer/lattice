@@ -17,6 +17,16 @@
  * main stays enforced: a step joins the list only with the main run that
  * shows it failing.
  *
+ * An entry with `"tier": "flaky"` is a step that passes on main more often
+ * than not but fails the hosted runners now and then for reasons outside the
+ * change (a clipboard read, a dialog's focus, a TeX package fetched on first
+ * use). Such a step that fails is rerun with its module (with `--rerun-app`)
+ * and is flaky when it passes there. One that fails both times is a warning
+ * on a branch, listed in the summary, and fails the run under
+ * `--strict-flaky`, which gpui.yml passes on main, so a step that really
+ * broke still turns main red with the commit that broke it. A flaky-tier step
+ * that passes is not reported as one to take off the list.
+ *
  * `--baseline FILE` adds the e2e steps a local main baseline record fails
  * (scripts/gpui-main-baseline.mjs's known-failures@<sha>.json) to the known
  * ones, for a run on a developer's Mac rather than a hosted runner.
@@ -48,15 +58,26 @@ export function knownFailures(file = path.join(repo, "scripts", "gpui-e2e-known-
   return JSON.parse(readFileSync(file, "utf8")).steps;
 }
 
-/** The run's failures split into new ones and known ones, and the known steps that passed. */
-export function judge(result, entries, platform) {
+export const TIERS = ["failing", "flaky"];
+
+const passes = (verdict) => !verdict.error && verdict.total > 0 && verdict.fresh.length === 0 && (!verdict.strict || verdict.quarantined.length === 0);
+
+/**
+ * The run's failures split into new ones, known ones and flaky-tier ones
+ * (`quarantined`: still to rerun, or failed again after the rerun), and the
+ * known failing steps that passed. `strict` fails the run on a flaky-tier
+ * step that failed.
+ */
+export function judge(result, entries, platform, { strict = false } = {}) {
   const parsed = parseE2e(result);
-  const listed = new Set(entries.filter((entry) => entry.platforms.includes(platform)).map((entry) => entry.step));
+  const tiers = new Map(entries.filter((entry) => entry.platforms.includes(platform)).map((entry) => [entry.step, entry.tier ?? "failing"]));
   const ran = new Set((result?.steps ?? []).map((step) => step.step));
-  const known = parsed.failing.filter((step) => listed.has(step));
-  const fresh = parsed.failing.filter((step) => !listed.has(step));
-  const fixed = [...listed].filter((step) => ran.has(step) && !parsed.failing.includes(step));
-  return { total: parsed.total, error: parsed.error ?? null, known, fresh, fixed, flaky: [], ok: !parsed.error && parsed.total > 0 && fresh.length === 0 };
+  const known = parsed.failing.filter((step) => tiers.get(step) === "failing");
+  const quarantined = parsed.failing.filter((step) => tiers.get(step) === "flaky");
+  const fresh = parsed.failing.filter((step) => !tiers.has(step));
+  const fixed = [...tiers].filter(([step, tier]) => tier === "failing" && ran.has(step) && !parsed.failing.includes(step)).map(([step]) => step);
+  const verdict = { total: parsed.total, error: parsed.error ?? null, known, fresh, fixed, flaky: [], quarantined, strict };
+  return { ...verdict, ok: passes(verdict) };
 }
 
 /** The modules to rerun for the new failures: `smoke` for a step outside any module. */
@@ -68,12 +89,12 @@ export function rerunModules(result, fresh) {
   return [...modules];
 }
 
-/** The verdict once the rerun is in: a new failure that passed there is flaky. */
+/** The verdict once the rerun is in: a new or flaky-tier failure that passed there is flaky. */
 export function settle(verdict, rerun) {
   const passed = new Set((rerun?.steps ?? []).filter((step) => step.passed === true).map((step) => step.step));
-  const flaky = verdict.fresh.filter((step) => passed.has(step));
-  const fresh = verdict.fresh.filter((step) => !passed.has(step));
-  return { ...verdict, fresh, flaky, ok: !verdict.error && verdict.total > 0 && fresh.length === 0 };
+  const flaky = [...verdict.fresh, ...verdict.quarantined].filter((step) => passed.has(step));
+  const settled = { ...verdict, fresh: verdict.fresh.filter((step) => !passed.has(step)), quarantined: verdict.quarantined.filter((step) => !passed.has(step)), flaky };
+  return { ...settled, ok: passes(settled) };
 }
 
 function rerun(app, fixture, modules) {
@@ -100,7 +121,7 @@ function main() {
   const fixture = value("--fixture");
   const file = argv.filter((arg, index) => !arg.startsWith("--") && !["--platform", "--baseline", "--rerun-app", "--fixture"].includes(argv[index - 1])).at(-1);
   if (Boolean(app) !== Boolean(fixture)) throw new Error("--rerun-app and --fixture go together");
-  if (!PLATFORMS.includes(platform) || !file) throw new Error("usage: gpui-e2e-verdict.mjs --platform macos|windows [--check-quit] [--baseline FILE] [--rerun-app BIN --fixture DIR] RESULT.json");
+  if (!PLATFORMS.includes(platform) || !file) throw new Error("usage: gpui-e2e-verdict.mjs --platform macos|windows [--check-quit] [--strict-flaky] [--baseline FILE] [--rerun-app BIN --fixture DIR] RESULT.json");
   let result = null;
   try {
     result = JSON.parse(readFileSync(file, "utf8"));
@@ -114,10 +135,12 @@ function main() {
       entries.push({ step, platforms: [platform], reason: "fails in this machine's main baseline", followup: path.basename(baselineFile) });
     }
   }
-  let verdict = judge(result, entries, platform);
-  if (app && verdict.fresh.length && !verdict.error) verdict = settle(verdict, rerun(app, fixture, rerunModules(result, verdict.fresh)));
-  const reasons = new Map(entries.map((entry) => [entry.step, entry]));
-  const lines = [`${verdict.total} steps on ${platform}: ${verdict.fresh.length} new failure(s), ${verdict.flaky.length} flaky (passed on a rerun), ${verdict.known.length} known (scripts/gpui-e2e-known-failures.json), ${verdict.fixed.length} known that passed.`];
+  let verdict = judge(result, entries, platform, { strict: argv.includes("--strict-flaky") });
+  const retry = [...verdict.fresh, ...verdict.quarantined];
+  if (app && retry.length && !verdict.error) verdict = settle(verdict, rerun(app, fixture, rerunModules(result, retry)));
+  const reasons = new Map(entries.filter((entry) => entry.platforms.includes(platform)).map((entry) => [entry.step, entry]));
+  const twice = app ? "failed twice" : "failed, not rerun";
+  const lines = [`${verdict.total} steps on ${platform}: ${verdict.fresh.length} new failure(s), ${verdict.flaky.length} flaky (passed on a rerun), ${verdict.quarantined.length} of the flaky tier ${twice}${verdict.strict ? " (counted on main)" : " (not counted on a branch)"}, ${verdict.known.length} known (scripts/gpui-e2e-known-failures.json), ${verdict.fixed.length} known that passed.`];
   if (verdict.error || !result) lines.push(`The scenario did not finish: ${verdict.error ?? "no result was written"}`);
   if (argv.includes("--check-quit")) {
     const quit = result?.after_quit;
@@ -135,6 +158,10 @@ function main() {
   console.log(lines.join("\n"));
   for (const step of verdict.fresh) console.log(`::error title=New e2e failure (${platform})::${step}`);
   for (const step of verdict.flaky) console.log(`::warning title=Flaky e2e step (${platform})::${step} (failed, then passed when its module ran again)`);
+  for (const step of verdict.quarantined) {
+    const why = `${step} (${twice}; flaky tier, ${reasons.get(step).followup}: ${reasons.get(step).reason})`;
+    console.log(verdict.strict ? `::error title=Flaky-tier e2e step ${twice} on main (${platform})::${why}` : `::warning title=Flaky-tier e2e step ${twice} (${platform})::${why}`);
+  }
   if (verdict.known.length) {
     console.log("::group::Known failures on main (not counted)");
     for (const step of verdict.known) console.log(`${step}  [${reasons.get(step).followup}: ${reasons.get(step).reason}]`);
@@ -152,6 +179,7 @@ function main() {
         "",
         ...list("New failures", verdict.fresh),
         ...list("Flaky: failed, then passed on a rerun of its module", verdict.flaky),
+        ...list(`Flaky tier, ${twice}${verdict.strict ? ": counted on main" : ": not counted on a branch"}`, verdict.quarantined, (step) => ` — ${reasons.get(step).followup}`),
         ...list("Known failures on main, not counted", verdict.known, (step) => ` — ${reasons.get(step).followup}`),
         ...list("Known failures that passed this run", verdict.fixed),
       ].join("\n") + "\n",
