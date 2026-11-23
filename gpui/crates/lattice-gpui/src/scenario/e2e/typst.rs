@@ -207,7 +207,7 @@ impl Run {
         log::info!("typst e2e: edit to pixels {} ms", to_pixels.as_millis());
         self.snapshot(cx, "typst-live").await;
 
-        self.typst_jumps(cx, steps, root, &source, &buffer).await?;
+        self.typst_jumps(cx, steps, root, &source, &editor, &buffer).await?;
 
         self.close_panel(cx, &editor).await?;
         std::fs::remove_file(&source).ok();
@@ -224,6 +224,7 @@ impl Run {
         steps: &mut Steps,
         root: &std::path::Path,
         source: &std::path::Path,
+        editor: &gpui::Entity<crate::editor_panel::EditorPanel>,
         buffer: &gpui::Entity<language::Buffer>,
     ) -> Result<()> {
         let part = root.join("notes-part.typ");
@@ -242,6 +243,19 @@ impl Run {
                 !shell.building() && panel.builds() > builds && panel.succeeded() == Some(true)
             })
             .await;
+        // The autosave of the notes builds them again (an automatic build
+        // of the document in front): let it land first, or it would build
+        // the part on its own once the part is in front (no main document).
+        let settled = self
+            .wait_for(cx, Duration::from_secs(20), |shell, cx| {
+                !editor.read(cx).is_dirty(cx) && !shell.read(cx).building()
+            })
+            .await;
+        self.pause(cx, Duration::from_millis(500)).await;
+        let settled = settled
+            && self
+                .wait_for(cx, Duration::from_secs(20), |shell, cx| !shell.read(cx).building())
+                .await;
 
         let part_editor = self.open(cx, &part, Some(2))?;
         self.pause(cx, Duration::from_millis(300)).await;
@@ -260,8 +274,8 @@ impl Run {
         });
         steps.check(
             "Typst: Jump to PDF from an included file's line marks it in the PDF, compiled from unsaved text",
-            included && marked && pages > 0 && mark == Some(pages - 1),
-            json!({ "included": included, "mark": mark.map(|page| page + 1), "pages": pages }),
+            included && settled && marked && pages > 0 && mark == Some(pages - 1),
+            json!({ "included": included, "settled": settled, "mark": mark.map(|page| page + 1), "pages": pages }),
         );
         self.snapshot(cx, "typst-jump-to-pdf").await;
 
