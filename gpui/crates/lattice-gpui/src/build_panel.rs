@@ -392,9 +392,13 @@ impl BuildPanel {
         sources: HashMap<String, String>,
         cx: &mut Context<Self>,
     ) {
+        let started = match &self.status {
+            Status::Running { started, .. } => Some(*started),
+            _ => None,
+        };
         self.builds += 1;
         self.status = Status::Finished;
-        self.outcome = BuildOutcome::of(result, wrote_pdf).map(|outcome| BuildOutcome {
+        self.outcome = BuildOutcome::of(result, wrote_pdf, started).map(|outcome| BuildOutcome {
             quiet: self.quiet && outcome.succeeded,
             ..outcome
         });

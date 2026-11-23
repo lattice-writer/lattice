@@ -42,6 +42,8 @@ pub struct TreeItem {
     pub id: SharedString,
     pub label: SharedString,
     pub children: Vec<TreeItem>,
+    /// A folder whatever its children: an empty folder is still one.
+    folder: bool,
     state: Rc<RefCell<TreeItemState>>,
 }
 
@@ -101,6 +103,7 @@ impl TreeItem {
             id: id.into(),
             label: label.into(),
             children: Vec::new(),
+            folder: false,
             state: Rc::new(RefCell::new(TreeItemState {
                 expanded: false,
                 disabled: false,
@@ -118,6 +121,13 @@ impl TreeItem {
         self
     }
 
+    /// Mark the item a folder even with no children, as an empty folder
+    /// on disk is: it draws, toggles and is reported as a folder.
+    pub fn folder(mut self, folder: bool) -> Self {
+        self.folder = folder;
+        self
+    }
+
     pub fn expanded(self, expanded: bool) -> Self {
         self.state.borrow_mut().expanded = expanded;
         self
@@ -130,7 +140,7 @@ impl TreeItem {
 
     #[inline]
     pub fn is_folder(&self) -> bool {
-        !self.children.is_empty()
+        self.folder || !self.children.is_empty()
     }
 
     pub fn is_disabled(&self) -> bool {
@@ -684,6 +694,19 @@ mod tests {
             state.toggle_expand(1, cx);
             assert_eq!(state.index_of(&"docs/guide/a".into()), Some(2));
         });
+    }
+
+    #[test]
+    fn an_item_marked_a_folder_is_one_without_children() {
+        assert!(!TreeItem::new("notes.tex", "notes.tex").is_folder());
+        let empty = TreeItem::new("figures", "figures").folder(true);
+        assert!(empty.is_folder());
+        assert!(TreeEntry::new(empty, 0).is_folder());
+        assert!(
+            TreeItem::new("src", "src")
+                .child(TreeItem::new("src/a", "a"))
+                .is_folder()
+        );
     }
 
     struct TreeHarness {

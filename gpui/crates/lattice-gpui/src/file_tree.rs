@@ -290,11 +290,17 @@ impl FileTreePanel {
     /// Lay the project's files out as the tree's items, with the row being
     /// created among them, keeping which folders are open.
     fn rebuild(&mut self, cx: &mut Context<Self>) {
+        self.adopt_kit_row(cx);
+        self.remember_expanded(cx);
+        self.lay_out(cx);
+    }
+
+    /// Lay the rows out from the open folders as noted, without first
+    /// noting which folders Kit's tree has open.
+    fn lay_out(&mut self, cx: &mut Context<Self>) {
         let Some(project) = self.project.clone() else {
             return;
         };
-        self.adopt_kit_row(cx);
-        self.remember_expanded(cx);
         let mut nodes = project.read(cx).files().to_vec();
         if !project.read(cx).show_hidden() {
             hide_template_files(&mut nodes);

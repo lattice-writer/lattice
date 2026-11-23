@@ -161,9 +161,11 @@ impl Shell {
             .any(|view| self.keyboard_in_view(view, window, cx))
     }
 
-    /// A view closed (its X, its menu, ⌘W): a document's panel keeps an
-    /// empty slot when it was the last document there, outside a preset or
-    /// focus mode, and the document can be opened again with ⌘⇧T.
+    /// A view closed (its X, its menu, ⌘W): its panel closes with its last
+    /// view, in this same update, so no frame draws it "Empty"; only the
+    /// last document panel, with no document anywhere else, keeps an empty
+    /// slot (outside a preset or focus mode). A panel left with nothing but
+    /// a slot closes too. The document can be opened again with ⌘⇧T.
     fn view_closed(&mut self, view: &str, window: &mut Window, cx: &mut Context<Self>) {
         // The keyboard in the view that closed goes to the document in
         // front, so the window's commands still reach the shell.
@@ -182,6 +184,14 @@ impl Shell {
             }
         }
         self.last_document = close_view(&self.last_document, view);
+        let stranded = trellis_layout::stranded_slots(&self.document(cx));
+        if !stranded.is_empty() {
+            self.engine_do(cx, |engine| {
+                for slot in &stranded {
+                    engine.close(slot);
+                }
+            });
+        }
         self.sync_views(window, cx);
         self.forget_closed_pdfs(cx);
         self.forget_closed_assets();

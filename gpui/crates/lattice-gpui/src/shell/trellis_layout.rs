@@ -26,7 +26,7 @@ use trellis::model::{
     Axis, LayoutDocument, LayoutNode, PanelNode, SplitNode, ViewRecord, Views, sanitize,
 };
 
-pub use arrange::{arrange_documents, filled_slots, keep_document_slot, places_of};
+pub use arrange::{arrange_documents, filled_slots, keep_document_slot, places_of, stranded_slots};
 pub use presets::{
     ActiveFocus, ActivePreset, Documents, Preset, enter_focus, enter_preset, return_layout,
     undo_reset,
