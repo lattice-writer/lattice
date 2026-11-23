@@ -26,7 +26,7 @@ function liveHooks(phase: "live" | "paused" = "live") {
     baseLoading: vi.fn(),
     baseShown: vi.fn(),
     basePageCount: vi.fn(),
-    getSnapshot: () => ({ phase, layoutPending: false, detail: null, exit: null, rebuilding: false }),
+    getSnapshot: () => ({ phase, layoutPending: false, detail: null, exit: null, rebuilding: false, overdue: false }),
   } satisfies LivePreviewBuildHooks;
 }
 

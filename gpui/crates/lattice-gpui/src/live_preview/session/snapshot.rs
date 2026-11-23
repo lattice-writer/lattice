@@ -40,6 +40,13 @@ pub struct Snapshot {
     /// A quiet build is bringing the full PDF up to date: running, or its
     /// PDF loading.
     pub rebuilding: bool,
+    /// The first-layout bound (`LivePreview::first_layout_timeout`) passed
+    /// with no layout yet while rtex is still starting or on its first pass.
+    /// rtex has no bound of its own: a document that loops, or a first
+    /// LuaLaTeX run building its font list, keeps it there, and the pill
+    /// offers a restart rather than spinning. A layout that arrives later
+    /// still takes over.
+    pub overdue: bool,
 }
 
 impl Default for Snapshot {
@@ -50,6 +57,57 @@ impl Default for Snapshot {
             detail: None,
             exit: None,
             rebuilding: false,
+            overdue: false,
+        }
+    }
+}
+
+/// The phase an engine that loaded the preamble (`EngineState` Ready) puts
+/// the session in. rtex reports a failed first pass and Ready in either
+/// order, so a pass that already failed keeps `Uncompiled`.
+pub(super) fn ready_phase(has_layout: bool, first_pass_failed: bool) -> Phase {
+    if has_layout {
+        Phase::Live
+    } else if first_pass_failed {
+        Phase::Uncompiled
+    } else {
+        Phase::FirstLayout
+    }
+}
+
+/// rtex is still on its way to a first layout in `phase`: no layout yet,
+/// and no failed pass to say why.
+pub(super) fn awaiting_first_layout(
+    phase: Phase,
+    has_layout: bool,
+    first_pass_failed: bool,
+) -> bool {
+    !has_layout
+        && !first_pass_failed
+        && matches!(phase, Phase::Starting | Phase::FirstLayout | Phase::Paused)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ready_after_a_failed_first_pass_keeps_waiting_for_the_document_to_compile() {
+        // rtex 0.0.6 on a loaded Mac reports the failed pass before Ready.
+        assert_eq!(ready_phase(false, true), Phase::Uncompiled);
+        assert_eq!(ready_phase(false, false), Phase::FirstLayout);
+        assert_eq!(ready_phase(true, true), Phase::Live);
+    }
+
+    #[test]
+    fn only_a_session_still_on_its_way_to_a_first_layout_can_be_overdue() {
+        for phase in [Phase::Starting, Phase::FirstLayout, Phase::Paused] {
+            assert!(awaiting_first_layout(phase, false, false), "{phase:?}");
+            assert!(!awaiting_first_layout(phase, true, false), "{phase:?}");
+            assert!(!awaiting_first_layout(phase, false, true), "{phase:?}");
+        }
+        for phase in [Phase::Live, Phase::Uncompiled, Phase::Exited] {
+            assert!(!awaiting_first_layout(phase, false, false), "{phase:?}");
         }
     }
 }

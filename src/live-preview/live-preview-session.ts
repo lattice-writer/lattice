@@ -44,9 +44,25 @@ export type LivePreviewSnapshot = Readonly<{
   exit: RtexExit | null;
   /** A quiet build (quiet-builds.ts) is bringing the full PDF up to date: running, or its PDF loading. */
   rebuilding: boolean;
+  /**
+   * FIRST_LAYOUT_TIMEOUT_MS passed with no layout yet while rtex is still
+   * starting or on its first pass. rtex has no bound of its own: a document
+   * that loops, or a first LuaLaTeX run building its font list, keeps it
+   * there, and the pill offers a restart rather than spinning. A layout that
+   * arrives later still takes over.
+   */
+  overdue: boolean;
 }>;
 
-const INITIAL: LivePreviewSnapshot = { phase: "starting", layoutPending: false, detail: null, exit: null, rebuilding: false };
+const INITIAL: LivePreviewSnapshot = {
+  phase: "starting", layoutPending: false, detail: null, exit: null, rebuilding: false, overdue: false,
+};
+
+/** How long rtex may take from starting to its first layout before the pill says so. */
+export const FIRST_LAYOUT_TIMEOUT_MS = 60_000;
+
+/** The phases that wait for rtex's first layout. */
+const AWAITING_FIRST_LAYOUT: ReadonlySet<LivePreviewPhase> = new Set(["starting", "first-layout", "paused"]);
 
 /** What a mirror of the session starts from (live-preview-mirror.ts). */
 export type LivePreviewMirrorStart = {
@@ -152,6 +168,13 @@ export class LivePreviewSession {
 
   private generation = -1;
   private basePages: number | null = null;
+  /**
+   * The first whole-document pass failed before any layout. rtex reports the
+   * failed pass and the engine's Ready in either order (a loaded Mac finishes
+   * the pass first), and Ready must not put "First layout…" back over it.
+   */
+  private firstPassFailed = false;
+  private overdueTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private readonly projectRoot: string,
@@ -170,6 +193,10 @@ export class LivePreviewSession {
    * changing them (or names none) sends rtex nothing.
    */
   async start(texFiles: readonly string[] = []): Promise<void> {
+    this.overdueTimer = setTimeout(() => {
+      this.overdueTimer = null;
+      if (this.awaitingFirstLayout(this.snapshot.phase)) this.updateSnapshot({ overdue: true });
+    }, FIRST_LAYOUT_TIMEOUT_MS);
     const events = new Channel<RtexEvent | Reply>();
     events.onmessage = (message) => {
       if (!this.disposed) this.receive(message);
@@ -194,6 +221,7 @@ export class LivePreviewSession {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    if (this.overdueTimer !== null) clearTimeout(this.overdueTimer);
     const session = this.session;
     if (session !== null) void invoke("live_preview_stop", { projectRoot: this.projectRoot, session }).catch(() => undefined);
     this.assets.dispose();
@@ -480,7 +508,10 @@ export class LivePreviewSession {
         if (event.engine_generation !== this.generation && this.generation >= 0) this.markPages(this.change({ op: "drop" }));
         this.generation = event.engine_generation;
         if (event.state === "Failed") this.updateSnapshot({ phase: "paused", detail: event.reason });
-        else if (event.state === "Ready") this.updateSnapshot({ phase: this.model.hasLayout ? "live" : "first-layout", detail: null });
+        else if (event.state === "Ready") {
+          const phase = this.model.hasLayout ? "live" : this.firstPassFailed ? "uncompiled" : "first-layout";
+          this.updateSnapshot({ phase, detail: null });
+        }
         else if (event.state === "Starting" && this.model.hasLayout) this.awaitLayout();
         break;
       case "LayoutUpdate":
@@ -507,7 +538,10 @@ export class LivePreviewSession {
     if (event.compile.state === "Failed") {
       // rtex keeps the previous layout; before the first one there is nothing
       // to show until an edit makes the document compile.
-      if (!this.model.hasLayout) this.updateSnapshot({ phase: "uncompiled", detail: null });
+      if (!this.model.hasLayout) {
+        this.firstPassFailed = true;
+        this.updateSnapshot({ phase: "uncompiled", detail: null });
+      }
       return;
     }
     const dirty = this.change({
@@ -567,12 +601,19 @@ export class LivePreviewSession {
     for (const listener of [...this.pageListeners]) listener(pages);
   }
 
+  /** rtex is still on its way to a first layout: no layout yet, and no failed pass to say why. */
+  private awaitingFirstLayout(phase: LivePreviewPhase): boolean {
+    return !this.model.hasLayout && !this.firstPassFailed && AWAITING_FIRST_LAYOUT.has(phase);
+  }
+
   private updateSnapshot(patch: Partial<LivePreviewSnapshot>): void {
     const next = { ...this.snapshot, ...patch };
-    const { phase, layoutPending, detail, exit, rebuilding } = this.snapshot;
+    // Only a session still waiting for its first layout is overdue.
+    if (!this.awaitingFirstLayout(next.phase)) next.overdue = false;
+    const { phase, layoutPending, detail, exit, rebuilding, overdue } = this.snapshot;
     if (
       next.phase === phase && next.layoutPending === layoutPending && next.detail === detail && next.exit === exit
-      && next.rebuilding === rebuilding
+      && next.rebuilding === rebuilding && next.overdue === overdue
     ) return;
     this.snapshot = next;
     for (const listener of [...this.listeners]) listener();

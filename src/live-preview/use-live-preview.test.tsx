@@ -19,7 +19,7 @@ const sessions = vi.hoisted(() => [] as Array<{ exit: (signal: number) => void; 
 vi.mock("./live-preview-chunk", async () => ({
   watchRestarts: (await vi.importActual<typeof import("./live-preview-session")>("./live-preview-session")).watchRestarts,
   LivePreviewSession: class {
-    private snapshot = { phase: "live", layoutPending: false, detail: null as string | null, exit: null as unknown, rebuilding: false };
+    private snapshot = { phase: "live", layoutPending: false, detail: null as string | null, exit: null as unknown, rebuilding: false, overdue: false };
     private readonly listeners = new Set<() => void>();
     constructor(root: string, main: string) {
       started.push(main === "main.tex" ? root : `${root}:${main}`);

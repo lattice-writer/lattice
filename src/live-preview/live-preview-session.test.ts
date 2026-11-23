@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
-import { LivePreviewSession } from "./live-preview-session";
+import { FIRST_LAYOUT_TIMEOUT_MS, LivePreviewSession } from "./live-preview-session";
 import type { Item } from "./rtex-protocol";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -207,5 +207,58 @@ describe("a live preview session", () => {
     layout("Ok");
     expect(session.getSnapshot().phase).toBe("live");
     session.dispose();
+  });
+
+  const failedPass = () => reply({
+    event: "LayoutUpdate", compile: { state: "Failed" }, convergence: { state: "PassLimitReached", passes: 2, reasons: [] },
+    pages_changed: [], pages_total: 0, placements: [], versions: { source_revision: 1, layout_version: 0 },
+  });
+  const engine = (state: string) => reply({ event: "EngineState", engine_generation: 0, state, reason: null });
+
+  it("keeps waiting for the document to compile when the engine's Ready comes after the failed first pass", async () => {
+    // rtex 0.0.6 on a loaded Mac: the whole-document pass fails before the
+    // engine has loaded the preamble, so Ready arrives second.
+    const session = new LivePreviewSession("/project", "main.tex");
+    await session.start();
+    engine("Starting");
+    failedPass();
+    engine("Ready");
+    expect(session.getSnapshot().phase).toBe("uncompiled");
+    session.dispose();
+  });
+
+  it("says so when no first layout comes within a minute, and goes live if one comes after", async () => {
+    vi.useFakeTimers();
+    const session = new LivePreviewSession("/project", "main.tex");
+    await session.start();
+    engine("Starting");
+    engine("Ready");
+    vi.advanceTimersByTime(FIRST_LAYOUT_TIMEOUT_MS - 1);
+    expect(session.getSnapshot()).toMatchObject({ phase: "first-layout", overdue: false });
+    vi.advanceTimersByTime(1);
+    expect(session.getSnapshot()).toMatchObject({ phase: "first-layout", overdue: true });
+    reply({
+      event: "LayoutUpdate", compile: { state: "Ok" }, convergence: { state: "Converged" }, pages_changed: [], pages_total: 1,
+      placements: [], versions: { source_revision: 1, layout_version: 1 },
+    });
+    expect(session.getSnapshot()).toMatchObject({ phase: "live", overdue: false });
+    session.dispose();
+  });
+
+  it("is not overdue once the first pass has failed, nor once rtex is gone", async () => {
+    vi.useFakeTimers();
+    const failed = new LivePreviewSession("/project", "main.tex");
+    await failed.start();
+    engine("Ready");
+    failedPass();
+    vi.advanceTimersByTime(FIRST_LAYOUT_TIMEOUT_MS);
+    expect(failed.getSnapshot()).toMatchObject({ phase: "uncompiled", overdue: false });
+    failed.dispose();
+    const exited = new LivePreviewSession("/project", "main.tex");
+    await exited.start();
+    reply({ event: "SessionExited", session: 7, stderr: "", code: 1, signal: null });
+    vi.advanceTimersByTime(FIRST_LAYOUT_TIMEOUT_MS);
+    expect(exited.getSnapshot()).toMatchObject({ phase: "exited", overdue: false });
+    exited.dispose();
   });
 });

@@ -4183,6 +4183,10 @@ msgstr "Click to copy the LaTeX command"
 msgid "Click to keep the original"
 msgstr "Click to keep the original"
 
+#: src/live-preview/live-preview-status.tsx
+msgid "Click to restart live preview, or turn it off in Settings › Editor & builds."
+msgstr "Click to restart live preview, or turn it off in Settings › Editor & builds."
+
 #: src/telemetry/app-notify.ts
 msgid "Clipboard"
 msgstr "Clipboard"
@@ -9562,6 +9566,10 @@ msgstr "Live preview"
 msgid "Live preview engine"
 msgstr "Live preview engine"
 
+#: src/live-preview/live-preview-status.tsx
+msgid "Live preview is taking long"
+msgstr "Live preview is taking long"
+
 #: src/live-preview/live-preview-settings.tsx
 msgid "Live preview needs a Mac"
 msgstr "Live preview needs a Mac"
@@ -14566,6 +14574,14 @@ msgstr "rtex could not load the preamble for live typing. The preview still upda
 msgid "rtex exited with status {code}."
 msgstr "rtex exited with status {code}."
 
+#: src/live-preview/live-preview-status.tsx
+msgid "rtex has spent over a minute loading your preamble."
+msgstr "rtex has spent over a minute loading your preamble."
+
+#: src/live-preview/live-preview-status.tsx
+msgid "rtex has spent over a minute on the first layout."
+msgstr "rtex has spent over a minute on the first layout."
+
 #: src/live-preview/live-preview-session.ts
 msgid "rtex stopped {times} times in five minutes. Click to restart it."
 msgstr "rtex stopped {times} times in five minutes. Click to restart it."
@@ -17119,6 +17135,10 @@ msgstr "The files already read as {name}."
 #: src/app/remove-reference-action.ts
 msgid "The first is at {path}:{line}."
 msgstr "The first is at {path}:{line}."
+
+#: src/live-preview/live-preview-status.tsx
+msgid "The first LuaLaTeX run on a Mac can take minutes to list its fonts, and something in the document can keep LuaLaTeX busy, such as a loop or a package waiting for input. The PDF still updates with each build."
+msgstr "The first LuaLaTeX run on a Mac can take minutes to list its fonts, and something in the document can keep LuaLaTeX busy, such as a loop or a package waiting for input. The PDF still updates with each build."
 
 #: src/platform/host-errors-workspace.ts
 msgid "The folder is not empty."

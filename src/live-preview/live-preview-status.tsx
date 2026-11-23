@@ -1,6 +1,7 @@
 /**
  * The live preview's state, as a small pill over the PDF: downloading rtex,
- * starting, the first layout, live, a layout catching up, or stopped; its dot
+ * starting, the first layout, live, a layout catching up, or stopped; a first
+ * layout that never comes says so after a minute and offers a restart. Its dot
  * pulses while a quiet build brings the full PDF up to date. It
  * floats over the pages rather than joining the PDF toolbar, so it costs the
  * toolbar no width in a narrow panel. Live preview is on by default, so a Mac
@@ -38,10 +39,21 @@ function StatusPill({ state, snapshot, onRetry }: {
   let tone: Tone = "busy";
   let label: string;
   let detail: string | null = null;
+  // Clickable: stopped, or still without a first layout after a minute.
+  let restartable = false;
   if (state.kind === "downloading") {
     const percent = Math.round(state.progress * 100);
     label = t`Setting up live preview… ${percent}%`;
     detail = t`Downloading rtex once, about 4 MB. Builds work as usual meanwhile. You can turn it off in Settings › Editor & builds.`;
+  } else if (snapshot?.overdue) {
+    tone = "pending";
+    restartable = true;
+    label = t`Live preview is taking long`;
+    detail = [
+      snapshot.phase === "starting" ? t`rtex has spent over a minute loading your preamble.` : t`rtex has spent over a minute on the first layout.`,
+      t`The first LuaLaTeX run on a Mac can take minutes to list its fonts, and something in the document can keep LuaLaTeX busy, such as a loop or a package waiting for input. The PDF still updates with each build.`,
+      t`Click to restart live preview, or turn it off in Settings › Editor & builds.`,
+    ].join("\n\n");
   } else if (state.kind === "starting" || snapshot?.phase === "starting") {
     label = t`Starting live preview…`;
     detail = t`Loading your preamble into LuaLaTeX.`;
@@ -73,6 +85,7 @@ function StatusPill({ state, snapshot, onRetry }: {
     label = t`Live`;
   }
   const stopped = tone === "stopped";
+  restartable ||= stopped;
   // The pulse stands in for the Build button's spinner and the PDF's
   // "Updating…", which a quiet build does not show (quiet-builds.ts).
   const rebuilding = !stopped && snapshot?.rebuilding === true;
@@ -81,7 +94,7 @@ function StatusPill({ state, snapshot, onRetry }: {
   return (
     <div className="live-preview-status-host" data-rebuilding={rebuilding || undefined}>
       <Tip label={<span className="live-preview-status-tip">{tip}</span>} side="top">
-        {stopped ? (
+        {restartable ? (
           <button type="button" className="live-preview-status" data-tone={tone} onClick={onRetry} aria-label={t`${label}. Restart live preview`}>
             <span className="live-preview-status-dot" aria-hidden="true" />
             <span className="live-preview-status-label">{label}</span>

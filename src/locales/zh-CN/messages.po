@@ -4183,6 +4183,10 @@ msgstr "点击复制 LaTeX 命令"
 msgid "Click to keep the original"
 msgstr "点击保留原文"
 
+#: src/live-preview/live-preview-status.tsx
+msgid "Click to restart live preview, or turn it off in Settings › Editor & builds."
+msgstr "点击可重新启动实时预览，也可在 设置 › 编辑编译 中关闭。"
+
 #: src/telemetry/app-notify.ts
 msgid "Clipboard"
 msgstr "剪贴板"
@@ -9562,6 +9566,10 @@ msgstr "实时预览"
 msgid "Live preview engine"
 msgstr "实时预览引擎"
 
+#: src/live-preview/live-preview-status.tsx
+msgid "Live preview is taking long"
+msgstr "实时预览耗时过长"
+
 #: src/live-preview/live-preview-settings.tsx
 msgid "Live preview needs a Mac"
 msgstr "实时预览需要在 Mac 上运行"
@@ -14566,6 +14574,14 @@ msgstr "rtex 无法为实时排版载入导言区。每次整篇排版和编译�
 msgid "rtex exited with status {code}."
 msgstr "rtex 以状态 {code} 退出。"
 
+#: src/live-preview/live-preview-status.tsx
+msgid "rtex has spent over a minute loading your preamble."
+msgstr "rtex 载入导言区已超过一分钟。"
+
+#: src/live-preview/live-preview-status.tsx
+msgid "rtex has spent over a minute on the first layout."
+msgstr "rtex 首次排版已超过一分钟。"
+
 #: src/live-preview/live-preview-session.ts
 msgid "rtex stopped {times} times in five minutes. Click to restart it."
 msgstr "rtex 在五分钟内停止了 {times} 次。点击可重新启动。"
@@ -17119,6 +17135,10 @@ msgstr "文件已与{name}一致。"
 #: src/app/remove-reference-action.ts
 msgid "The first is at {path}:{line}."
 msgstr "第一处：{path}:{line}"
+
+#: src/live-preview/live-preview-status.tsx
+msgid "The first LuaLaTeX run on a Mac can take minutes to list its fonts, and something in the document can keep LuaLaTeX busy, such as a loop or a package waiting for input. The PDF still updates with each build."
+msgstr "Mac 上首次运行 LuaLaTeX 时，整理字体列表可能需要几分钟；文档中的内容也可能让 LuaLaTeX 一直忙碌，例如死循环或等待输入的宏包。PDF 仍会在每次编译后更新。"
 
 #: src/platform/host-errors-workspace.ts
 msgid "The folder is not empty."

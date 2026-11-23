@@ -104,6 +104,9 @@ pub struct LivePreview {
     run: Option<Task<()>>,
     /// When rtex was last started again on its own, newest last.
     restarts: Vec<Instant>,
+    /// How long rtex may take from starting to its first layout before the
+    /// pill says so (`Snapshot::overdue`); the e2e scenario shortens it.
+    pub(crate) first_layout_timeout: Duration,
     _project: Option<Subscription>,
 }
 
@@ -114,6 +117,10 @@ pub struct LivePreview {
 /// stopped, but a crash loop is not run forever.
 pub const MAX_RESTARTS: usize = 3;
 const RESTART_WINDOW: Duration = Duration::from_secs(5 * 60);
+
+/// `LivePreview::first_layout_timeout`: a 300-page book lays out in about
+/// 8 s on an M-series Mac, so a minute is well past a slow document.
+const FIRST_LAYOUT_TIMEOUT: Duration = Duration::from_secs(60);
 
 impl EventEmitter<LivePreviewEvent> for LivePreview {}
 
@@ -146,6 +153,7 @@ impl LivePreview {
             remove_error: None,
             run: None,
             restarts: Vec::new(),
+            first_layout_timeout: FIRST_LAYOUT_TIMEOUT,
             _project: None,
         }
     }

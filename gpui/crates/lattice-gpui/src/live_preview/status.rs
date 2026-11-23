@@ -1,7 +1,8 @@
 //! The live preview's state, as a small pill over the PDF
 //! (`src/live-preview/live-preview-status.tsx` and `live-preview.css`):
 //! downloading rtex, starting, the first layout, live, a layout catching up,
-//! or stopped; its dot pulses while a quiet build brings the full PDF up to
+//! or stopped; a first layout that never comes says so after a minute and
+//! offers a restart. Its dot pulses while a quiet build brings the full PDF up to
 //! date. It floats at the bottom left of the pages rather than joining the
 //! PDF toolbar, so it costs the toolbar no width in a narrow panel, and while
 //! all is live it shrinks to its dot, so it does not sit over the page while
@@ -44,6 +45,9 @@ pub struct Status {
     pub tip: SharedString,
     /// A quiet build is bringing the full PDF up to date: the dot pulses.
     pub rebuilding: bool,
+    /// A click restarts live preview: it stopped, or is still without a
+    /// first layout after a minute.
+    pub restartable: bool,
 }
 
 /// What the pill shows for `preview`, or `None` when it shows nothing.
@@ -62,6 +66,7 @@ pub fn status(preview: &LivePreview) -> Option<Status> {
          still come from the normal build."
     );
     let phase = snapshot.map(|snapshot| snapshot.phase);
+    let overdue = snapshot.is_some_and(|snapshot| snapshot.overdue);
     let (tone, label, detail): (Tone, String, Option<String>) = match state {
         State::Downloading(progress) => {
             let percent = (progress * 100.).round() as u32;
@@ -71,6 +76,22 @@ pub fn status(preview: &LivePreview) -> Option<Status> {
                 Some(t!("Downloading rtex once, about 4 MB. Builds work as usual meanwhile. You can turn it off in Settings › Editor & builds.").to_string()),
             )
         }
+        _ if overdue => (
+            Tone::Pending,
+            t!("Live preview is taking long").to_string(),
+            Some(
+                [
+                    if phase == Some(Phase::Starting) {
+                        t!("rtex has spent over a minute loading your preamble.")
+                    } else {
+                        t!("rtex has spent over a minute on the first layout.")
+                    },
+                    t!("The first LuaLaTeX run on a Mac can take minutes to list its fonts, and something in the document can keep LuaLaTeX busy, such as a loop or a package waiting for input. The PDF still updates with each build."),
+                    t!("Click to restart live preview, or turn it off in Settings › Editor & builds."),
+                ]
+                .join("\n\n"),
+            ),
+        ),
         State::Starting => (
             Tone::Busy,
             t!("Starting live preview…").to_string(),
@@ -138,6 +159,7 @@ pub fn status(preview: &LivePreview) -> Option<Status> {
         label: label.into(),
         tip: tip.into(),
         rebuilding,
+        restartable: tone == Tone::Stopped || overdue,
     })
 }
 
@@ -183,7 +205,7 @@ pub fn pill(
 ) -> Option<AnyElement> {
     let status = status(preview.read(cx))?;
     let palette = cx.palette().clone();
-    let stopped = status.tone == Tone::Stopped;
+    let restartable = status.restartable;
     let live = status.tone == Tone::Live;
     let dot_color = match status.tone {
         Tone::Live => palette.success,
@@ -227,14 +249,14 @@ pub fn pill(
         .gap(SPACING_3)
         .max_w_full()
         .rounded(RADIUS_CONTROL)
-        .bg(if stopped {
+        .bg(if restartable {
             mix(palette.raised, palette.hover, interaction.hover)
         } else {
             palette.raised
         })
         .shadow(Elevation::Popover.shadows(&palette))
         .text_role(TextRole::Micro, cx)
-        .text_color(if stopped {
+        .text_color(if restartable {
             palette.text
         } else {
             palette.text_secondary
@@ -254,7 +276,7 @@ pub fn pill(
             )
         })
         .tooltip(move |_, cx| -> AnyView { cx.new(|_| PillTip { text: tip.clone() }).into() });
-    if stopped {
+    if restartable {
         let preview = preview.clone();
         body = track_pointer(body, pointer)
             .cursor_pointer()
