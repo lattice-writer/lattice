@@ -32,6 +32,10 @@ impl Run {
         character: char,
         mut observe: impl FnMut(&mut AsyncApp) -> T,
     ) -> Result<Vec<T>> {
+        // The menu bar's key equivalents (File › Close Tab's ⌘W) see a
+        // key only in the active app's key window.
+        #[cfg(target_os = "macos")]
+        let _front = self.foreground(cx, "held keys").await?;
         let mut seen = Vec::new();
         for repeat in std::iter::once(false).chain(std::iter::repeat_n(true, REPEATS)) {
             self.key_down(cx, character, repeat)?;
@@ -48,7 +52,7 @@ impl Run {
     }
 
     /// One keyDown of `character` with the shortcut modifier: on macOS
-    /// through AppKit, as the keyboard sends it (`isARepeat` for a
+    /// through the application, as the keyboard sends it (`isARepeat` for a
     /// repeat); elsewhere as the window's platform reports it.
     fn key_down(&self, cx: &mut AsyncApp, character: char, repeat: bool) -> Result<()> {
         #[cfg(target_os = "macos")]
@@ -57,7 +61,8 @@ impl Run {
         }
         #[cfg(not(target_os = "macos"))]
         {
-            let keystroke = gpui::Keystroke::parse(&format!("ctrl-{character}"))?;
+            let keystroke = gpui::Keystroke::parse(&format!("ctrl-{character}"))
+                .map_err(|error| anyhow::anyhow!("{error}"))?;
             self.with_window(cx, move |_, window, cx| {
                 window.dispatch_event(
                     gpui::PlatformInput::KeyDown(gpui::KeyDownEvent {

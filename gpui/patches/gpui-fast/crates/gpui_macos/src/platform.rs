@@ -32,8 +32,8 @@ use objc2::{
 use objc2_app_kit::{
     NSAppearance, NSAppearanceNameAqua, NSAppearanceNameDarkAqua, NSAppearanceNameVibrantDark,
     NSAppearanceNameVibrantLight, NSApplication, NSApplicationActivationPolicy,
-    NSControlStateValueOn, NSCursor, NSDocumentController, NSEventModifierFlags, NSMenu,
-    NSMenuItem, NSModalResponse, NSModalResponseOK, NSOpenPanel, NSSavePanel, NSScroller,
+    NSControlStateValueOn, NSCursor, NSDocumentController, NSEventModifierFlags, NSEventType,
+    NSMenu, NSMenuItem, NSModalResponse, NSModalResponseOK, NSOpenPanel, NSSavePanel, NSScroller,
     NSScrollerStyle, NSWorkspace, NSWorkspaceDidWakeNotification, NSWorkspaceWillSleepNotification,
 };
 use objc2_foundation::{
@@ -67,6 +67,10 @@ unsafe fn build_classes() {
             let mut decl = ClassBuilder::new(c"GPUIApplication", class!(NSApplication))
                 .expect("failed to register GPUIApplication");
             decl.add_ivar::<*mut c_void>(MAC_PLATFORM_IVAR);
+            decl.add_method(
+                sel!(sendEvent:),
+                send_event as extern "C-unwind" fn(_, Sel, *mut AnyObject),
+            );
             decl.register()
         }
     };
@@ -1054,6 +1058,10 @@ impl Platform for MacPlatform {
         self.0.lock().on_keyboard_layout_change = Some(callback);
     }
 
+    fn menu_action_from_key_repeat(&self) -> bool {
+        SENDING_KEY_REPEAT.get()
+    }
+
     fn on_app_menu_action(&self, callback: Box<dyn FnMut(&dyn Action)>) {
         self.0.lock().menu_command = Some(callback);
     }
@@ -1513,6 +1521,29 @@ extern "C-unwind" fn open_urls(this: &AnyObject, _: Sel, _: *mut AnyObject, urls
         callback(urls);
         platform.0.lock().open_urls.get_or_insert(callback);
     }
+}
+
+thread_local! {
+    /// The application is sending a key's repeat: a menu item's key
+    /// equivalent it reaches was chosen by a held key. `currentEvent` says
+    /// so only for an event the run loop took from the queue, not for one
+    /// sent to the application directly.
+    static SENDING_KEY_REPEAT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+extern "C-unwind" fn send_event(this: &AnyObject, _: Sel, event: *mut AnyObject) {
+    let repeat = unsafe {
+        let kind: NSEventType = msg_send![event, type];
+        kind == NSEventType::KeyDown && {
+            let repeat: Bool = msg_send![event, isARepeat];
+            repeat.as_bool()
+        }
+    };
+    let sending = SENDING_KEY_REPEAT.replace(repeat);
+    unsafe {
+        let _: () = msg_send![super(this, class!(NSApplication)), sendEvent: event];
+    }
+    SENDING_KEY_REPEAT.set(sending);
 }
 
 extern "C-unwind" fn handle_menu_item(this: &AnyObject, _: Sel, item: *mut AnyObject) {

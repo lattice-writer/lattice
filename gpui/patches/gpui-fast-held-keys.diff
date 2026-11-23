@@ -35,7 +35,7 @@ diff --git a/gpui-fast/crates/gpui/src/app.rs b/gpui-fast/crates/gpui/src/app.rs
 diff --git a/gpui-fast/crates/gpui/src/key_dispatch.rs b/gpui-fast/crates/gpui/src/key_dispatch.rs
 --- a/gpui-fast/crates/gpui/src/key_dispatch.rs
 +++ b/gpui-fast/crates/gpui/src/key_dispatch.rs
-@@ -1722,6 +1722,47 @@ mod tests {
+@@ -1722,6 +1722,45 @@ mod tests {
          test.read_with(cx, |test, _| assert_eq!(test.action_count.get(), 0));
      }
  
@@ -68,9 +68,7 @@ diff --git a/gpui-fast/crates/gpui/src/key_dispatch.rs b/gpui-fast/crates/gpui/s
 +        test.read_with(cx, |test, _| assert_eq!(test.action_count.get(), 3));
 +
 +        test.update(cx, |test, _| test.action_count.set(0));
-+        cx.update(|_, cx| {
-+            cx.set_held_key_repeats(|action| !action.as_any().is::<TestAction>())
-+        });
++        cx.update(|_, cx| cx.set_held_key_repeats(|action| !action.as_any().is::<TestAction>()));
 +        for is_held in [false, true, true] {
 +            assert!(!press(cx, is_held));
 +        }
@@ -83,6 +81,46 @@ diff --git a/gpui-fast/crates/gpui/src/key_dispatch.rs b/gpui-fast/crates/gpui/s
      #[crate::test]
      fn test_consumed_modifier_preserves_pending_input(cx: &mut TestAppContext) {
          let (test, cx) = cx.add_window_view(|_, cx| PendingTextInputTestView::new(cx));
+diff --git a/gpui-fast/crates/gpui/src/platform.rs b/gpui-fast/crates/gpui/src/platform.rs
+--- a/gpui-fast/crates/gpui/src/platform.rs
++++ b/gpui-fast/crates/gpui/src/platform.rs
+@@ -507,6 +507,11 @@ pub trait Platform: 'static {
+         Task::ready(Vec::new())
+     }
+     fn on_app_menu_action(&self, callback: Box<dyn FnMut(&dyn Action)>);
++    /// Whether the menu action now being run was chosen by a key the
++    /// keyboard repeats while it is held (a menu item's key equivalent).
++    fn menu_action_from_key_repeat(&self) -> bool {
++        false
++    }
+     fn on_will_open_app_menu(&self, callback: Box<dyn FnMut()>);
+     fn on_validate_app_menu_command(&self, callback: Box<dyn FnMut(&dyn Action) -> bool>);
+ 
+diff --git a/gpui-fast/crates/gpui/src/platform/app_menu.rs b/gpui-fast/crates/gpui/src/platform/app_menu.rs
+--- a/gpui-fast/crates/gpui/src/platform/app_menu.rs
++++ b/gpui-fast/crates/gpui/src/platform/app_menu.rs
+@@ -352,7 +352,20 @@ pub(crate) fn init_app_menus(platform: &dyn Platform, cx: &App) {
+         let cx = cx.to_async();
+         move |action| {
+             if let Some(app) = cx.app.upgrade() {
+-                app.borrow_mut().update(|cx| cx.dispatch_action(action));
++                app.borrow_mut().update(|cx| {
++                    // A held key's repeat reaches a menu item's key
++                    // equivalent too: it runs only actions that repeat, as
++                    // the window's own key dispatch does.
++                    if cx.platform.menu_action_from_key_repeat()
++                        && cx
++                            .held_key_repeats
++                            .clone()
++                            .is_some_and(|repeats| !repeats(action))
++                    {
++                        return;
++                    }
++                    cx.dispatch_action(action)
++                });
+             }
+         }
+     }));
 diff --git a/gpui-fast/crates/gpui/src/window.rs b/gpui-fast/crates/gpui/src/window.rs
 --- a/gpui-fast/crates/gpui/src/window.rs
 +++ b/gpui-fast/crates/gpui/src/window.rs
@@ -142,3 +180,69 @@ diff --git a/gpui-fast/crates/gpui/src/window.rs b/gpui-fast/crates/gpui/src/win
                  self.dispatch_action_on_node(node_id, binding.action.as_ref(), cx);
                  if !cx.propagate_event {
                      self.dispatch_keystroke_observers(
+diff --git a/gpui-fast/crates/gpui_macos/src/platform.rs b/gpui-fast/crates/gpui_macos/src/platform.rs
+--- a/gpui-fast/crates/gpui_macos/src/platform.rs
++++ b/gpui-fast/crates/gpui_macos/src/platform.rs
+@@ -32,8 +32,8 @@ use objc2::{
+ use objc2_app_kit::{
+     NSAppearance, NSAppearanceNameAqua, NSAppearanceNameDarkAqua, NSAppearanceNameVibrantDark,
+     NSAppearanceNameVibrantLight, NSApplication, NSApplicationActivationPolicy,
+-    NSControlStateValueOn, NSCursor, NSDocumentController, NSEventModifierFlags, NSMenu,
+-    NSMenuItem, NSModalResponse, NSModalResponseOK, NSOpenPanel, NSSavePanel, NSScroller,
++    NSControlStateValueOn, NSCursor, NSDocumentController, NSEventModifierFlags, NSEventType,
++    NSMenu, NSMenuItem, NSModalResponse, NSModalResponseOK, NSOpenPanel, NSSavePanel, NSScroller,
+     NSScrollerStyle, NSWorkspace, NSWorkspaceDidWakeNotification, NSWorkspaceWillSleepNotification,
+ };
+ use objc2_foundation::{
+@@ -67,6 +67,10 @@ unsafe fn build_classes() {
+             let mut decl = ClassBuilder::new(c"GPUIApplication", class!(NSApplication))
+                 .expect("failed to register GPUIApplication");
+             decl.add_ivar::<*mut c_void>(MAC_PLATFORM_IVAR);
++            decl.add_method(
++                sel!(sendEvent:),
++                send_event as extern "C-unwind" fn(_, Sel, *mut AnyObject),
++            );
+             decl.register()
+         }
+     };
+@@ -1054,6 +1058,10 @@ impl Platform for MacPlatform {
+         self.0.lock().on_keyboard_layout_change = Some(callback);
+     }
+ 
++    fn menu_action_from_key_repeat(&self) -> bool {
++        SENDING_KEY_REPEAT.get()
++    }
++
+     fn on_app_menu_action(&self, callback: Box<dyn FnMut(&dyn Action)>) {
+         self.0.lock().menu_command = Some(callback);
+     }
+@@ -1515,6 +1523,29 @@ extern "C-unwind" fn open_urls(this: &AnyObject, _: Sel, _: *mut AnyObject, urls
+     }
+ }
+ 
++thread_local! {
++    /// The application is sending a key's repeat: a menu item's key
++    /// equivalent it reaches was chosen by a held key. `currentEvent` says
++    /// so only for an event the run loop took from the queue, not for one
++    /// sent to the application directly.
++    static SENDING_KEY_REPEAT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
++}
++
++extern "C-unwind" fn send_event(this: &AnyObject, _: Sel, event: *mut AnyObject) {
++    let repeat = unsafe {
++        let kind: NSEventType = msg_send![event, type];
++        kind == NSEventType::KeyDown && {
++            let repeat: Bool = msg_send![event, isARepeat];
++            repeat.as_bool()
++        }
++    };
++    let sending = SENDING_KEY_REPEAT.replace(repeat);
++    unsafe {
++        let _: () = msg_send![super(this, class!(NSApplication)), sendEvent: event];
++    }
++    SENDING_KEY_REPEAT.set(sending);
++}
++
+ extern "C-unwind" fn handle_menu_item(this: &AnyObject, _: Sel, item: *mut AnyObject) {
+     unsafe {
+         let platform = get_mac_platform(this);

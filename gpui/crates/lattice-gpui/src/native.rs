@@ -231,7 +231,9 @@ fn post_chord(
 }
 
 /// `character` going down with ⌘ when `command`, and staying down: the
-/// keyboard's repeat of it when `repeat`. [`send_key_up`] lets go of it.
+/// keyboard's repeat of it when `repeat`. Through the application, as the
+/// keyboard sends it, so the menu bar's key equivalents see it too.
+/// [`send_key_up`] lets go of it.
 pub fn send_key_down(native: Native, character: char, command: bool, repeat: bool) -> Result<()> {
     post_key(
         native,
@@ -239,7 +241,7 @@ pub fn send_key_down(native: Native, character: char, command: bool, repeat: boo
         (command, false, false),
         KEY_DOWN,
         repeat,
-        false,
+        true,
     )
 }
 
@@ -251,7 +253,7 @@ pub fn send_key_up(native: Native, character: char, command: bool) -> Result<()>
         (command, false, false),
         KEY_UP,
         false,
-        false,
+        true,
     )
 }
 

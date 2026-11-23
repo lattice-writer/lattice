@@ -1751,9 +1751,7 @@ mod tests {
         test.read_with(cx, |test, _| assert_eq!(test.action_count.get(), 3));
 
         test.update(cx, |test, _| test.action_count.set(0));
-        cx.update(|_, cx| {
-            cx.set_held_key_repeats(|action| !action.as_any().is::<TestAction>())
-        });
+        cx.update(|_, cx| cx.set_held_key_repeats(|action| !action.as_any().is::<TestAction>()));
         for is_held in [false, true, true] {
             assert!(!press(cx, is_held));
         }
