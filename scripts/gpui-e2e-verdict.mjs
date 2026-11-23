@@ -138,7 +138,7 @@ function main() {
   let verdict = judge(result, entries, platform, { strict: argv.includes("--strict-flaky") });
   const retry = [...verdict.fresh, ...verdict.quarantined];
   if (app && retry.length && !verdict.error) verdict = settle(verdict, rerun(app, fixture, rerunModules(result, retry)));
-  const reasons = new Map(entries.map((entry) => [entry.step, entry]));
+  const reasons = new Map(entries.filter((entry) => entry.platforms.includes(platform)).map((entry) => [entry.step, entry]));
   const twice = app ? "failed twice" : "failed, not rerun";
   const lines = [`${verdict.total} steps on ${platform}: ${verdict.fresh.length} new failure(s), ${verdict.flaky.length} flaky (passed on a rerun), ${verdict.quarantined.length} of the flaky tier ${twice}${verdict.strict ? " (counted on main)" : " (not counted on a branch)"}, ${verdict.known.length} known (scripts/gpui-e2e-known-failures.json), ${verdict.fixed.length} known that passed.`];
   if (verdict.error || !result) lines.push(`The scenario did not finish: ${verdict.error ?? "no result was written"}`);

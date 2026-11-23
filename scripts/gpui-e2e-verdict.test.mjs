@@ -111,7 +111,7 @@ describe("gpui-e2e-verdict", () => {
     }
   });
 
-  it("gives every checked-in entry a platform, a reason and an owner, once", () => {
+  it("gives every checked-in entry a platform, a reason and an owner, once per platform", () => {
     const list = knownFailures();
     expect(list.length).toBeGreaterThan(0);
     for (const entry of list) {
@@ -121,6 +121,8 @@ describe("gpui-e2e-verdict", () => {
       expect(entry.followup, entry.step).toMatch(/^[A-Z]+-\d+$/);
       expect(TIERS, entry.step).toContain(entry.tier ?? "failing");
     }
-    expect(new Set(list.map((entry) => entry.step)).size).toBe(list.length);
+    // A step may have one entry per platform (known on one, flaky on the other), never two for one platform.
+    const pairs = list.flatMap((entry) => entry.platforms.map((platform) => `${platform} ${entry.step}`));
+    expect(new Set(pairs).size).toBe(pairs.length);
   });
 });
