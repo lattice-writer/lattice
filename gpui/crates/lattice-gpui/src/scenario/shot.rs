@@ -53,49 +53,4 @@ impl Run {
         })
         .await
     }
-
-    #[cfg(feature = "offscreen-shots")]
-    pub(super) async fn capture(&self, cx: &mut AsyncApp, out: &str) -> Result<()> {
-        // A covered window gets no frames, so frames are drawn here: each one
-        // asks PDFium for the pages it shows, and the images land a little
-        // later, so draw until two pages are on screen (or give up after 8 s),
-        // then once more for anything the last draw scheduled.
-        let started = std::time::Instant::now();
-        loop {
-            self.with_window(cx, |_, window, cx| {
-                window.refresh();
-                let _ = window.draw(cx);
-            })?;
-            sleep(cx, Duration::from_millis(250)).await;
-            let drawn = cx.update(|cx| self.shell.read(cx).pdf().read(cx).pages_drawn(cx));
-            if drawn >= 2 || started.elapsed() > Duration::from_secs(8) {
-                break;
-            }
-        }
-        self.with_window(cx, |_, window, cx| {
-            window.refresh();
-            let _ = window.draw(cx);
-        })?;
-        let image = self.with_window(cx, |_, window, _| window.render_to_image())??;
-        image.save(out)?;
-        Ok(())
-    }
-
-    #[cfg(not(feature = "offscreen-shots"))]
-    pub(super) async fn capture(&self, cx: &mut AsyncApp, out: &str) -> Result<()> {
-        use anyhow::anyhow;
-        use std::process::Command;
-
-        let number = native::window_number(self.native(cx)?);
-        let status = Command::new("screencapture")
-            .args(["-x", "-o", &format!("-l{number}"), out])
-            .status()?;
-        if !status.success() {
-            return Err(anyhow!(
-                "screencapture failed ({status}); a locked screen composites no windows, \
-                 build with --features offscreen-shots"
-            ));
-        }
-        Ok(())
-    }
 }

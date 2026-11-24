@@ -663,15 +663,12 @@ impl Run {
 
     /// Save the window as `name` under `LATTICE_E2E_SHOTS`.
     async fn design_shot(&self, cx: &mut AsyncApp, name: &str) {
-        #[cfg(target_os = "macos")]
         if let Some(dir) = std::env::var_os("LATTICE_E2E_SHOTS") {
             let path = std::path::Path::new(&dir).join(format!("{name}.png"));
             if let Err(error) = self.capture(cx, &path.to_string_lossy()).await {
                 log::warn!("could not save {}: {error:#}", path.display());
             }
         }
-        #[cfg(not(target_os = "macos"))]
-        let _ = (cx, name);
     }
 }
 

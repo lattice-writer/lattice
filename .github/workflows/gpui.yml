@@ -428,6 +428,11 @@ jobs:
           Copy-Item -Recurse fixtures/e2e $project
           $env:LATTICE_GPUI_LOG = "info"
           $env:RUST_BACKTRACE = "1"
+          # The look shots the modules take (LATTICE_E2E_SHOTS), copied from
+          # the screen, so a WebView2 page and what covers it show as they
+          # are; kept as an artifact for a look review.
+          $env:LATTICE_E2E_SHOTS = Join-Path $env:RUNNER_TEMP "e2e-shots"
+          New-Item -ItemType Directory -Force $env:LATTICE_E2E_SHOTS | Out-Null
           # Typst support from a stand-in release on disk, as script/e2e
           # makes it on a Mac (scenario/e2e/typst.rs installs it from there).
           $typst = Join-Path $env:RUNNER_TEMP "typst-release"
@@ -462,8 +467,29 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: gpui-e2e-windows
-          path: ${{ runner.temp }}/e2e-windows.json
+          path: |
+            ${{ runner.temp }}/e2e-windows.json
+            ${{ runner.temp }}/e2e-shots/*.png
           if-no-files-found: ignore
+      # The native app for Windows as an unsigned archive: the binary, the
+      # Typst helper, PDFium and the island pages side by side, as
+      # structured/resources.rs looks for them. Not a release: nothing is
+      # signed or published.
+      - name: Pack the archive
+        if: ${{ !cancelled() }}
+        run: |
+          $stage = Join-Path $env:RUNNER_TEMP "lattice-gpui-windows-x86_64"
+          New-Item -ItemType Directory -Force $stage | Out-Null
+          Copy-Item target/release/lattice-gpui.exe, target/release/lattice-typst.exe, vendor/pdfium/win-x64/bin/pdfium.dll, LICENSE $stage
+          Copy-Item -Recurse islands/dist (Join-Path $stage "islands")
+          Compress-Archive -Path $stage -DestinationPath (Join-Path $env:RUNNER_TEMP "lattice-gpui-windows-x86_64.zip")
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: lattice-gpui-windows-x86_64
+          path: ${{ runner.temp }}/lattice-gpui-windows-x86_64.zip
+          if-no-files-found: ignore
+          retention-days: 14
 
   # The native app on Linux: built, unit-tested, launched under Xvfb, and
   # kept as an unsigned archive (the binary, the Typst helper, PDFium and the
