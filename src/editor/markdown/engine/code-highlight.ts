@@ -45,7 +45,10 @@ function request(grammar: string) {
       for (const view of views) view.dispatch(view.state.tr.setMeta(key, "grammar"));
     })
     .catch(() => {
-      // A grammar that fails to load leaves its blocks plain.
+      // A grammar that fails to load leaves its blocks plain until the next
+      // edit asks for it again (an offline chunk, a stale build).
+      requested.delete(grammar);
+      if (!shiki) shikiLoad = null;
     });
 }
 

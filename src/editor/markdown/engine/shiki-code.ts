@@ -11,6 +11,11 @@ import { cssVariablesTheme } from "../../../settings/syntax-scopes";
 
 export type CodeToken = { from: number; to: number; color: string; italic: boolean };
 
+/** Lines longer than this (minified code) stay plain, as VS Code leaves them. */
+export const MAX_LINE_LENGTH = 1500;
+/** Blocks longer than this stay plain. */
+export const MAX_BLOCK_LENGTH = 100_000;
+
 type Grammar = () => Promise<{ default: LanguageRegistration[] }>;
 
 /** Every grammar code-languages.ts names, each its own chunk. */
@@ -63,6 +68,7 @@ export function loadGrammar(grammar: string): Promise<void> {
     ready = instance;
     loaded.add(grammar);
   });
+  load.catch(() => loads.delete(grammar));
   loads.set(grammar, load);
   return load;
 }
@@ -74,10 +80,13 @@ export function loadGrammar(grammar: string): Promise<void> {
  */
 export function tokenize(code: string, grammar: string): CodeToken[] | null {
   if (!ready || !loaded.has(grammar)) return null;
+  // A block is tokenized again, whole and synchronously, on every edit inside
+  // it, so a huge one (a pasted log, a data dump) stays plain.
+  if (code.length > MAX_BLOCK_LENGTH) return [];
   const tokens: CodeToken[] = [];
   let lines;
   try {
-    lines = ready.codeToTokensBase(code, { lang: grammar, theme: THEME.name });
+    lines = ready.codeToTokensBase(code, { lang: grammar, theme: THEME.name, tokenizeMaxLineLength: MAX_LINE_LENGTH });
   } catch {
     return [];
   }

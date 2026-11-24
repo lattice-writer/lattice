@@ -111,10 +111,14 @@ fn python() {
 /// tokens, which the visual editor's code blocks are highlighted with.
 #[test]
 fn python_matches_the_textmate_grammars_roles() {
-    let text = "def solve(lines):\n    out = int(lines[0])\n    out.append(len(out))\nif __name__ == \"__main__\":\n    solve(out)\n";
+    let text = "def solve(lines, Model, *rest, **options):\n    out = int(lines[0])\n    out.append(len(out))\n    key = lambda item: item\nif __name__ == \"__main__\":\n    solve(out)\n";
     let captured = captures(build("python"), text);
     for (token, capture) in [
         ("lines", "variable"),
+        ("Model", "variable"),
+        ("rest", "variable"),
+        ("options", "variable"),
+        ("item", "variable"),
         ("int", "type"),
         ("len", "function"),
         ("append", "function"),

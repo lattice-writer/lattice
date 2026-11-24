@@ -6,7 +6,19 @@
 ; Shiki highlights with that grammar, look the same: a plain name stays in
 ; the ink, a builtin type is a type, `True` and `None` are constants.
 
+((identifier) @type
+  (#match? @type "^[A-Z]"))
+
+((identifier) @constant
+  (#match? @constant "^[A-Z][A-Z_0-9]*$"))
+
+; Parameters come after the capitalised-name patterns, so `def f(Model)`
+; keeps its parameter a parameter, and before `self` and `cls`, which stay
+; special.
 (parameters
+  (identifier) @variable)
+
+(lambda_parameters
   (identifier) @variable)
 
 (default_parameter
@@ -18,11 +30,11 @@
 (typed_default_parameter
   name: (identifier) @variable)
 
-((identifier) @type
-  (#match? @type "^[A-Z]"))
+(list_splat_pattern
+  (identifier) @variable)
 
-((identifier) @constant
-  (#match? @constant "^[A-Z][A-Z_0-9]*$"))
+(dictionary_splat_pattern
+  (identifier) @variable)
 
 ((identifier) @variable.special
   (#any-of? @variable.special "self" "cls"))
