@@ -222,8 +222,8 @@ describe("the macOS Intel workflow", () => {
     expect(intel.jobs.native.if).toBe(intel.jobs.build.if);
   });
 
-  it("attaches nothing for Intel unless the native build passed too", () => {
-    expect(intel.jobs.attach.needs).toEqual(["build", "smoke", "native"]);
+  it("attaches nothing for Intel unless the native build passed and launched on Intel too", () => {
+    expect(intel.jobs.attach.needs).toEqual(["build", "smoke", "native", "native-smoke"]);
     expect(attach.find((step) => step.with?.name === "lattice-gpui-macos-x86_64-main")).toBeTruthy();
   });
 
