@@ -11,12 +11,12 @@ import { showError } from "./notify";
 import type { useInterfaceZoom } from "./use-interface-zoom";
 import type { useProjectLifecycle } from "./use-project-lifecycle";
 import type { useWhatsNew } from "./use-whats-new";
-import { updatedFromThisLaunch } from "./whats-new";
+import { updatesItself } from "../telemetry/updates-itself";
 
 // Memoized: its props are stable, and App re-renders on every keystroke.
 const InterfaceZoomHud = memo(InterfaceZoomPill);
 const WhatsNewDialog = lazy(() => import("./whats-new-dialog").then((module) => ({ default: module.WhatsNewDialog })));
-const NativeAppOffer = lazy(() => import("./native-app-offer").then((module) => ({ default: module.NativeAppOffer })));
+const NativeAppMigration = lazy(() => import("./native-app-migration").then((module) => ({ default: module.NativeAppMigration })));
 const CloneRepositoryDialog = lazy(() => import("../project/clone-repository-dialog").then((module) => ({ default: module.CloneRepositoryDialog })));
 const RecentProjectFinder = lazy(() => import("../project/recent-project-finder").then((module) => ({ default: module.RecentProjectFinder })));
 
@@ -41,11 +41,11 @@ export function AppOverlays({ interfaceScale, interfaceZoom, whatsNew, lifecycle
           />
         </Suspense>
       )}
-      {/* Only an update can bring the offer, so other launches never load it.
-          It waits for What's new to close: one sheet at a time after an update. */}
-      {updatedFromThisLaunch() && (
+      {/* The move to the native app happens on a Mac only, so no other
+          platform loads it. It waits for What's new to close: one sheet at a time. */}
+      {updatesItself() && (
         <Suspense fallback={null}>
-          <NativeAppOffer whatsNewOpen={whatsNew.open} />
+          <NativeAppMigration whatsNewOpen={whatsNew.open} />
         </Suspense>
       )}
       {clone.open && (

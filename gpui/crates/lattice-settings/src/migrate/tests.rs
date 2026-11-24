@@ -554,15 +554,22 @@ fn the_union_stops_at_the_cap_and_never_drops_the_gpui_apps_own() {
 }
 
 #[test]
-fn a_later_switch_merges_the_recent_projects_and_nothing_else() {
+fn a_launch_after_the_tauri_app_ran_again_catches_up_on_what_changed_there() {
     let profile = profile("later");
     full_tauri_profile(&profile);
     let (tauri, gpui) = (&profile.tauri, &profile.gpui);
+    let settings = crate::file_in(&gpui.state);
     // No marker yet: the first pass's to do, not this.
-    assert!(merge_recent_projects(tauri, gpui).is_none());
+    assert!(catch_up(tauri, gpui).is_none());
     assert!(migrate(tauri, gpui).is_some());
+    // The first read imports the Tauri app's settings, as the app does.
+    let website_data = tauri.website_data.as_deref().unwrap();
+    assert!(matches!(
+        crate::load(&settings, Some(website_data)),
+        crate::Loaded::Imported(_)
+    ));
     // The launch after the first pass: the Tauri app has not run since.
-    assert!(merge_recent_projects(tauri, gpui).is_none());
+    assert!(catch_up(tauri, gpui).is_none());
 
     // Some time in the GPUI app...
     write(
@@ -574,18 +581,25 @@ fn a_later_switch_merges_the_recent_projects_and_nothing_else() {
         &gpui.overleaf.join("overleaf-session.json"),
         r#"{"cookie":"mine"}"#,
     );
-    // ...then back in the Tauri app, which opens projects and changes the
-    // rest of its state too.
-    let website_data = tauri.website_data.as_deref().unwrap();
+    let mut own = crate::read(&settings).unwrap();
+    own.author_name = "Ada in native".into();
+    crate::write(&settings, &own).unwrap();
+    // ...then back in the Tauri app, which opens projects, changes a
+    // setting and adds to the rest of its state.
     store(
         website_data,
         RECENT_PROJECTS,
         r#"[{"name":"Back","path":"/Users/ada/Back","openedAt":1900000000000},{"name":"Thesis","path":"/Users/ada/Thesis","openedAt":1850000000000}]"#,
     );
     store(website_data, RECENT_COMMANDS, r#"["tauri"]"#);
+    store(website_data, "lattice.theme-preference.v1", "light");
     write(
         &tauri.config.join("overleaf-session.json"),
         r#"{"cookie":"tauri"}"#,
+    );
+    write(
+        &tauri.config.join("overleaf-local-copies.json"),
+        r#"{"folders":["/Users/ada/Overleaf Projects/Thesis","/Users/ada/Paper","/Users/ada/Grant"]}"#,
     );
     write(
         &tauri.data.join("themes/dev.ada.new.json"),
@@ -593,12 +607,14 @@ fn a_later_switch_merges_the_recent_projects_and_nothing_else() {
     );
     write(&tauri.data.join("synara/skills/cite/SKILL.md"), "# Cite");
     let tauri_before = snapshot(&profile.root.join("tauri"));
-    let gpui_before = snapshot(&profile.root.join("gpui"));
 
-    let merged = merge_recent_projects(tauri, gpui)
-        .expect("the Tauri app ran since")
-        .unwrap();
-    assert_eq!(merged, 2);
+    let report = catch_up(tauri, gpui).expect("the Tauri app ran since");
+    assert!(report.failed.is_empty(), "{:?}", report.failed);
+    assert_eq!(report.carried["recent projects"], 2);
+    assert_eq!(report.carried["settings"], 1);
+    assert_eq!(report.carried["themes"], 1);
+    assert_eq!(report.carried["skills"], 1);
+    assert_eq!(report.carried["overleaf linked folders"], 1);
     assert_eq!(
         read_json(&gpui.state.join("recent-projects.json")),
         json!([
@@ -607,21 +623,68 @@ fn a_later_switch_merges_the_recent_projects_and_nothing_else() {
             { "name": "Native", "path": "/Users/ada/Native", "openedAt": 1800000000000u64 }
         ])
     );
-    // Only the list and the marker changed; the Tauri app's files not at all.
-    let recents = gpui.state.join("recent-projects.json");
-    let marker = gpui.state.join(MARKER);
-    let mut after = snapshot(&profile.root.join("gpui"));
-    let mut before = gpui_before;
-    for path in [&recents, &marker] {
-        after.remove(path);
-        before.remove(path);
-    }
-    assert_eq!(after, before);
+    // The setting changed there wins; the one changed only here stays.
+    let caught_up = crate::read(&settings).unwrap();
+    assert_eq!(caught_up.theme_preference, crate::ThemePreference::Light);
+    assert_eq!(caught_up.author_name, "Ada in native");
+    assert!(gpui.data.join("themes/dev.ada.new.json").exists());
+    assert!(gpui.data.join("synara/skills/cite/SKILL.md").exists());
+    assert_eq!(
+        read_json(&gpui.overleaf.join("overleaf-local-copies.json"))["folders"][2],
+        "/Users/ada/Grant"
+    );
+    // What the GPUI app already has stays as it is.
+    assert_eq!(
+        read_json(&gpui.state.join("recent-commands.json")),
+        json!(["mine"])
+    );
+    assert_eq!(
+        read_json(&gpui.overleaf.join("overleaf-session.json")),
+        json!({ "cookie": "mine" })
+    );
+    // The Tauri app's files are left exactly as they were.
     assert_eq!(snapshot(&profile.root.join("tauri")), tauri_before);
-    assert_eq!(read_json(&marker)["carried"]["plugins"], 2);
 
-    // Once per switch: the next launch finds the storage as it was.
-    assert!(merge_recent_projects(tauri, gpui).is_none());
+    // Once per run of the Tauri app: the next launch finds the storage as it
+    // was, and a setting changed here afterwards is not undone.
+    assert!(catch_up(tauri, gpui).is_none());
+    let mut own = crate::read(&settings).unwrap();
+    own.theme_preference = crate::ThemePreference::Dark;
+    crate::write(&settings, &own).unwrap();
+    store(website_data, RECENT_COMMANDS, r#"["again"]"#);
+    let report = catch_up(tauri, gpui).expect("the Tauri app ran again");
+    assert_eq!(report.carried.get("settings"), None);
+    assert_eq!(
+        crate::read(&settings).unwrap().theme_preference,
+        crate::ThemePreference::Dark
+    );
+    let _ = std::fs::remove_dir_all(&profile.root);
+}
+
+#[test]
+fn a_marker_from_before_0_20_takes_every_setting_the_tauri_app_holds() {
+    let profile = profile("old-marker");
+    full_tauri_profile(&profile);
+    let (tauri, gpui) = (&profile.tauri, &profile.gpui);
+    assert!(migrate(tauri, gpui).is_some());
+    // A 0.19 marker: no settings kept.
+    let marker = gpui.state.join(MARKER);
+    let mut body = read_json(&marker);
+    body.as_object_mut().unwrap().remove("settings");
+    write(&marker, &pretty(&body));
+    let settings = crate::file_in(&gpui.state);
+    crate::write(&settings, &crate::Settings::default()).unwrap();
+    store(
+        tauri.website_data.as_deref().unwrap(),
+        "lattice.author-name.v1",
+        "Ada",
+    );
+    let report = catch_up(tauri, gpui).unwrap();
+    // The theme the Tauri app held all along (dark) and the name set there.
+    assert_eq!(report.carried["settings"], 2);
+    let caught_up = crate::read(&settings).unwrap();
+    assert_eq!(caught_up.theme_preference, crate::ThemePreference::Dark);
+    assert_eq!(caught_up.author_name, "Ada");
     let _ = std::fs::remove_dir_all(&profile.root);
 }
 

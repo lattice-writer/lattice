@@ -1,21 +1,19 @@
 import { lazy, Suspense, useEffect, useReducer } from "react";
-import { autoOfferNativeApp, releaseNativeApp, type NativeAppRelease } from "./native-app";
+import { nativeMigrationRelease, releaseNativeApp, type NativeAppRelease } from "./native-app";
 
 const NativeAppDialog = lazy(() => import("./native-app-dialog").then((module) => ({ default: module.NativeAppDialog })));
 
 /**
- * The native app's automatic offer (native-app.ts), mounted only on the first
- * launch after an update and loaded on demand, so none of it sits on the
- * startup path of any other launch: the dialog
- * once this launch qualifies and the check finds a release, held back while
- * What's new is open so the two sheets never stack. The dialog records how
- * it was answered.
+ * The move to the native app (native-app.ts), mounted on a Mac only and loaded
+ * after the first paint: the notice once the backend says this launch moves
+ * and the check finds a release, held back while What's new is open so the two
+ * sheets never stack.
  */
-export function NativeAppOffer({ whatsNewOpen }: { whatsNewOpen: boolean }) {
+export function NativeAppMigration({ whatsNewOpen }: { whatsNewOpen: boolean }) {
   const [release, setRelease] = useReducer((_: NativeAppRelease | null, next: NativeAppRelease | null) => next, null);
   useEffect(() => {
     let cancelled = false;
-    void autoOfferNativeApp().then((found) => {
+    void nativeMigrationRelease().then((found) => {
       if (found && cancelled) releaseNativeApp(found);
       else if (found) setRelease(found);
     });

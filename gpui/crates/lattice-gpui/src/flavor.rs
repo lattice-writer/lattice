@@ -6,16 +6,16 @@
 //!   channel, which it reads only once the writer turns on Beta updates. A
 //!   binary outside a bundle (a build tree, the e2e) is this one too.
 //! - **Lattice** (`app.leo1oel.researchwriter`, the Tauri app's own
-//!   identifier), the native Lattice a writer on an Apple silicon Mac chooses
-//!   to switch to: the Tauri app's updater installs it in place of the Tauri
-//!   app when they ask, and its Settings switch back the same way
-//!   (`crate::updater::switch_to_classic`). It has the Tauri app's name and
-//!   its own feed beside the Tauri app's (`latest-native.json`), with updates
-//!   always on as the Tauri app has them. Its data folder is new, so the
-//!   carry-over from the Tauri app (`lattice_settings::migrate`) runs on its
-//!   first launch even after Lattice Beta ran it into `lattice-gpui`, and the
-//!   Tauri app's own folder (`app.leo1oel.researchwriter`) is only ever read,
-//!   so the Tauri app finds it as it left it after a switch back.
+//!   identifier), the native Lattice, which from 0.20.0 is the only app on a
+//!   Mac: the Tauri app's feed hands every Mac its archive, so the Tauri
+//!   app's updater installs it in place of the Tauri app (and a Tauri copy
+//!   of 0.20.0 or later installs it at launch). It has the Tauri app's name
+//!   and its own feed beside the Tauri app's (`latest-native.json`), with
+//!   updates always on as the Tauri app has them. Its data folder is new, so
+//!   the carry-over from the Tauri app (`lattice_settings::migrate`) runs on
+//!   its first launch even after Lattice Beta ran it into `lattice-gpui`,
+//!   and the Tauri app's own folder (`app.leo1oel.researchwriter`) is only
+//!   ever read.
 
 use std::sync::OnceLock;
 
@@ -31,12 +31,12 @@ pub struct Flavor {
     /// its address before the move, which GitHub redirects only while nobody
     /// recreates it.
     pub endpoints: &'static [&'static str],
-    /// Whether it is the native Lattice, installed in the Tauri app's place
-    /// by the writer's choice: its updater is always on, as the Tauri app's
-    /// is; the launch that first carries the Tauri app's state over announces
-    /// the update (What's new); a later switch from the Tauri app brings its
-    /// recent projects (`crate::settings::migrate_from_tauri`); and Settings
-    /// offers the switch back to the classic version.
+    /// Whether it is the native Lattice, installed in the Tauri app's place:
+    /// its updater is always on, as the Tauri app's is; the launch that
+    /// first carries the Tauri app's state over announces the update (What's
+    /// new); and a launch after the Tauri app ran again (a writer who had
+    /// switched back before 0.20.0) carries what changed there
+    /// (`crate::settings::migrate_from_tauri`).
     pub native_lattice: bool,
 }
 
@@ -57,10 +57,9 @@ pub const MAIN: Flavor = Flavor {
     name: "Lattice",
     folder: "app.leo1oel.lattice",
     // Its own manifest beside the Tauri app's `latest.json` in every release
-    // (`plugins.updater.endpoints` in tauri.conf.json), which carries only
-    // this app's Apple silicon archive. The Tauri app's feed stays the
-    // Tauri app's; Settings reads it only to switch back
-    // (`crate::updater::classic_channel`).
+    // (`plugins.updater.endpoints` in tauri.conf.json), which carries this
+    // app's Mac archives; from 0.20.0 the Tauri app's feed names the same
+    // archives for every Mac.
     endpoints: &[
         "https://github.com/lattice-writer/lattice/releases/latest/download/latest-native.json",
         "https://github.com/leo1oel/lattice/releases/latest/download/latest-native.json",

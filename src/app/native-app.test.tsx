@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * The backend is the seam: every command the offer reaches goes through
+ * The backend is the seam: every command the move reaches goes through
  * `invoke`, answered here per command name, and the install's channel is
  * the one the dialog hands over.
  */
@@ -24,14 +24,23 @@ vi.mock("@tauri-apps/api/core", () => ({
 }));
 
 import { NativeAppDialog } from "./native-app-dialog";
-import { declineNativeApp, loadNativeOfferRecord, shouldAutoOfferNativeApp } from "./native-app";
-import { NativeAppOffer } from "./native-app-offer";
+import { NativeAppMigration } from "./native-app-migration";
 
-const OFFER_KEY = "lattice.native-app-offer.v1";
-const LAST_RUN_KEY = "lattice.last-run-version.v1";
-const RELEASE = { version: "0.19.0", rid: 7 };
+const RELEASE = { version: "0.20.0", rid: 7 };
 
 const called = (command: string) => backend.calls.filter((call) => call.command === command);
+
+function installs() {
+  backend.answers.set("claim_update_install", () => "claimed");
+  backend.answers.set("install_update", (args) => {
+    const channel = args.onEvent as { onmessage: (event: unknown) => void };
+    channel.onmessage({ event: "Started", data: { contentLength: 100 } });
+    channel.onmessage({ event: "Progress", data: { chunkLength: 100 } });
+    channel.onmessage({ event: "Finished" });
+    return null;
+  });
+  backend.answers.set("restart_lattice", () => null);
+}
 
 beforeEach(() => {
   backend.answers.clear();
@@ -44,110 +53,90 @@ afterEach(() => {
   localStorage.clear();
 });
 
-describe("when the native app is offered by itself", () => {
-  it("offers once on the first launch after an update to 0.19.0 or later", () => {
-    expect(shouldAutoOfferNativeApp("0.18.4", "0.19.0", {})).toBe(true);
-    expect(shouldAutoOfferNativeApp("0.19.0", "0.20.1", {})).toBe(true);
-    // Not an update launch: a fresh install, or the same version again.
-    expect(shouldAutoOfferNativeApp(null, "0.19.0", {})).toBe(false);
-    // Releases before the native app have nothing to offer.
-    expect(shouldAutoOfferNativeApp("0.18.3", "0.18.4", {})).toBe(false);
-  });
-
-  it("asks again after Not now only once a later update arrives", () => {
-    declineNativeApp("later", "0.19.0");
-    expect(loadNativeOfferRecord()).toEqual({ declinedAt: "0.19.0" });
-    expect(shouldAutoOfferNativeApp("0.18.4", "0.19.0", loadNativeOfferRecord())).toBe(false);
-    expect(shouldAutoOfferNativeApp("0.19.0", "0.19.1", loadNativeOfferRecord())).toBe(true);
-  });
-
-  it("never asks again after Don't ask again, or once the writer switched", () => {
-    declineNativeApp("never", "0.19.0");
-    expect(shouldAutoOfferNativeApp("0.19.0", "0.25.0", loadNativeOfferRecord())).toBe(false);
-    localStorage.setItem(OFFER_KEY, JSON.stringify({ stop: "switched" }));
-    expect(shouldAutoOfferNativeApp("0.19.0", "0.25.0", loadNativeOfferRecord())).toBe(false);
-    // A record nobody could have written is no answer.
-    localStorage.setItem(OFFER_KEY, "{not json");
-    expect(loadNativeOfferRecord()).toEqual({});
-  });
-
-  it("waits for What's new to close, and offers only what the check found", async () => {
-    localStorage.setItem(LAST_RUN_KEY, "0.18.0");
+describe("when Lattice moves to the native app", () => {
+  it("checks only when the backend says this launch moves", async () => {
+    backend.answers.set("take_native_move", () => false);
     backend.answers.set("check_native_app", () => RELEASE);
-    const { rerender } = render(<NativeAppOffer whatsNewOpen />);
+    render(<NativeAppMigration whatsNewOpen={false} />);
+    await waitFor(() => expect(called("take_native_move")).toHaveLength(1));
+    await act(async () => {});
+    expect(called("check_native_app")).toHaveLength(0);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("says nothing when no release is found, so the next launch tries again", async () => {
+    backend.answers.set("take_native_move", () => true);
+    backend.answers.set("check_native_app", () => null);
+    render(<NativeAppMigration whatsNewOpen={false} />);
     await waitFor(() => expect(called("check_native_app")).toHaveLength(1));
     await act(async () => {});
     expect(screen.queryByRole("dialog")).toBeNull();
-    rerender(<NativeAppOffer whatsNewOpen={false} />);
-    fireEvent.click(await screen.findByRole("button", { name: "Not now" }));
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    expect(loadNativeOfferRecord().declinedAt).toMatch(/^\d+\.\d+\.\d+$/);
+  });
+
+  it("waits for What's new to close, then moves without asking", async () => {
+    backend.answers.set("take_native_move", () => true);
+    backend.answers.set("check_native_app", () => RELEASE);
+    installs();
+    const { rerender } = render(<NativeAppMigration whatsNewOpen />);
+    await waitFor(() => expect(called("check_native_app")).toHaveLength(1));
+    await act(async () => {});
+    expect(screen.queryByRole("dialog")).toBeNull();
+    rerender(<NativeAppMigration whatsNewOpen={false} />);
+    expect(await screen.findByRole("dialog", { name: "Lattice is moving to its native version" })).toBeTruthy();
+    await waitFor(() => expect(called("restart_lattice")).toHaveLength(1));
+    // No way to stay on this version.
+    expect(screen.queryByRole("button", { name: /Not now|Don’t ask again/ })).toBeNull();
   });
 });
 
-describe("the native app offer", () => {
-  it("records Not now at the running version and Don't ask again for good", () => {
-    const onClose = vi.fn();
-    render(<NativeAppDialog release={RELEASE} onClose={onClose} />);
-    fireEvent.click(screen.getByRole("button", { name: "Not now" }));
-    expect(onClose).toHaveBeenCalledTimes(1);
-    expect(loadNativeOfferRecord().declinedAt).toMatch(/^\d+\.\d+\.\d+$/);
-    cleanup();
-    render(<NativeAppDialog release={RELEASE} onClose={onClose} />);
-    fireEvent.click(screen.getByRole("button", { name: "Don’t ask again" }));
-    expect(loadNativeOfferRecord().stop).toBe("never");
-    // The release a closed offer held is let go.
-    expect(called("plugin:resources|close").map((call) => call.args)).toContainEqual({ rid: 7 });
-  });
-
+describe("the move's notice", () => {
   it("installs the native release under its own claim, then restarts into it", async () => {
-    backend.answers.set("claim_update_install", () => "claimed");
-    backend.answers.set("install_update", (args) => {
-      const channel = args.onEvent as { onmessage: (event: unknown) => void };
-      channel.onmessage({ event: "Started", data: { contentLength: 100 } });
-      channel.onmessage({ event: "Progress", data: { chunkLength: 100 } });
-      channel.onmessage({ event: "Finished" });
-      return null;
-    });
-    backend.answers.set("restart_lattice", () => null);
+    installs();
     render(<NativeAppDialog release={RELEASE} onClose={() => {}} />);
-    fireEvent.click(screen.getByRole("button", { name: "Switch now" }));
     await waitFor(() => expect(called("restart_lattice")).toHaveLength(1));
-    // Never the same claim as a classic update to 0.19.0.
-    expect(called("claim_update_install")[0]?.args).toEqual({ version: "native 0.19.0" });
-    expect(called("install_update")[0]?.args).toMatchObject({ version: "native 0.19.0", rid: 7 });
-    expect(loadNativeOfferRecord().stop).toBe("switched");
+    // Never the same claim as a classic update to 0.20.0.
+    expect(called("claim_update_install")[0]?.args).toEqual({ version: "native 0.20.0" });
+    expect(called("install_update")[0]?.args).toMatchObject({ version: "native 0.20.0", rid: 7 });
   });
 
-  it("warns about running work before switching, as a restart does", async () => {
+  it("installs but waits to restart while work is running", async () => {
+    installs();
     backend.answers.set("restart_impact", () => ({ terminalCommands: 0, builds: 2, agentTurns: 0 }));
+    render(<NativeAppDialog release={RELEASE} onClose={() => {}} />);
+    expect(await screen.findByText(/Restarting now stops 2 compiles/)).toBeTruthy();
+    expect(called("install_update")).toHaveLength(1);
+    expect(called("restart_lattice")).toHaveLength(0);
+    fireEvent.click(screen.getByRole("button", { name: "Restart now" }));
+    await waitFor(() => expect(called("restart_lattice")).toHaveLength(1));
+  });
+
+  it("restarts without downloading again when another window already installed it", async () => {
     backend.answers.set("claim_update_install", () => "installed");
     backend.answers.set("restart_lattice", () => null);
     render(<NativeAppDialog release={RELEASE} onClose={() => {}} />);
-    fireEvent.click(screen.getByRole("button", { name: "Switch now" }));
-    expect(await screen.findByText(/Switching restarts Lattice and stops 2 compiles/)).toBeTruthy();
-    expect(called("claim_update_install")).toHaveLength(0);
-    fireEvent.click(screen.getByRole("button", { name: "Switch anyway" }));
     await waitFor(() => expect(called("restart_lattice")).toHaveLength(1));
-    // Already installed by another window: nothing downloads twice.
     expect(called("install_update")).toHaveLength(0);
+  });
+
+  it("says why a move failed and tries again", async () => {
+    backend.answers.set("claim_update_install", () => "claimed");
+    backend.answers.set("install_update", () => { throw new Error("signature mismatch"); });
+    const onClose = vi.fn();
+    render(<NativeAppDialog release={RELEASE} onClose={onClose} />);
+    expect(await screen.findByText(/signature mismatch/)).toBeTruthy();
+    expect(screen.getByText(/tries again the next time it starts/)).toBeTruthy();
+    installs();
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(called("restart_lattice")).toHaveLength(1));
+    // The release the closed notice held is let go.
+    cleanup();
+    expect(called("plugin:resources|close").map((call) => call.args)).toContainEqual({ rid: 7 });
   });
 
   it("says another window is installing instead of installing alongside", async () => {
     backend.answers.set("claim_update_install", () => "busy");
     render(<NativeAppDialog release={RELEASE} onClose={() => {}} />);
-    fireEvent.click(screen.getByRole("button", { name: "Switch now" }));
     expect(await screen.findByText(/Another Lattice window is installing an update/)).toBeTruthy();
     expect(called("install_update")).toHaveLength(0);
-  });
-
-  it("checks for the release itself when opened from Settings", async () => {
-    let found: typeof RELEASE | null = null;
-    backend.answers.set("check_native_app", () => found);
-    render(<NativeAppDialog release={null} onClose={() => {}} />);
-    expect(await screen.findByText(/isn’t available right now/)).toBeTruthy();
-    found = RELEASE;
-    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
-    await waitFor(() => expect((screen.getByRole("button", { name: "Switch now" }) as HTMLButtonElement).disabled).toBe(false));
   });
 });

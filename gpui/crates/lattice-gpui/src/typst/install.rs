@@ -26,11 +26,23 @@ pub struct Source {
     pub public_key: String,
 }
 
-/// The release asset for this Mac, as release.yml names it: only Apple
-/// silicon, the one platform the native app ships for.
+/// The release asset for this Mac, as release.yml (Apple silicon) and
+/// macos-intel.yml (Intel, tauri-action's `x64` suffix) name it; none
+/// elsewhere, where the native app does not ship.
 pub fn asset() -> Option<String> {
-    cfg!(all(target_os = "macos", target_arch = "aarch64"))
-        .then(|| format!("Lattice-typst_{}_aarch64.tar.gz", lattice_core::VERSION))
+    asset_for(std::env::consts::OS, std::env::consts::ARCH)
+}
+
+fn asset_for(os: &str, arch: &str) -> Option<String> {
+    let suffix = match (os, arch) {
+        ("macos", "aarch64") => "aarch64",
+        ("macos", "x86_64") => "x64",
+        _ => return None,
+    };
+    Some(format!(
+        "Lattice-typst_{}_{suffix}.tar.gz",
+        lattice_core::VERSION
+    ))
 }
 
 /// The archive's addresses beside each feed in `endpoints`: a feed that is
@@ -207,6 +219,25 @@ mod tests {
                 ),
                 "https://github.com/leo1oel/lattice/releases/download/lattice-beta/Lattice-typst_1.2.3_aarch64.tar.gz".to_string(),
             ]
+        );
+    }
+
+    #[test]
+    fn each_mac_downloads_the_helper_built_for_its_cpu() {
+        let version = lattice_core::VERSION;
+        assert_eq!(
+            asset_for("macos", "aarch64"),
+            Some(format!("Lattice-typst_{version}_aarch64.tar.gz"))
+        );
+        assert_eq!(
+            asset_for("macos", "x86_64"),
+            Some(format!("Lattice-typst_{version}_x64.tar.gz"))
+        );
+        assert_eq!(asset_for("windows", "x86_64"), None);
+        assert_eq!(asset_for("linux", "aarch64"), None);
+        assert_eq!(
+            asset(),
+            asset_for(std::env::consts::OS, std::env::consts::ARCH)
         );
     }
 
