@@ -76,8 +76,8 @@ jobs:
       # its binding before an input method, a binding's prefix or an unbound
       # key to the input method; key_dispatch::tests::test_held_key: a held
       # key's repeat runs only the actions that repeat;
-      # fast::composition::overlay_bounds: what the overlay surface hides,
-      # without shadows or a dimming backdrop; profiler::journal: the journal,
+      # fast::composition::overlay_bounds: what the overlay surface draws,
+      # without shadows or press-catching layers; profiler::journal: the journal,
       # installed on first use, keeps its turns in step; in gpui_macos,
       # fast::composition::tests::cursor: the window view's cursor rects leave
       # out a webview but not a GPUI overlay above it. runtime_shaders: GPUI

@@ -11,11 +11,11 @@
 //! space of what the frame painted on the overlay surface: deferred and
 //! window-level draws (menus, popovers, dialogs, tooltips, the palette).
 //!
-//! The rectangles are a conservative cover of what is seen: shadows are
-//! left out, as is a quad that is mostly see-through and has no border (a
-//! dialog's dimming backdrop, a transparent layer catching presses), so a
-//! page under a dialog stays visible around the dialog's card rather than
-//! being cut away where the backdrop dims it.
+//! The rectangles cover what is seen: shadows are left out, as is a quad
+//! with nothing to draw (a transparent layer catching presses), but a
+//! dialog's dimming backdrop counts, so a page under a modal dialog is cut
+//! away with the rest of the window and the backdrop dims what GPUI draws
+//! there instead of leaving the page bright beside the card.
 
 use std::rc::{Rc, Weak};
 
@@ -161,20 +161,19 @@ pub(crate) fn overlay_rectangles(
     kept
 }
 
-/// Whether `primitive` hides what is under it enough to count.
+/// Whether `primitive` draws anything that should be seen above a page.
 fn covers(primitive: &Primitive) -> bool {
     match primitive {
         Primitive::Shadow(_) => false,
         Primitive::Quad(quad) => {
             let background = &quad.background;
-            let see_through =
-                background.tag == BackgroundTag::Solid && background.solid.a < 0.5;
+            let invisible = background.tag == BackgroundTag::Solid && background.solid.a == 0.;
             let border = !quad.border_color.is_transparent()
                 && (quad.border_widths.top.0 > 0.
                     || quad.border_widths.right.0 > 0.
                     || quad.border_widths.bottom.0 > 0.
                     || quad.border_widths.left.0 > 0.);
-            !see_through || border
+            !invisible || border
         }
         _ => true,
     }
@@ -207,7 +206,7 @@ mod tests {
     }
 
     #[test]
-    fn overlay_rectangles_cover_what_the_overlay_surface_hides() {
+    fn overlay_rectangles_cover_what_the_overlay_surface_draws() {
         let mut tree = CompositionTree::new();
         let base = tree.insert(CompositionSurfaceKind::Gpui, None).unwrap();
         let overlay = tree.insert(CompositionSurfaceKind::Gpui, None).unwrap();
@@ -215,9 +214,9 @@ mod tests {
         // The root view: not an overlay.
         scene.insert_primitive(quad(scaled(0., 0., 2000., 2000.), 1.));
         let overlay_start = scene.len();
-        // A dialog's dimming backdrop, its card's shadow, the card, and
-        // the card's content.
-        scene.insert_primitive(quad(scaled(0., 0., 2000., 2000.), 0.3));
+        // A transparent layer catching presses, a menu's shadow, the menu,
+        // and the menu's content.
+        scene.insert_primitive(quad(scaled(0., 0., 2000., 2000.), 0.));
         scene.insert_primitive(Shadow {
             order: 0,
             blur_radius: ScaledPixels(24.),
@@ -257,5 +256,15 @@ mod tests {
             ]
         );
         assert!(overlay_rectangles(&scene, &[(base, 0)], overlay, 2.).is_empty());
+
+        // A modal dialog's dimming backdrop covers the whole window.
+        let mut dialog = Scene::default();
+        dialog.insert_primitive(quad(scaled(0., 0., 2000., 2000.), 0.3));
+        dialog.insert_primitive(quad(scaled(600., 400., 800., 600.), 1.));
+        dialog.finish();
+        assert_eq!(
+            overlay_rectangles(&dialog, &[(overlay, 0)], overlay, 2.),
+            [Bounds::new(point(px(0.), px(0.)), size(px(1000.), px(1000.)))]
+        );
     }
 }
