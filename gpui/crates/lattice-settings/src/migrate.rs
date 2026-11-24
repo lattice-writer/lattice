@@ -274,12 +274,12 @@ pub fn catch_up(tauri: &Tauri, gpui: &Gpui) -> Option<Report> {
         return None;
     }
     let storage = read_tauri_storage(tauri);
-    // A marker from before 0.20.0 kept no settings: every value the Tauri
-    // app holds then counts as changed there, against its defaults.
-    let baseline: BTreeMap<String, String> = body
+    // A marker from before 0.20.0 kept no settings, so which app changed a
+    // value cannot be told: the baseline is the defaults, and a value the
+    // GPUI app has changed from its default is kept over the Tauri app's.
+    let baseline: Option<BTreeMap<String, String>> = body
         .get("settings")
-        .and_then(|settings| serde_json::from_value(settings.clone()).ok())
-        .unwrap_or_default();
+        .and_then(|settings| serde_json::from_value(settings.clone()).ok());
     let mut steps = vec![
         (
             "recent projects",
@@ -290,7 +290,7 @@ pub fn catch_up(tauri: &Tauri, gpui: &Gpui) -> Option<Report> {
         ),
         (
             "settings",
-            settings_changed_there(&storage, &baseline, &crate::file_in(&gpui.state)),
+            settings_changed_there(&storage, baseline.as_ref(), &crate::file_in(&gpui.state)),
         ),
     ];
     steps.extend(carry_the_rest(tauri, gpui, &storage));
@@ -309,12 +309,14 @@ pub fn catch_up(tauri: &Tauri, gpui: &Gpui) -> Option<Report> {
 /// it held when last carried), written over the GPUI app's own file at
 /// `path`: a value the Tauri app still holds as it was leaves the GPUI
 /// app's as it is, so a change made only in the GPUI app survives, and one
-/// made in the Tauri app since, the later of the two, wins. Without a file
-/// there is nothing to change: the first read imports the Tauri app's whole
-/// (`crate::load`). How many values changed.
+/// made in the Tauri app since, the later of the two, wins. With no
+/// baseline (a 0.19 marker) each value is merged on its own: one the GPUI
+/// app has changed from its default stays, and any other takes the Tauri
+/// app's. Without a file there is nothing to change: the first read imports
+/// the Tauri app's whole (`crate::load`). How many values changed.
 fn settings_changed_there(
     storage: &BTreeMap<String, String>,
-    baseline: &BTreeMap<String, String>,
+    baseline: Option<&BTreeMap<String, String>>,
     path: &Path,
 ) -> anyhow::Result<usize> {
     let items: BTreeMap<String, String> = crate::import::KEYS
@@ -329,8 +331,11 @@ fn settings_changed_there(
     };
     let mut value = own.to_value();
     let there = crate::import::settings_from_items(&items).to_value();
-    let before = crate::import::settings_from_items(baseline).to_value();
-    let changed = overlay(&mut value, &there, &before);
+    let before = match baseline {
+        Some(baseline) => crate::import::settings_from_items(baseline).to_value(),
+        None => crate::Settings::default().to_value(),
+    };
+    let changed = overlay(&mut value, &there, &before, baseline.is_none());
     if changed > 0 {
         crate::write(path, &crate::Settings::from_value(&value))?;
     }
@@ -339,15 +344,16 @@ fn settings_changed_there(
 
 /// Write into `own` each value of `there` that differs from `before`,
 /// field by field through nested objects (the appearance, the live preview's
-/// projects); how many values of `own` that changed.
-fn overlay(own: &mut Value, there: &Value, before: &Value) -> usize {
+/// projects), but with `keep_own_changes` only where `own` still holds
+/// `before`; how many values of `own` that changed.
+fn overlay(own: &mut Value, there: &Value, before: &Value, keep_own_changes: bool) -> usize {
     if let (Value::Object(own), Value::Object(there)) = (&mut *own, there) {
         return there
             .iter()
             .map(|(key, there)| {
                 let before = before.get(key).unwrap_or(&Value::Null);
                 match own.get_mut(key) {
-                    Some(own) => overlay(own, there, before),
+                    Some(own) => overlay(own, there, before, keep_own_changes),
                     None if there != before => {
                         own.insert(key.clone(), there.clone());
                         1
@@ -357,7 +363,7 @@ fn overlay(own: &mut Value, there: &Value, before: &Value) -> usize {
             })
             .sum();
     }
-    if there != before && own != there {
+    if there != before && own != there && (!keep_own_changes || own == before) {
         *own = there.clone();
         1
     } else {
@@ -525,17 +531,26 @@ fn verbatim(
     Ok(1)
 }
 
-/// One of the Overleaf folder's single-value files, copied when the GPUI
-/// app has none and the Tauri app's is a JSON object holding `field`. The
-/// session keeps the owner-only mode lattice-core gives it, as it is as good
-/// as a browser login; signing out of either app afterwards deletes only
-/// that app's copy (`overleaf::disconnect`).
+/// One of the Overleaf folder's single-value files, copied when the Tauri
+/// app's is a JSON object holding `field` and the GPUI app has none, or an
+/// older one: a writer who signed in again or picked another folder in the
+/// Tauri app after switching back keeps that. The copy is newer than the
+/// file it came from, so a later pass leaves it alone. The session keeps the
+/// owner-only mode lattice-core gives it, as it is as good as a browser
+/// login; signing out of either app afterwards deletes only that app's copy
+/// (`overleaf::disconnect`).
 fn overleaf_file(from: &Path, to: &Path, name: &str, field: &str) -> anyhow::Result<usize> {
     let target = to.join(name);
-    if target.exists() {
+    let source = from.join(name);
+    let modified = |path: &Path| {
+        std::fs::metadata(path)
+            .and_then(|meta| meta.modified())
+            .ok()
+    };
+    if target.exists() && modified(&source) <= modified(&target) {
         return Ok(0);
     }
-    let Ok(text) = std::fs::read_to_string(from.join(name)) else {
+    let Ok(text) = std::fs::read_to_string(&source) else {
         return Ok(0);
     };
     let readable = serde_json::from_str::<Value>(&text)

@@ -174,6 +174,18 @@ fn a_launch_after_the_tauri_app_ran_again_catches_up_on_what_changed_there() {
         &tauri.config.join("overleaf-session.json"),
         r#"{"cookie":"tauri"}"#,
     );
+    // Signed in again there, after the GPUI app's sign-in; the download
+    // folder the GPUI app picked last stays.
+    age(&gpui.overleaf.join("overleaf-session.json"), 120);
+    write(
+        &tauri.config.join("overleaf-download-folder.json"),
+        r#"{"folder":"/Users/ada/Older"}"#,
+    );
+    age(&tauri.config.join("overleaf-download-folder.json"), 120);
+    write(
+        &gpui.overleaf.join("overleaf-download-folder.json"),
+        r#"{"folder":"/Users/ada/Mine"}"#,
+    );
     write(
         &tauri.config.join("overleaf-local-copies.json"),
         r#"{"folders":["/Users/ada/Overleaf Projects/Thesis","/Users/ada/Paper","/Users/ada/Grant"]}"#,
@@ -215,9 +227,15 @@ fn a_launch_after_the_tauri_app_ran_again_catches_up_on_what_changed_there() {
         read_json(&gpui.state.join("recent-commands.json")),
         json!(["mine"])
     );
+    // Of the Overleaf files both apps have, the newer one.
+    assert_eq!(report.carried["overleaf session"], 1);
     assert_eq!(
         read_json(&gpui.overleaf.join("overleaf-session.json")),
-        json!({ "cookie": "mine" })
+        json!({ "cookie": "tauri" })
+    );
+    assert_eq!(
+        read_json(&gpui.overleaf.join("overleaf-download-folder.json")),
+        json!({ "folder": "/Users/ada/Mine" })
     );
     // The Tauri app's files are left exactly as they were.
     assert_eq!(snapshot(&profile.root.join("tauri")), tauri_before);
@@ -262,5 +280,40 @@ fn a_marker_from_before_0_20_takes_every_setting_the_tauri_app_holds() {
     let caught_up = crate::read(&settings).unwrap();
     assert_eq!(caught_up.theme_preference, crate::ThemePreference::Dark);
     assert_eq!(caught_up.author_name, "Ada");
+    let _ = std::fs::remove_dir_all(&profile.root);
+}
+
+/// Hand test B (LATA-87): the name set in the GPUI app under 0.19, then
+/// back to the Tauri app, whose stale name must not replace it.
+#[test]
+fn a_marker_from_before_0_20_keeps_what_the_gpui_app_changed_from_its_defaults() {
+    let profile = profile("old-marker-switched-back");
+    full_tauri_profile(&profile);
+    let (tauri, gpui) = (&profile.tauri, &profile.gpui);
+    let website_data = tauri.website_data.as_deref().unwrap();
+    store(website_data, "lattice.author-name.v1", "Ada in classic");
+    assert!(migrate(tauri, gpui).is_some());
+    let marker = gpui.state.join(MARKER);
+    let mut body = read_json(&marker);
+    body.as_object_mut().unwrap().remove("settings");
+    write(&marker, &pretty(&body));
+    let settings = crate::file_in(&gpui.state);
+    let own = crate::Settings {
+        author_name: "Ada in native".into(),
+        theme_preference: crate::ThemePreference::Light,
+        ..Default::default()
+    };
+    crate::write(&settings, &own).unwrap();
+    // Back in the Tauri app, which still holds its old name and dark theme
+    // and now wraps History's diffs.
+    assert!(!crate::Settings::default().history_diff_wrap);
+    store(website_data, "lattice.history.diff-wrap.v1", "true");
+
+    let report = catch_up(tauri, gpui).unwrap();
+    let caught_up = crate::read(&settings).unwrap();
+    assert_eq!(caught_up.author_name, "Ada in native");
+    assert_eq!(caught_up.theme_preference, crate::ThemePreference::Light);
+    assert!(caught_up.history_diff_wrap);
+    assert_eq!(report.carried["settings"], 1);
     let _ = std::fs::remove_dir_all(&profile.root);
 }
