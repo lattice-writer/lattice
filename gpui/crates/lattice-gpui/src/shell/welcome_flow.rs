@@ -169,9 +169,18 @@ impl Shell {
             window,
             |this, dialog, event, window, cx| match event {
                 NewProjectEvent::Dismiss => this.dismiss_new_project(window, cx),
-                NewProjectEvent::Create { name, venue } => {
-                    this.create_project(dialog.clone(), name.clone(), venue.clone(), window, cx)
-                }
+                NewProjectEvent::Create {
+                    parent,
+                    name,
+                    venue,
+                } => this.create_project(
+                    dialog.clone(),
+                    parent.clone(),
+                    name.clone(),
+                    venue.clone(),
+                    window,
+                    cx,
+                ),
             },
         )
         .detach();
@@ -194,29 +203,18 @@ impl Shell {
         self.lobby.new_project.as_ref()
     }
 
-    /// Ask where, then make the project there and open it; an error stays
-    /// in the dialog.
+    /// Make the project in `parent`, the folder the dialog chose, and open
+    /// it; an error stays in the dialog.
     fn create_project(
         &mut self,
         dialog: Entity<NewProjectDialog>,
+        parent: PathBuf,
         name: String,
         venue: String,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let parent = cx.prompt_for_paths(PathPromptOptions {
-            files: false,
-            directories: true,
-            multiple: false,
-            prompt: Some("Choose where to create the project".into()),
-        });
         cx.spawn_in(window, async move |this, cx| {
-            let Ok(Ok(Some(paths))) = parent.await else {
-                return;
-            };
-            let Some(parent) = paths.into_iter().next() else {
-                return;
-            };
             this.update(cx, |this, cx| {
                 this.set_busy(Some(t!("Creating project…")), cx)
             })

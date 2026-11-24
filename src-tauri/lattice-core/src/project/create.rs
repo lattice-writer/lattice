@@ -25,6 +25,9 @@ macro_rules! venue_template {
 
 type TemplateFiles = &'static [(&'static str, &'static [u8])];
 
+/// Files to write, each a relative path and its contents.
+pub(super) type Files = Vec<(String, Vec<u8>)>;
+
 const NEURIPS_TEMPLATE: TemplateFiles =
     venue_template!("neurips-2026": "main.tex", "neurips_2026.sty");
 const ICML_TEMPLATE: TemplateFiles =
@@ -261,7 +264,7 @@ impl Venue {
     }
 
     /// The document a new project builds.
-    fn main_document(self) -> &'static str {
+    pub(super) fn main_document(self) -> &'static str {
         match self {
             Self::Typst => "main.typ",
             _ => "main.tex",
@@ -324,28 +327,40 @@ pub fn create_with_venue(parent: &Path, name: &str, venue: Venue) -> Result<Path
     // A thesis class also takes English theses; the Chinese article is for Chinese.
     let language = if venue == Venue::ChineseArticle { "Chinese" } else { "English" };
     fs::write(root.join(".research/brief.md"), brief_in(name, language)).map_err(err)?;
-    let title = latex_title(name, venue.loads_cjk_fonts());
-    for (relative, contents) in venue.template() {
+    for (relative, contents) in venue_files(venue, name)? {
         let path = root.join(relative);
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).map_err(err)?;
         }
-        if *relative == "main.tex" {
-            let body = std::str::from_utf8(contents).map_err(err)?;
-            fs::write(path, body.replace("LATTICE_PROJECT_TITLE", &title)).map_err(err)?;
-        } else if *relative == "main.typ" {
-            let body = std::str::from_utf8(contents).map_err(err)?;
-            fs::write(path, body.replace("LATTICE_PROJECT_TITLE", &typst_title(name)))
-                .map_err(err)?;
-        } else {
-            fs::write(path, contents).map_err(err)?;
-        }
-    }
-    let bibliography = venue.bibliography();
-    if !venue.template().iter().any(|(relative, _)| *relative == bibliography) {
-        fs::write(root.join(bibliography), "").map_err(err)?;
+        fs::write(path, contents).map_err(err)?;
     }
     Ok(root)
+}
+
+/// The files `venue` starts a project or a manuscript with, at their paths
+/// under `templates/<dir>`: its main document titled `name`, the style files
+/// beside it, and the empty bibliography it cites when the template ships
+/// none.
+pub(super) fn venue_files(venue: Venue, name: &str) -> Result<Files, String> {
+    let mut files = Vec::new();
+    for (relative, contents) in venue.template() {
+        let titled = |title: &str| {
+            std::str::from_utf8(contents)
+                .map(|body| body.replace("LATTICE_PROJECT_TITLE", title).into_bytes())
+                .map_err(err)
+        };
+        let body = match *relative {
+            "main.tex" => titled(&latex_title(name, venue.loads_cjk_fonts()))?,
+            "main.typ" => titled(&typst_title(name))?,
+            _ => contents.to_vec(),
+        };
+        files.push((relative.to_string(), body));
+    }
+    let bibliography = venue.bibliography();
+    if !files.iter().any(|(relative, _)| relative == bibliography) {
+        files.push((bibliography.to_string(), Vec::new()));
+    }
+    Ok(files)
 }
 
 /// A project holding only a one-page `main.tex` and an empty bibliography, so

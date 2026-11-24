@@ -115,6 +115,9 @@ pub enum FileTreeEvent {
     FindInProject,
     /// Delete `paths`, already confirmed.
     Delete(Vec<String>),
+    /// New manuscript from template… in the folder `directory` ("" is the
+    /// project's top level).
+    NewManuscript { directory: String },
     /// Import files…: choose files and folders to bring into `target`.
     Import { target: String },
     /// Duplicate `paths` into `target` (⌘V after the tree's ⌘C).

@@ -2,8 +2,13 @@
 //! in `src/project/project-dialogs.tsx`, `.create-project-modal` in
 //! `src/styles/dialogs.css`): a 440px dialog with its title in the serif,
 //! the project's name (Untitled research when left empty) and its venue
-//! template (NeurIPS by default), then Cancel and Choose location, which
-//! asks where to create the folder. Enter in the name chooses too.
+//! template (NeurIPS by default), then Cancel and Choose parent folder…,
+//! which asks for the folder the project's own folder goes in. Once one is
+//! chosen the dialog says what Create project will make there, "Will create
+//! ProjectA/Manuscript/", and warns when the parent already carries the
+//! project's name, so a doubled Manuscript/Manuscript/ shows before anything
+//! is made (lattice#1259). Enter in the name does what the primary button
+//! says.
 //!
 //! Under the venue, My templates lists the templates the writer saved and
 //! offers Save a local template… (`local_templates.rs`, `save_template.rs`);
@@ -13,14 +18,14 @@
 //! `templates::instantiate` for a saved template, as the Tauri app's
 //! `create_project`), and an error lands under the fields.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use super::save_template::{SaveTemplateDialog, SaveTemplateEvent};
 
 use gpui::{
     App, AppContext as _, Context, Entity, EventEmitter, FocusHandle, Focusable,
-    InteractiveElement as _, IntoElement, KeyDownEvent, MouseButton, ParentElement as _, Render,
-    Styled as _, Subscription, Window, div, px,
+    InteractiveElement as _, IntoElement, KeyDownEvent, MouseButton, ParentElement as _,
+    PathPromptOptions, Render, Styled as _, Subscription, Window, div, px,
 };
 use gpui_kit::component::input::{InputEvent, InputState};
 use lattice_i18n::t;
@@ -51,13 +56,14 @@ pub const VENUES: [(&str, &str); 15] = [
     // The native app's alone: the Tauri app cannot build Typst.
     ("typst", "Blank Typst document"),
 ];
-const DEFAULT_VENUE: usize = 2;
+pub(crate) const DEFAULT_VENUE: usize = 2;
 
 pub enum NewProjectEvent {
     Dismiss,
-    /// Create a project named `name` from `venue` (a built-in venue's id,
-    /// or `local:<id>`); the window asks where.
+    /// Create a project named `name` in `parent` from `venue` (a built-in
+    /// venue's id, or `local:<id>`).
     Create {
+        parent: PathBuf,
         name: String,
         venue: String,
     },
@@ -74,6 +80,8 @@ enum Venue {
 pub struct NewProjectDialog {
     name: Entity<InputState>,
     venue: Venue,
+    /// The folder the project's folder goes in, once chosen.
+    parent: Option<PathBuf>,
     error: Option<String>,
     /// My templates.
     mine: super::local_templates::MyTemplates,
@@ -90,10 +98,11 @@ impl EventEmitter<NewProjectEvent> for NewProjectDialog {}
 impl NewProjectDialog {
     pub fn new(current: Option<PathBuf>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let name = cx.new(|cx| InputState::new(window, cx).placeholder(t!("Untitled research")));
-        let subscription = cx.subscribe(&name, |this, _, event, cx| {
-            if let InputEvent::PressEnter { .. } = event {
-                this.create(cx);
-            }
+        // The preview follows the name as it is typed.
+        let subscription = cx.subscribe(&name, |this, _, event, cx| match event {
+            InputEvent::PressEnter { .. } => this.create(cx),
+            InputEvent::Change => cx.notify(),
+            _ => {}
         });
         let load = super::local_templates::load(cx);
         cx.spawn(async move |this, cx| {
@@ -108,6 +117,7 @@ impl NewProjectDialog {
         Self {
             name,
             venue: Venue::BuiltIn(DEFAULT_VENUE),
+            parent: None,
             error: None,
             mine: Default::default(),
             current,
@@ -183,21 +193,96 @@ impl NewProjectDialog {
         cx.notify();
     }
 
+    /// The name the project is made with: Untitled research when left empty.
+    fn project_name(&self, cx: &App) -> String {
+        match self.name.read(cx).value().trim() {
+            "" => t!("Untitled research").to_string(),
+            name => name.to_string(),
+        }
+    }
+
+    /// Choose parent folder…: the system's folder picker, its answer the
+    /// parent the preview names.
+    pub(crate) fn choose_parent(&mut self, cx: &mut Context<Self>) {
+        let chosen = cx.prompt_for_paths(PathPromptOptions {
+            files: false,
+            directories: true,
+            multiple: false,
+            prompt: Some(t!("Choose parent folder").into()),
+        });
+        cx.spawn(async move |this, cx| {
+            let Ok(Ok(Some(paths))) = chosen.await else {
+                return;
+            };
+            if let Some(parent) = paths.into_iter().next() {
+                this.update(cx, |this, cx| this.set_parent(parent, cx)).ok();
+            }
+        })
+        .detach();
+    }
+
+    /// Type `name` as the project's name (for a scenario).
+    pub fn set_name(&mut self, name: &str, window: &mut Window, cx: &mut Context<Self>) {
+        self.name.update(cx, |input, cx| {
+            input.set_value(name.to_string(), window, cx)
+        });
+        cx.notify();
+    }
+
+    pub fn set_parent(&mut self, parent: PathBuf, cx: &mut Context<Self>) {
+        self.parent = Some(parent);
+        self.error = None;
+        cx.notify();
+    }
+
+    /// What Create project makes, as the dialog says it, and whether the
+    /// name is doubled; None until a parent is chosen (for a scenario too).
+    pub fn preview(&self, cx: &App) -> Option<(String, bool)> {
+        let parent = self.parent.as_deref()?;
+        Some(creates(parent, &self.project_name(cx)))
+    }
+
+    /// The primary button: choose the parent first, then create.
     fn create(&mut self, cx: &mut Context<Self>) {
-        let name = self.name.read(cx).value().trim().to_string();
+        let Some(parent) = self.parent.clone() else {
+            self.choose_parent(cx);
+            return;
+        };
         let venue = match &self.venue {
             Venue::BuiltIn(ix) => VENUES[*ix].0.to_string(),
             Venue::Local(id) => format!("{}{id}", super::local_templates::LOCAL_PREFIX),
         };
         cx.emit(NewProjectEvent::Create {
-            name: if name.is_empty() {
-                t!("Untitled research").to_string()
-            } else {
-                name
-            },
+            parent,
+            name: self.project_name(cx),
             venue,
         });
     }
+}
+
+/// The folder a project `name` makes in `parent`, named from the parent's
+/// own folder (`ProjectA/Manuscript/`), and whether the parent already has
+/// that name, which would make `Manuscript/Manuscript/`.
+pub(crate) fn creates(parent: &Path, name: &str) -> (String, bool) {
+    let shown = parent
+        .file_name()
+        .map(|folder| folder.to_string_lossy().into_owned())
+        .unwrap_or_else(|| parent.display().to_string());
+    let doubled = parent
+        .file_name()
+        .is_some_and(|folder| folder.to_string_lossy().to_lowercase() == name.to_lowercase());
+    (
+        format!("{}/{name}/", shown.trim_end_matches(['/', '\\'])),
+        doubled,
+    )
+}
+
+/// `path` with the home folder written `~`.
+pub(crate) fn home_relative(path: &Path) -> String {
+    dirs::home_dir()
+        .and_then(|home| path.strip_prefix(home).ok().map(Path::to_path_buf))
+        .map(|rest| format!("~/{}", rest.display()))
+        .unwrap_or_else(|| path.display().to_string())
 }
 
 /// Create the project in `parent` from the venue, or the saved template
@@ -254,6 +339,57 @@ impl Render for NewProjectDialog {
             Venue::BuiltIn(_) => None,
         };
         let mine = super::local_templates::render(&self.mine, chosen, cx);
+        let location = self.parent.clone().map(|parent| {
+            let (made, doubled) = creates(&parent, &self.project_name(cx));
+            let name = self.project_name(cx);
+            div()
+                .id("new-project-location")
+                .pt(px(12.))
+                .flex()
+                .flex_col()
+                .gap(px(4.))
+                .min_w_0()
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .justify_between()
+                        .gap(px(8.))
+                        .min_w_0()
+                        .child(
+                            div()
+                                .min_w_0()
+                                .truncate()
+                                .text_role(TextRole::Caption, cx)
+                                .font_weight(FONT_WEIGHT_MEDIUM)
+                                .text_color(palette.text)
+                                .child(t!("Will create {path}", path = made)),
+                        )
+                        .child(
+                            Button::new("new-project-parent", t!("Change…"))
+                                .ghost()
+                                .compact()
+                                .on_click(cx.listener(|this, _, _, cx| this.choose_parent(cx))),
+                        ),
+                )
+                .child(
+                    div()
+                        .min_w_0()
+                        .truncate()
+                        .text_role(TextRole::Caption, cx)
+                        .text_color(palette.text_secondary)
+                        .child(t!("In {folder}", folder = home_relative(&parent))),
+                )
+                .children(doubled.then(|| {
+                    div()
+                        .text_role(TextRole::Caption, cx)
+                        .text_color(palette.warning)
+                        .child(t!(
+                            "The parent folder is already named “{name}”, so this makes {name}/{name}/.",
+                            name = name
+                        ))
+                }))
+        });
         let card = div()
             .id("new-project")
             .w(width)
@@ -286,6 +422,7 @@ impl Render for NewProjectDialog {
                     .child(label(t!("Venue template"), venue.into_any_element(), cx)),
             )
             .child(mine)
+            .children(location)
             .children(self.error.clone().map(|error| {
                 div()
                     .pt(px(6.))
@@ -305,9 +442,16 @@ impl Render for NewProjectDialog {
                             .on_click(cx.listener(|_, _, _, cx| cx.emit(NewProjectEvent::Dismiss))),
                     )
                     .child(
-                        Button::new("new-project-create", t!("Choose location"))
-                            .primary()
-                            .on_click(cx.listener(|this, _, _, cx| this.create(cx))),
+                        Button::new(
+                            "new-project-create",
+                            if self.parent.is_some() {
+                                t!("Create project")
+                            } else {
+                                t!("Choose parent folder…")
+                            },
+                        )
+                        .primary()
+                        .on_click(cx.listener(|this, _, _, cx| this.create(cx))),
                     ),
             );
         div()
@@ -348,5 +492,23 @@ mod tests {
             assert!(lattice_core::project::Venue::parse(id).is_ok(), "{id}");
         }
         assert_eq!(VENUES[DEFAULT_VENUE].0, "neurips");
+    }
+
+    // lattice#1259: the preview names the parent's own folder, and a parent
+    // already named for the project is the doubled folder it warns about.
+    #[test]
+    fn the_preview_names_the_folder_made_and_a_doubled_name() {
+        assert_eq!(
+            creates(Path::new("/Users/a/ProjectA"), "Manuscript"),
+            ("ProjectA/Manuscript/".to_string(), false)
+        );
+        assert_eq!(
+            creates(Path::new("/Users/a/ProjectA/manuscript"), "Manuscript"),
+            ("manuscript/Manuscript/".to_string(), true)
+        );
+        assert_eq!(
+            creates(Path::new("/"), "Paper"),
+            ("/Paper/".to_string(), false)
+        );
     }
 }

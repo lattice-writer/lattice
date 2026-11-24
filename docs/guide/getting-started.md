@@ -28,7 +28,7 @@ To check your setup at any time, open **Settings › TeX doctor**. It lists ever
 The project menu (the project name at the top left of the window) and the **File** menu have the same actions:
 
 - **Open another folder** (`⌘O`): any folder with a `.tex` file. Lattice works on it in place.
-- **New project** (`⌘⇧N`): name it, pick a venue template (NeurIPS, ICML, ICLR, ACL, CVPR, AAAI or a thesis class) or one of your own saved templates, then **Choose location**.
+- **New project** (`⌘⇧N`): name it, pick a venue template (NeurIPS, ICML, ICLR, ACL, CVPR, AAAI or a thesis class) or one of your own saved templates, then **Choose location**. In the native Lattice the button is **Choose parent folder…**: the folder you pick holds the project's own folder, and the dialog shows what it will make (for example **Will create ProjectA/Manuscript/**) before you press **Create project**. It warns you when the parent folder already has the project's name, so you don't end up with `Manuscript/Manuscript/`.
 - **Clone repository…**: a Git repository from GitHub or elsewhere.
 - **Open from Overleaf**: see [Overleaf sync](overleaf.md).
 - **Import Overleaf ZIP…**: a project downloaded from Overleaf as a ZIP.
@@ -36,6 +36,12 @@ The project menu (the project name at the top left of the window) and the **File
 ![The New project dialog with a name, a venue template and Choose location](images/en-new-project.webp)
 
 Recent projects are in **File › Open Recent**. A window can hold several projects as tabs in the title bar.
+
+### A repository with several manuscripts
+
+A project is just a folder, so it can be a whole repository: analysis code, data and one or more papers side by side. Opening the repository's root as the project lets the Agent work across all of it, for example checking a number in the Results against the output in `analysis/` and then revising the paper in the same conversation.
+
+In the native Lattice, start each paper with **New manuscript from template…**. It is on a folder's right-click menu, on the Project panel's own right-click menu, in its **+** menu and in the command palette. Pick a template (the same ones New project offers, your saved templates included) and a folder name, and optionally tick **Set as main document** so **Build** compiles it. Lattice writes the template's files into that folder and opens its main file. The project that is open stays open, with its settings, history and Agent conversations; no second project is made. If any of the files is already there, nothing is written and the dialog lists the files in the way.
 
 ## The Get started checklist
 

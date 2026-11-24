@@ -41,6 +41,9 @@ impl Shell {
             }
             FileTreeEvent::Delete(paths) => self.delete_entries(paths.clone(), window, cx),
             FileTreeEvent::Import { target } => self.choose_imports(target.clone(), window, cx),
+            FileTreeEvent::NewManuscript { directory } => {
+                self.open_new_manuscript(directory.clone(), window, cx)
+            }
             FileTreeEvent::Paste { paths, target } => {
                 self.paste_entries(paths.clone(), target.clone(), window, cx)
             }

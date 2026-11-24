@@ -34,6 +34,7 @@ impl Shell {
             || self.conflict.is_some()
             || self.sheets.arxiv.is_some()
             || self.rounds_sheet_open()
+            || self.new_manuscript_open()
             || self.sheets.figures.is_some()
             || self.sheets.whats_new.is_some()
             || self.references.rename.is_some()
