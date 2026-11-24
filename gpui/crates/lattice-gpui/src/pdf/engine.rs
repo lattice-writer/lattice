@@ -143,7 +143,7 @@ impl PdfEngine {
     fn start() -> Result<Self> {
         let library = find_library().ok_or_else(|| {
             anyhow!(
-                "PDFium was not found. Run script/fetch-pdfium (macOS) or script/fetch-pdfium.ps1 (Windows), or set PDFIUM_LIBRARY_PATH."
+                "PDFium was not found. Run script/fetch-pdfium (macOS, Linux) or script/fetch-pdfium.ps1 (Windows), or set PDFIUM_LIBRARY_PATH."
             )
         })?;
         let bindings = Pdfium::bind_to_library(&library)
@@ -651,6 +651,10 @@ fn find_library() -> Option<PathBuf> {
     let vendor = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../vendor/pdfium");
     let platform = if cfg!(target_os = "windows") {
         "win-x64/bin"
+    } else if cfg!(all(target_os = "linux", target_arch = "aarch64")) {
+        "linux-arm64/lib"
+    } else if cfg!(target_os = "linux") {
+        "linux-x64/lib"
     } else if cfg!(target_arch = "aarch64") {
         "mac-arm64/lib"
     } else {

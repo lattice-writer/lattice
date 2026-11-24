@@ -8,7 +8,8 @@
 //!
 //! 1. where an environment variable names it (`LATTICE_GPUI_ISLANDS_DIR`,
 //!    `LATTICE_GPUI_RESOURCES`: the folder holding `presentation-runtime/`);
-//! 2. in the app bundle, `Contents/Resources/` beside `Contents/MacOS/`;
+//! 2. in the app bundle, `Contents/Resources/` beside `Contents/MacOS/`, or
+//!    on Windows and Linux beside the binary, as their archives lay it out;
 //! 3. in the checkout the binary runs from: `gpui/target/<profile>/` is two
 //!    folders under `gpui/`, where `scripts/gpui-build.mjs` copies the binary
 //!    it builds in the shared tree back to.
@@ -49,6 +50,8 @@ pub fn islands_dir() -> Option<PathBuf> {
     let mut candidates = Vec::new();
     if let Some(dir) = exe_dir() {
         candidates.push(dir.join("../Resources/islands"));
+        #[cfg(not(target_os = "macos"))]
+        candidates.push(dir.join("islands"));
     }
     if let Some(gpui) = checkout_gpui() {
         candidates.push(gpui.join("islands/dist"));
@@ -65,6 +68,8 @@ pub fn presentation_bundle() -> Option<PathBuf> {
     let mut candidates = Vec::new();
     if let Some(dir) = exe_dir() {
         candidates.push(dir.join("../Resources"));
+        #[cfg(not(target_os = "macos"))]
+        candidates.push(dir);
     }
     if let Some(gpui) = checkout_gpui() {
         candidates.push(gpui.join("../src-tauri"));
@@ -84,6 +89,8 @@ pub fn agent_bundle() -> PathBuf {
     let mut candidates = Vec::new();
     if let Some(dir) = exe_dir() {
         candidates.push(dir.join("../Resources"));
+        #[cfg(not(target_os = "macos"))]
+        candidates.push(dir);
     }
     if let Some(gpui) = checkout_gpui() {
         candidates.push(gpui.join("../src-tauri"));
