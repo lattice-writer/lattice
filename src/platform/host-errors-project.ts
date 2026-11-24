@@ -47,6 +47,7 @@ export const PROJECT_HOST_ERRORS: readonly HostErrorEntry[] = [
   ["project/paths.rs", "A project path component is not a folder.", () => t`A project path component is not a folder.`],
   ["project/paths.rs", "Choose a project-relative path outside .research.", () => t`Choose a project-relative path outside .research.`],
   ["project/paths.rs", "Choose a simple name without folders or a leading dot.", () => t`Choose a simple name without folders or a leading dot.`],
+  ["project/manuscript.rs", "Choose a folder name whose parts are not empty and do not start with a dot.", () => t`Choose a folder name whose parts are not empty and do not start with a dot.`],
   ["project/paths.rs", "History records cannot edit themselves.", () => t`History records cannot edit themselves.`],
   ["project/paths.rs", "{what} has an invalid file name.", ([what]) => {
     const item = unnamedPath(what);

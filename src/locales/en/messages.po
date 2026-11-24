@@ -3800,6 +3800,10 @@ msgstr "Choose a file to save the PDF to."
 msgid "Choose a folder"
 msgstr "Choose a folder"
 
+#: src/platform/host-errors-project.ts
+msgid "Choose a folder name whose parts are not empty and do not start with a dot."
+msgstr "Choose a folder name whose parts are not empty and do not start with a dot."
+
 #: src/platform/host-errors-workspace.ts
 msgid "Choose a folder or ZIP containing LaTeX source files."
 msgstr "Choose a folder or ZIP containing LaTeX source files."

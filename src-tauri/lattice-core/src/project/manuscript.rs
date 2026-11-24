@@ -58,12 +58,13 @@ pub fn add_manuscript(
     let folder = folder.trim().replace('\\', "/");
     let folder = folder.trim_matches('/');
     paths::validate_user_entry(folder)?;
-    if !folder
-        .split('/')
-        .all(|segment| paths::is_plain_segment(segment) && segment.trim() == segment)
-    {
+    // As the tree's own names (`validate_entry_name`): no hidden folders,
+    // which also leaves out "." and "..".
+    if !folder.split('/').all(|segment| {
+        paths::is_plain_segment(segment) && segment.trim() == segment && !segment.starts_with('.')
+    }) {
         return Err(ManuscriptError::Failed(
-            "Choose a folder name without empty, \".\" or \"..\" parts.".into(),
+            "Choose a folder name whose parts are not empty and do not start with a dot.".into(),
         ));
     }
     let name = folder.rsplit('/').next().unwrap_or(folder);
@@ -187,7 +188,17 @@ mod tests {
     #[test]
     fn a_folder_outside_the_writers_files_is_refused() {
         let fixture = Fixture::project("manuscript-refused");
-        for folder in ["", "/", ".research/papers", "../outside", "a//b", "a/./b", "a/ b"] {
+        for folder in [
+            "",
+            "/",
+            ".research/papers",
+            "../outside",
+            "a//b",
+            "a/./b",
+            "a/ b",
+            ".drafts",
+            "a/.git",
+        ] {
             assert!(
                 matches!(
                     add_manuscript(&fixture.root, folder, ManuscriptTemplate::Venue(Venue::Blank)),
@@ -197,6 +208,22 @@ mod tests {
             );
         }
         assert!(!fixture.parent.join("outside").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_folder_reached_through_a_symbolic_link_is_refused_and_nothing_lands_outside() {
+        let fixture = Fixture::project("manuscript-symlink");
+        let outside = fixture.parent.join("elsewhere");
+        fs::create_dir_all(&outside).unwrap();
+        std::os::unix::fs::symlink(&outside, fixture.path("linked")).unwrap();
+        let refused = add_manuscript(
+            &fixture.root,
+            "linked/Manuscript",
+            ManuscriptTemplate::Venue(Venue::Blank),
+        );
+        assert!(matches!(refused, Err(ManuscriptError::Failed(_))), "{refused:?}");
+        assert_eq!(fs::read_dir(&outside).unwrap().count(), 0);
     }
 
     #[test]

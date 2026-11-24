@@ -3800,6 +3800,10 @@ msgstr "请选择 PDF 的保存位置"
 msgid "Choose a folder"
 msgstr "选择一个分类"
 
+#: src/platform/host-errors-project.ts
+msgid "Choose a folder name whose parts are not empty and do not start with a dot."
+msgstr "文件夹名的每一级都不能为空，也不能以点开头"
+
 #: src/platform/host-errors-workspace.ts
 msgid "Choose a folder or ZIP containing LaTeX source files."
 msgstr "请选择包含 LaTeX 源文件的文件夹或 ZIP"
