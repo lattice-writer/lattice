@@ -89,7 +89,19 @@ impl Run {
             Ok(bounds.map_or(0., |bounds| page_share(&image, bounds, scale)))
         };
 
+        // What the window draws above its root view, as the cutouts see it.
+        let overlays = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+        let observer: std::rc::Rc<gpui::OverlayBoundsObserver> = std::rc::Rc::new({
+            let overlays = overlays.clone();
+            move |bounds: &[Bounds<Pixels>]| *overlays.borrow_mut() = bounds.to_vec()
+        });
+        self.with_window(cx, |_, window, _| window.observe_overlay_bounds(&observer))?;
+        let drawn = |overlays: &std::rc::Rc<std::cell::RefCell<Vec<Bounds<Pixels>>>>| {
+            format!("{:?}", overlays.borrow())
+        };
+
         let shown = share(cx, self)?;
+        let overlays_before = drawn(&overlays);
         self.open_palette_now(cx)?;
         self.pause(cx, Duration::from_millis(600)).await;
         let under_palette = share(cx, self)?;
@@ -100,7 +112,7 @@ impl Run {
         steps.check(
             "on Windows the command palette opened over a webview island is drawn above the page",
             loaded && shown > 0.9 && under_palette < shown - 0.05,
-            json!({ "loaded": loaded, "page_share": shown, "under_palette": under_palette, "bounds": format!("{bounds:?}") }),
+            json!({ "loaded": loaded, "page_share": shown, "under_palette": under_palette, "bounds": format!("{bounds:?}"), "overlays_before": overlays_before }),
         );
 
         let host = cx.update(confirm::install);
@@ -112,6 +124,7 @@ impl Run {
         });
         self.pause(cx, Duration::from_millis(800)).await;
         let under_dialog = share(cx, self)?;
+        let overlays_dialog = drawn(&overlays);
         self.snapshot(cx, "island-overlay-dialog").await;
         let answered = self.with_window(cx, {
             let host = host.clone();
@@ -122,7 +135,7 @@ impl Run {
         steps.check(
             "on Windows a modal dialog's backdrop dims a webview island's whole page, and the page shows again once it closes",
             under_dialog < 0.02 && answered && after > 0.9,
-            json!({ "under_dialog": under_dialog, "answered": answered, "after": after }),
+            json!({ "under_dialog": under_dialog, "answered": answered, "after": after, "overlays_dialog": overlays_dialog, "overlays_after": drawn(&overlays) }),
         );
         self.close_panel(cx, &panel).await?;
         Ok(())
