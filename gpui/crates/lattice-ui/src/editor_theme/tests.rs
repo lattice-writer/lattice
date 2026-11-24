@@ -39,7 +39,11 @@ fn the_themes_are_the_apps_in_its_order() {
 
 #[test]
 fn every_theme_has_a_family_with_both_appearances() {
-    let families = zed_theme_families(Tint::Graphite, Accent::Graphite);
+    let families = zed_theme_families(&Palette::new(
+        Appearance::Light,
+        Tint::Graphite,
+        Accent::Graphite,
+    ));
     assert_eq!(families.len(), CodeTheme::ALL.len());
     for (theme, family) in CodeTheme::ALL.into_iter().zip(&families) {
         let family: Value = serde_json::from_slice(family).unwrap();
@@ -61,6 +65,50 @@ fn every_theme_has_a_family_with_both_appearances() {
                 (theme.zed_theme_name(Appearance::Dark).as_str(), "dark"),
             ]
         );
+    }
+}
+
+/// Nord with a keyword colour of #FFDC84 in both appearances (lattice#1268).
+fn installed_theme() -> std::sync::Arc<lattice_theme::ThemeFile> {
+    let mut theme = lattice_theme::bundled()
+        .into_iter()
+        .find(|theme| theme.id == "app.lattice.nord")
+        .expect("Nord is bundled");
+    for variant in &mut theme.variants {
+        variant
+            .syntax
+            .insert("keyword".into(), lattice_theme::Color::opaque(0xFFDC84));
+    }
+    std::sync::Arc::new(theme)
+}
+
+/// An installed theme's syntax colours win over the code theme's in the
+/// source editor, in the current appearance and the other one alike: the
+/// keyword as the theme resolves it there (fitted to 4.5:1 on the editor,
+/// so #FFDC84 itself in dark).
+#[test]
+fn an_installed_themes_syntax_reaches_every_zed_theme() {
+    let theme = installed_theme();
+    let keyword = |appearance| {
+        let themed = Palette::new(appearance, Tint::Graphite, Accent::Blue)
+            .with_theme(Some(theme.clone()))
+            .themed
+            .unwrap();
+        format!("{}ff", themed.syntax["keyword"].hex())
+    };
+    let expected = [keyword(Appearance::Light), keyword(Appearance::Dark)];
+    assert_eq!(expected[1], "#ffdc84ff");
+    let palette =
+        Palette::new(Appearance::Dark, Tint::Sage, Accent::Blue).with_theme(Some(theme.clone()));
+    for family in zed_theme_families(&palette) {
+        let family: Value = serde_json::from_slice(&family).unwrap();
+        for (theme, expected) in family["themes"].as_array().unwrap().iter().zip(&expected) {
+            assert_eq!(
+                theme["style"]["syntax"]["keyword"]["color"], **expected,
+                "{}",
+                theme["name"]
+            );
+        }
     }
 }
 

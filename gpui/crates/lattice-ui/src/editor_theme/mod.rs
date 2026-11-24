@@ -214,10 +214,14 @@ pub fn gutter_ink(theme: CodeTheme, palette: &Palette) -> GutterInk {
 }
 
 /// One Zed theme family per code theme, holding its light-app and dark-app
-/// themes, as the bytes `theme_settings::load_user_theme` reads.
-pub fn zed_theme_families(tint: Tint, accent: Accent) -> Vec<Vec<u8>> {
-    let palettes = [Appearance::Light, Appearance::Dark]
-        .map(|appearance| Palette::new(appearance, tint, accent));
+/// themes, as the bytes `theme_settings::load_user_theme` reads. Both are
+/// built from `palette`'s choices, its installed theme included, so that
+/// theme's syntax colours win over the code theme's (`docs/themes.md`).
+pub fn zed_theme_families(palette: &Palette) -> Vec<Vec<u8>> {
+    let palettes = [Appearance::Light, Appearance::Dark].map(|appearance| {
+        Palette::new(appearance, palette.tint, palette.accent_preset)
+            .with_theme(palette.theme.clone())
+    });
     CodeTheme::ALL
         .into_iter()
         .map(|theme| {

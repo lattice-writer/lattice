@@ -221,4 +221,41 @@ mod tests {
             document(&light, CodeTheme::Vscode, None)
         );
     }
+
+    /// An installed theme's syntax colours win in the island's code blocks
+    /// over every code theme (lattice#1268), in a fixed variant's
+    /// appearance too, where the theme resolves its keyword as #FFDC84.
+    #[test]
+    fn a_document_page_gets_an_installed_themes_syntax_colours() {
+        let mut nord = lattice_theme::bundled()
+            .into_iter()
+            .find(|theme| theme.id == "app.lattice.nord")
+            .expect("Nord is bundled");
+        for variant in &mut nord.variants {
+            variant
+                .syntax
+                .insert("keyword".into(), lattice_theme::Color::opaque(0xFFDC84));
+        }
+        let palette = Palette::new(Appearance::Light, Tint::Graphite, Accent::Graphite)
+            .with_theme(Some(std::sync::Arc::new(nord)));
+        let rgb = palette.themed.as_ref().unwrap().syntax["keyword"].rgb;
+        let keyword = format!(
+            "rgba({}, {}, {}, 1.000)",
+            rgb >> 16,
+            (rgb >> 8) & 0xFF,
+            rgb & 0xFF
+        );
+        for code_theme in CodeTheme::ALL {
+            let payload = document(&palette, code_theme, None);
+            assert_eq!(
+                payload["vars"]["--syntax-keyword"], keyword,
+                "{code_theme:?}"
+            );
+            let dark = document(&palette, code_theme, Some(Appearance::Dark));
+            assert_eq!(
+                dark["vars"]["--syntax-keyword"], "rgba(255, 220, 132, 1.000)",
+                "{code_theme:?}"
+            );
+        }
+    }
 }
