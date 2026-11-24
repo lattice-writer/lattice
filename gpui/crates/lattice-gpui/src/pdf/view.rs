@@ -19,7 +19,7 @@
 
 use std::{
     ops::Range,
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
@@ -132,6 +132,8 @@ pub struct PdfView {
     /// The SHA-256 of the bytes shown, which a review copy is checked
     /// against (`review.rs`).
     shown_digest: Option<String>,
+    /// How many times a PDF was read into this viewer, for a scenario.
+    opens: usize,
     pub(super) document: Option<Document>,
     pub(super) pages: Vec<PageSlot>,
     pub(super) layout: Layout,
@@ -270,6 +272,7 @@ impl PdfView {
             doc: None,
             source: None,
             shown_digest: None,
+            opens: 0,
             document: None,
             pages: Vec::new(),
             layout: Layout::default(),
@@ -360,6 +363,7 @@ impl PdfView {
         };
         // The host has the PDF now.
         self.host_load = HostLoad::Ready;
+        self.opens += 1;
         let reload = self.source.as_ref() == Some(&path) && self.document.is_some();
         if !reload {
             // Another file: what was shown goes at once.
@@ -443,6 +447,34 @@ impl PdfView {
     #[cfg(any(target_os = "macos", target_os = "windows"))]
     pub fn shown_digest(&self) -> Option<&str> {
         self.shown_digest.as_deref()
+    }
+
+    /// How many times a PDF was read into this viewer, for a scenario
+    /// counting the reads an entry or a build costs.
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    pub fn opens(&self) -> usize {
+        self.opens
+    }
+
+    /// Whether the viewer shows nothing, nor is loading anything: its empty
+    /// state ("No PDF yet").
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    pub fn is_empty(&self) -> bool {
+        self.document.is_none() && !self.loading && self.message.is_none()
+    }
+
+    /// Whether this viewer shows `path`: with `digest`, those very bytes,
+    /// loaded; without, any copy of it, loaded or loading.
+    pub fn holds(&self, path: &Path, digest: Option<&str>) -> bool {
+        self.source.as_deref() == Some(path)
+            && match digest {
+                Some(digest) => {
+                    self.document.is_some()
+                        && !self.loading
+                        && self.shown_digest.as_deref() == Some(digest)
+                }
+                None => self.document.is_some() || self.loading,
+            }
     }
 
     /// Show nothing, for a project without a built PDF.

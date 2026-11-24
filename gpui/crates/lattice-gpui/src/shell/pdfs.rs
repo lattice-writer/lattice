@@ -126,11 +126,12 @@ impl Shell {
 
     /// A build left `document`'s PDF: it is the live one now. `requested`
     /// when the writer asked for the build, which brings the live tab to the
-    /// front.
+    /// front; `load` unless the viewer holds that PDF already.
     pub(super) fn show_built_pdf(
         &mut self,
         document: String,
         requested: bool,
+        load: bool,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
@@ -165,7 +166,7 @@ impl Shell {
             .unwrap_or(false);
         let pdf = root.join(&document).with_extension("pdf");
         self.label_pdfs(cx);
-        if !self.shows_marked_pdf() {
+        if load && !self.shows_marked_pdf() {
             self.pdf.update(cx, |panel, cx| panel.open(pdf, window, cx));
         }
         self.review_pdf_built(window, cx);

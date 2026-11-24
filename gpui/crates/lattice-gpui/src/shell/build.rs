@@ -30,7 +30,7 @@ mod request;
 
 pub(super) use request::BuildRequest;
 
-use compiled::{fingerprint_pdfs, flatten, read_sources, rewrote};
+use compiled::{fingerprint_pdfs, flatten, read_sources, written};
 
 use super::{Build, Shell};
 use crate::{
@@ -143,39 +143,13 @@ impl Shell {
             .or_else(|| open_document.clone())
             .unwrap_or_default();
         let candidates: Vec<String> = main.iter().chain(&open_document).cloned().collect();
-        self.build_panel.update(cx, |panel, cx| {
-            panel.set_quiet(request.quiet, cx);
-            panel.set_project_files(files.clone());
-            panel.started(&root, &label, cx);
-        });
-
-        // A build still going after minutes may be looping: say so, with Stop.
-        self.slow_build = Some(cx.spawn(async move |_, cx| {
-            cx.background_executor().timer(SLOW_BUILD).await;
-            cx.update(|cx| {
-                let stop = NoticeAction::new(t!("Stop"), |window, cx| {
-                    window.dispatch_action(Box::new(super::StopBuild), cx)
-                });
-                let notice = Notice::new(
-                    ToastLevel::Warning,
-                    t!(
-                        "Still building after {minutes} minutes. Something in the document may be \
-                         looping; stop the build if it does not finish.",
-                        minutes = SLOW_BUILD.as_secs() / 60
-                    ),
-                )
-                .action(stop)
-                .key(SLOW_BUILD_NOTICE)
-                .persistent();
-                notices::show(notice, cx);
-            });
-        }));
+        // Until entering a project knows it has to typeset, no build shows.
+        if !request.entry {
+            self.show_build_running(request.quiet, &root, &label, files.clone(), cx);
+        }
         let build_panel = self.build_panel.clone();
         // Read now: a switch flipped while the build waits applies to the next one.
         let aux_files = crate::settings::aux_files(cx);
-        self.pdf
-            .update(cx, |panel, cx| panel.set_building(true, cx));
-        crate::build::tex_setup::reminder::building(cx.entity_id(), true, cx);
         self.build_trace = Some(oplog::start(request, cx));
         let live_preview = self.live_preview.clone();
         // Typst documents compile in the helper Typst support installs
@@ -211,6 +185,28 @@ impl Shell {
             let (revision, active) = project.read_with(cx, |project, _| {
                 (project.input_revision(), project.active_build().clone())
             });
+            // Entering a project whose last build is current takes that
+            // build, of these inputs, and shows the PDF already on screen; the
+            // inputs are read after their revision, so an edit meanwhile
+            // still counts as one the PDF lacks.
+            let current = if request.entry {
+                cx.background_spawn({
+                    let root = root.clone();
+                    let open_document = open_document.clone();
+                    async move { latex::current_build(&root, open_document.as_deref(), aux_files) }
+                })
+                .await
+            } else {
+                None
+            };
+            if request.entry && current.is_none() {
+                let shown = this.update(cx, |this, cx| {
+                    this.show_build_running(request.quiet, &root, &label, files.clone(), cx)
+                });
+                if shown.is_err() {
+                    return;
+                }
+            }
             this.update(cx, |this, _| this.build_pass_started()).ok();
             // latexmk reads the inputs after this: the live preview's token
             // for the files as they are now.
@@ -222,6 +218,24 @@ impl Shell {
             let build = cx.background_spawn({
                 let root = root.clone();
                 async move {
+                    if let Some(result) = current {
+                        let sources = read_sources(
+                            &root,
+                            &result.diagnostics,
+                            &result.root_document,
+                            &files,
+                            &saved,
+                        );
+                        return Ok(Finished {
+                            result,
+                            rewritten: false,
+                            pdf_digest: None,
+                            current: true,
+                            sources,
+                            live,
+                            needs_typst: false,
+                        });
+                    }
                     let before = fingerprint_pdfs(&root, &candidates);
                     let mut needs_typst = false;
                     let result = match latex::choose_document(&root, open_document.as_deref()) {
@@ -253,7 +267,7 @@ impl Shell {
                     };
                     result.map(|result| {
                         let pdf = root.join(&result.root_document).with_extension("pdf");
-                        let rewritten = rewrote(&pdf, &before);
+                        let (pdf_digest, rewritten) = written(&pdf, &before);
                         let sources = read_sources(
                             &root,
                             &result.diagnostics,
@@ -264,6 +278,8 @@ impl Shell {
                         Finished {
                             result,
                             rewritten,
+                            pdf_digest,
+                            current: false,
                             sources,
                             live,
                             needs_typst,
@@ -305,6 +321,47 @@ impl Shell {
             }
         }));
         cx.notify();
+    }
+
+    /// What a running build shows: its passes on the Build button, the PDF
+    /// pane's busy state, and after minutes the notice that offers to stop it.
+    fn show_build_running(
+        &mut self,
+        quiet: bool,
+        root: &std::path::Path,
+        label: &str,
+        files: Vec<String>,
+        cx: &mut Context<Self>,
+    ) {
+        self.build_panel.update(cx, |panel, cx| {
+            panel.set_quiet(quiet, cx);
+            panel.set_project_files(files);
+            panel.started(root, label, cx);
+        });
+        // A build still going after minutes may be looping: say so, with Stop.
+        self.slow_build = Some(cx.spawn(async move |_, cx| {
+            cx.background_executor().timer(SLOW_BUILD).await;
+            cx.update(|cx| {
+                let stop = NoticeAction::new(t!("Stop"), |window, cx| {
+                    window.dispatch_action(Box::new(super::StopBuild), cx)
+                });
+                let notice = Notice::new(
+                    ToastLevel::Warning,
+                    t!(
+                        "Still building after {minutes} minutes. Something in the document may be \
+                         looping; stop the build if it does not finish.",
+                        minutes = SLOW_BUILD.as_secs() / 60
+                    ),
+                )
+                .action(stop)
+                .key(SLOW_BUILD_NOTICE)
+                .persistent();
+                notices::show(notice, cx);
+            });
+        }));
+        self.pdf
+            .update(cx, |panel, cx| panel.set_building(true, cx));
+        crate::build::tex_setup::reminder::building(cx.entity_id(), true, cx);
     }
 
     /// The .tex or .typ in the editor the writer was last in, and whether it
@@ -382,6 +439,8 @@ impl Shell {
             Some(Ok(Finished {
                 result,
                 rewritten,
+                pdf_digest,
+                current: current_build,
                 sources,
                 live,
                 ..
@@ -398,6 +457,11 @@ impl Shell {
                     && (result.success || result.unchanged || rewritten);
                 self.show_build_marks(&result, &sources, cx);
                 self.build_panel.update(cx, |panel, cx| {
+                    // The last build, taken on entry, ran nothing now: the
+                    // Build button shows it without a build's flourish.
+                    if current_build {
+                        panel.set_quiet(true, cx);
+                    }
                     panel.finished(&result, wrote_pdf, request.requested, sources, cx)
                 });
                 self.build_pass_finished(&result, revision, cx);
@@ -438,17 +502,37 @@ impl Shell {
                     self.get_started_built(cx);
                 }
                 if result.has_pdf {
+                    // The viewer holds the PDF the build left already (the
+                    // same bytes, or the current build's on entry): nothing
+                    // to read or load again (lattice#1267).
+                    let pdf = project
+                        .read(cx)
+                        .root()
+                        .join(&result.root_document)
+                        .with_extension("pdf");
+                    // The PDF in its own window loads again, as before.
+                    let panel = self.pdf.read(cx);
+                    let view = (!panel.in_window()).then(|| panel.live_view().read(cx));
+                    let shown = match (view, current_build, pdf_digest.as_deref()) {
+                        (Some(view), true, _) => view.holds(&pdf, None),
+                        (Some(view), false, Some(digest)) => view.holds(&pdf, Some(digest)),
+                        _ => false,
+                    };
                     // The PDF the viewer loads now holds the files as of the
                     // build's token; the live preview stops painting those
-                    // edits once it is shown.
+                    // edits once it is shown, at once when it already is.
                     if !result.one_off {
                         self.live_preview.update(cx, |preview, cx| {
-                            preview.base_loading(live, request.quiet, cx)
+                            preview.base_loading(live, request.quiet, cx);
+                            if shown {
+                                preview.base_promoted(result.pages, cx);
+                            }
                         });
                     }
                     self.show_built_pdf(
                         result.root_document.clone(),
                         request.requested,
+                        !shown,
                         window,
                         cx,
                     );
@@ -591,6 +675,12 @@ impl Shell {
 pub(super) struct Finished {
     pub(super) result: BuildResult,
     rewritten: bool,
+    /// The SHA-256 of the PDF the build left, as the viewer keeps the one it
+    /// shows.
+    pdf_digest: Option<String>,
+    /// The project's last build, current on entering it: the PDF is the one
+    /// the viewer opened then.
+    current: bool,
     sources: HashMap<String, String>,
     /// The live preview's token for the files the build read.
     live: Option<(u64, usize)>,

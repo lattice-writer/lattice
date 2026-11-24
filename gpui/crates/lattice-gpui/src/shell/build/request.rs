@@ -22,12 +22,24 @@ pub(in crate::shell) struct BuildRequest {
     /// Typst's live preview: compile the open buffers as they are, saving
     /// nothing.
     pub(in crate::shell) live: bool,
+    /// The build that entering a project starts: when the project's last
+    /// build is current (`latex::current_build`), that build is the answer,
+    /// and nothing shows a build running.
+    pub(in crate::shell) entry: bool,
 }
 
 impl BuildRequest {
     pub(in crate::shell) fn automatic() -> Self {
         Self {
             unattended: true,
+            ..Self::default()
+        }
+    }
+
+    /// Entering a project: build it, unless its last build is current.
+    pub(in crate::shell) fn entry() -> Self {
+        Self {
+            entry: true,
             ..Self::default()
         }
     }
@@ -64,6 +76,7 @@ impl BuildRequest {
     pub(in crate::shell) fn merge(self, other: Self) -> Self {
         Self {
             live: self.live && other.live,
+            entry: self.entry && other.entry,
             force: self.force || other.force,
             clean: self.clean || other.clean,
             unattended: self.unattended && other.unattended,
@@ -86,5 +99,12 @@ mod tests {
         assert!(automatic.unattended && !automatic.requested);
         let clean = BuildRequest::automatic().merge(BuildRequest::clean_rebuild());
         assert!(clean.clean && clean.force && clean.requested && !clean.unattended);
+    }
+
+    #[test]
+    fn an_entry_queued_with_another_ask_builds() {
+        assert!(BuildRequest::entry().merge(BuildRequest::entry()).entry);
+        assert!(!BuildRequest::entry().merge(BuildRequest::automatic()).entry);
+        assert!(!BuildRequest::requested().merge(BuildRequest::entry()).entry);
     }
 }

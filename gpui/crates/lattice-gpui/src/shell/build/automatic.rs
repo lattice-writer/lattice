@@ -1,5 +1,5 @@
 //! When an automatic build runs: now, or once typing pauses while the
-//! live preview paints the edits (\`quiet-builds.ts\`), and Typst's live
+//! live preview paints the edits (`quiet-builds.ts`), and Typst's live
 //! build after each pause in typing.
 
 use std::time::Duration;
