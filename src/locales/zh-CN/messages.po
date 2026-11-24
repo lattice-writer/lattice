@@ -725,16 +725,32 @@ msgstr "{installedProduct} 已装好，但以下检查未通过：\n"
 "{0}"
 
 #: src/platform/host-errors-project.ts
+msgid "{item} could not be read as an attachment."
+msgstr "无法读取 {item}，不能作为附件"
+
+#: src/platform/host-errors-project.ts
 msgid "{item} has an invalid file name."
 msgstr "{item}的文件名无效"
+
+#: src/platform/host-errors-project.ts
+msgid "{item} is a folder. Attach the files inside it instead."
+msgstr "{item} 是文件夹，请改为附加其中的文件"
 
 #: src/platform/host-errors-project.ts
 msgid "{item} is a symbolic link and cannot be imported."
 msgstr "{item} 是符号链接，不能导入"
 
 #: src/platform/host-errors-project.ts
+msgid "{item} is empty, so it cannot be attached."
+msgstr "{item} 是空文件，不能作为附件"
+
+#: src/platform/host-errors-project.ts
 msgid "{item} is larger than the 10 MB source-file limit."
 msgstr "{item} 超过了源文件 10 MB 的上限"
+
+#: src/platform/host-errors-project.ts
+msgid "{item} is larger than the 25 MB limit for agent file attachments."
+msgstr "{item} 超过了 AI 助手文件附件 25 MB 的上限"
 
 #: src/platform/host-errors-project.ts
 msgid "{item} is larger than the 64 MB limit for agent attachments."
@@ -747,6 +763,10 @@ msgstr "{item} 不是 Lattice 能导入的普通文件"
 #: src/platform/host-errors-project.ts
 msgid "{item} is not a regular file or folder Lattice can import."
 msgstr "{item} 不是 Lattice 能导入的普通文件或文件夹"
+
+#: src/platform/host-errors-project.ts
+msgid "{item} is not a regular file, so it cannot be attached."
+msgstr "{item} 不是普通文件，不能作为附件"
 
 #: src/platform/host-errors-project.ts
 msgid "{item} is not a supported image or PDF file."
@@ -16703,6 +16723,10 @@ msgstr "AI 助手仍在使用启动时的代理。重启会中断正在进行的
 #: src/canvas/annotation-review.tsx
 msgid "The agent suggests leaving the passage as it is."
 msgstr "AI 助手建议这一段保持不变。"
+
+#: src/agent/agent-composer-files.ts
+msgid "The Agent takes {attached} files at a time, so {skipped} more weren’t attached."
+msgstr "AI 助手一次最多接收 {attached} 个文件，另有 {skipped} 个未附加"
 
 #: src/settings/model-endpoint-settings.tsx
 msgid "The agent uses it after a restart, which would stop the turn running now."

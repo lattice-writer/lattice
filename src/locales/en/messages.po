@@ -725,16 +725,32 @@ msgstr "{installedProduct} finished installing, but Lattice could not verify:\n"
 "{0}"
 
 #: src/platform/host-errors-project.ts
+msgid "{item} could not be read as an attachment."
+msgstr "{item} could not be read as an attachment."
+
+#: src/platform/host-errors-project.ts
 msgid "{item} has an invalid file name."
 msgstr "{item} has an invalid file name."
+
+#: src/platform/host-errors-project.ts
+msgid "{item} is a folder. Attach the files inside it instead."
+msgstr "{item} is a folder. Attach the files inside it instead."
 
 #: src/platform/host-errors-project.ts
 msgid "{item} is a symbolic link and cannot be imported."
 msgstr "{item} is a symbolic link and cannot be imported."
 
 #: src/platform/host-errors-project.ts
+msgid "{item} is empty, so it cannot be attached."
+msgstr "{item} is empty, so it cannot be attached."
+
+#: src/platform/host-errors-project.ts
 msgid "{item} is larger than the 10 MB source-file limit."
 msgstr "{item} is larger than the 10 MB source-file limit."
+
+#: src/platform/host-errors-project.ts
+msgid "{item} is larger than the 25 MB limit for agent file attachments."
+msgstr "{item} is larger than the 25 MB limit for agent file attachments."
 
 #: src/platform/host-errors-project.ts
 msgid "{item} is larger than the 64 MB limit for agent attachments."
@@ -747,6 +763,10 @@ msgstr "{item} is not a regular file Lattice can import."
 #: src/platform/host-errors-project.ts
 msgid "{item} is not a regular file or folder Lattice can import."
 msgstr "{item} is not a regular file or folder Lattice can import."
+
+#: src/platform/host-errors-project.ts
+msgid "{item} is not a regular file, so it cannot be attached."
+msgstr "{item} is not a regular file, so it cannot be attached."
 
 #: src/platform/host-errors-project.ts
 msgid "{item} is not a supported image or PDF file."
@@ -16703,6 +16723,10 @@ msgstr "The agent still uses the proxy it started with. Restarting it stops any 
 #: src/canvas/annotation-review.tsx
 msgid "The agent suggests leaving the passage as it is."
 msgstr "The agent suggests leaving the passage as it is."
+
+#: src/agent/agent-composer-files.ts
+msgid "The Agent takes {attached} files at a time, so {skipped} more weren’t attached."
+msgstr "The Agent takes {attached} files at a time, so {skipped} more weren’t attached."
 
 #: src/settings/model-endpoint-settings.tsx
 msgid "The agent uses it after a restart, which would stop the turn running now."

@@ -1,12 +1,14 @@
 //! Files dragged in from the Finder onto the Agent panel, attached to its
-//! composer as the Tauri app attaches them (`use-project-tree.ts`'s drop
-//! handling, `agent-composer-files.ts`): the island takes the drag from
+//! composer (`agent-composer-files.ts`): the island takes the drag from
 //! WebKit (`Island::accept_file_drops`), so Synara's frame never sees it,
-//! and the page hears each phase (`agent:file-drag`). The page decides as
-//! the Tauri app does whether the files are ones the Agent can read
-//! (`classifyExternalProjectDrop`), lights the panel while they are over
-//! it, and on the drop asks for their bytes (`read_agent_composer_files`),
-//! which it relays into the composer as its "+" menu would.
+//! and the page hears each phase (`agent:file-drag`). Any file is an
+//! attachment here, whatever its format (lattice#1254; the Tauri app still
+//! takes only figures and sources), so the page lights the panel for any
+//! drag and on the drop asks for its bytes (`read_agent_composer_files`,
+//! answered by [`lattice_core::project::read_agent_attachments`]), which
+//! it relays into the composer as its "+" menu would, with the count of
+//! files past the composer's cap that were never read. The bytes go to the
+//! composer alone, never into an editor or the project.
 //!
 //! The bytes read are only those of the drop that just happened: a page
 //! cannot have the app read a path it names.
@@ -46,17 +48,21 @@ impl SynaraSurface {
     /// `read_agent_composer_files`, for the paths of the last drop alone.
     pub(super) fn read_dropped(&mut self, id: u64, cx: &mut Context<Self>) {
         let dropped = std::mem::take(&mut self.dropped);
-        let read = cx.background_spawn(async move {
-            lattice_core::project::read_agent_composer_files(&dropped)
-                .and_then(|files| serde_json::to_value(files).map_err(|error| error.to_string()))
-        });
+        let read =
+            cx.background_spawn(
+                async move { lattice_core::project::read_agent_attachments(&dropped) },
+            );
         cx.spawn(async move |this, cx| {
-            let answer = read.await;
+            let attachments = read.await;
             this.update(cx, |this, cx| {
-                this.drop_read = Some(match &answer {
-                    Ok(files) => Ok(files.as_array().map_or(0, Vec::len)),
-                    Err(error) => Err(error.clone()),
-                });
+                this.drop_read = Some(attachments.as_ref().map_err(Clone::clone).map(|read| {
+                    read.files
+                        .iter()
+                        .map(|file| (file.name.clone(), file.mime_type.clone()))
+                        .collect()
+                }));
+                let answer = attachments
+                    .and_then(|read| serde_json::to_value(read).map_err(|error| error.to_string()));
                 this.respond(id, answer, cx);
             })
             .ok();
@@ -64,9 +70,9 @@ impl SynaraSurface {
         .detach();
     }
 
-    /// How many files the page's last read of a drop took, or why it took
-    /// none, for a scenario.
-    pub fn drop_read(&self) -> Option<&Result<usize, String>> {
+    /// The names and types of the files the page's last read of a drop
+    /// took, or why it took none, for a scenario.
+    pub fn drop_read(&self) -> Option<&Result<Vec<(String, String)>, String>> {
         self.drop_read.as_ref()
     }
 }
