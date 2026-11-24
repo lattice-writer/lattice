@@ -41,61 +41,16 @@ export function NativeAppDialog({ release, onClose }: { release: NativeAppReleas
   // The backend holds the release until told to let go of it.
   useEffect(() => () => releaseNativeApp(release), [release]);
 
-  const restart = async (running: string | null) => {
-    setStep({ kind: "restarting" });
-    try {
-      await restartLattice();
-    } catch {
-      // A window could not save an edit and says so itself; the native app
-      // is in place and opens at the next launch, or on Restart now.
-      setStep({ kind: "installed", running });
-    }
-  };
-
-  /**
-   * Install the native app over this one, then restart into it unless that
-   * would stop running work. The claim is the updater's own (app_restart.rs),
-   * under "native <version>" so a classic release of the same number never
-   * reads as this install.
-   */
-  const move = async () => {
-    const version = `native ${release.version}`;
-    setStep({ kind: "downloading", progress: null });
-    const claim = await invoke<UpdateClaim>("claim_update_install", { version }).catch(() => "claimed" as const);
-    if (claim === "busy") {
-      setStep({ kind: "failed", reason: null });
-      return;
-    }
-    if (claim === "claimed") {
-      let total = 0;
-      let received = 0;
-      const channel = new Channel<DownloadEvent>();
-      channel.onmessage = (event) => {
-        if (event.event === "Started") total = event.data?.contentLength ?? 0;
-        else if (event.event === "Progress") {
-          received += event.data.chunkLength;
-          if (total > 0) setStep({ kind: "downloading", progress: Math.min(1, received / total) });
-        } else setStep({ kind: "installing" });
-      };
-      try {
-        await invoke("install_update", { version, rid: release.rid, onEvent: channel });
-      } catch (reason) {
-        setStep({ kind: "failed", reason: toMessage(reason) });
-        return;
-      }
-    }
-    const running = await runningWorkStoppedByRestart();
-    if (running) setStep({ kind: "installed", running });
-    else await restart(null);
-  };
+  const restart = (running: string | null) => void restartInto(running, setStep);
+  const move = () => void moveToNative(release, setStep);
 
   useEffect(() => {
+    // Once per notice, even when React runs the effect twice; Try again
+    // starts it over.
     if (started.current) return;
     started.current = true;
-    void move();
-    // Once per notice; Try again starts it over.
-    // eslint-disable-next-line react-hooks-js/exhaustive-deps
-  }, []);
+    void moveToNative(release, setStep);
+  }, [release]);
 
   const running = step.kind === "installed" ? step.running : null;
   const percent = step.kind === "downloading" && step.progress !== null ? Math.round(step.progress * 100) : null;
@@ -160,9 +115,9 @@ export function NativeAppDialog({ release, onClose }: { release: NativeAppReleas
             <span className="native-app-actions-end">
               <Button variant="secondary" onClick={onClose}>{t`Close`}</Button>
               {step.kind === "failed" ? (
-                <Button variant="primary" onClick={() => void move()} autoFocus>{t`Try again`}</Button>
+                <Button variant="primary" onClick={move} autoFocus>{t`Try again`}</Button>
               ) : (
-                <Button variant="primary" onClick={() => void restart(step.running)} autoFocus>{t`Restart now`}</Button>
+                <Button variant="primary" onClick={() => restart(step.running)} autoFocus>{t`Restart now`}</Button>
               )}
             </span>
           </div>
@@ -170,4 +125,53 @@ export function NativeAppDialog({ release, onClose }: { release: NativeAppReleas
       </div>
     </ModalDialog>
   );
+}
+
+/** Restart into the installed native app; a window that could not save leaves it for Restart now or the next launch. */
+async function restartInto(running: string | null, setStep: (step: Step) => void) {
+  setStep({ kind: "restarting" });
+  try {
+    await restartLattice();
+  } catch {
+    // A window could not save an edit and says so itself; the native app
+    // is in place and opens at the next launch, or on Restart now.
+    setStep({ kind: "installed", running });
+  }
+}
+
+/**
+ * Install the native app over this one, then restart into it unless that
+ * would stop running work. The claim is the updater's own (app_restart.rs),
+ * under "native <version>" so a classic release of the same number never
+ * reads as this install.
+ */
+async function moveToNative(release: NativeAppRelease, setStep: (step: Step) => void) {
+  const version = `native ${release.version}`;
+  setStep({ kind: "downloading", progress: null });
+  const claim = await invoke<UpdateClaim>("claim_update_install", { version }).catch(() => "claimed" as const);
+  if (claim === "busy") {
+    setStep({ kind: "failed", reason: null });
+    return;
+  }
+  if (claim === "claimed") {
+    let total = 0;
+    let received = 0;
+    const channel = new Channel<DownloadEvent>();
+    channel.onmessage = (event) => {
+      if (event.event === "Started") total = event.data?.contentLength ?? 0;
+      else if (event.event === "Progress") {
+        received += event.data.chunkLength;
+        if (total > 0) setStep({ kind: "downloading", progress: Math.min(1, received / total) });
+      } else setStep({ kind: "installing" });
+    };
+    try {
+      await invoke("install_update", { version, rid: release.rid, onEvent: channel });
+    } catch (reason) {
+      setStep({ kind: "failed", reason: toMessage(reason) });
+      return;
+    }
+  }
+  const running = await runningWorkStoppedByRestart();
+  if (running) setStep({ kind: "installed", running });
+  else await restartInto(null, setStep);
 }
