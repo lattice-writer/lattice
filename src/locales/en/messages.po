@@ -725,8 +725,8 @@ msgstr "{installedProduct} finished installing, but Lattice could not verify:\n"
 "{0}"
 
 #: src/platform/host-errors-project.ts
-msgid "{item} could not be read."
-msgstr "{item} could not be read."
+msgid "{item} could not be read as an attachment."
+msgstr "{item} could not be read as an attachment."
 
 #: src/platform/host-errors-project.ts
 msgid "{item} has an invalid file name."
@@ -741,8 +741,8 @@ msgid "{item} is a symbolic link and cannot be imported."
 msgstr "{item} is a symbolic link and cannot be imported."
 
 #: src/platform/host-errors-project.ts
-msgid "{item} is empty."
-msgstr "{item} is empty."
+msgid "{item} is empty, so it cannot be attached."
+msgstr "{item} is empty, so it cannot be attached."
 
 #: src/platform/host-errors-project.ts
 msgid "{item} is larger than the 10 MB source-file limit."
@@ -765,8 +765,8 @@ msgid "{item} is not a regular file or folder Lattice can import."
 msgstr "{item} is not a regular file or folder Lattice can import."
 
 #: src/platform/host-errors-project.ts
-msgid "{item} is not a regular file."
-msgstr "{item} is not a regular file."
+msgid "{item} is not a regular file, so it cannot be attached."
+msgstr "{item} is not a regular file, so it cannot be attached."
 
 #: src/platform/host-errors-project.ts
 msgid "{item} is not a supported image or PDF file."

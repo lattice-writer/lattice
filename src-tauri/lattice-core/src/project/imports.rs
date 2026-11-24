@@ -197,16 +197,16 @@ pub fn read_agent_attachments(sources: &[String]) -> Result<AgentAttachments, St
         let source = Path::new(source);
         let name = file_name(source, "A dropped file")?;
         let Ok(metadata) = fs::metadata(source) else {
-            return Err(format!("{name} could not be read."));
+            return Err(format!("{name} could not be read as an attachment."));
         };
         if metadata.is_dir() {
             return Err(format!("{name} is a folder. Attach the files inside it instead."));
         }
         if !metadata.is_file() {
-            return Err(format!("{name} is not a regular file."));
+            return Err(format!("{name} is not a regular file, so it cannot be attached."));
         }
         if metadata.len() == 0 {
-            return Err(format!("{name} is empty."));
+            return Err(format!("{name} is empty, so it cannot be attached."));
         }
         let mime_type = asset_mime_type(source)
             .or_else(|| source_kind(source)?.mime)
@@ -218,7 +218,7 @@ pub fn read_agent_attachments(sources: &[String]) -> Result<AgentAttachments, St
         let read =
             fs::File::open(source).and_then(|file| file.take(cap + 1).read_to_end(&mut bytes));
         if read.is_err() {
-            return Err(format!("{name} could not be read."));
+            return Err(format!("{name} could not be read as an attachment."));
         }
         if bytes.len() as u64 > cap {
             return Err(if image {
@@ -228,7 +228,7 @@ pub fn read_agent_attachments(sources: &[String]) -> Result<AgentAttachments, St
             });
         }
         if bytes.is_empty() {
-            return Err(format!("{name} is empty."));
+            return Err(format!("{name} is empty, so it cannot be attached."));
         }
         files.push(AgentComposerFile {
             name: name.to_string(),

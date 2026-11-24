@@ -130,10 +130,13 @@ fn agent_attachments_refuse_folders_empty_unreadable_and_oversized_files() {
     let refusal = |path: &Path| read_agent_attachments(&paths([path])).unwrap_err();
     let folder = fixture.outside("figures/plot.png", b"png").parent().unwrap().to_path_buf();
     assert_eq!(refusal(&folder), "figures is a folder. Attach the files inside it instead.");
-    assert_eq!(refusal(&fixture.outside("blank.bin", b"")), "blank.bin is empty.");
+    assert_eq!(
+        refusal(&fixture.outside("blank.bin", b"")),
+        "blank.bin is empty, so it cannot be attached."
+    );
     let missing = fixture.outside("gone.docx", b"x");
     fs::remove_file(&missing).unwrap();
-    assert_eq!(refusal(&missing), "gone.docx could not be read.");
+    assert_eq!(refusal(&missing), "gone.docx could not be read as an attachment.");
     let grow = |name: &str, len: u64| {
         let path = fixture.outside(name, b"x");
         fs::File::options().write(true).open(&path).unwrap().set_len(len).unwrap();
@@ -177,7 +180,7 @@ fn agent_attachments_follow_symlinks_and_refuse_fifos_and_unreadable_files() {
     let fifo_path = std::ffi::CString::new(fifo.to_string_lossy().as_bytes()).unwrap();
     assert_eq!(unsafe { libc::mkfifo(fifo_path.as_ptr(), 0o600) }, 0);
     let error = read_agent_attachments(&paths([&fifo])).unwrap_err();
-    assert_eq!(error, "pipe.bin is not a regular file.");
+    assert_eq!(error, "pipe.bin is not a regular file, so it cannot be attached.");
     let locked = fixture.outside("locked.xlsx", b"xlsx");
     fs::set_permissions(&locked, fs::Permissions::from_mode(0o000)).unwrap();
     let readable = fs::File::open(&locked).is_ok();
@@ -185,7 +188,7 @@ fn agent_attachments_follow_symlinks_and_refuse_fifos_and_unreadable_files() {
     fs::set_permissions(&locked, fs::Permissions::from_mode(0o600)).unwrap();
     // Root reads through any mode bits; everyone else is refused.
     if !readable {
-        assert_eq!(outcome.unwrap_err(), "locked.xlsx could not be read.");
+        assert_eq!(outcome.unwrap_err(), "locked.xlsx could not be read as an attachment.");
     }
 }
 

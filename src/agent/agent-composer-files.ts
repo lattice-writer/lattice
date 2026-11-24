@@ -38,7 +38,12 @@ export function buildAgentComposerFilesMessage(
   };
 }
 
-/** The native app's note that a drop held more files than the composer takes (`read_agent_attachments`). */
+/**
+ * The native app's note that a drop held more files than the composer takes
+ * (`read_agent_attachments`). Its one caller is the Agent island
+ * (`gpui/islands/agent/drops.ts`), which knip does not read.
+ * @public
+ */
 export function agentAttachmentsSkippedMessage(attached: number, skipped: number): string {
   return t`The Agent takes ${attached} files at a time, so ${skipped} more weren’t attached.`;
 }

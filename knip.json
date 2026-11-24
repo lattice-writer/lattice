@@ -44,10 +44,6 @@
       "ignoreDependencies": ["@fontsource-variable/inter"]
     }
   },
-  // gpui/islands is not in project: an export only an island page imports is
-  // listed here with the island that reads it. agent-composer-files.ts:
-  // agentAttachmentsSkippedMessage (gpui/islands/agent/drops.ts).
-  "ignoreIssues": { "src/agent/agent-composer-files.ts": ["exports"] },
   // literature-worker/ is a separate workspace with its own package.json and is
   // not in `project`, so knip cannot see it. src-tauri/templates/ holds sample
   // project content; the perf-bench page reads it as raw text, and its slide
