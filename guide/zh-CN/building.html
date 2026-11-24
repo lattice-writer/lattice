@@ -73,12 +73,14 @@ main blockquote { margin: 12px 0; padding: 2px 16px; border-left: 3px solid var(
 </li>
 <li><p><strong>错误</strong>：编译按钮和问题面板显示 Typst 的错误与警告，并标明文件和行号，点击即可跳到对应行。</p>
 </li>
+<li><p><strong>源码与 PDF</strong>：在 PDF 中双击某处，光标就会跳到源码中对应的那一行，<code>#include</code> 进来的文件也可以；按 <code>⌘⇧J</code> 则在 PDF 中标出光标所在的行。尚未保存的修改也算在内；需要先编译一次文档。</p>
+</li>
 <li><p><strong>字体与包</strong>：可以使用系统字体，以及 Typst 自带的字体（Libertinus Serif、New Computer Modern、DejaVu Sans Mono）。<code>#import &quot;@preview/…&quot;</code> 第一次使用时会从 Typst Universe 下载包，之后离线也能用。</p>
 </li>
 <li><p><strong>在 LaTeX 项目中</strong>编译某个 <code>.typ</code> 文件时，只单独编译它，其他编译仍然编译原来的 LaTeX 论文。</p>
 </li>
 </ul>
-<p>源码与 PDF 之间的点击跳转（SyncTeX）、Overleaf 同步和可视化编辑器目前只支持 LaTeX。</p>
+<p>Overleaf 同步和可视化编辑器目前只支持 LaTeX。</p>
 </main>
 </div>
 </body>
