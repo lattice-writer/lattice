@@ -686,21 +686,88 @@ fn a_workspace_leaves_documents_to_the_tab_sync_when_it_has_no_place_for_them() 
     );
 }
 
+// Leo: closing a tab closes it. A document panel whose last tab closes
+// goes away, even the last one beside Project or the PDF; only a panel
+// that is the whole layout stays, as an empty slot.
 #[test]
-fn closing_the_last_document_of_a_panel_keeps_it_as_an_empty_slot() {
+fn closing_the_last_document_of_a_panel_closes_it_unless_it_is_the_only_panel() {
     let previous = side_by_side();
     let current = trellis::model::close_view(&previous, "doc-2");
-    let kept = tidy(&keep_document_slot(&previous, &current, "doc-2").unwrap());
-    let ids = |doc: &LayoutDocument| -> Vec<String> {
-        panels(doc).into_iter().map(|(id, _, _)| id).collect()
-    };
-    assert_eq!(ids(&kept), ids(&previous));
+    assert!(keep_document_slot(&previous, &current, "doc-2").is_none());
+    // A panel that still holds a document closes as before.
+    assert!(keep_document_slot(&previous, &previous, "doc-0").is_none());
+
+    let mut last_document = side_by_side();
+    find_panel(&mut last_document, "panel-doc-0").views.clear();
+    let last_document = tidy(&last_document);
+    let current = trellis::model::close_view(&last_document, "doc-2");
+    assert!(keep_document_slot(&last_document, &current, "doc-2").is_none());
+
+    let mut alone = side_by_side();
+    alone.root = Some(LayoutNode::Panel(PanelNode::single("panel-doc-2", "doc-2")));
+    alone.floating.clear();
+    alone.hidden.clear();
+    let current = trellis::model::close_view(&alone, "doc-2");
+    let kept = tidy(&keep_document_slot(&alone, &current, "doc-2").unwrap());
     assert_eq!(
         docked(&kept, "panel-doc-2").unwrap().views,
         ["slot-panel-doc-2"]
     );
     assert!(!kept.views.contains_key("doc-2"));
-    // A panel that still holds a document closes as before.
-    assert!(keep_document_slot(&previous, &previous, "doc-0").is_none());
     assert!(filled_slots(&kept).is_empty());
+    assert!(stranded_slots(&kept, false).is_empty());
+}
+
+// A floating or hidden panel does not fill the workspace: the only docked
+// panel keeps its slot beside them, and that slot is not swept away.
+#[test]
+fn the_only_docked_panel_keeps_its_slot_beside_floating_and_hidden_panels() {
+    let previous = side_by_side();
+    let mut alone = previous.clone();
+    alone.root = Some(LayoutNode::Panel(PanelNode::single("panel-doc-2", "doc-2")));
+    alone.floating = vec![FloatingPanel {
+        panel: PanelNode::single("panel-agent", "agent"),
+        rect: Rect::new(0.1, 0.1, 0.3, 0.3),
+        z: 1.,
+        layer: FloatingLayer::Overlay,
+    }];
+    alone.hidden = vec![trellis::model::HiddenPanel {
+        panel: PanelNode::single("panel-project", "project"),
+        restore: trellis::model::RestoreTarget::Floating {
+            rect: Rect::new(0.1, 0.1, 0.3, 0.3),
+            layer: FloatingLayer::Overlay,
+        },
+    }];
+    alone.views.insert("agent".into(), record("agent"));
+    let current = trellis::model::close_view(&alone, "doc-2");
+    let kept =
+        keep_document_slot(&alone, &current, "doc-2").expect("the only docked panel keeps a slot");
+    let docked = trellis::model::panels_of(kept.root.as_ref());
+    assert_eq!(docked.len(), 1);
+    assert_eq!(docked[0].views, ["slot-panel-doc-2"]);
+
+    let mut with_file = kept.clone();
+    with_file.floating[0].panel.views.push("doc-0".into());
+    assert!(stranded_slots(&with_file, false).is_empty());
+}
+
+// A panel left with only its slot (a document and the Agent shared it, the
+// document closed, then the Agent) closes while a document is open elsewhere.
+#[test]
+fn a_panel_left_with_only_a_slot_closes_while_a_document_is_open_elsewhere() {
+    let mut doc = side_by_side();
+    let (slot, record) = document_slot("panel-doc-2");
+    find_panel(&mut doc, "panel-doc-2").views = vec![slot.clone()];
+    find_panel(&mut doc, "panel-doc-2").selected = slot.clone();
+    doc.views.insert(slot.clone(), record);
+    assert_eq!(stranded_slots(&doc, false), [slot.clone()]);
+    // A preset's or focus mode's empty slot is its own.
+    assert!(stranded_slots(&doc, true).is_empty());
+
+    find_panel(&mut doc, "panel-doc-0").views.clear();
+    let doc = tidy(&doc);
+    assert!(
+        stranded_slots(&doc, false).is_empty(),
+        "the last document panel keeps its slot"
+    );
 }

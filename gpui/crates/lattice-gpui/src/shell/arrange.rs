@@ -161,20 +161,23 @@ impl Shell {
             .any(|view| self.keyboard_in_view(view, window, cx))
     }
 
-    /// A view closed (its X, its menu, ⌘W): a document's panel keeps an
-    /// empty slot when it was the last document there, outside a preset or
-    /// focus mode, and the document can be opened again with ⌘⇧T.
+    /// A view closed (its X, its menu, ⌘W): its panel closes with its last
+    /// view, in this same update, so no frame draws it "Empty"; only the
+    /// only docked panel keeps an empty slot. A panel left with nothing but
+    /// a slot closes too. Neither runs in a preset or focus mode, whose
+    /// arrangement is its own. The document can be opened again with ⌘⇧T.
     fn view_closed(&mut self, view: &str, window: &mut Window, cx: &mut Context<Self>) {
         // The keyboard in the view that closed goes to the document in
         // front, so the window's commands still reach the shell.
         let had_focus = self.keyboard_in_view(view, window, cx);
         let record = self.last_document.views.get(view).cloned();
         let key = file_key(record.as_ref());
+        let arranged = self.layout.preset.is_some() || self.layout.focus.is_some();
         if !key.is_empty() {
             if let Some(root) = self.root(cx) {
                 self.closed_tabs.push(root.join(&key));
             }
-            if self.layout.preset.is_none() && self.layout.focus.is_none() {
+            if !arranged {
                 let current = self.document(cx);
                 if let Some(kept) = keep_document_slot(&self.last_document, &current, view) {
                     self.engine_do(cx, |engine| engine.set_document(kept, false));
@@ -182,6 +185,14 @@ impl Shell {
             }
         }
         self.last_document = close_view(&self.last_document, view);
+        let stranded = trellis_layout::stranded_slots(&self.document(cx), arranged);
+        if !stranded.is_empty() {
+            self.engine_do(cx, |engine| {
+                for slot in &stranded {
+                    engine.close(slot);
+                }
+            });
+        }
         self.sync_views(window, cx);
         self.forget_closed_pdfs(cx);
         self.forget_closed_assets();

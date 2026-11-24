@@ -42,8 +42,13 @@ pub struct BuildOutcome {
 
 impl BuildOutcome {
     /// The outcome a finished pass reports; `None` for one the writer
-    /// stopped, which reports nothing.
-    pub fn of(result: &BuildResult, wrote_pdf: bool) -> Option<Self> {
+    /// stopped, which reports nothing. `started`: when the writer's Build
+    /// began. The outcome's time is the wall clock from then to now, what
+    /// the writer waited, a Typst helper's start (its font scan) and the
+    /// saves before the compile included; the compiler's own time counts
+    /// only without it. A one-time Typst download is outside it: the build
+    /// starts again once the download's own progress toast is done.
+    pub fn of(result: &BuildResult, wrote_pdf: bool, started: Option<Instant>) -> Option<Self> {
         let cancelled = result
             .diagnostics
             .iter()
@@ -57,7 +62,10 @@ impl BuildOutcome {
         Some(Self {
             succeeded: result.success,
             wrote_pdf,
-            duration: Duration::from_millis(u64::try_from(result.duration_ms).unwrap_or(u64::MAX)),
+            duration: started.map_or_else(
+                || Duration::from_millis(u64::try_from(result.duration_ms).unwrap_or(u64::MAX)),
+                |started| started.elapsed(),
+            ),
             counts: diagnostics::summarize(&result.diagnostics),
             root_document: (!result.root_document.is_empty()).then(|| result.root_document.clone()),
             finished_at: Instant::now(),
@@ -153,6 +161,33 @@ mod tests {
             info,
             capped,
         }
+    }
+
+    // A first Typst build reported a 20 ms compile after a three-second
+    // helper start, and the Build button read "0.0 s".
+    #[test]
+    fn the_time_is_the_wall_clock_from_build_not_the_compilers() {
+        let result = BuildResult {
+            success: true,
+            has_pdf: true,
+            log: String::new(),
+            duration_ms: 20,
+            diagnostics: Vec::new(),
+            root_document: "main.typ".into(),
+            one_off: false,
+            venue: None,
+            steps: Vec::new(),
+            pages: None,
+            synctex: None,
+            outputs: Vec::new(),
+            unchanged: false,
+            aux_folder: String::new(),
+        };
+        let started = Instant::now() - Duration::from_secs(3);
+        let outcome = BuildOutcome::of(&result, true, Some(started)).unwrap();
+        assert!(outcome.duration >= Duration::from_secs(3));
+        let unstarted = BuildOutcome::of(&result, true, None).unwrap();
+        assert_eq!(unstarted.duration, Duration::from_millis(20));
     }
 
     #[test]

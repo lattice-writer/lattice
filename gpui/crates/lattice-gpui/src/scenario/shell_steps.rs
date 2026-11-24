@@ -24,6 +24,8 @@ use crate::shell::{
     workspaces::{ProjectLayout, Workspaces},
 };
 
+mod closing;
+
 /// What one step found: its name, whether it passed, and what it saw.
 pub(super) type Step = (&'static str, bool, Value);
 
@@ -52,6 +54,10 @@ impl Run {
         steps.push(self.layout_survives_a_relaunch(cx).await?);
         steps.push(self.palette_lists_commands(cx).await?);
         steps.push(self.closing_the_focused_tab_keeps_the_keyboard(cx).await?);
+        steps.push(
+            self.closing_a_panels_last_tab_leaves_no_empty_panel(cx)
+                .await?,
+        );
         Ok(steps)
     }
 

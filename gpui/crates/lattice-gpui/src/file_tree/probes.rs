@@ -44,6 +44,32 @@ impl FileTreePanel {
         self.commit_naming(true, window, cx);
     }
 
+    /// Drop the row being named, as Escape does, for a scenario.
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    pub fn cancel_name(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.cancel_naming(window, cx);
+    }
+
+    /// Close every folder, for a scenario.
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    pub fn close_folders(&mut self, cx: &mut Context<Self>) {
+        self.expanded.clear();
+        self.lay_out(cx);
+        self.remember_expanded(cx);
+    }
+
+    /// The rows on screen drawn as folders, project-relative, for a
+    /// scenario.
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    pub fn folder_rows(&self, cx: &App) -> Vec<String> {
+        let state = self.state.read(cx);
+        (0..)
+            .map_while(|ix| state.entry(ix))
+            .filter(|entry| entry.is_folder())
+            .map(|entry| entry.item().id.to_string())
+            .collect()
+    }
+
     /// Select the row at `path` and give the tree the keyboard, as a click
     /// on the row does, for a scenario.
     #[cfg(any(target_os = "macos", target_os = "windows"))]

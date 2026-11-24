@@ -102,11 +102,42 @@ impl Run {
         let installed = self
             .wait_for(cx, Duration::from_secs(60), |_, cx| crate::typst::binary(cx).is_some())
             .await;
+        let installed_at = Instant::now();
         let rebuilt = self
             .wait_for(cx, Duration::from_secs(60), |shell, cx| {
                 !shell.read(cx).building() && pdf.is_file()
             })
             .await;
+        // The Build button's time for the build that started the helper is
+        // the wall clock the writer waited, the helper's start with it, not
+        // the compile alone (it read "0.0 s").
+        let waited = installed_at.elapsed();
+        let pill = cx.update(|cx| self.shell.read(cx).build_panel().read(cx).chip());
+        let compiled = cx.update(|cx| {
+            self.shell
+                .read(cx)
+                .build_panel()
+                .read(cx)
+                .outcome()
+                .map(|outcome| outcome.steps.iter().filter_map(|step| step.duration_ms).sum::<u64>())
+        });
+        let took = match pill {
+            crate::build_panel::ChipState::Succeeded(took) => Some(took),
+            _ => None,
+        };
+        steps.check(
+            "the first Typst build's time on the Build button is the wall clock from Build, the helper's start included",
+            took.is_some_and(|took| {
+                took >= Duration::from_millis(50)
+                    && took <= started.elapsed()
+                    && compiled.is_none_or(|ms| took.as_millis() >= u128::from(ms))
+            }),
+            json!({
+                "pill_s": took.map(|took| took.as_secs_f32()),
+                "compile_ms": compiled,
+                "since_install_ms": waited.as_millis(),
+            }),
+        );
         steps.check(
             "Download installs Typst support from the release, checked with its key, and runs the build that asked",
             asked_again && installed && rebuilt,
