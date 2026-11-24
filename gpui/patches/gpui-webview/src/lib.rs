@@ -6,6 +6,8 @@ mod composition;
 mod linux;
 #[cfg(target_os = "macos")]
 mod macos;
+#[cfg(all(feature = "gpui-fast", target_os = "windows"))]
+mod win32;
 
 #[cfg(all(feature = "gpui-fast", target_os = "macos"))]
 use composition::NativeWebViewSurface;
@@ -80,6 +82,9 @@ pub struct WebView {
     /// The window-relative origin that page clicks are forwarded to GPUI from.
     #[cfg(target_os = "linux")]
     origin: Rc<Cell<gpui::Point<Pixels>>>,
+    /// The child window's cutouts for GPUI's overlays and the element's clip.
+    #[cfg(all(feature = "gpui-fast", target_os = "windows"))]
+    cutouts: win32::OverlayCutouts,
 }
 
 impl Drop for WebView {
@@ -111,7 +116,12 @@ impl WebView {
         linux::forward_mouse_down(&webview, origin.clone(), window, cx);
         #[cfg(target_os = "linux")]
         linux::match_scale_factor(&webview, window.scale_factor(), 1.0);
-        #[cfg(not(any(all(feature = "gpui-fast", target_os = "macos"), target_os = "linux")))]
+        #[cfg(all(feature = "gpui-fast", target_os = "windows"))]
+        let cutouts = win32::OverlayCutouts::new(&webview, window);
+        #[cfg(not(any(
+            all(feature = "gpui-fast", any(target_os = "macos", target_os = "windows")),
+            target_os = "linux"
+        )))]
         let _ = window;
 
         Self {
@@ -131,6 +141,8 @@ impl WebView {
             interface_zoom: Cell::new(1.0),
             #[cfg(target_os = "linux")]
             origin,
+            #[cfg(all(feature = "gpui-fast", target_os = "windows"))]
+            cutouts,
         }
     }
 
@@ -225,6 +237,8 @@ impl WebView {
             .into(),
         };
         self.set_bounds(rect)?;
+        #[cfg(all(feature = "gpui-fast", target_os = "windows"))]
+        self.cutouts.set_geometry(document, visible);
         self.set_native_visible(true)?;
         Ok(())
     }
@@ -511,6 +525,11 @@ impl Element for WebViewElement {
         }
         #[cfg(target_os = "linux")]
         parent.origin.set(bounds.origin);
+        // Wry places the child window in the display's logical pixels.
+        #[cfg(all(feature = "gpui-fast", target_os = "windows"))]
+        parent
+            .cutouts
+            .set_scale_factor(window.scale_factor() / window.interface_zoom());
         let clip = window.content_mask().bounds;
         if let Err(error) = parent.set_geometry(bounds, clip) {
             if !parent.geometry_failed.replace(true) {

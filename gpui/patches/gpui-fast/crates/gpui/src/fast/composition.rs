@@ -53,6 +53,10 @@ use std::{
     rc::Rc,
 };
 
+#[path = "overlay_bounds.rs"]
+mod overlay_bounds;
+pub use overlay_bounds::OverlayBoundsObserver;
+
 slotmap::new_key_type! {
     /// Stable identity for a surface in a window composition tree.
     pub struct CompositionSurfaceId;
@@ -754,6 +758,7 @@ pub(crate) struct WindowCompositionState {
     pointer_capture: Option<CompositionSurfaceId>,
     pressed_buttons: Vec<MouseButton>,
     hovered_native: Option<CompositionSurfaceId>,
+    overlay_bounds: overlay_bounds::OverlayBounds,
 }
 
 /// The surfaces every composition tree holds: the base and the overlay.
@@ -796,6 +801,7 @@ impl Default for WindowCompositionHandle {
             pointer_capture: None,
             pressed_buttons: Vec::new(),
             hovered_native: None,
+            overlay_bounds: Default::default(),
         })))
     }
 }
@@ -1422,6 +1428,11 @@ fn ordered_plain_scene(
 /// Presents the frame last drawn: on its one surface, or split along the
 /// composition tree while the window composes around another surface.
 pub(crate) fn present(window: &mut Window) {
+    present_scene(window);
+    overlay_bounds::presented(window);
+}
+
+fn present_scene(window: &mut Window) {
     let state = window.fast_composition.0.clone();
     let splits = {
         let state = state.borrow();
