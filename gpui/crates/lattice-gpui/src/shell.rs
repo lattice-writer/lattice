@@ -593,7 +593,6 @@ impl Shell {
         self.project.as_ref()
     }
 
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
     pub fn pdf(&self) -> &Entity<PdfPanel> {
         &self.pdf
     }
@@ -603,7 +602,6 @@ impl Shell {
         &self.build_panel
     }
 
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
     pub fn file_tree(&self) -> &Entity<FileTreePanel> {
         &self.file_tree
     }
@@ -626,7 +624,6 @@ impl Shell {
     }
 
     /// Whether a build is under way or queued.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
     pub fn building(&self) -> bool {
         self.build_task.is_some()
     }
