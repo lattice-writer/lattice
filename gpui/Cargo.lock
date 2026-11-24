@@ -7378,6 +7378,7 @@ dependencies = [
  "vim_mode_setting",
  "windows 0.62.2",
  "workspace",
+ "x11rb",
  "zed_actions",
  "zip 9.4.1",
 ]

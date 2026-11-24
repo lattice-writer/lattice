@@ -577,7 +577,7 @@ impl AddPapers {
     }
 
     /// The cards' titles and states, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn row_states(&self, cx: &App) -> Vec<(String, RowState)> {
         self.rows(cx)
             .into_iter()
@@ -586,13 +586,13 @@ impl AddPapers {
     }
 
     /// Close without adding, as Cancel does, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn cancel(&mut self, _: &mut Window, cx: &mut Context<Self>) {
         self.close(cx);
     }
 
     /// Paste `text` as a writer would, read at once, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn paste(&mut self, text: &str, window: &mut Window, cx: &mut Context<Self>) {
         self.text.update(cx, |state, cx| {
             state.set_value(text.to_string(), window, cx)

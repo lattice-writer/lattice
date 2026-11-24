@@ -375,7 +375,7 @@ impl Shell {
         }));
     }
 
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub(crate) fn overleaf_picker(&self) -> Option<Entity<OverleafPicker>> {
         self.overleaf_layers
             .picker
@@ -383,7 +383,7 @@ impl Shell {
             .map(|(picker, _)| picker.clone())
     }
 
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub(crate) fn overleaf_review(&self) -> Option<Entity<OverleafReview>> {
         self.overleaf_layers
             .review

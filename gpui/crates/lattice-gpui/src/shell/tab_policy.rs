@@ -380,7 +380,7 @@ impl Shell {
 }
 
 /// What a scenario reads of the tabs.
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 impl Shell {
     /// Document `key`'s tab: its panel, its place in the strip, and whether
     /// it is a preview and pinned.

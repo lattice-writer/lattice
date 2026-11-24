@@ -385,7 +385,7 @@ impl SettingsDialog {
 
     /// The page on screen.
     /// Settings › Overleaf's view of the account, once the page has drawn.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn overleaf_connection(&self) -> Option<Entity<super::overleaf_pane::OverleafConnection>> {
         self.overleaf.clone()
     }

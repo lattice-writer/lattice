@@ -176,13 +176,13 @@ impl Shell {
     }
 
     /// The asset previews open now, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn asset_previews(&self) -> Vec<Entity<AssetPanel>> {
         self.asset_panels.clone()
     }
 
     /// Close every asset preview's tab, as its X does, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn close_asset_previews(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         for panel in self.asset_panels.clone() {
             self.close_asset(&panel, window, cx);

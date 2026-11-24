@@ -243,7 +243,7 @@ pub fn note_editor(
 }
 
 /// The documents a crash would write now, for a scenario.
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 pub(crate) fn open_edit_paths() -> Vec<String> {
     let edits = OPEN_EDITS
         .lock()
@@ -255,7 +255,7 @@ pub(crate) fn open_edit_paths() -> Vec<String> {
 
 /// Run the crash save as the panic hook runs it, without a crash, for a
 /// scenario: the documents written, and the ones that were not.
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 pub(crate) fn save_open_edits_now() -> (Vec<String>, Vec<String>) {
     save_open_edits(Instant::now() + CRASH_SAVE_TIMEOUT)
 }

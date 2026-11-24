@@ -98,7 +98,7 @@ impl Shell {
     }
 
     /// A build Lattice starts on its own, as after a save, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn build_unattended(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.run_build(BuildRequest::automatic(), window, cx);
     }

@@ -281,7 +281,7 @@ impl Shell {
 
     /// Import `sources` into `target` as Import files… does, asking about
     /// taken names, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub(crate) fn import_for_scenario(
         &mut self,
         sources: Vec<String>,

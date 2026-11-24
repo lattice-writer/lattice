@@ -137,7 +137,7 @@ impl Render for DragPreview {
 impl PapersPanel {
     /// The row of the paper titled `title`, as last laid out, for a scenario
     /// to drag it.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn row_bounds(&self, title: &str, cx: &App) -> Option<gpui::Bounds<Pixels>> {
         let shown = self.shown(cx);
         let sections = model::group(shown, self.group, &self.facts);

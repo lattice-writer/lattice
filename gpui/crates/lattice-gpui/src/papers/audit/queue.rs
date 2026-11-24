@@ -322,7 +322,7 @@ impl Audit {
 }
 
 /// The queue as a scenario reads and fills it.
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 impl Audit {
     /// Give each reference `finding` answers for the finding a check would
     /// have: the queue's steps run offline.

@@ -42,7 +42,7 @@ mod parity_welcome;
 #[cfg(target_os = "macos")]
 mod pdf_shots;
 mod shell_steps;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 mod shot;
 
 pub struct ScenarioArgs {
@@ -121,7 +121,7 @@ pub fn start(shell: Entity<Shell>, window: AnyWindowHandle, args: ScenarioArgs, 
             "memory" => run.memory(cx).await,
             #[cfg(target_os = "macos")]
             "ime-protocol" => run.ime_protocol(cx).await,
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", target_os = "linux"))]
             "shot" => run.shot(cx).await,
             #[cfg(target_os = "macos")]
             "parity" => run.parity(cx).await,
@@ -396,14 +396,14 @@ impl Run {
     /// `name.png` in that folder, for a reviewer to look at; a no-op off
     /// macOS.
     async fn completion_shot(&self, cx: &mut AsyncApp, name: &str) {
-        #[cfg(target_os = "macos")]
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
         if let Some(dir) = std::env::var_os("LATTICE_E2E_SHOTS") {
             let path = std::path::Path::new(&dir).join(format!("{name}.png"));
             if let Err(error) = self.capture(cx, &path.to_string_lossy()).await {
                 log::warn!("no shot {name}: {error:#}");
             }
         }
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
         let _ = (cx, name);
     }
 
@@ -451,8 +451,9 @@ impl Run {
         native::send_key(self.native(cx)?, character, command)?;
         self.pump_frame(cx);
         // AppKit handles a sent event before `sendEvent:` returns. Windows
-        // posts the key for GPUI's message loop, which has to run first.
-        #[cfg(target_os = "windows")]
+        // posts the key for GPUI's message loop, and X11 delivers it to
+        // GPUI's event loop; either has to run first.
+        #[cfg(any(target_os = "windows", target_os = "linux"))]
         {
             sleep(cx, native::QUEUE_SETTLE).await;
             native::release_keys()?;

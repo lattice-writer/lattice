@@ -213,7 +213,7 @@ impl ManuscriptWords {
         }));
     }
 
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn count(&self) -> Option<&WordCount> {
         self.count.as_ref()
     }

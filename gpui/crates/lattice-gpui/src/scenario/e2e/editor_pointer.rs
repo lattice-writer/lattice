@@ -17,7 +17,7 @@ use crate::{editor_panel::EditorPanel, native, scenario::Run};
 impl Run {
     /// Save the window as `name` under `LATTICE_E2E_SHOTS`, when set.
     pub(in crate::scenario) async fn adapter_shot(&self, cx: &mut AsyncApp, name: &str) {
-        #[cfg(target_os = "macos")]
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
         if let Some(dir) = std::env::var_os("LATTICE_E2E_SHOTS") {
             // A covered window is not drawn: bring it above the others,
             // leaving the keyboard where it is.
@@ -31,7 +31,7 @@ impl Run {
                 log::warn!("could not save {}: {error:#}", path.display());
             }
         }
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
         let _ = (cx, name);
     }
 

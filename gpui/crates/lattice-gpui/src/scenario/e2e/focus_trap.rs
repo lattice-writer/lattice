@@ -36,11 +36,11 @@ impl Run {
     }
 
     /// The window as it is now, for `LATTICE_FOCUS_SHOTS`: the scenario's
-    /// capture is macOS's (`shot.rs`), so elsewhere there is none.
+    /// capture is macOS's and Linux's (`shot.rs`), so elsewhere there is none.
     async fn focus_shot(&self, cx: &mut AsyncApp, out: &std::path::Path) -> Result<()> {
-        #[cfg(target_os = "macos")]
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
         self.capture(cx, &out.to_string_lossy()).await?;
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
         let _ = (cx, out);
         Ok(())
     }

@@ -235,7 +235,7 @@ impl RecentProjects {
     }
 
     /// Replace the list, for a scenario that stages one.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn stage(list: Vec<RecentProject>, cx: &mut App) {
         if cx.has_global::<Self>() {
             let recents = cx.global_mut::<Self>();

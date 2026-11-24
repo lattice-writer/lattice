@@ -135,7 +135,7 @@ pub fn available(cx: &App) -> bool {
 
 /// Point the download elsewhere, for a scenario: a local archive signed with
 /// the unit tests' key.
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 pub fn use_source(source: install::Source, cx: &mut App) {
     if let Some(support) = support_mut(cx) {
         support.source = Some(source);

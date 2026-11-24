@@ -440,7 +440,7 @@ impl PdfView {
 
     /// The digest of the PDF on screen, which changes once a rebuild's bytes
     /// are loaded, for a scenario timing an edit to its pages.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn shown_digest(&self) -> Option<&str> {
         self.shown_digest.as_deref()
     }
@@ -675,7 +675,7 @@ impl PdfView {
     }
 
     /// Leave fit mode at the scale it gave, as a zoom does, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn clear_fit(&mut self, cx: &mut Context<Self>) {
         self.fit = None;
         self.remember_view();

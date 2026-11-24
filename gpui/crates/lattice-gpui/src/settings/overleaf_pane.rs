@@ -87,7 +87,7 @@ impl OverleafConnection {
     }
 
     /// The account and the link as the page shows them, once read.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn scenario_state(&self) -> Option<(OverleafStatus, Option<OverleafLink>)> {
         (!self.loading)
             .then(|| {
@@ -100,7 +100,7 @@ impl OverleafConnection {
 
     /// The account and the link as given, with nothing asked of the network:
     /// the parity harness's Settings › Overleaf.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn scenario_stage(
         &mut self,
         status: OverleafStatus,

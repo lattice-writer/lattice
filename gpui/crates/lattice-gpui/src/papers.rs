@@ -689,7 +689,7 @@ impl PapersPanel {
     }
 
     /// The papers shown, by key, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn shown_titles(&self, cx: &App) -> Vec<String> {
         self.shown(cx)
             .into_iter()
@@ -698,7 +698,7 @@ impl PapersPanel {
     }
 
     /// Type `text` into the box, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn type_query(&mut self, text: &str, window: &mut Window, cx: &mut Context<Self>) {
         self.input.update(cx, |input, cx| {
             input.set_value(text.to_string(), window, cx)
@@ -707,7 +707,7 @@ impl PapersPanel {
     }
 
     /// Whether the library has been read and the text pass has answered.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn settled(&self, cx: &App) -> bool {
         self.load == Load::Ready
             && self.uses_known()
@@ -716,14 +716,14 @@ impl PapersPanel {
     }
 
     /// The open paper's key, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn active_key(&self) -> Option<String> {
         self.active.clone()
     }
 
     /// Open the paper titled `title` as a click on its row does, for a
     /// scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn open_titled(
         &mut self,
         title: &str,

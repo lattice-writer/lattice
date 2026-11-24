@@ -329,7 +329,7 @@ impl ProjectFind {
 
     /// The hits shown, as `path:line`, once the search answered; `None`
     /// while it runs, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn shown_hits(&self, cx: &App) -> Option<Vec<String>> {
         if !self.showing_results(cx) {
             return None;
@@ -346,7 +346,7 @@ impl ProjectFind {
     }
 
     /// Step to the next hit and open it, as F3 does, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn next_hit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.cycle(false, window, cx);
     }

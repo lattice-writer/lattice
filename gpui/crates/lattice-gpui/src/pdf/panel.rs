@@ -480,7 +480,7 @@ impl PdfPanel {
     }
 
     /// The status line over the pages, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn notice(&self, cx: &App) -> Option<SharedString> {
         self.view.read(cx).notice.clone()
     }

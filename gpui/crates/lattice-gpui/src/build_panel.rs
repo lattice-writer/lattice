@@ -210,7 +210,7 @@ impl BuildPanel {
     }
 
     /// Whether the last build succeeded; `None` before the first one ends.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn succeeded(&self) -> Option<bool> {
         match self.status {
             Status::Finished => Some(self.last.as_ref().is_some_and(|last| last.success)),
@@ -219,7 +219,7 @@ impl BuildPanel {
         }
     }
 
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn diagnostics(&self) -> &[Diagnostic] {
         self.last.as_ref().map_or(&[], |last| &last.diagnostics)
     }
@@ -559,7 +559,7 @@ impl BuildPanel {
     }
 
     /// Back to no choice made, for a scenario that made one.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn forget_docked_choice(&mut self, cx: &mut Context<Self>) {
         self.docked_choice = None;
         crate::settings::update(cx, |settings| settings.build_output_docked = None);

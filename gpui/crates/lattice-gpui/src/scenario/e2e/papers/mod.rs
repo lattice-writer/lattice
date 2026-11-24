@@ -277,7 +277,7 @@ impl Run {
 
     /// Save the window as `name` under `LATTICE_E2E_SHOTS`.
     pub(super) async fn papers_shot(&self, cx: &mut AsyncApp, name: &str) {
-        #[cfg(target_os = "macos")]
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
         if let Some(dir) = std::env::var_os("LATTICE_E2E_SHOTS") {
             self.pause(cx, Duration::from_millis(300)).await;
             let path = Path::new(&dir).join(format!("{name}.png"));
@@ -285,7 +285,7 @@ impl Run {
                 log::warn!("could not save {}: {error:#}", path.display());
             }
         }
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
         let _ = (cx, name);
     }
 }

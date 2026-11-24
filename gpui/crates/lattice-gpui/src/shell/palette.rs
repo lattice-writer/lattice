@@ -334,7 +334,7 @@ impl CommandPaletteView {
     }
 
     /// The rows shown, as (group, label) pairs, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub(crate) fn rows(&self) -> Vec<(String, String, Option<String>)> {
         self.shown
             .iter()
@@ -350,7 +350,7 @@ impl CommandPaletteView {
     }
 
     /// Type `text` in the search field, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub(crate) fn type_query(&mut self, text: &str, window: &mut Window, cx: &mut Context<Self>) {
         self.input.update(cx, |input, cx| {
             input.set_value(text.to_string(), window, cx)
@@ -359,7 +359,7 @@ impl CommandPaletteView {
     }
 
     /// Run the row labelled `label`, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub(crate) fn run_labelled(
         &mut self,
         label: &str,
@@ -624,13 +624,13 @@ impl Render for CommandPaletteView {
 }
 
 impl Shell {
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub(crate) fn palette_rows(&self, cx: &App) -> Option<usize> {
         Some(self.palette.as_ref()?.read(cx).shown.len())
     }
 
     /// The palette, while it is open, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub(crate) fn palette_view(&self) -> Option<Entity<CommandPaletteView>> {
         self.palette.clone()
     }

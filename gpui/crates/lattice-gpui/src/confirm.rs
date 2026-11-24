@@ -170,7 +170,7 @@ impl ConfirmHost {
 
     /// Answer the open question as a click on its answer would, for a
     /// scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn accept(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
         let Some(question) = self.pending.take() else {
             return false;
@@ -185,13 +185,13 @@ impl ConfirmHost {
         self.pending.is_some()
     }
 
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn question(&self) -> Option<SharedString> {
         self.pending.as_ref().map(|question| question.title.clone())
     }
 
     /// The open question's body, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn question_list(&self) -> Vec<SharedString> {
         self.pending
             .as_ref()
@@ -206,7 +206,7 @@ impl ConfirmHost {
     }
 
     /// Leave the open question unanswered, as Cancel would, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn dismiss(&mut self, cx: &mut Context<Self>) {
         self.close(cx);
     }

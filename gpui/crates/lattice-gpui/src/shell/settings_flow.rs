@@ -67,7 +67,7 @@ impl Shell {
     }
 
     /// Whether Settings is open, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub(crate) fn settings_open(&self) -> bool {
         self.settings.is_some()
     }

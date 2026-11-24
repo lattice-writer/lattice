@@ -70,7 +70,7 @@ impl Detail {
 impl BibEditor {
     /// The form's boxes as drawn, each field's name and what its box holds,
     /// for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn form_fields(&self, cx: &gpui::App) -> Vec<(String, String)> {
         self.detail
             .iter()
@@ -81,7 +81,7 @@ impl BibEditor {
 
     /// The focus of the form's box for the field `name`, for a scenario to
     /// type into it.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn field_focus(&self, name: &str, cx: &gpui::App) -> Option<gpui::FocusHandle> {
         let detail = self.detail.as_ref()?;
         let field = detail.fields.iter().find(|field| field.name == name)?;
@@ -89,7 +89,7 @@ impl BibEditor {
     }
 
     /// The focus of the form's key box, for a scenario to rename in it.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn key_focus(&self, cx: &gpui::App) -> Option<gpui::FocusHandle> {
         Some(self.detail.as_ref()?.key_input.focus_handle(cx))
     }
@@ -98,7 +98,7 @@ impl BibEditor {
     /// scenario. GPUI sends a box's `Blur` only in an active window, and on
     /// a locked screen none can become active, so a scenario that moved the
     /// focus in an inactive window sends it as GPUI would once it was key.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn field_left(&self, name: &str, cx: &mut gpui::App) {
         let Some(field) = self
             .detail

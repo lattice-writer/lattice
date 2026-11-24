@@ -256,7 +256,7 @@ impl QuickOpen {
 
     /// The rows' text as the list shows them (`name folder tag`), for a
     /// scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn row_texts(&self) -> Vec<String> {
         self.rows
             .iter()
@@ -282,7 +282,7 @@ impl QuickOpen {
     }
 
     /// Type `query` in the field, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn set_query(&mut self, query: &str, window: &mut Window, cx: &mut Context<Self>) {
         self.input
             .update(cx, |input, cx| input.set_value(query, window, cx));
@@ -290,7 +290,7 @@ impl QuickOpen {
     }
 
     /// Pick the current row, as ↩ does, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn confirm(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.select(self.active, window, cx);
     }
@@ -301,7 +301,7 @@ impl QuickOpen {
     }
 
     /// Whether the `@` items are still being read.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn reading_symbols(&self) -> bool {
         self.symbols_task.is_some()
     }

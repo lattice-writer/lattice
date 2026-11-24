@@ -206,7 +206,7 @@ impl Run {
 
     /// Save the window as `name` under `LATTICE_E2E_SHOTS`, after `wait`.
     async fn fluid_shot(&self, cx: &mut AsyncApp, name: &str, wait: Duration) {
-        #[cfg(target_os = "macos")]
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
         if let Some(dir) = std::env::var_os("LATTICE_E2E_SHOTS") {
             self.pause(cx, wait).await;
             let path = std::path::Path::new(&dir).join(format!("{name}.png"));
@@ -214,7 +214,7 @@ impl Run {
                 log::warn!("could not save {}: {error:#}", path.display());
             }
         }
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
         let _ = (cx, name, wait);
     }
 }

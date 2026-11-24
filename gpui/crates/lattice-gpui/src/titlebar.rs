@@ -84,14 +84,14 @@ pub struct TitlebarDrag {
 
 impl TitlebarDrag {
     /// Where the title bar's tools began, last frame, in window coordinates.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn tools_start(&self) -> Option<f32> {
         self.measured.get().tools_start
     }
 
     /// Where the title bar's left group (the project switcher first) began,
     /// last frame, in window coordinates.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn left_start(&self) -> Option<f32> {
         self.measured.get().left_start
     }

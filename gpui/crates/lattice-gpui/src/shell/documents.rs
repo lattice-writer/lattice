@@ -337,19 +337,19 @@ impl Shell {
     }
 
     /// Quick open, while it is up, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn quick_open(&self) -> Option<&Entity<QuickOpen>> {
         self.documents.quick_open.as_ref()
     }
 
     /// Find in project, while it is up, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn project_find(&self) -> Option<&Entity<ProjectFind>> {
         self.documents.find.as_ref()
     }
 
     /// Replace in project, while it is up, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn project_replace(&self) -> Option<&Entity<ProjectReplace>> {
         self.documents.replace.as_ref()
     }

@@ -465,11 +465,12 @@ jobs:
           path: ${{ runner.temp }}/e2e-windows.json
           if-no-files-found: ignore
 
-  # The native app on Linux: built, unit-tested, launched under Xvfb, and
-  # kept as an unsigned archive (the binary, the Typst helper, PDFium and the
-  # island pages, laid out side by side as structured/resources.rs looks for
-  # them). Not a release: nothing here is signed or published, and it has no
-  # e2e scenario yet (the scenario's native input is macOS and Windows only).
+  # The native app on Linux: built, unit-tested, launched under Xvfb, kept as
+  # an unsigned archive (the binary, the Typst helper, PDFium and the island
+  # pages, laid out side by side as structured/resources.rs looks for them),
+  # and put through the whole e2e scenario under Xvfb, its keys and clicks
+  # sent through XTEST (native_linux.rs). Not a release: nothing here is
+  # signed or published.
   #
   # Ubuntu 22.04, as the Tauri app's AppImage, so the archive runs on that
   # glibc and later. gpui_linux needs Zed's X11, Wayland, xkbcommon, ALSA and
@@ -480,7 +481,7 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && needs.changes.outputs.gpui != 'false' }}
     runs-on: ubuntu-22.04
-    timeout-minutes: 120
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v7
       # A cold release build of Zed's crates takes most of the runner's free
@@ -566,5 +567,69 @@ jobs:
           path: |
             ${{ runner.temp }}/lattice-gpui-linux-x86_64.tar.gz
             ${{ runner.temp }}/linux-smoke.log
+          if-no-files-found: ignore
+          retention-days: 14
+      # After the unit tests, so the ignored latexmk build test stays ignored
+      # there. Ubuntu's TeX Live: latexmk, pdfTeX and SyncTeX
+      # (texlive-binaries), and the recommended set for the fixture's xcolor
+      # and hyperref. No TexLab, as on Windows: the scenario skips its step.
+      - name: Install TeX Live
+        timeout-minutes: 15
+        working-directory: .
+        run: .github/scripts/apt-install.sh texlive-latex-base texlive-latex-recommended latexmk
+      # Experiment for this branch only: which renderer X11 reads back.
+      - name: Shot backends
+        continue-on-error: true
+        timeout-minutes: 10
+        run: |
+          ../.github/scripts/apt-install.sh libegl1 libegl-mesa0 libgl1-mesa-dri || true
+          exp="$RUNNER_TEMP/e2e-linux-shots/backends"
+          mkdir -p "$exp"
+          for backend in vulkan gl; do
+            project="$RUNNER_TEMP/shot-$backend"
+            cp -R fixtures/e2e "$project"
+            hide=()
+            if [ "$backend" = gl ]; then hide=(env VK_ICD_FILENAMES=/dev/null VK_DRIVER_FILES=/dev/null); fi
+            LATTICE_SHOT_OUT="$exp/$backend.png" LATTICE_GPUI_LOG=info timeout 150 \
+              xvfb-run -a -s "-screen 0 1440x900x24" ${hide[@]+"${hide[@]}"} target/release/lattice-gpui "$project" \
+              --scenario shot --out "$exp/$backend.json" >"$exp/$backend.log" 2>&1 || echo "$backend: exit $?"
+            grep -iE 'adapter|selected gpu|shot|error' "$exp/$backend.log" | head -30 || true
+            cat "$exp/$backend.json" || true
+          done
+      # As on Windows: the whole scenario, judged against the steps main
+      # fails on Linux (scripts/gpui-e2e-known-failures.json), a new failure's
+      # module rerun once first, and the text typed before the quit saved.
+      # Xvfb gives the window a display of its own and no window manager; the
+      # app gets 40 minutes, so a scenario that hangs is stopped here with its
+      # log. LATTICE_E2E_SHOTS saves the looks the steps capture (read back
+      # from the X server, shot.rs) for the artifact.
+      - name: e2e scenario
+        timeout-minutes: 65
+        env:
+          STRICT_FLAKY: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && '--strict-flaky' || '' }}
+        run: |
+          project="$RUNNER_TEMP/e2e-project"
+          out="$RUNNER_TEMP/e2e-linux.json"
+          shots="$RUNNER_TEMP/e2e-linux-shots"
+          cp -R fixtures/e2e "$project"
+          mkdir -p "$shots"
+          # Typst support from a stand-in release on disk, as script/e2e
+          # makes it on a Mac (scenario/e2e/typst.rs installs it from there).
+          node ../scripts/typst-helper-fake-release.mjs target/release/lattice-typst "$RUNNER_TEMP/typst-release"
+          export LATTICE_E2E_TYPST_RELEASE="$RUNNER_TEMP/typst-release"
+          export LATTICE_E2E_SHOTS="$shots" LATTICE_GPUI_LOG=info RUST_BACKTRACE=1
+          xvfb-run -a -s "-screen 0 1440x900x24" bash -c '
+            timeout 2400 target/release/lattice-gpui "$1" --scenario e2e --out "$2" || echo "the app exited with $?"
+            cat "$2" || true
+            node ../scripts/gpui-e2e-verdict.mjs --platform linux --check-quit $3 \
+              --rerun-app target/release/lattice-gpui --fixture fixtures/e2e "$2"
+          ' e2e "$project" "$out" "$STRICT_FLAKY"
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: gpui-e2e-linux
+          path: |
+            ${{ runner.temp }}/e2e-linux.json
+            ${{ runner.temp }}/e2e-linux-shots/
           if-no-files-found: ignore
           retention-days: 14

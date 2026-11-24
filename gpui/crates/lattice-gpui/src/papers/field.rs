@@ -407,7 +407,7 @@ impl PapersPanel {
     }
 
     /// The steps the import under way's pending row names, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn pending_stages(&self) -> Option<&'static [&'static str]> {
         self.importing.as_ref().map(super::Importing::stages)
     }

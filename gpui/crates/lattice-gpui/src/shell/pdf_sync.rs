@@ -67,7 +67,7 @@ impl Shell {
 impl Shell {
     /// A double-click in the live PDF at (`x`, `y`) on `page`, with `word`
     /// under it, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub(crate) fn double_click_pdf(
         &mut self,
         page: u32,
@@ -80,7 +80,7 @@ impl Shell {
     }
 
     /// The project's PDFs open in tabs of their own, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub(crate) fn file_pdf_tabs(&self) -> Vec<gpui::Entity<crate::pdf::PdfPanel>> {
         self.file_pdfs.clone()
     }

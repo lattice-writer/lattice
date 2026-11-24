@@ -223,7 +223,7 @@ impl ProjectReplace {
     }
 
     /// Type into the fields and preview, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn fill(
         &mut self,
         query: &str,
@@ -241,7 +241,7 @@ impl ProjectReplace {
     }
 
     /// The previewed count, once the preview answered, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn previewed(&self, cx: &App) -> Option<u32> {
         if self.busy {
             return None;
@@ -250,7 +250,7 @@ impl ProjectReplace {
     }
 
     /// Press Replace, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn replace(&mut self, cx: &mut Context<Self>) {
         self.run_replace(cx);
     }

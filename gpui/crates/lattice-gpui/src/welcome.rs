@@ -158,7 +158,7 @@ impl Welcome {
     }
 
     /// The desk's projects' names, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn desk_names(&self, cx: &App) -> Vec<String> {
         self.desk_projects(cx)
             .into_iter()

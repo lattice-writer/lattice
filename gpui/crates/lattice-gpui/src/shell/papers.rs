@@ -495,19 +495,19 @@ impl Shell {
     }
 
     /// Check references, while it is up, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn audit(&self) -> Option<&Entity<Audit>> {
         self.documents.audit.as_ref()
     }
 
     /// Add reference, while it is up, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn add_reference(&self) -> Option<&Entity<AddReference>> {
         self.documents.add_reference.as_ref()
     }
 
     /// Add papers, while it is up, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn add_papers(&self) -> Option<&Entity<AddPapers>> {
         self.documents.add_papers.as_ref()
     }

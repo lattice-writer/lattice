@@ -216,14 +216,14 @@ impl AssetPanel {
     }
 
     /// The zoom, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn scale(&self) -> f32 {
         self.view.scale
     }
 
     /// The image's natural size and the size it is drawn at, once it is
     /// read; `None` while loading or for a format it does not draw.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn image_sizes(&self) -> Option<(Size<f32>, Size<f32>)> {
         match &self.shown {
             Shown::Image { natural, .. } => Some((*natural, self.drawn_size(*natural))),
@@ -232,7 +232,7 @@ impl AssetPanel {
     }
 
     /// Whether it shows the "cannot be rendered" fallback, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn unsupported(&self) -> bool {
         matches!(self.shown, Shown::Unsupported)
     }

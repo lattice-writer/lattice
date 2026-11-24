@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * `node scripts/gpui-e2e-verdict.mjs --platform macos|windows RESULT.json`:
+ * `node scripts/gpui-e2e-verdict.mjs --platform macos|windows|linux RESULT.json`:
  * whether a GPUI e2e run failed anything that passes on main.
  *
  * `scripts/gpui-e2e-known-failures.json` lists the steps that fail on main
@@ -52,7 +52,7 @@ import { parseE2e } from "./gpui-main-baseline.mjs";
 import { isMain } from "./lib/util.mjs";
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-export const PLATFORMS = ["macos", "windows"];
+export const PLATFORMS = ["macos", "windows", "linux"];
 
 export function knownFailures(file = path.join(repo, "scripts", "gpui-e2e-known-failures.json")) {
   return JSON.parse(readFileSync(file, "utf8")).steps;
@@ -121,7 +121,7 @@ function main() {
   const fixture = value("--fixture");
   const file = argv.filter((arg, index) => !arg.startsWith("--") && !["--platform", "--baseline", "--rerun-app", "--fixture"].includes(argv[index - 1])).at(-1);
   if (Boolean(app) !== Boolean(fixture)) throw new Error("--rerun-app and --fixture go together");
-  if (!PLATFORMS.includes(platform) || !file) throw new Error("usage: gpui-e2e-verdict.mjs --platform macos|windows [--check-quit] [--strict-flaky] [--baseline FILE] [--rerun-app BIN --fixture DIR] RESULT.json");
+  if (!PLATFORMS.includes(platform) || !file) throw new Error("usage: gpui-e2e-verdict.mjs --platform macos|windows|linux [--check-quit] [--strict-flaky] [--baseline FILE] [--rerun-app BIN --fixture DIR] RESULT.json");
   let result = null;
   try {
     result = JSON.parse(readFileSync(file, "utf8"));

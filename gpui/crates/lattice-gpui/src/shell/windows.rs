@@ -111,7 +111,7 @@ struct MinimumWidths(HashMap<WindowId, f32>);
 impl Global for MinimumWidths {}
 
 /// The minimum width `window` was given last, for a scenario.
-#[cfg(target_os = "windows")]
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 pub(crate) fn applied_minimum_width(window: &Window, cx: &App) -> Option<f32> {
     cx.try_global::<MinimumWidths>()?
         .0
@@ -328,7 +328,7 @@ pub(crate) fn window_showing_except(
 }
 
 /// The window showing the project at `root`, and its shell, for a scenario.
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 pub(crate) fn shell_showing(
     root: &std::path::Path,
     cx: &App,
@@ -559,7 +559,7 @@ impl Shell {
     }
 
     /// The interface size pill, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub(crate) fn zoom_hud(&self) -> &Entity<crate::interface_zoom::ZoomHud> {
         &self.zoom_hud
     }

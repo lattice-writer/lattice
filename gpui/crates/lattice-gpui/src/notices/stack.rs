@@ -161,7 +161,7 @@ impl Look {
 }
 
 /// One card as a scenario reads it.
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 #[derive(Clone, Debug, serde::Serialize)]
 pub struct CardState {
     pub title: String,
@@ -175,7 +175,7 @@ pub struct CardState {
     pub actions: Vec<String>,
 }
 
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 impl Look {
     pub(super) fn state(&self, notice: &super::Notice, now: Instant) -> CardState {
         CardState {

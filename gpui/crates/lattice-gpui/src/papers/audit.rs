@@ -528,14 +528,14 @@ impl Audit {
     }
 
     /// The references by key and bucket, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn rows(&self) -> Vec<(String, Bucket)> {
         (0..self.entries.len())
             .map(|index| (self.entries[index].key.clone(), self.bucket(index)))
             .collect()
     }
 
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn loaded(&self) -> bool {
         !self.loading
     }

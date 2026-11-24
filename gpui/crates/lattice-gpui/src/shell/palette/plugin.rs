@@ -627,7 +627,7 @@ impl CommandPaletteView {
     /// What a scenario reads of a plugin step: its name, and its rows as
     /// `(kind, text)` (`file`, `item`, `diagnostic`, `progress`,
     /// `message`, `error`, `empty`).
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub(crate) fn plugin_state(&self) -> Option<(&'static str, Vec<(String, String)>)> {
         let step = self.plugin.as_ref()?;
         Some(match step {
@@ -692,7 +692,7 @@ impl CommandPaletteView {
     }
 
     /// Type `text` in the input step and press ↩, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub(crate) fn plugin_submit(
         &mut self,
         text: &str,
@@ -707,7 +707,7 @@ impl CommandPaletteView {
 
     /// Run action `index` (or the default) of the row whose text is
     /// `label`, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub(crate) fn plugin_act_on(
         &mut self,
         label: &str,
@@ -738,7 +738,7 @@ impl CommandPaletteView {
     }
 
     /// Type `text` in the input step without running it, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub(crate) fn plugin_type(&mut self, text: &str, window: &mut Window, cx: &mut Context<Self>) {
         self.input.update(cx, |input, cx| {
             input.set_value(text.to_string(), window, cx)
@@ -746,7 +746,7 @@ impl CommandPaletteView {
     }
 
     /// Press the confirmation's answer, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub(crate) fn plugin_confirm_accept(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.write_bib(window, cx);
     }

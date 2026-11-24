@@ -172,12 +172,12 @@ impl Default for SplitRatio {
 impl gpui::Global for SplitRatio {}
 
 /// The split's ratio, and setting it, for a scenario.
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 pub fn split_ratio(cx: &App) -> f32 {
     cx.try_global::<SplitRatio>().copied().unwrap_or_default().0
 }
 
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 pub fn set_split_ratio(ratio: f32, cx: &mut App) {
     cx.set_global(SplitRatio(ratio));
 }
@@ -469,7 +469,7 @@ impl EditorPanel {
     }
 
     /// Focus the split's divider, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn focus_split_divider(&self, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(views) = &self.views {
             window.focus(&views.divider_focus, cx);
@@ -478,7 +478,7 @@ impl EditorPanel {
 
     /// The middle of the split's divider as last laid out, in window
     /// coordinates, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn split_divider_center(&self, cx: &App) -> Option<gpui::Point<Pixels>> {
         let views = self
             .views

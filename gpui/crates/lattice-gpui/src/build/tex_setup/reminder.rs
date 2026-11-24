@@ -346,7 +346,7 @@ impl Reminder {
 
     /// Show the reminder for `report` now, as a daily check that found it
     /// would once nothing holds it back, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn remind(&mut self, cx: &mut Context<Self>) {
         self.pending = Some(Pending::Remind);
         self.show_when_due(cx);
@@ -400,7 +400,7 @@ fn reminder_notice(report: &TexPackageUpdates, reminder: Entity<Reminder>) -> No
 }
 
 /// The reminder, once a center has made it, for a scenario.
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 pub fn reminder(cx: &App) -> Option<Entity<Reminder>> {
     cx.try_global::<ReminderGlobal>()
         .map(|global| global.0.clone())

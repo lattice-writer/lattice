@@ -549,12 +549,12 @@ impl EditorPanel {
     }
 
     /// TexLab's diagnostics for this file, when it is a `.tex` source.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn texlab_diagnostics(&self) -> Option<&Entity<TexlabDiagnostics>> {
         self.diagnostics.as_ref()
     }
 
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn find_bar(&self) -> &Entity<find_bar::FindBar> {
         &self.find_bar
     }

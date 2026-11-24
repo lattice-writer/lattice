@@ -268,7 +268,7 @@ impl PapersPanel {
 
     /// Where the keyboard is in the list, and whether the box holds it, for
     /// a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn keyboard(&self, window: &Window, cx: &gpui::App) -> (Option<KeyStop>, bool) {
         use gpui::Focusable as _;
         let in_box = self.input.read(cx).focus_handle(cx).is_focused(window);
@@ -277,7 +277,7 @@ impl PapersPanel {
     }
 
     /// Put the keyboard in the search box, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn focus_box(&self, window: &mut Window, cx: &mut gpui::App) {
         self.input.update(cx, |input, cx| input.focus(window, cx));
     }

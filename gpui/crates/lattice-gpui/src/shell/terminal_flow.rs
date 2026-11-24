@@ -27,7 +27,7 @@ impl Shell {
         terminal
     }
 
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn terminal(&self) -> &Entity<TerminalPanel> {
         &self.terminal
     }

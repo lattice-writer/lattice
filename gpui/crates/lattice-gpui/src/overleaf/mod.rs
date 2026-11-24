@@ -97,7 +97,7 @@ pub fn host() -> String {
 /// Sign in to `host` instead of overleaf.com, and keep the session, the
 /// links and the downloads under `scratch`, for the e2e scenario's stand-in
 /// (`scenario::overleaf_mock`).
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 pub(crate) fn use_stand_in_for_scenario(host: String, scratch: PathBuf) {
     *STAND_IN.lock().unwrap_or_else(PoisonError::into_inner) = Some(StandIn { host, scratch });
 }

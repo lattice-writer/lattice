@@ -3,8 +3,8 @@
 //! preview, latexmk builds with diagnostics, all in GPUI Kit's dockable
 //! panels drawn as the Tauri app draws its own.
 //!
-//! Usage: `lattice-gpui [PROJECT_DIR]`; scripted runs (`e2e` on macOS and
-//! Windows, the measurements on macOS):
+//! Usage: `lattice-gpui [PROJECT_DIR]`; scripted runs (`e2e` on macOS,
+//! Windows and Linux, the measurements on macOS):
 //! `lattice-gpui PROJECT_DIR --scenario e2e|perf|ime --out RESULT.json`.
 
 mod agent;
@@ -39,6 +39,9 @@ mod native;
 #[cfg(target_os = "windows")]
 #[path = "native_windows.rs"]
 mod native;
+#[cfg(target_os = "linux")]
+#[path = "native_linux.rs"]
+mod native;
 mod notices;
 mod opener;
 mod outline;
@@ -51,7 +54,7 @@ mod plugins;
 mod project;
 mod recents;
 mod research_art;
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 mod scenario;
 mod screen_color;
 mod search;
@@ -84,13 +87,13 @@ fn main() {
         return;
     }
     init_logging();
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     let (root, scenario) = scenario::parse_args();
-    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
     let root = std::env::args_os().nth(1).map(std::path::PathBuf::from);
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     let scripted = scenario.is_some();
-    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
     let scripted = false;
     // From here a panic is logged and the open edits are written before
     // the app ends (`crash.rs`).
@@ -105,7 +108,7 @@ fn main() {
     }
 
     // The parity harness's named regions are recorded from the first frame.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     if scenario
         .as_ref()
         .is_some_and(|scenario| scenario.name == "parity")
@@ -134,9 +137,9 @@ fn main() {
             return;
         }
         // A scripted measurement leaves the user's frontmost app alone.
-        #[cfg(any(target_os = "macos", target_os = "windows"))]
+        #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
         let activate = scenario.is_none();
-        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
         let activate = true;
         let launch = root.is_none() && activate;
         match shell::Shell::open_window(root, cx) {
@@ -151,7 +154,7 @@ fn main() {
                 }
                 // The launch after a crash says so, once a window shows.
                 crash::announce_previous_crash(cx);
-                #[cfg(any(target_os = "macos", target_os = "windows"))]
+                #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
                 if let Some(scenario) = scenario {
                     scenario::start(_shell, _window, scenario, cx);
                 }

@@ -263,7 +263,7 @@ pub fn update_appearance(cx: &mut App, edit: impl FnOnce(&mut AppearanceSettings
 
 /// Keep the settings in the file at `path` from now on and watch it, as an
 /// ordinary run does, for a scenario that checks an outside edit.
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 pub(crate) fn use_file(path: PathBuf, cx: &mut App) {
     let watching = cx.global::<AppSettings>().path.is_some();
     let state = cx.global_mut::<AppSettings>();

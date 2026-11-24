@@ -116,8 +116,15 @@ tungstenite = { version = "0.29.0", default-features = false, features = ["hands
 
 [dev-dependencies]
 
-[target.'cfg(any(target_os = "macos", target_os = "windows"))'.dependencies]
+[target.'cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))'.dependencies]
 raw-window-handle = "0.6"
+
+# The scenario's X11 input and window capture (`native_linux.rs`): the
+# version gpui_linux already uses, so it adds no crate; XTEST is one more
+# feature of it. libc is the input lock's pid check (`scenario/input_lock.rs`).
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2"
+x11rb = { version = "0.13", features = ["xtest"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 libc = "0.2"

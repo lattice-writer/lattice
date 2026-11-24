@@ -45,7 +45,7 @@ pub(crate) struct GetStarted {
 
 impl Shell {
     /// Get started's state in this window, for the scripted runs.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub(crate) fn get_started(&self) -> &GetStarted {
         self.parts.get()
     }

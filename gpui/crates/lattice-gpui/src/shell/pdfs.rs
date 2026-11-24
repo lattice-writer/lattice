@@ -515,7 +515,7 @@ impl Shell {
         }
     }
 
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn live_document(&self) -> Option<&str> {
         self.live_document.as_deref()
     }

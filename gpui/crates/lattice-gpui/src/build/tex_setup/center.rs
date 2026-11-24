@@ -178,17 +178,17 @@ impl TexSetupCenter {
         self.busy
     }
 
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn wizard_open(&self) -> bool {
         self.wizard_open
     }
 
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn doctor_open(&self) -> bool {
         self.doctor_open
     }
 
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn dependency(&self) -> Option<&DependencyInstall> {
         self.dependency.as_ref()
     }

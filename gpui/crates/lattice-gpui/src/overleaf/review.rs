@@ -457,7 +457,7 @@ impl OverleafReview {
     }
 }
 
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 impl OverleafReview {
     /// The summary under the title, once the preview has loaded.
     pub fn scenario_summary(&self) -> Option<String> {

@@ -200,7 +200,7 @@ pub struct Batch {
 }
 
 /// What a scenario reads of the batch.
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 impl Batch {
     /// How many imports are under way at once.
     pub fn under_way(&self) -> usize {
@@ -502,7 +502,7 @@ impl PapersPanel {
     }
 
     /// Whether the batch under way saves full text, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn batch_full_text(&self) -> Option<FullText> {
         self.batch.run.as_ref().map(|run| run.full_text)
     }

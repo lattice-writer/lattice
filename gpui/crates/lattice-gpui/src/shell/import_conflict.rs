@@ -123,7 +123,7 @@ impl ImportConflict {
     }
 
     /// Whether a question is up, and what Enter answers, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn asking(&self) -> Option<(SharedString, NameConflict)> {
         self.open.as_ref().map(|question| {
             (
@@ -134,7 +134,7 @@ impl ImportConflict {
     }
 
     /// Press `choice`'s button, as the writer would, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn choose(&mut self, choice: NameConflict, window: &mut Window, cx: &mut Context<Self>) {
         self.answer(Some(choice), window, cx);
     }

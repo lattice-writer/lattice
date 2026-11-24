@@ -8,7 +8,7 @@ use super::{FileTreeEvent, FileTreePanel};
 impl FileTreePanel {
     /// Drop the row at `path` on the folder `target`, as a drag ending there
     /// does, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn drop_on(&mut self, path: String, target: String, cx: &mut Context<Self>) {
         cx.emit(FileTreeEvent::Move {
             paths: vec![path],
@@ -18,7 +18,7 @@ impl FileTreePanel {
 
     /// The row being named, its field's text and whether the field has
     /// focus, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn naming_state(&self, window: &Window, cx: &App) -> Option<(String, String, bool)> {
         self.naming.as_ref().map(|naming| {
             let input = naming.input.read(cx);
@@ -33,7 +33,7 @@ impl FileTreePanel {
     /// Give the row being named `name` and confirm it as Enter does, for a
     /// scenario. Typing into the field is GPUI Kit's own, and takes a window
     /// that draws: a scripted run on a locked screen gets no frames.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn confirm_name(&mut self, name: &str, window: &mut Window, cx: &mut Context<Self>) {
         let Some(input) = self.naming.as_ref().map(|naming| naming.input.clone()) else {
             return;
@@ -45,13 +45,13 @@ impl FileTreePanel {
     }
 
     /// Drop the row being named, as Escape does, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn cancel_name(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.cancel_naming(window, cx);
     }
 
     /// Close every folder, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn close_folders(&mut self, cx: &mut Context<Self>) {
         self.expanded.clear();
         self.lay_out(cx);
@@ -60,7 +60,7 @@ impl FileTreePanel {
 
     /// The rows on screen drawn as folders, project-relative, for a
     /// scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn folder_rows(&self, cx: &App) -> Vec<String> {
         let state = self.state.read(cx);
         (0..)
@@ -72,7 +72,7 @@ impl FileTreePanel {
 
     /// Select the row at `path` and give the tree the keyboard, as a click
     /// on the row does, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn select_row(&mut self, path: &str, window: &mut Window, cx: &mut Context<Self>) -> bool {
         let id = SharedString::from(path.to_string());
         let Some(ix) = self.state.read(cx).index_of(&id) else {
@@ -88,7 +88,7 @@ impl FileTreePanel {
 
     /// The selected rows, project-relative, and the folders kept open for
     /// the project, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn selection_state(&self, cx: &App) -> (Vec<String>, Vec<String>) {
         let mut open: Vec<String> = self.expanded.iter().cloned().collect();
         open.sort();
@@ -97,13 +97,13 @@ impl FileTreePanel {
 
     /// The folder + makes a new LaTeX file in, "" for the project root, for
     /// a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn new_entry_folder(&self, cx: &App) -> String {
         self.selection_folder(cx)
     }
 
     /// The folders kept open for the project across runs, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn remembered_open(&self, cx: &App) -> Vec<String> {
         self.project
             .as_ref()
@@ -116,7 +116,7 @@ impl FileTreePanel {
     }
 
     /// The rows on screen, project-relative, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn row_paths(&self, cx: &App) -> Vec<String> {
         let state = self.state.read(cx);
         (0..)
@@ -126,13 +126,13 @@ impl FileTreePanel {
     }
 
     /// The folder a drag over the tree is aimed at now, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn drop_folder(&self, cx: &App) -> Option<String> {
         self.aim.borrow().folder(cx)
     }
 
     /// What the rows' fluid hover shows, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn hover_snapshot(&self, cx: &App) -> Option<lattice_ui::fluid_hover::FluidHoverSnapshot> {
         self.hover.as_ref().map(|hover| hover.snapshot(cx))
     }
@@ -153,7 +153,7 @@ impl FileTreePanel {
     }
 
     /// What Delete in the row menu of `path` does, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn delete_from_menu(&mut self, path: &str, cx: &mut Context<Self>) {
         let paths = super::including(&self.selected_paths(cx), path);
         self.ask_delete(paths, cx);
@@ -161,7 +161,7 @@ impl FileTreePanel {
 
     /// The type-to-filter field's text, its query, the match in focus and
     /// whether the field has the keyboard, while it is open, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn search_state(
         &self,
         window: &Window,
@@ -180,7 +180,7 @@ impl FileTreePanel {
 
     /// Put `text` in the open filter field, as typing it there does, for a
     /// scenario: typing into the field is GPUI Kit's own (`confirm_name`).
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn type_in_search(&mut self, text: &str, window: &mut Window, cx: &mut Context<Self>) {
         let Some(input) = self.search.as_ref().map(|search| search.input.clone()) else {
             return;
@@ -199,7 +199,7 @@ impl FileTreePanel {
     }
 
     /// The pinned folders' paths and tops, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn pinned_state(&self, cx: &App) -> Vec<(String, f32)> {
         let state = self.state.read(cx);
         self.pinned_rows(cx)
@@ -209,7 +209,7 @@ impl FileTreePanel {
     }
 
     /// How far the rows are scrolled, in rows, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn scrolled_rows(&self, cx: &App) -> f32 {
         let scroll = self.state.read(cx).scroll_handle().clone();
         -f32::from(scroll.0.borrow().base_handle.offset().y) / super::motion::ROW
@@ -217,7 +217,7 @@ impl FileTreePanel {
 
     /// The folder moving, whether it opened, and how many rows it moves,
     /// for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn motion_state(&self, cx: &App) -> Option<(String, bool, usize)> {
         let motion = self.motion.as_ref()?;
         let folder = self
@@ -231,14 +231,14 @@ impl FileTreePanel {
     }
 
     /// Every row's id, shown or inside a closed folder, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn all_row_ids(&self, _: &App) -> std::rc::Rc<std::collections::HashSet<String>> {
         self.known.clone()
     }
 
     /// Scroll the rows to `rows` down, as the scrollbar would, for a
     /// scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn scroll_rows_to(&mut self, rows: f32, cx: &mut Context<Self>) {
         let scroll = self.state.read(cx).scroll_handle().clone();
         let y = gpui::px(-rows * super::motion::ROW);

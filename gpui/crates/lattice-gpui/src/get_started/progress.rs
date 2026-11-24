@@ -99,7 +99,7 @@ pub fn mark(step: Step, cx: &mut App) {
 }
 
 /// The step undone, so a scenario sees it marked again by what it checks.
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 pub(crate) fn forget(step: Step, cx: &mut App) {
     global(cx).update(cx, |progress, cx| {
         if progress.is_done(step) {

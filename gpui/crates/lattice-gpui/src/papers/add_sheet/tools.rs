@@ -98,7 +98,7 @@ fn set_full_text(on: bool, window: &mut gpui::Window, cx: &mut gpui::App) {
 
 impl AddPapers {
     /// A click on the full-text switch, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn toggle_full_text(&self, window: &mut gpui::Window, cx: &mut gpui::App) {
         set_full_text(!crate::settings::get(cx).save_full_text, window, cx);
     }

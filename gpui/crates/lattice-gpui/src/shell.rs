@@ -122,7 +122,7 @@ pub use get_started_flow::ShowGetStarted;
 pub use help_flow::{ReportProblem, WhatsNew};
 pub use insert_flow::{InsertTable, PasteImageAsFigure};
 pub use insert_pickers_flow::{GoToLine, GoToSymbol, InsertCitation, InsertReference};
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 pub use overleaf_collab::AnnotateSelection;
 pub use overleaf_menus::ReviewHere;
 pub(crate) use palette_groups::init as init_recent_commands;
@@ -588,7 +588,7 @@ impl Shell {
             .map(|project| project.read(cx).root().to_path_buf())
     }
 
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn project(&self) -> Option<&Entity<Project>> {
         self.project.as_ref()
     }
@@ -597,7 +597,7 @@ impl Shell {
         &self.pdf
     }
 
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn build_panel(&self) -> &Entity<BuildPanel> {
         &self.build_panel
     }
@@ -606,18 +606,18 @@ impl Shell {
         &self.file_tree
     }
 
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn papers(&self) -> &Entity<PapersPanel> {
         &self.papers
     }
 
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn confirm(&self) -> &Entity<ConfirmHost> {
         &self.confirm
     }
 
     /// The project-relative path of the editor the writer was last in.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn active_editor_path(&self, cx: &App) -> Option<String> {
         self.active_editor()
             .map(|editor| editor.read(cx).relative().to_string())
@@ -630,7 +630,7 @@ impl Shell {
 
     /// Whether Clean is still deleting the auxiliary files, which turns a
     /// clean rebuild away until it is done.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn cleaning(&self) -> bool {
         self.cleaning
     }
@@ -747,12 +747,12 @@ impl Shell {
         self.words.update(cx, |words, cx| words.refresh(root, cx));
     }
 
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn tex_setup(&self) -> &Entity<TexSetupCenter> {
         &self.tex_setup
     }
 
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn words(&self) -> &Entity<ManuscriptWords> {
         &self.words
     }

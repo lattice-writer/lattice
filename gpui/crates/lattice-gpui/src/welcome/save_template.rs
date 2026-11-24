@@ -269,7 +269,7 @@ impl SaveTemplateDialog {
 }
 
 /// What a scenario reads and drives.
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 impl SaveTemplateDialog {
     /// Read `path` as the source, as From folder does once it is chosen.
     pub fn read_source(&mut self, path: PathBuf, window: &mut Window, cx: &mut Context<Self>) {

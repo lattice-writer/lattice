@@ -291,7 +291,7 @@ impl Shell {
     /// A build the writer asks for that typesets even when nothing changed,
     /// for a scenario: the project's build on opening leaves latexmk
     /// nothing to do in the next.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub(crate) fn build_forced(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let mut request = BuildRequest::requested();
         request.force = true;
@@ -299,7 +299,7 @@ impl Shell {
     }
 
     /// The build marks shown in `editor`, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub(crate) fn build_marks_shown(&self, editor: EntityId, cx: &gpui::App) -> usize {
         self.parts
             .get::<BuildWatch>()

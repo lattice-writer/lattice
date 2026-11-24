@@ -109,7 +109,7 @@ pub(in crate::editor_panel) fn flash(editor: &Entity<Editor>, row: u32, cx: &mut
 }
 
 /// The rows the flash paints now (0-based), for a scenario.
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 pub(crate) fn flashing_rows(editor: &Editor, cx: &App) -> Vec<u32> {
     let snapshot = editor.buffer().read(cx).snapshot(cx);
     editor

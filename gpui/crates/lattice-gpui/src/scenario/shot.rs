@@ -5,6 +5,9 @@
 //! itself and reads it back from Metal, so the screen may be locked and the
 //! window covered; otherwise it asks `screencapture -l` for the window
 //! server's copy of the window, which needs the window on an unlocked screen.
+//! On Linux it reads the window back from the X server (`native_linux.rs`):
+//! gpui_linux has no `render_to_image` at the gpui-fast pin, so the window
+//! must be mapped, as it is on the runner's Xvfb display.
 //!
 //! `LATTICE_SHOT_OUT=PATH.png` names the image (default `shot.png`),
 //! `LATTICE_APPEARANCE=light|dark` fixes the appearance (see `app.rs`), and
@@ -54,7 +57,7 @@ impl Run {
         .await
     }
 
-    #[cfg(feature = "offscreen-shots")]
+    #[cfg(all(target_os = "macos", feature = "offscreen-shots"))]
     pub(super) async fn capture(&self, cx: &mut AsyncApp, out: &str) -> Result<()> {
         // A covered window gets no frames, so frames are drawn here: each one
         // asks PDFium for the pages it shows, and the images land a little
@@ -81,7 +84,7 @@ impl Run {
         Ok(())
     }
 
-    #[cfg(not(feature = "offscreen-shots"))]
+    #[cfg(all(target_os = "macos", not(feature = "offscreen-shots")))]
     pub(super) async fn capture(&self, cx: &mut AsyncApp, out: &str) -> Result<()> {
         use anyhow::anyhow;
         use std::process::Command;
@@ -97,5 +100,17 @@ impl Run {
             ));
         }
         Ok(())
+    }
+
+    /// The window as the X server holds it, once the frame a change asked
+    /// for has had time to reach it (GPUI draws a mapped window on its own
+    /// clock, so it is asked for one and given a few of them).
+    #[cfg(target_os = "linux")]
+    pub(super) async fn capture(&self, cx: &mut AsyncApp, out: &str) -> Result<()> {
+        let native = self.native(cx)?;
+        native::order_front(native);
+        self.with_window(cx, |_, window, _| window.refresh())?;
+        sleep(cx, Duration::from_millis(300)).await;
+        native::capture(native, out)
     }
 }

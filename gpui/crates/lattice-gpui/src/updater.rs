@@ -536,7 +536,7 @@ pub fn register_actions(cx: &mut App) {
 
 /// Point the updater at `channel` and turn Beta updates on, for a
 /// scenario (a run's env is set before it starts).
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 pub(crate) fn use_channel(channel: Channel, cx: &mut App) {
     if let Some(updater) = global(cx) {
         updater.update(cx, |updater, cx| {

@@ -207,7 +207,7 @@ impl Shell {
 }
 
 /// What a scenario reads of the track.
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 impl Shell {
     /// Workspace `id`'s tab as last drawn, in window coordinates.
     pub fn workspace_tab_bounds(&self, id: &str) -> Option<Bounds<Pixels>> {

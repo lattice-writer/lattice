@@ -303,7 +303,7 @@ impl OverleafBridge {
 
     /// Whether a push of ours is still to probe, for a scenario that counts
     /// the live poll's own probes.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn push_waiting(&self) -> bool {
         self.push_waiting
     }
@@ -434,7 +434,7 @@ impl OverleafBridge {
 
     /// Linked to `link`, signed in as `status`, the live channel up, with
     /// nothing asked of the network: the parity harness's linked project.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn scenario_stage(
         &mut self,
         status: OverleafStatus,

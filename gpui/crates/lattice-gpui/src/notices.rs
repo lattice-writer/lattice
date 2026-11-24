@@ -594,7 +594,7 @@ impl NoticeStack {
     }
 
     /// The titles of the notices showing, newest last, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn titles(&self) -> Vec<SharedString> {
         self.shown
             .iter()
@@ -604,7 +604,7 @@ impl NoticeStack {
     }
 
     /// The details of the notices showing, newest last, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn details(&self) -> Vec<SharedString> {
         self.shown
             .iter()
@@ -614,7 +614,7 @@ impl NoticeStack {
     }
 
     /// Every showing card as it is drawn now, front first, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn cards(&self) -> Vec<stack::CardState> {
         let now = Instant::now();
         self.shown
@@ -624,20 +624,20 @@ impl NoticeStack {
     }
 
     /// Whether the stack is fanned out.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn expanded(&self) -> bool {
         self.hovered || self.focused
     }
 
     /// How many cards are on their way out.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn leaving(&self) -> usize {
         self.leaving.len()
     }
 
     /// Answer the notice titled `title` with its action `label`, as a click
     /// on that button would, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn answer(
         &mut self,
         title: &str,
@@ -669,7 +669,7 @@ impl NoticeStack {
     }
 
     /// Take every notice down at once, without their exits, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn clear(&mut self, cx: &mut Context<Self>) {
         self.shown.clear();
         self.leaving.clear();

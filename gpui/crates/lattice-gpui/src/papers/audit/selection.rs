@@ -204,7 +204,7 @@ impl Audit {
 
 /// The selection as a scenario ticks and reads it, through the handlers the
 /// sheet's checkboxes and buttons call.
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 impl Audit {
     /// Tick (or untick) the reference with citation key `key`.
     pub fn tick(&mut self, key: &str, on: bool, cx: &mut Context<Self>) {

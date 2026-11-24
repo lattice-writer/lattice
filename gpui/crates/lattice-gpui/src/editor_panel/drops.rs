@@ -92,7 +92,7 @@ impl EditorPanel {
 
     /// The middle of the caret before `offset`, in window coordinates: where
     /// a scenario aims a drop at that place.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn point_before(
         &self,
         offset: usize,
@@ -105,7 +105,7 @@ impl EditorPanel {
 
     /// Whether a drag over the editor lights it now, and draws a drop
     /// caret, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn drop_lit(&self, cx: &App) -> (Option<DropLit>, bool) {
         let hover = self.drop_hover.borrow();
         (

@@ -228,7 +228,7 @@ fn wash(editor: &Entity<Editor>, rows: &[u32], cx: &mut App) {
 }
 
 /// The rows the wash paints now (0-based), for a scenario.
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 pub(crate) fn washed_rows(editor: &Editor, cx: &App) -> Vec<u32> {
     let snapshot = editor.buffer().read(cx).snapshot(cx);
     editor

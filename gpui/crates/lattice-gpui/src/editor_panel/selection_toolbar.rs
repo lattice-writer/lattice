@@ -319,13 +319,13 @@ impl EditorPanel {
     }
 
     /// How many highlights are painted in the source, for scripted checks.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn highlights_painted(&self, _: &App) -> usize {
         self.toolbar.painted
     }
 
     /// Whether the selection is bold, as the toolbar's Bold shows it.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn toolbar_pressed_bold(&self, cx: &App) -> bool {
         self.toolbar_selection(cx).is_some_and(|range| {
             format_toggle::selection_formats(&self.buffer.read(cx).text(), range)
@@ -337,7 +337,7 @@ impl EditorPanel {
     /// Press one of the toolbar's tools by name (scripted runs): `bold`,
     /// `pen`, `unhighlight`, a block such as `heading-1` in Markdown, or
     /// `custom`, the highlight palette's "+" (its custom colour view).
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn scripted_toolbar(&mut self, name: &str, window: &mut Window, cx: &mut Context<Self>) {
         let markdown = self.toolbar_kind() == Some(Kind::Markdown);
         let action = match name {
