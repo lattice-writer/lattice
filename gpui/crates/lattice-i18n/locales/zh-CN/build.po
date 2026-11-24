@@ -101,3 +101,7 @@ msgstr "{count} 分钟前"
 #: lattice-gpui/src/build/sequence.rs
 msgid "⌘S, or ⇧-click for a clean rebuild"
 msgstr "⌘S，按住 ⇧ 点击则从头编译"
+
+#: lattice-gpui/src/typst.rs
+msgid "Not now"
+msgstr "以后再说"
