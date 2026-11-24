@@ -38,7 +38,9 @@ use code_palette::CodePalette;
 /// The code themes of Settings › Appearance, in its order.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum CodeTheme {
+    /// VS Code's Light+ and Dark+.
     #[default]
+    Vscode,
     Github,
     /// Lattice's own palette.
     WeftAndWarp,
@@ -52,7 +54,8 @@ pub enum CodeTheme {
 }
 
 impl CodeTheme {
-    pub const ALL: [CodeTheme; 9] = [
+    pub const ALL: [CodeTheme; 10] = [
+        CodeTheme::Vscode,
         CodeTheme::Github,
         CodeTheme::WeftAndWarp,
         CodeTheme::One,
@@ -68,6 +71,7 @@ impl CodeTheme {
     /// Warp, whose colours are the Lattice palette's.
     pub fn source(self) -> Option<&'static CodeThemeSource> {
         Some(match self {
+            CodeTheme::Vscode => &CODE_THEME_VSCODE,
             CodeTheme::Github => &CODE_THEME_GITHUB,
             CodeTheme::WeftAndWarp => return None,
             CodeTheme::One => &CODE_THEME_ONE,
@@ -107,6 +111,36 @@ impl CodeTheme {
 /// the window's editor sheet, or the theme's own in the other appearance.
 pub fn ground(theme: CodeTheme, palette: &Palette) -> Hsla {
     CodePalette::new(theme, palette).ground
+}
+
+/// Each token role's colour in `theme` in an app painted with `palette`, by
+/// its `--syntax-*` name, and which way the ground they were fitted on goes:
+/// what a page painting code with those properties (the Markdown island's
+/// code blocks) needs to match the source editor.
+pub fn syntax_properties(theme: CodeTheme, palette: &Palette) -> (Appearance, [(&'static str, Hsla); 16]) {
+    let code = CodePalette::new(theme, palette);
+    let s = code.syntax;
+    (
+        code.kind,
+        [
+            ("--syntax-keyword", s.keyword),
+            ("--syntax-operator", s.operator),
+            ("--syntax-function", s.function),
+            ("--syntax-type", s.type_),
+            ("--syntax-variable", s.variable),
+            ("--syntax-variable-special", s.variable_special),
+            ("--syntax-property", s.property),
+            ("--syntax-attribute", s.attribute),
+            ("--syntax-string", s.string),
+            ("--syntax-comment", s.comment),
+            ("--syntax-comment-doc", s.comment_doc),
+            ("--syntax-number", s.number),
+            ("--syntax-constant", s.constant),
+            ("--syntax-bracket", s.bracket),
+            ("--syntax-citation", s.citation),
+            ("--syntax-reference", s.reference),
+        ],
+    )
 }
 
 /// The caret's colour in `theme` (`--code-caret`).

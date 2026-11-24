@@ -65,6 +65,8 @@ Its hand-written language table matched OK's `packages/app/src/editor/extensions
 - labels where highlight.js's differ;
 - a short list of spellings Lattice's earlier table accepted.
 
+When Shiki replaced highlight.js for the code blocks (LATA-86), that derived table was frozen as it stood: `CODE_LANGUAGES` now lists the names and aliases highlight.js 11.11.1's registrations produced, verbatim, with each language's Shiki grammar beside them, so no entry was rewritten by hand.
+
 | `code-languages.ts` vs `code-block-languages.ts` | engine | ref |
 | --- | ---: | ---: |
 | before | 0.23 | 0.56 |

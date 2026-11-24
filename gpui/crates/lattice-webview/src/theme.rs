@@ -2,7 +2,7 @@
 
 use gpui::{App, Hsla, Rgba};
 use lattice_ui::{
-    ActiveLattice as _,
+    ActiveLattice as _, Appearance, CodeTheme, editor_theme,
     palette::{Accent, Palette, Tint},
 };
 use serde_json::{Value, json};
@@ -36,7 +36,7 @@ fn css(color: Hsla) -> String {
 pub fn theme_payload(mode: IslandTheme, cx: &App) -> Value {
     match mode {
         IslandTheme::Variables => variables(cx),
-        IslandTheme::Document => document(cx.palette()),
+        IslandTheme::Document => document(cx.palette(), cx.lattice().code_theme),
     }
 }
 
@@ -46,7 +46,10 @@ pub fn theme_payload(mode: IslandTheme, cx: &App) -> Value {
 /// fitted, as `--accent`. So is a chosen theme (`docs/themes.md`): its base
 /// variables come as `vars`, set inline as the Tauri app sets them, or the
 /// page (the Agent's Synara host among them) would stay on the stock palette.
-fn document(palette: &Palette) -> Value {
+/// The code theme comes as its token roles' `--syntax-*` colours, as the
+/// Tauri app sets them on the root, and `data-code-theme-kind`, the way its
+/// ground goes; the Markdown editor's code blocks paint with them.
+fn document(palette: &Palette, code_theme: CodeTheme) -> Value {
     let theme = if palette.is_dark() { "dark" } else { "light" };
     let tint = match palette.tint {
         Tint::Graphite => "graphite",
@@ -67,16 +70,21 @@ fn document(palette: &Palette) -> Value {
         Accent::Theme if theme_accent(palette) => "custom",
         Accent::Theme => "graphite",
     };
-    let vars: serde_json::Map<String, Value> = palette
-        .themed
-        .iter()
-        .flat_map(|themed| themed.css_variables())
+    let (code_kind, syntax) = editor_theme::syntax_properties(code_theme, palette);
+    let vars: serde_json::Map<String, Value> = syntax
+        .into_iter()
+        .map(|(name, color)| (name.to_owned(), css(color)))
+        .chain(palette.themed.iter().flat_map(|themed| themed.css_variables()))
         .filter(|(name, _)| name != "--accent")
         .map(|(name, value)| (name, Value::String(value)))
         .collect();
+    let code_kind = match code_kind {
+        Appearance::Light => "light",
+        Appearance::Dark => "dark",
+    };
     json!({
         "appearance": theme,
-        "dataset": { "theme": theme, "tint": tint, "accent": accent },
+        "dataset": { "theme": theme, "tint": tint, "accent": accent, "codeThemeKind": code_kind },
         "accent": (matches!(palette.accent_preset, Accent::Custom(_)) || theme_accent(palette))
             .then(|| css(palette.accent)),
         "vars": vars,
@@ -126,22 +134,19 @@ fn variables(cx: &App) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lattice_ui::Appearance;
 
     #[test]
     fn a_document_page_gets_the_tauri_apps_root_attributes() {
         let palette = Palette::new(Appearance::Dark, Tint::Sage, Accent::Blue);
+        let payload = document(&palette, CodeTheme::Vscode);
         assert_eq!(
-            document(&palette),
-            json!({
-                "appearance": "dark",
-                "dataset": { "theme": "dark", "tint": "sage", "accent": "blue" },
-                "accent": null,
-                "vars": {},
-            })
+            payload["dataset"],
+            json!({ "theme": "dark", "tint": "sage", "accent": "blue", "codeThemeKind": "dark" })
         );
+        assert_eq!(payload["appearance"], "dark");
+        assert_eq!(payload["accent"], Value::Null);
         let custom = Palette::new(Appearance::Light, Tint::Graphite, Accent::Custom(0x3366cc));
-        let payload = document(&custom);
+        let payload = document(&custom, CodeTheme::Vscode);
         assert_eq!(payload["dataset"]["accent"], "custom");
         assert!(payload["accent"].as_str().unwrap().starts_with("rgba("));
     }
@@ -154,9 +159,24 @@ mod tests {
             .expect("Nord is bundled");
         let palette = Palette::new(Appearance::Dark, Tint::Sage, Accent::Blue)
             .with_theme(Some(std::sync::Arc::new(nord)));
-        let payload = document(&palette);
+        let payload = document(&palette, CodeTheme::Vscode);
         assert_eq!(payload["dataset"]["tint"], "graphite");
         assert_eq!(payload["vars"]["--side-panel"], "#262c37");
         assert!(payload["vars"].get("--accent").is_none());
+    }
+
+    /// The Markdown island's code blocks paint with the code theme's roles,
+    /// as the source editor does.
+    #[test]
+    fn a_document_page_gets_the_code_themes_syntax_colours() {
+        let palette = Palette::new(Appearance::Light, Tint::Graphite, Accent::Graphite);
+        let (_, syntax) = editor_theme::syntax_properties(CodeTheme::Vscode, &palette);
+        let payload = document(&palette, CodeTheme::Vscode);
+        for (name, color) in syntax {
+            assert_eq!(payload["vars"][name], css(color), "{name}");
+        }
+        let dracula = document(&palette, CodeTheme::Dracula);
+        assert_eq!(dracula["dataset"]["codeThemeKind"], "dark");
+        assert_ne!(dracula["vars"]["--syntax-keyword"], payload["vars"]["--syntax-keyword"]);
     }
 }

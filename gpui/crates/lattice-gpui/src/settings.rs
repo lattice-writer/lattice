@@ -414,6 +414,7 @@ pub fn accent(accent: &lattice_settings::Accent) -> Accent {
 
 pub fn code_theme(theme: StoredCodeTheme) -> CodeTheme {
     match theme {
+        StoredCodeTheme::Vscode => CodeTheme::Vscode,
         StoredCodeTheme::Github => CodeTheme::Github,
         StoredCodeTheme::Lattice => CodeTheme::WeftAndWarp,
         StoredCodeTheme::One => CodeTheme::One,

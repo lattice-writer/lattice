@@ -317,8 +317,8 @@ describe("code blocks (R-BLK-7, R-FMT-8)", () => {
   });
 
   it("highlights without putting a line ending inside a span", async () => {
-    renderEditor("```js\n// first line\n// second line\n```");
-    await waitFor(() => expect(document.querySelector(".hljs-comment")).not.toBeNull());
+    renderEditor("```js\n// first line\n// next line\n```");
+    await waitFor(() => expect(document.querySelector("[style*=comment]")).toBeTruthy());
     const spans = [...document.querySelectorAll(".lx-md-code-pre span")];
     expect(spans.length).toBeGreaterThan(1);
     for (const span of spans) expect(span.textContent).not.toContain("\n");

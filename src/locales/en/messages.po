@@ -4349,6 +4349,10 @@ msgstr "Code block title"
 msgid "Code theme"
 msgstr "Code theme"
 
+#: src/settings/acknowledged-software.ts
+msgid "Code theme colours from Microsoft's Light+ and Dark+ and GitHub's Light and Dark Default, as Shiki packages them"
+msgstr "Code theme colours from Microsoft's Light+ and Dark+ and GitHub's Light and Dark Default, as Shiki packages them"
+
 #: src/papers/zotero-browser.tsx
 msgid "Collapse {name}"
 msgstr "Collapse {name}"

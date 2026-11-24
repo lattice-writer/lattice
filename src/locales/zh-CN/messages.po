@@ -4349,6 +4349,10 @@ msgstr "标题"
 msgid "Code theme"
 msgstr "代码主题"
 
+#: src/settings/acknowledged-software.ts
+msgid "Code theme colours from Microsoft's Light+ and Dark+ and GitHub's Light and Dark Default, as Shiki packages them"
+msgstr "代码主题配色取自 Microsoft 的 Light+ 与 Dark+ 及 GitHub 的 Light 与 Dark Default，由 Shiki 打包"
+
 #: src/papers/zotero-browser.tsx
 msgid "Collapse {name}"
 msgstr "收起 {name}"

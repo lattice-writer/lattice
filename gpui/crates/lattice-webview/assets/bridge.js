@@ -90,7 +90,7 @@
     // attributes the app sets (src/settings/use-appearance.ts), and a custom
     // accent's colour, which those stylesheets cannot derive.
     if (theme.dataset && typeof theme.dataset === "object") {
-      for (const name of ["theme", "tint", "accent"]) {
+      for (const name of ["theme", "tint", "accent", "codeThemeKind"]) {
         const value = theme.dataset[name];
         if (typeof value === "string") root.dataset[name] = value;
       }

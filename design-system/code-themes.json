@@ -1,6 +1,7 @@
 {
   "about": "Generated from src/settings/code-themes.ts by design-system/code-themes.mjs. Do not edit.",
   "order": [
+    "vscode",
     "github",
     "lattice",
     "one",
@@ -12,6 +13,76 @@
     "monokai"
   ],
   "themes": [
+    {
+      "id": "vscode",
+      "name": "VS Code",
+      "kinds": [
+        "light",
+        "dark"
+      ],
+      "apps": {
+        "light": {
+          "kind": "light",
+          "ground": "window",
+          "properties": {
+            "--code-caret": "#000000",
+            "--code-ground": "var(--editor-bg)",
+            "--code-ink": "#000000",
+            "--code-line": "color-mix(in srgb, #000000 5%, var(--editor-bg))",
+            "--code-line-number": "#237893",
+            "--code-line-number-contrast": "#237893",
+            "--code-selection": "color-mix(in srgb, #add6ff 60%, var(--editor-bg))",
+            "--code-selection-focused": "color-mix(in srgb, #add6ff 100%, var(--editor-bg))",
+            "--syntax-attribute": "#d90201",
+            "--syntax-bracket": "#000000",
+            "--syntax-citation": "#000000",
+            "--syntax-comment": "#067d05",
+            "--syntax-comment-doc": "#067d05",
+            "--syntax-constant": "#0000ff",
+            "--syntax-function": "#795e26",
+            "--syntax-keyword": "#0000ff",
+            "--syntax-number": "#117b51",
+            "--syntax-operator": "#000000",
+            "--syntax-property": "#001080",
+            "--syntax-reference": "#000000",
+            "--syntax-string": "#a31515",
+            "--syntax-type": "#17758e",
+            "--syntax-variable": "#001080",
+            "--syntax-variable-special": "#0000ff"
+          }
+        },
+        "dark": {
+          "kind": "dark",
+          "ground": "window",
+          "properties": {
+            "--code-caret": "#aeafad",
+            "--code-ground": "var(--editor-bg)",
+            "--code-ink": "#d4d4d4",
+            "--code-line": "color-mix(in srgb, #d4d4d4 5%, var(--editor-bg))",
+            "--code-line-number": "#858585",
+            "--code-line-number-contrast": "#868686",
+            "--code-selection": "color-mix(in srgb, #264f78 60%, var(--editor-bg))",
+            "--code-selection-focused": "color-mix(in srgb, #264f78 100%, var(--editor-bg))",
+            "--syntax-attribute": "#9cdcfe",
+            "--syntax-bracket": "#d4d4d4",
+            "--syntax-citation": "#d4d4d4",
+            "--syntax-comment": "#6c9b57",
+            "--syntax-comment-doc": "#6c9b57",
+            "--syntax-constant": "#569cd6",
+            "--syntax-function": "#dcdcaa",
+            "--syntax-keyword": "#569cd6",
+            "--syntax-number": "#b5cea8",
+            "--syntax-operator": "#d4d4d4",
+            "--syntax-property": "#9cdcfe",
+            "--syntax-reference": "#d4d4d4",
+            "--syntax-string": "#ce9178",
+            "--syntax-type": "#4ec9b0",
+            "--syntax-variable": "#9cdcfe",
+            "--syntax-variable-special": "#569cd6"
+          }
+        }
+      }
+    },
     {
       "id": "github",
       "name": "GitHub",
@@ -34,19 +105,19 @@
             "--code-selection-focused": "color-mix(in srgb, #0969da 20%, var(--editor-bg))",
             "--syntax-attribute": "#0550ae",
             "--syntax-bracket": "#1f2328",
-            "--syntax-citation": "#0a3069",
-            "--syntax-comment": "#59636e",
-            "--syntax-comment-doc": "#0a3069",
+            "--syntax-citation": "#0550ae",
+            "--syntax-comment": "#656d77",
+            "--syntax-comment-doc": "#656d77",
             "--syntax-constant": "#0550ae",
             "--syntax-function": "#804ddc",
             "--syntax-keyword": "#cf222e",
             "--syntax-number": "#0550ae",
             "--syntax-operator": "#cf222e",
-            "--syntax-property": "#0550ae",
-            "--syntax-reference": "#953800",
+            "--syntax-property": "#1f2328",
+            "--syntax-reference": "#0550ae",
             "--syntax-string": "#0a3069",
-            "--syntax-type": "#116329",
-            "--syntax-variable": "#0550ae",
+            "--syntax-type": "#953800",
+            "--syntax-variable": "#953800",
             "--syntax-variable-special": "#0550ae"
           }
         },
@@ -64,19 +135,19 @@
             "--code-selection-focused": "color-mix(in srgb, #388bfd 20%, var(--editor-bg))",
             "--syntax-attribute": "#79c0ff",
             "--syntax-bracket": "#e6edf3",
-            "--syntax-citation": "#a5d6ff",
+            "--syntax-citation": "#79c0ff",
             "--syntax-comment": "#8b949e",
-            "--syntax-comment-doc": "#a5d6ff",
+            "--syntax-comment-doc": "#8b949e",
             "--syntax-constant": "#79c0ff",
             "--syntax-function": "#d2a8ff",
             "--syntax-keyword": "#ff7b72",
             "--syntax-number": "#79c0ff",
             "--syntax-operator": "#ff7b72",
-            "--syntax-property": "#79c0ff",
-            "--syntax-reference": "#ffa657",
+            "--syntax-property": "#e6edf3",
+            "--syntax-reference": "#79c0ff",
             "--syntax-string": "#a5d6ff",
-            "--syntax-type": "#7ee787",
-            "--syntax-variable": "#79c0ff",
+            "--syntax-type": "#ffa657",
+            "--syntax-variable": "#ffa657",
             "--syntax-variable-special": "#79c0ff"
           }
         }

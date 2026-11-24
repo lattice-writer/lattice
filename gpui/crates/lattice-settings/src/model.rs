@@ -121,6 +121,7 @@ choice!(
 );
 choice!(
     CodeTheme {
+        Vscode = "vscode",
         Github = "github",
         Lattice = "lattice",
         One = "one",
@@ -130,7 +131,7 @@ choice!(
         Dracula = "dracula",
         Nord = "nord",
         Monokai = "monokai",
-    } default Github
+    } default Vscode
 );
 choice!(
     /// Which variant of a two-variant code theme; `auto` follows the app.
@@ -291,7 +292,10 @@ impl Default for Appearance {
             accent: Accent::default(),
             theme: String::new(),
             translucency: Translucency::Subtle,
-            code_theme: CodeTheme::Github,
+            // GitHub was the default before VS Code. A stored "github" stays:
+            // the file is written whole, so a defaulted one cannot be told
+            // from one the writer picked.
+            code_theme: CodeTheme::Vscode,
             code_theme_variant: CodeThemeVariant::Auto,
         }
     }
