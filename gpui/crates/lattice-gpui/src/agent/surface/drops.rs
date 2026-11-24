@@ -47,9 +47,10 @@ impl SynaraSurface {
     /// `read_agent_composer_files`, for the paths of the last drop alone.
     pub(super) fn read_dropped(&mut self, id: u64, cx: &mut Context<Self>) {
         let dropped = std::mem::take(&mut self.dropped);
-        let read = cx.background_spawn(async move {
-            lattice_core::project::read_agent_attachments(&dropped)
-        });
+        let read =
+            cx.background_spawn(
+                async move { lattice_core::project::read_agent_attachments(&dropped) },
+            );
         cx.spawn(async move |this, cx| {
             let files = read.await;
             this.update(cx, |this, cx| {
@@ -59,8 +60,9 @@ impl SynaraSurface {
                         .map(|file| (file.name.clone(), file.mime_type.clone()))
                         .collect()
                 }));
-                let answer = files
-                    .and_then(|files| serde_json::to_value(files).map_err(|error| error.to_string()));
+                let answer = files.and_then(|files| {
+                    serde_json::to_value(files).map_err(|error| error.to_string())
+                });
                 this.respond(id, answer, cx);
             })
             .ok();

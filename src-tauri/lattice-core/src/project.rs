@@ -107,7 +107,8 @@ pub use history::{
 pub use history::{HistoryItem, TransactionRecord};
 pub use imports::{
     import_assets, import_files, import_image_bytes, import_sources, read_agent_attachments,
-    read_agent_composer_files, write_bytes, AgentComposerFile, ImportRequest, NameConflict, ProjectImport,
+    read_agent_composer_files, write_bytes, AgentComposerFile, ImportRequest, NameConflict,
+    ProjectImport,
 };
 pub use linked_bibliography::{
     read_bibliography_source, read_linked_bibliography, save_linked_bibliography,

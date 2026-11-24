@@ -98,7 +98,11 @@ fn agent_attachments_take_any_regular_file_whatever_its_format() {
         vec![
             ("report.docx", "application/octet-stream", STANDARD.encode(docx)),
             ("budget.xlsx", "application/octet-stream", STANDARD.encode(xlsx)),
-            ("trace.qzx", "application/octet-stream", STANDARD.encode(b"\x00\x01\x02 no known format")),
+            (
+                "trace.qzx",
+                "application/octet-stream",
+                STANDARD.encode(b"\x00\x01\x02 no known format")
+            ),
             ("plot.png", "image/png", STANDARD.encode(b"png-bytes")),
             ("notes.md", "text/markdown", STANDARD.encode(b"# Notes")),
         ]
