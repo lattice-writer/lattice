@@ -12,6 +12,9 @@ pub struct LatticeTheme {
     pub palette: Palette,
     pub fonts: Fonts,
     pub code_theme: CodeTheme,
+    /// The appearance the code theme's variant fixes, or `None` to follow
+    /// the app's (Settings → Appearance → Variant).
+    pub code_theme_variant: Option<Appearance>,
 }
 
 impl Global for LatticeTheme {}
@@ -50,6 +53,7 @@ impl LatticeTheme {
             palette: Palette::new(appearance, Tint::default(), Accent::default()),
             fonts,
             code_theme: CodeTheme::default(),
+            code_theme_variant: None,
         });
         kit::apply(cx);
     }
@@ -119,12 +123,24 @@ impl LatticeTheme {
         Self::update(cx, |theme| theme.code_theme = code_theme);
     }
 
+    pub fn set_code_theme_variant(variant: Option<Appearance>, cx: &mut App) {
+        Self::update(cx, |theme| theme.code_theme_variant = variant);
+    }
+
     /// Change the look, then bring GPUI Kit along and redraw every window.
     /// Observers of the global (the Zed editor theme, in the app) run after.
     fn update(cx: &mut App, edit: impl FnOnce(&mut LatticeTheme)) {
-        let before = (cx.lattice().palette.clone(), cx.lattice().code_theme);
+        let look = |cx: &App| {
+            let lattice = cx.lattice();
+            (
+                lattice.palette.clone(),
+                lattice.code_theme,
+                lattice.code_theme_variant,
+            )
+        };
+        let before = look(cx);
         edit(cx.global_mut::<LatticeTheme>());
-        if (cx.lattice().palette.clone(), cx.lattice().code_theme) == before {
+        if look(cx) == before {
             return;
         }
         kit::apply(cx);

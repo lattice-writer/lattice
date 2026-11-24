@@ -221,8 +221,8 @@ fn editor_family(face: &str, default: &str) -> String {
 pub(crate) fn apply_editor_settings(cx: &mut App) {
     let lattice = cx.lattice();
     let code_theme = lattice.code_theme;
+    let variant = lattice.code_theme_variant;
     let appearance = crate::settings::get(cx).appearance.clone();
-    let variant = crate::settings::code_theme_variant(appearance.code_theme_variant);
     let vim_mode = appearance.editor_keymap == lattice_settings::EditorKeymap::Vim;
     let json = BASE_SETTINGS
         .replace(

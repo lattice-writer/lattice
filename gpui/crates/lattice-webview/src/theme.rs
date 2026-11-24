@@ -36,7 +36,11 @@ fn css(color: Hsla) -> String {
 pub fn theme_payload(mode: IslandTheme, cx: &App) -> Value {
     match mode {
         IslandTheme::Variables => variables(cx),
-        IslandTheme::Document => document(cx.palette(), cx.lattice().code_theme),
+        IslandTheme::Document => document(
+            cx.palette(),
+            cx.lattice().code_theme,
+            cx.lattice().code_theme_variant,
+        ),
     }
 }
 
@@ -48,8 +52,10 @@ pub fn theme_payload(mode: IslandTheme, cx: &App) -> Value {
 /// page (the Agent's Synara host among them) would stay on the stock palette.
 /// The code theme comes as its token roles' `--syntax-*` colours, as the
 /// Tauri app sets them on the root, and `data-code-theme-kind`, the way its
-/// ground goes; the Markdown editor's code blocks paint with them.
-fn document(palette: &Palette, code_theme: CodeTheme) -> Value {
+/// ground goes; the Markdown editor's code blocks paint with them. A fixed
+/// `variant` paints them as the source editor's Zed theme does: the code
+/// theme in that appearance, the chosen theme's syntax laid over it.
+fn document(palette: &Palette, code_theme: CodeTheme, variant: Option<Appearance>) -> Value {
     let theme = if palette.is_dark() { "dark" } else { "light" };
     let tint = match palette.tint {
         Tint::Graphite => "graphite",
@@ -70,17 +76,25 @@ fn document(palette: &Palette, code_theme: CodeTheme) -> Value {
         Accent::Theme if theme_accent(palette) => "custom",
         Accent::Theme => "graphite",
     };
-    let (code_kind, syntax) = editor_theme::syntax_properties(code_theme, palette);
+    let code_palette = match variant {
+        Some(appearance) if appearance != palette.appearance => {
+            Palette::new(appearance, palette.tint, palette.accent_preset)
+                .with_theme(palette.theme.clone())
+        }
+        _ => palette.clone(),
+    };
+    let (code_kind, syntax) = editor_theme::syntax_properties(code_theme, &code_palette);
+    // The chosen theme's `--syntax-*` are in `syntax` already, through the
+    // code palette, in the variant's appearance.
+    let themed = palette
+        .themed
+        .iter()
+        .flat_map(|themed| themed.css_variables())
+        .filter(|(name, _)| name != "--accent" && !name.starts_with("--syntax-"));
     let vars: serde_json::Map<String, Value> = syntax
         .into_iter()
         .map(|(name, color)| (name.to_owned(), css(color)))
-        .chain(
-            palette
-                .themed
-                .iter()
-                .flat_map(|themed| themed.css_variables()),
-        )
-        .filter(|(name, _)| name != "--accent")
+        .chain(themed)
         .map(|(name, value)| (name, Value::String(value)))
         .collect();
     let code_kind = match code_kind {
@@ -143,7 +157,7 @@ mod tests {
     #[test]
     fn a_document_page_gets_the_tauri_apps_root_attributes() {
         let palette = Palette::new(Appearance::Dark, Tint::Sage, Accent::Blue);
-        let payload = document(&palette, CodeTheme::Vscode);
+        let payload = document(&palette, CodeTheme::Vscode, None);
         assert_eq!(
             payload["dataset"],
             json!({ "theme": "dark", "tint": "sage", "accent": "blue", "codeThemeKind": "dark" })
@@ -151,7 +165,7 @@ mod tests {
         assert_eq!(payload["appearance"], "dark");
         assert_eq!(payload["accent"], Value::Null);
         let custom = Palette::new(Appearance::Light, Tint::Graphite, Accent::Custom(0x3366cc));
-        let payload = document(&custom, CodeTheme::Vscode);
+        let payload = document(&custom, CodeTheme::Vscode, None);
         assert_eq!(payload["dataset"]["accent"], "custom");
         assert!(payload["accent"].as_str().unwrap().starts_with("rgba("));
     }
@@ -164,7 +178,7 @@ mod tests {
             .expect("Nord is bundled");
         let palette = Palette::new(Appearance::Dark, Tint::Sage, Accent::Blue)
             .with_theme(Some(std::sync::Arc::new(nord)));
-        let payload = document(&palette, CodeTheme::Vscode);
+        let payload = document(&palette, CodeTheme::Vscode, None);
         assert_eq!(payload["dataset"]["tint"], "graphite");
         assert_eq!(payload["vars"]["--side-panel"], "#262c37");
         assert!(payload["vars"].get("--accent").is_none());
@@ -176,15 +190,35 @@ mod tests {
     fn a_document_page_gets_the_code_themes_syntax_colours() {
         let palette = Palette::new(Appearance::Light, Tint::Graphite, Accent::Graphite);
         let (_, syntax) = editor_theme::syntax_properties(CodeTheme::Vscode, &palette);
-        let payload = document(&palette, CodeTheme::Vscode);
+        let payload = document(&palette, CodeTheme::Vscode, None);
         for (name, color) in syntax {
             assert_eq!(payload["vars"][name], css(color), "{name}");
         }
-        let dracula = document(&palette, CodeTheme::Dracula);
+        let dracula = document(&palette, CodeTheme::Dracula, None);
         assert_eq!(dracula["dataset"]["codeThemeKind"], "dark");
         assert_ne!(
             dracula["vars"]["--syntax-keyword"],
             payload["vars"]["--syntax-keyword"]
+        );
+    }
+
+    /// A fixed variant paints the code blocks as the source editor's theme:
+    /// VS Code set to Dark in a light app sends Dark+ and the dark kind, so
+    /// the stylesheet's opposite-appearance ground applies.
+    #[test]
+    fn a_document_page_follows_the_code_themes_fixed_variant() {
+        let light = Palette::new(Appearance::Light, Tint::Graphite, Accent::Graphite);
+        let dark = Palette::new(Appearance::Dark, Tint::Graphite, Accent::Graphite);
+        let payload = document(&light, CodeTheme::Vscode, Some(Appearance::Dark));
+        assert_eq!(payload["dataset"]["theme"], "light");
+        assert_eq!(payload["dataset"]["codeThemeKind"], "dark");
+        let (_, syntax) = editor_theme::syntax_properties(CodeTheme::Vscode, &dark);
+        for (name, color) in syntax {
+            assert_eq!(payload["vars"][name], css(color), "{name}");
+        }
+        assert_eq!(
+            document(&light, CodeTheme::Vscode, Some(Appearance::Light)),
+            document(&light, CodeTheme::Vscode, None)
         );
     }
 }

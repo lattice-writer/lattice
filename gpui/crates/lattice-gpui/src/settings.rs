@@ -477,6 +477,7 @@ fn apply(before: Option<&Settings>, cx: &mut App) {
     LatticeTheme::set_tint(tint(a.tint), cx);
     LatticeTheme::set_accent(accent(&a.accent), cx);
     LatticeTheme::set_code_theme(code_theme(a.code_theme), cx);
+    LatticeTheme::set_code_theme_variant(code_theme_variant(a.code_theme_variant), cx);
     if changed(|was, now| was.appearance.theme == now.appearance.theme) {
         reload_theme(cx);
     }
@@ -487,13 +488,11 @@ fn apply(before: Option<&Settings>, cx: &mut App) {
             was.editor_font_size,
             &was.source_font,
             was.source_line_height,
-            was.code_theme_variant,
         ) == (
             now.editor_keymap,
             now.editor_font_size,
             &now.source_font,
             now.source_line_height,
-            now.code_theme_variant,
         )
     }) {
         crate::app::apply_editor_settings(cx);
