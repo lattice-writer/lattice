@@ -481,7 +481,7 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && needs.changes.outputs.gpui != 'false' }}
     runs-on: ubuntu-22.04
-    timeout-minutes: 180
+    timeout-minutes: 220
     steps:
       - uses: actions/checkout@v7
       # A cold release build of Zed's crates takes most of the runner's free
@@ -530,9 +530,9 @@ jobs:
       # From the staged copy, so the smoke also proves the archive's layout:
       # PDFium and the islands beside the binary, nothing read from the
       # checkout. The app must open its window on the e2e fixture and stay up.
-      # No screenshot yet: lavapipe's frames read back black from X11 (both
-      # the root and the app's own ARGB window), so the Linux look comes with
-      # the e2e harness, which draws offscreen.
+      # No screenshot here: lavapipe's frames read back black from X11 (both
+      # the root and the app's own ARGB window); the e2e step below draws
+      # through GL instead and keeps its shots.
       - name: Launch smoke
         timeout-minutes: 5
         run: |
@@ -573,39 +573,28 @@ jobs:
       # there. Ubuntu's TeX Live: latexmk, pdfTeX and SyncTeX
       # (texlive-binaries), and the recommended set for the fixture's xcolor
       # and hyperref. No TexLab, as on Windows: the scenario skips its step.
+      # Mesa's EGL and GL drivers, for the scenario's GL renderer (below).
       - name: Install TeX Live
         timeout-minutes: 15
         working-directory: .
-        run: .github/scripts/apt-install.sh texlive-latex-base texlive-latex-recommended latexmk
-      # Experiment for this branch only: which renderer X11 reads back.
-      - name: Shot backends
-        continue-on-error: true
-        timeout-minutes: 10
-        run: |
-          ../.github/scripts/apt-install.sh libegl1 libegl-mesa0 libgl1-mesa-dri || true
-          exp="$RUNNER_TEMP/e2e-linux-shots/backends"
-          mkdir -p "$exp"
-          for backend in vulkan gl; do
-            project="$RUNNER_TEMP/shot-$backend"
-            cp -R fixtures/e2e "$project"
-            hide=()
-            if [ "$backend" = gl ]; then hide=(env VK_ICD_FILENAMES=/dev/null VK_DRIVER_FILES=/dev/null); fi
-            LATTICE_SHOT_OUT="$exp/$backend.png" LATTICE_GPUI_LOG=info timeout 150 \
-              xvfb-run -a -s "-screen 0 1440x900x24" ${hide[@]+"${hide[@]}"} target/release/lattice-gpui "$project" \
-              --scenario shot --out "$exp/$backend.json" >"$exp/$backend.log" 2>&1 || echo "$backend: exit $?"
-            grep -iE 'adapter|selected gpu|shot|error' "$exp/$backend.log" | head -30 || true
-            cat "$exp/$backend.json" || true
-          done
+        run: .github/scripts/apt-install.sh texlive-latex-base texlive-latex-recommended latexmk libegl1 libegl-mesa0 libgl1-mesa-dri
       # As on Windows: the whole scenario, judged against the steps main
       # fails on Linux (scripts/gpui-e2e-known-failures.json), a new failure's
       # module rerun once first, and the text typed before the quit saved.
       # Xvfb gives the window a display of its own and no window manager; the
-      # app gets 40 minutes, so a scenario that hangs is stopped here with its
+      # app gets 75 minutes, so a scenario that hangs is stopped here with its
       # log. LATTICE_E2E_SHOTS saves the looks the steps capture (read back
       # from the X server, shot.rs) for the artifact.
+      #
+      # Vulkan is hidden, so wgpu draws through GL on Mesa's llvmpipe: what
+      # lavapipe presents reads back black from X11 (the shots of run
+      # 45464952474 were black under Vulkan and whole under GL), and the
+      # scenario's shots read the window back from the X server.
       - name: e2e scenario
-        timeout-minutes: 65
+        timeout-minutes: 110
         env:
+          VK_ICD_FILENAMES: /dev/null
+          VK_DRIVER_FILES: /dev/null
           STRICT_FLAKY: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && '--strict-flaky' || '' }}
         run: |
           project="$RUNNER_TEMP/e2e-project"
@@ -619,7 +608,7 @@ jobs:
           export LATTICE_E2E_TYPST_RELEASE="$RUNNER_TEMP/typst-release"
           export LATTICE_E2E_SHOTS="$shots" LATTICE_GPUI_LOG=info RUST_BACKTRACE=1
           xvfb-run -a -s "-screen 0 1440x900x24" bash -c '
-            timeout 2400 target/release/lattice-gpui "$1" --scenario e2e --out "$2" || echo "the app exited with $?"
+            timeout 4500 target/release/lattice-gpui "$1" --scenario e2e --out "$2" || echo "the app exited with $?"
             cat "$2" || true
             node ../scripts/gpui-e2e-verdict.mjs --platform linux --check-quit $3 \
               --rerun-app target/release/lattice-gpui --fixture fixtures/e2e "$2"
