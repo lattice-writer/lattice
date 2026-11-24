@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# Usage: smoke-macos-dmg.sh <Lattice.dmg> <evidence dir> <signed: true|false>
+# Usage: smoke-macos-dmg.sh <Lattice.dmg> <evidence dir> <signed: true|false> [classic|native]
 #
 # Installs Lattice from its disk image the way a user does (mount, copy to a
 # folder, launch with `open`) on a fresh runner, then checks that it reached
-# its interface: the process stays up, it has a window on screen, and the
-# frontend's own events reach lattice.log (only a running React app writes
-# those, through the Tauri IPC). The bundled Node is run directly, since
+# its interface: the process stays up and it has a window on screen. For the
+# classic (Tauri) app the frontend's own events must also reach lattice.log
+# (only a running React app writes those, through the Tauri IPC); the native
+# (GPUI) app draws its window itself, so the window is its proof, and its
+# data folder is kept as evidence. The bundled Node is run directly, since
 # Synara starts only when a Synara surface opens. A screenshot and the log
 # land in the evidence directory.
 set -euo pipefail
@@ -13,9 +15,16 @@ set -euo pipefail
 dmg="$1"
 evidence="$2"
 signed="$3"
+kind="${4:-classic}"
 mkdir -p "$evidence"
 bundle_id="app.leo1oel.researchwriter"
-log="$HOME/Library/Logs/$bundle_id/lattice.log"
+if [[ "$kind" == "native" ]]; then
+  # flavor.rs MAIN.folder; app_log.rs writes logs/lattice.log there.
+  data="$HOME/Library/Application Support/app.leo1oel.lattice"
+  log="$data/logs/lattice.log"
+else
+  log="$HOME/Library/Logs/$bundle_id/lattice.log"
+fi
 
 mount_path="$(mktemp -d "${RUNNER_TEMP:-/tmp}/lattice-smoke-dmg.XXXXXX")"
 hdiutil attach "$dmg" -nobrowse -readonly -mountpoint "$mount_path" >/dev/null
@@ -42,6 +51,9 @@ open "$app"
 cleanup() {
   pkill -x "$executable" >/dev/null 2>&1 || true
   cp "$log" "$evidence/lattice.log" 2>/dev/null || true
+  if [[ "$kind" == "native" ]]; then
+    ls -laR "$data" >"$evidence/data-folder.txt" 2>&1 || true
+  fi
 }
 trap cleanup EXIT
 
@@ -58,6 +70,7 @@ SWIFT
 swiftc -O -o "$evidence/windows" "$evidence/windows.swift" >/dev/null
 
 frontend=false
+[[ "$kind" == "native" ]] && frontend=true
 window=""
 for _ in $(seq 90); do
   sleep 2
@@ -87,7 +100,9 @@ echo "Lattice window on screen: ${window/ /x}."
 # It must stay up once its interface is there.
 sleep 10
 pgrep -x "$executable" >/dev/null || { echo "::error::Lattice exited after launch."; exit 1; }
-echo "First frontend events:"
-grep '"service":"lattice.frontend"' "$log" | head -5 | cut -c1-300
-grep -E '"event":"(project.open|app.start)' "$log" | head -3 | cut -c1-300 || true
+if [[ "$kind" == "classic" ]]; then
+  echo "First frontend events:"
+  grep '"service":"lattice.frontend"' "$log" | head -5 | cut -c1-300
+  grep -E '"event":"(project.open|app.start)' "$log" | head -3 | cut -c1-300 || true
+fi
 echo "Lattice runs on this $(uname -m) Mac."

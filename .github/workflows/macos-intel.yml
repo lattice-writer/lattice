@@ -30,6 +30,10 @@ name: macOS Intel
 # - native: the native app for x86_64 through gpui-package.yml (flavor
 #   main, arch x86_64), on GitHub's Intel runner, checked that every Mach-O
 #   file contains x86_64;
+# - native-smoke: the native DMG installed and launched on a fresh Intel
+#   runner by the same script (its native mode): it must show its window and
+#   stay up. No Intel Mac in the project ever launches the native app, so
+#   this is its only run on Intel before every Intel copy installs it;
 # - attach: the classic DMG and archive, the native app's
 #   Lattice-native_<version>_x64.* and its Typst helper
 #   Lattice-typst_<version>_x64.* uploaded once check-native-feed.mjs has
@@ -393,6 +397,37 @@ jobs:
       ref: ${{ github.event.workflow_run.head_sha || github.sha }}
     secrets: inherit
 
+  # The native DMG on a fresh Intel runner, as smoke does the classic one.
+  native-smoke:
+    needs: native
+    runs-on: macos-15-intel
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          sparse-checkout: .github/scripts
+      - uses: actions/download-artifact@v8
+        with:
+          name: lattice-gpui-macos-x86_64-main
+          path: ${{ runner.temp }}/native
+      # gpui-package.yml signs and notarizes the native app on every run.
+      - name: Install and launch the native DMG
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          dmgs=("$RUNNER_TEMP"/native/Lattice-native_*_x64.dmg)
+          if ((${#dmgs[@]} != 1)); then
+            echo "::error::Expected one Lattice-native x64 DMG, found: ${dmgs[*]}"
+            exit 1
+          fi
+          .github/scripts/smoke-macos-dmg.sh "${dmgs[0]}" "$RUNNER_TEMP/smoke-evidence" true native
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: macos-intel-native-smoke-evidence
+          path: ${{ runner.temp }}/smoke-evidence
+          if-no-files-found: ignore
+
   # Only after every check, the native build's included, and only for a
   # release. The release is already public (the Release run succeeded), so
   # this adds the Intel assets, the darwin-x86_64 updater entries and the
@@ -402,7 +437,7 @@ jobs:
   # archive: a re-built archive has a new signature, and replacing the one a
   # feed vouches for would break every Intel copy's update.
   attach:
-    needs: [build, smoke, native]
+    needs: [build, smoke, native, native-smoke]
     if: github.event_name == 'workflow_run' && github.event.workflow_run.event == 'push' && startsWith(github.event.workflow_run.head_branch, 'v')
     runs-on: ubuntu-latest
     permissions:
