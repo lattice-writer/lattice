@@ -505,8 +505,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: gpui
-          save-if: ${{ github.ref == 'refs/heads/main' }}
-          cache-on-failure: true
+          # Restore only: the repository's Actions cache is at its 10 GB
+          # limit, and a third multi-GB GPUI cache from main would evict the
+          # Tauri release caches tag builds restore. Saved once Linux ships.
+          save-if: false
       - run: script/fetch-pdfium
       - run: cargo build --release --locked
       # Without TeX, so the ignored latexmk build test stays ignored.
@@ -548,6 +550,11 @@ jobs:
             wait "$app" || true
           ' "$STAGE" "$project" "$log" || status=$?
           tail -n 80 "$log"
+          # PDFium from the archive, not the checkout's vendor/pdfium.
+          if [ "$status" -eq 0 ] && ! grep -q "PDFium loaded from $STAGE/libpdfium.so" "$log"; then
+            echo "PDFium did not load from the staged archive"
+            status=1
+          fi
           exit $status
       - name: Pack the archive
         if: ${{ !cancelled() }}
