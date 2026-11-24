@@ -475,6 +475,7 @@ jobs:
             ${{ runner.temp }}/e2e-windows.json
             ${{ runner.temp }}/e2e-shots/*.png
           if-no-files-found: ignore
+          retention-days: 14
       # The native app for Windows as an unsigned archive: the binary, the
       # Typst helper, PDFium and the island pages side by side, as
       # structured/resources.rs looks for them. Not a release: nothing is
