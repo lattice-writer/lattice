@@ -58,6 +58,7 @@ impl Shell {
             )
             .chain(self.document_overlays())
             .chain(self.lobby_dialogs())
+            .chain(self.new_manuscript_element())
             .chain(self.overleaf_overlays())
             .chain(Some(self.zoom_hud.clone().into_any_element()));
         for dialog in dialogs {

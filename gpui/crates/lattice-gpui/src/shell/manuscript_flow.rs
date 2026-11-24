@@ -47,7 +47,8 @@ impl Shell {
         cx.notify();
     }
 
-    /// The dialog, for the window to draw over everything.
+    /// The dialog, for the window to draw over everything, deferred with
+    /// its other dialogs (`layers.rs`) so it draws above native webviews.
     pub(super) fn new_manuscript_element(&self) -> Option<AnyElement> {
         let (dialog, _) = self.parts.get::<ManuscriptFlow>().dialog.as_ref()?;
         Some(dialog.clone().into_any_element())
@@ -115,23 +116,33 @@ impl Shell {
         });
         cx.spawn_in(window, async move |this, cx| {
             let added = added.await;
-            this.update_in(cx, |this, window, cx| match added {
-                Ok(added) => {
-                    this.close_new_manuscript(window, cx);
+            this.update_in(cx, |this, window, cx| {
+                // Dismissed while it wrote, or another project in front
+                // now: the files are there, but the window has moved on.
+                let current = this.new_manuscript_dialog().as_ref() == Some(&dialog)
+                    && this.project.as_ref() == Some(&project);
+                if !current {
                     project.update(cx, |project, cx| project.rescan(cx));
-                    this.file_tree().clone().update(cx, |tree, cx| {
-                        tree.reveal_paths(vec![added.main.clone()], cx)
-                    });
-                    this.open_path(root.join(&added.main), None, window, cx);
-                    if main {
-                        project
-                            .update(cx, |project, cx| {
-                                project.choose_main_document(added.main.clone(), cx)
-                            })
-                            .detach();
-                    }
+                    return;
                 }
-                Err(error) => dialog.update(cx, |dialog, cx| dialog.failed(error, cx)),
+                match added {
+                    Ok(added) => {
+                        this.close_new_manuscript(window, cx);
+                        project.update(cx, |project, cx| project.rescan(cx));
+                        this.file_tree().clone().update(cx, |tree, cx| {
+                            tree.reveal_paths(vec![added.main.clone()], cx)
+                        });
+                        this.open_path(root.join(&added.main), None, window, cx);
+                        if main {
+                            project
+                                .update(cx, |project, cx| {
+                                    project.choose_main_document(added.main.clone(), cx)
+                                })
+                                .detach();
+                        }
+                    }
+                    Err(error) => dialog.update(cx, |dialog, cx| dialog.failed(error, cx)),
+                }
             })
             .ok();
         })
