@@ -102,7 +102,8 @@ jobs:
 
           ## Install (Apple silicon Mac)
 
-          Download the **.dmg** below, open it, and drag Lattice to Applications.
+          Download **Lattice-native_*_aarch64.dmg** below (the native app, which
+          every Mac runs from 0.20.0), open it, and drag Lattice to Applications.
 
           Lattice is signed with an Apple Developer ID and notarized by Apple.
 
