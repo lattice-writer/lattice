@@ -69,6 +69,12 @@ impl Run {
             shell.update(cx, |shell, cx| shell.dismiss_new_project(window, cx))
         })?;
 
+        // The manifest as it was, for the steps after these: Set as main
+        // document marks its choice there, and a chosen main document changes
+        // what a second root document's build does.
+        let manifest = root.join(".research/project.json");
+        let manifest_before = std::fs::read(&manifest)?;
+
         // New manuscript from template… with chapters/ selected.
         let tree = cx.update(|cx| self.shell.read(cx).file_tree().clone());
         let manuscript = self.open_new_manuscript_in_chapters(cx, &tree).await?;
@@ -182,17 +188,36 @@ impl Run {
         }
 
         // The project as the steps after these expect it: main.tex the main
-        // document, the manuscript gone.
+        // document and the live PDF again (built, so the manuscript's build
+        // gives its place back), no tab of the manuscript's left, and the
+        // manuscript gone.
+        std::fs::write(&manifest, &manifest_before)?;
+        cx.update(|cx| {
+            if let Some(project) = self.shell.read(cx).project().cloned() {
+                project.update(cx, |project, cx| project.reload_manifest(cx));
+            }
+        });
+        self.open(cx, &root.join("main.tex"), Some(1))?;
+        self.pause(cx, Duration::from_millis(300)).await;
+        self.build(cx).await?;
+        self.wait_for(cx, Duration::from_secs(20), |shell, cx| {
+            let shell = shell.read(cx);
+            shell.live_document() == Some("main.tex")
+                && !shell
+                    .root_pdf_tabs()
+                    .iter()
+                    .any(|(document, _)| document == "main.tex")
+        })
+        .await;
         cx.update(|cx| {
             self.shell.update(cx, |shell, cx| {
-                if let Some(project) = shell.project().cloned() {
-                    project
-                        .update(cx, |project, cx| {
-                            project.choose_main_document("main.tex".into(), cx)
-                        })
-                        .detach();
-                }
-                let views: Vec<String> = shell.view_of_document(MAIN, cx).into_iter().collect();
+                let mut views: Vec<String> = shell
+                    .root_pdf_tabs()
+                    .into_iter()
+                    .filter(|(document, _)| document.starts_with("chapters/Manuscript/"))
+                    .map(|(document, _)| crate::shell::views::root_pdf_id(&document))
+                    .collect();
+                views.extend(shell.view_of_document(MAIN, cx));
                 shell
                     .workspace()
                     .clone()
@@ -200,9 +225,27 @@ impl Run {
             })
         });
         self.pause(cx, Duration::from_millis(300)).await;
+        let left = cx.update(|cx| {
+            self.shell
+                .read(cx)
+                .root_pdf_tabs()
+                .into_iter()
+                .map(|(document, _)| document)
+                .collect::<Vec<_>>()
+        });
+        steps.check(
+            "after the manuscript steps the manifest is as it was and main.tex the live PDF again, with no tab of the manuscript's left",
+            left.is_empty()
+                && std::fs::read(&manifest).ok() == Some(manifest_before)
+                && cx.update(|cx| {
+                    let shell = self.shell.read(cx);
+                    shell.live_document() == Some("main.tex")
+                        && shell.view_of_document(MAIN, cx).is_none()
+                }),
+            json!({ "root_pdf_tabs": left }),
+        );
         std::fs::remove_dir_all(root.join("chapters/Manuscript")).ok();
         cx.update(|cx| tree.update(cx, |tree, cx| tree.refresh(cx)));
-        self.open(cx, &root.join("main.tex"), Some(1))?;
         self.pause(cx, Duration::from_millis(500)).await;
         Ok(())
     }
