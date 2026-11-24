@@ -3,7 +3,7 @@ import githubDarkDefault from "@shikijs/themes/github-dark-default";
 import githubLightDefault from "@shikijs/themes/github-light-default";
 import lightPlus from "@shikijs/themes/light-plus";
 import { describe, expect, it } from "vitest";
-import { THEMES } from "./code-themes";
+import { syntaxProperty, THEMES, type SyntaxRole } from "./code-themes";
 import { cssVariablesTheme, resolveRoleColors, resolveScopeColor, ROLE_SCOPES, type VscodeTheme } from "./syntax-scopes";
 
 describe("code themes taken from @shikijs/themes", () => {
@@ -37,6 +37,6 @@ describe("cssVariablesTheme", () => {
   it("paints every role with its custom property", () => {
     const theme = cssVariablesTheme();
     expect(theme.tokenColors.map((rule) => rule.settings.foreground))
-      .toEqual(Object.keys(ROLE_SCOPES).map((role) => `var(--syntax-${role})`));
+      .toEqual(Object.keys(ROLE_SCOPES).map((role) => `var(${syntaxProperty(role as SyntaxRole)})`));
   });
 });

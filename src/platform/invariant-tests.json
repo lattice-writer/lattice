@@ -11,6 +11,7 @@
   "src/settings/theme-parity.test.ts": "theme.css and foundations.css derive the same colors from a theme as GPUI (design-system/themes/parity.json)",
   "src/pdf/pdf-viewer.test.ts": "viewer and live-preview stylesheets applied in jsdom (Vitest empties CSS imports), and the selection tint's theme tokens",
   "src/pdf/pdf-text-layer-selection.test.ts": "text-layer selection stylesheet, likewise",
+  "src/editor/markdown/engine/code-block-selection.test.ts": "a code block's selection painting, which only WebKit itself draws, rendered from the real stylesheet in Playwright's WebKit",
   "src/styles/tokens.test.ts": "the design-token contract (CLAUDE.md)",
   "src/styles/design-system-drift.test.ts": "design-system/tokens.json (exported from the Paper file) matches theme.css and foundations.css",
   "src/styles/surfaces.test.ts": "shared surfaces owned by one stylesheet",

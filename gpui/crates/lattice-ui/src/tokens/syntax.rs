@@ -50,55 +50,55 @@ pub const COLOR_SYNTAX_CITATION: ColorToken = ColorToken::new(hex(0x8D472F), hex
 ///
 /// App: `--lattice-syntax-reference`.
 pub const COLOR_SYNTAX_REFERENCE: ColorToken = ColorToken::new(hex(0x7A3FA8), hex(0xD59BF0));
-/// GitHub code theme (the default): ink: plain code and brackets
+/// GitHub code theme: ink: plain code and brackets
 ///
 /// App: `code-theme github --code-ink`.
 pub const COLOR_SYNTAX_GITHUB_INK: ColorToken = ColorToken::new(hex(0x1F2328), hex(0xE6EDF3));
-/// GitHub code theme (the default): line numbers in the gutter
+/// GitHub code theme: line numbers in the gutter
 ///
 /// App: `code-theme github --code-line-number`.
 pub const COLOR_SYNTAX_GITHUB_LINE_NUMBER: ColorToken = ColorToken::new(hex(0x89929C), hex(0x6E7681));
-/// GitHub code theme (the default): the caret
+/// GitHub code theme: the caret
 ///
 /// App: `code-theme github --code-caret`.
 pub const COLOR_SYNTAX_GITHUB_CARET: ColorToken = ColorToken::new(hex(0x0969DA), hex(0x2F81F7));
-/// GitHub code theme (the default): LaTeX commands, keywords
+/// GitHub code theme: LaTeX commands, keywords
 ///
 /// App: `code-theme github --syntax-keyword`.
 pub const COLOR_SYNTAX_GITHUB_KEYWORD: ColorToken = ColorToken::new(hex(0xCF222E), hex(0xFF7B72));
-/// GitHub code theme (the default): operators
+/// GitHub code theme: operators
 ///
 /// App: `code-theme github --syntax-operator`.
 pub const COLOR_SYNTAX_GITHUB_OPERATOR: ColorToken = ColorToken::new(hex(0xCF222E), hex(0xFF7B72));
-/// GitHub code theme (the default): sectioning, functions
+/// GitHub code theme: sectioning, functions
 ///
 /// App: `code-theme github --syntax-function`.
 pub const COLOR_SYNTAX_GITHUB_FUNCTION: ColorToken = ColorToken::new(hex(0x804DDC), hex(0xD2A8FF));
-/// GitHub code theme (the default): environment names, types
+/// GitHub code theme: environment names, types
 ///
 /// App: `code-theme github --syntax-type`.
-pub const COLOR_SYNTAX_GITHUB_TYPE: ColorToken = ColorToken::new(hex(0x116329), hex(0x7EE787));
-/// GitHub code theme (the default): math, variables
+pub const COLOR_SYNTAX_GITHUB_TYPE: ColorToken = ColorToken::new(hex(0x953800), hex(0xFFA657));
+/// GitHub code theme: math, variables
 ///
 /// App: `code-theme github --syntax-variable`.
-pub const COLOR_SYNTAX_GITHUB_VARIABLE: ColorToken = ColorToken::new(hex(0x0550AE), hex(0x79C0FF));
-/// GitHub code theme (the default): strings, arguments
+pub const COLOR_SYNTAX_GITHUB_VARIABLE: ColorToken = ColorToken::new(hex(0x953800), hex(0xFFA657));
+/// GitHub code theme: strings, arguments
 ///
 /// App: `code-theme github --syntax-string`.
 pub const COLOR_SYNTAX_GITHUB_STRING: ColorToken = ColorToken::new(hex(0x0A3069), hex(0xA5D6FF));
-/// GitHub code theme (the default): comments
+/// GitHub code theme: comments
 ///
 /// App: `code-theme github --syntax-comment`.
-pub const COLOR_SYNTAX_GITHUB_COMMENT: ColorToken = ColorToken::new(hex(0x59636E), hex(0x8B949E));
-/// GitHub code theme (the default): numbers, constants
+pub const COLOR_SYNTAX_GITHUB_COMMENT: ColorToken = ColorToken::new(hex(0x656D77), hex(0x8B949E));
+/// GitHub code theme: numbers, constants
 ///
 /// App: `code-theme github --syntax-number`.
 pub const COLOR_SYNTAX_GITHUB_NUMBER: ColorToken = ColorToken::new(hex(0x0550AE), hex(0x79C0FF));
-/// GitHub code theme (the default): citation keys
+/// GitHub code theme: citation keys
 ///
 /// App: `code-theme github --syntax-citation`.
-pub const COLOR_SYNTAX_GITHUB_CITATION: ColorToken = ColorToken::new(hex(0x0A3069), hex(0xA5D6FF));
-/// GitHub code theme (the default): cross-references
+pub const COLOR_SYNTAX_GITHUB_CITATION: ColorToken = ColorToken::new(hex(0x0550AE), hex(0x79C0FF));
+/// GitHub code theme: cross-references
 ///
 /// App: `code-theme github --syntax-reference`.
-pub const COLOR_SYNTAX_GITHUB_REFERENCE: ColorToken = ColorToken::new(hex(0x953800), hex(0xFFA657));
+pub const COLOR_SYNTAX_GITHUB_REFERENCE: ColorToken = ColorToken::new(hex(0x0550AE), hex(0x79C0FF));

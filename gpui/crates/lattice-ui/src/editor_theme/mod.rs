@@ -117,7 +117,10 @@ pub fn ground(theme: CodeTheme, palette: &Palette) -> Hsla {
 /// its `--syntax-*` name, and which way the ground they were fitted on goes:
 /// what a page painting code with those properties (the Markdown island's
 /// code blocks) needs to match the source editor.
-pub fn syntax_properties(theme: CodeTheme, palette: &Palette) -> (Appearance, [(&'static str, Hsla); 16]) {
+pub fn syntax_properties(
+    theme: CodeTheme,
+    palette: &Palette,
+) -> (Appearance, [(&'static str, Hsla); 16]) {
     let code = CodePalette::new(theme, palette);
     let s = code.syntax;
     (

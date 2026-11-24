@@ -121,7 +121,9 @@ fn python_matches_the_textmate_grammars_roles() {
         ("__name__", "variable.special"),
     ] {
         assert!(
-            captured.iter().any(|(run, name)| run == token && name == capture),
+            captured
+                .iter()
+                .any(|(run, name)| run == token && name == capture),
             "{token:?} should be {capture}: {captured:?}"
         );
     }

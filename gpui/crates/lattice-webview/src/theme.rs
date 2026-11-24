@@ -74,7 +74,12 @@ fn document(palette: &Palette, code_theme: CodeTheme) -> Value {
     let vars: serde_json::Map<String, Value> = syntax
         .into_iter()
         .map(|(name, color)| (name.to_owned(), css(color)))
-        .chain(palette.themed.iter().flat_map(|themed| themed.css_variables()))
+        .chain(
+            palette
+                .themed
+                .iter()
+                .flat_map(|themed| themed.css_variables()),
+        )
         .filter(|(name, _)| name != "--accent")
         .map(|(name, value)| (name, Value::String(value)))
         .collect();
@@ -177,6 +182,9 @@ mod tests {
         }
         let dracula = document(&palette, CodeTheme::Dracula);
         assert_eq!(dracula["dataset"]["codeThemeKind"], "dark");
-        assert_ne!(dracula["vars"]["--syntax-keyword"], payload["vars"]["--syntax-keyword"]);
+        assert_ne!(
+            dracula["vars"]["--syntax-keyword"],
+            payload["vars"]["--syntax-keyword"]
+        );
     }
 }

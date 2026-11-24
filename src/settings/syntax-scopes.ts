@@ -9,7 +9,7 @@
  *   those colours for the themes taken from @shikijs/themes, and its test
  *   checks they still match.
  * - `cssVariablesTheme` turns the whole table into a Shiki theme whose every
- *   colour is `var(--syntax-<role>)`, so the visual editor's code blocks,
+ *   colour is the role's `--syntax-*` property, so the visual editor's code blocks,
  *   tokenized by Shiki's TextMate grammars, wear whichever code theme the
  *   writer chose, exactly as the source editors and GPUI's tree-sitter
  *   captures (their roles are the same names) do.
@@ -18,7 +18,7 @@
  * as in VS Code: `keyword.operator.logical.python` (`not`, `in`) is a
  * keyword, not an operator, because VS Code's themes say so.
  */
-import type { SyntaxRole } from "./code-themes";
+import { syntaxProperty, type SyntaxRole } from "./code-themes";
 
 /* eslint-disable lingui/no-unlocalized-strings -- TextMate scope names */
 export const ROLE_SCOPES: Record<SyntaxRole, readonly string[]> = {
@@ -110,18 +110,18 @@ export function resolveRoleColors(theme: VscodeTheme): Record<SyntaxRole, string
 
 /**
  * A Shiki theme whose colours are the roles' custom properties: a token is
- * painted `var(--syntax-<role>)` for the role its scopes match, and comments
+ * painted with the `--syntax-*` property of the role its scopes match, and comments
  * are italic as every Lattice surface sets them.
  */
 export function cssVariablesTheme() {
   return {
     name: "lattice-syntax",
     type: "light" as const,
-    colors: { "editor.foreground": "var(--lx-code-ink)", "editor.background": "transparent" },
+    colors: { "editor.foreground": "var(--code-ink)", "editor.background": "transparent" },
     tokenColors: Object.entries(ROLE_SCOPES).map(([role, scopes]) => ({
       scope: [...scopes],
       settings: {
-        foreground: `var(--syntax-${role})`,
+        foreground: `var(${syntaxProperty(role as SyntaxRole)})`,
         ...(role === "comment" || role === "comment-doc" ? { fontStyle: "italic" } : {}),
       },
     })),
