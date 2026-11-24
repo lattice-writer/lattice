@@ -10,7 +10,7 @@ measurements; re-run the commands rather than quoting them.
 
 The fork as a whole is **not** small. Measured on 2026-11-24 against upstream
 `v1.6.2` (`47f8f39979a61fc16e86b214c65bf56c46284061`), the current integration changes
-**924 files, +94,056 / −7,916 lines** (about 6,700 of the added lines are the zh-CN catalogs,
+**925 files, +94,180 / −7,950 lines** (about 6,700 of the added lines are the zh-CN catalogs,
 which upstream no longer ships). It carries embedded-workspace UI, a skills manager,
 source-control and provider-health surfaces, spreadsheet and canvas tool brokers, and their
 contracts. Treat "keep it in the seam" as the goal for new work. Re-measure after each sync:
@@ -510,3 +510,7 @@ The pin moved from `773204a14` to `79bc61959` on `amp/lattice-v1.6.2-sync`, thro
 - **Lattice default:** in the embed it defaults on, because a LaTeX or prose paragraph is one long line. Saved settings still carrying the old off value are turned on once (`wrapEmbedDiffLinesOnce`, flag `synara:embed-diff-word-wrap-default:v1`), and turning it off afterwards sticks. Standalone Synara keeps it off.
 - **Split alignment:** in a split diff the two sides share one grid when wrapping, so a wrapped row has the same height on both sides, and its line number appears only on the first visual row.
 - **Tests:** `DiffWordWrap.browser.tsx` checks the split alignment, wrap off, and the stacked view.
+
+### Files and folders from the composer's + menu (fork PR 46)
+
+The pin moved from `79bc61959` to `f87641c8b` on `amp/lattice-v1.6.2-sync`, through the merge commit of [fork PR 46](https://github.com/leo1oel/synara/pull/46). In the embed, **+ → Files and folders** opened the native chooser but attached nothing (lattice-writer/lattice#1253). The chooser takes focus from the embedded frame, the embed's blur dismissal (`latticePopupDismissal`) closed the + panel, and the `<input type="file">` inside the panel unmounted before the selection arrived. The input now lives in `ComposerFileInput`, which the composer form keeps mounted; the Files row opens it and closes the panel at once, and the chosen files attach to the thread that is active when the chooser returns. `ChatView.browser.tsx` ("attaches files chosen after the + panel closes for the native chooser in Lattice") covers it in embed mode with the real blur dismissal. `pnpm prepare:synara` reports the staged runtime as 179.1 MB.
