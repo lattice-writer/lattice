@@ -1,1 +1,0 @@
-import"./ui-ML7Tp3bN.js";import{n as e,t}from"./bib-entry-dialog-DK7_Nd6h.js";e();export{t as BibEntryDialog};
