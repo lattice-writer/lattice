@@ -77,6 +77,60 @@ fn agent_composer_files_carry_bytes_for_figures_and_text_sources() {
 }
 
 #[test]
+fn agent_attachments_take_any_regular_file_whatever_its_format() {
+    let fixture = Fixture::empty("agent-attachments");
+    let docx = b"PK\x03\x04word/document.xml\x00\xff\xfe";
+    let xlsx = b"PK\x03\x04xl/workbook.xml\x00\x80\x81";
+    let sources = paths([
+        fixture.outside("report.docx", docx),
+        fixture.outside("budget.xlsx", xlsx),
+        fixture.outside("trace.qzx", b"\x00\x01\x02 no known format"),
+        fixture.outside("plot.png", b"png-bytes"),
+        fixture.outside("notes.md", b"# Notes"),
+    ]);
+    let files = read_agent_attachments(&sources).unwrap();
+    let summary = files
+        .iter()
+        .map(|file| (file.name.as_str(), file.mime_type.as_str(), file.bytes_base64.clone()))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        summary,
+        vec![
+            ("report.docx", "application/octet-stream", STANDARD.encode(docx)),
+            ("budget.xlsx", "application/octet-stream", STANDARD.encode(xlsx)),
+            ("trace.qzx", "application/octet-stream", STANDARD.encode(b"\x00\x01\x02 no known format")),
+            ("plot.png", "image/png", STANDARD.encode(b"png-bytes")),
+            ("notes.md", "text/markdown", STANDARD.encode(b"# Notes")),
+        ]
+    );
+    // The classic app's reader keeps refusing what it cannot read.
+    assert!(read_agent_composer_files(&sources[..1]).is_err());
+}
+
+#[test]
+fn agent_attachments_refuse_folders_empty_files_and_oversized_files() {
+    let fixture = Fixture::empty("agent-attachments-refused");
+    let folder = fixture.outside("figures/plot.png", b"png").parent().unwrap().to_path_buf();
+    let error = read_agent_attachments(&paths([&folder])).unwrap_err();
+    assert!(error.contains("figures") && error.contains("folder"), "{error}");
+    let error = read_agent_attachments(&paths([fixture.outside("blank.bin", b"")])).unwrap_err();
+    assert!(error.contains("blank.bin is empty"), "{error}");
+    let missing = fixture.outside("gone.docx", b"x");
+    fs::remove_file(&missing).unwrap();
+    assert!(read_agent_attachments(&paths([&missing])).is_err());
+    let big = fixture.outside("huge.bin", b"x");
+    fs::File::options()
+        .write(true)
+        .open(&big)
+        .unwrap()
+        .set_len(MAX_AGENT_COMPOSER_FILE_BYTES + 1)
+        .unwrap();
+    let error = read_agent_attachments(&paths([&big])).unwrap_err();
+    assert!(error.contains("64 MB"), "{error}");
+    assert!(read_agent_attachments(&[]).is_err());
+}
+
+#[test]
 fn copied_project_entries_duplicate_contents_without_overwriting_sources() {
     let fixture = Fixture::project("copy-project-entries");
     let root = &fixture.root;

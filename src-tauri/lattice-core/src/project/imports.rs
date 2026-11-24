@@ -137,17 +137,50 @@ pub struct AgentComposerFile {
 /// touches the project. Accepts both figure files and text source files —
 /// the composer attaches images as images and everything else as documents.
 pub fn read_agent_composer_files(sources: &[String]) -> Result<Vec<AgentComposerFile>, String> {
+    read_composer_files(sources, |source| {
+        let mime_type = asset_mime_type(source).or_else(|| source_kind(source)?.mime);
+        mime_type.filter(|_| source.is_file()).ok_or_else(|| {
+            let name = display_name(source);
+            format!("{name} is not an image, PDF, or text file the agent can read.")
+        })
+    })
+}
+
+/// The native app's Agent attachments (lattice#1254): any regular file,
+/// whatever its format, under the same size cap. Bytes go to the composer
+/// alone, never into an editor or the project index; a type Lattice does not
+/// know travels as `application/octet-stream`, and Synara hands its path to
+/// the provider's tools. An empty file is refused here because the composer
+/// drops a whole relay that holds one.
+pub fn read_agent_attachments(sources: &[String]) -> Result<Vec<AgentComposerFile>, String> {
+    read_composer_files(sources, |source| {
+        let name = display_name(source);
+        let metadata = fs::metadata(source).map_err(err)?;
+        if metadata.is_dir() {
+            return Err(format!("{name} is a folder. Attach the files inside it instead."));
+        }
+        if !metadata.is_file() {
+            return Err(format!("{name} is not a file."));
+        }
+        if metadata.len() == 0 {
+            return Err(format!("{name} is empty."));
+        }
+        Ok(asset_mime_type(source)
+            .or_else(|| source_kind(source)?.mime)
+            .unwrap_or("application/octet-stream"))
+    })
+}
+
+fn read_composer_files(
+    sources: &[String], mime_type: impl Fn(&Path) -> Result<&'static str, String>,
+) -> Result<Vec<AgentComposerFile>, String> {
     if sources.is_empty() {
         return Err("Drop one or more files first.".to_string());
     }
     let mut files = Vec::new();
     for source in sources {
         let source = Path::new(source);
-        let mime_type = asset_mime_type(source).or_else(|| source_kind(source)?.mime);
-        let Some(mime_type) = mime_type.filter(|_| source.is_file()) else {
-            let name = display_name(source);
-            return Err(format!("{name} is not an image, PDF, or text file the agent can read."));
-        };
+        let mime_type = mime_type(source)?;
         let name = file_name(source, "A dropped file")?;
         if fs::metadata(source).map_err(err)?.len() > MAX_AGENT_COMPOSER_FILE_BYTES {
             return Err(format!("{name} is larger than the 64 MB limit for agent attachments."));
