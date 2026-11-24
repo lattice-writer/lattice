@@ -38,8 +38,9 @@
 - **新建**：创建项目时选择 **Blank Typst document**，或在项目面板的 `+` 菜单中选择 **新建 Typst**。打开的文件夹如果没有 LaTeX 文档、但有 `main.typ`（或引入其他文件的那个 `.typ`），就会编译这个文件。
 - **编译与预览**：`⌘S`、编译按钮和自动编译与 LaTeX 相同。Typst 还会边写边编译：停止输入片刻后，PDF 就会显示刚才未保存的修改，并保持原来的页码和滚动位置。
 - **错误**：编译按钮和问题面板显示 Typst 的错误与警告，并标明文件和行号，点击即可跳到对应行。
+- **源码与 PDF**：在 PDF 中双击某处，光标就会跳到源码中对应的那一行，`#include` 进来的文件也可以；按 `⌘⇧J` 则在 PDF 中标出光标所在的行。尚未保存的修改也算在内；需要先编译一次文档。
 - **字体与包**：可以使用系统字体，以及 Typst 自带的字体（Libertinus Serif、New Computer Modern、DejaVu Sans Mono）。`#import "@preview/…"` 第一次使用时会从 Typst Universe 下载包，之后离线也能用。
 - **在 LaTeX 项目中**编译某个 `.typ` 文件时，只单独编译它，其他编译仍然编译原来的 LaTeX 论文。
 
-源码与 PDF 之间的点击跳转（SyncTeX）、Overleaf 同步和可视化编辑器目前只支持 LaTeX。
+Overleaf 同步和可视化编辑器目前只支持 LaTeX。
 

@@ -38,8 +38,9 @@ The native Lattice app also writes and builds [Typst](https://typst.app) documen
 - **Start one:** choose **Blank Typst document** when you create a project, or **New Typst file** in the Project panel's `+` menu. A folder you open that has a `main.typ` (or another `.typ` that includes the rest) and no LaTeX document builds that file.
 - **Build and preview:** `⌘S`, the build button and automatic builds work as they do for LaTeX. Typst also compiles as you type: a moment after you stop, the PDF shows your edit, unsaved, and keeps its page and scroll position.
 - **Errors:** the build button and the problems panel show Typst's errors and warnings with their file and line. Click one to jump to it.
+- **Source and PDF:** double-click a place in the PDF to put the cursor on that line of its source, even in a file you `#include`, or press `⌘⇧J` to mark the cursor's line in the PDF. Edits you haven't saved count too; build the document once first.
 - **Fonts and packages:** your system fonts are available, plus the fonts Typst bundles (Libertinus Serif, New Computer Modern, DejaVu Sans Mono). `#import "@preview/…"` downloads the package from Typst Universe the first time; after that it works offline.
 - **In a LaTeX project**, a `.typ` file you build compiles on its own, and the LaTeX paper stays the document other builds compile.
 
-Clicking between the source and the PDF (SyncTeX), Overleaf sync and the Visual editor are LaTeX-only for now.
+Overleaf sync and the Visual editor are LaTeX-only for now.
 

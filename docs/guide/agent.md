@@ -21,6 +21,7 @@ Open the **Agent** panel (`⌘⌥3`, or the robot icon on the left). Then use on
 - In the editor, select text to **Proofread** (`⌘⌥P`), **Polish** or **Rewrite…** it in place, with a reason for each edit.
 - **Annotate** a passage (select it, choose **Annotate**, write what should change), then **Save and revise now**: the Agent proposes an edit for each annotation and you accept or reject it in place. **Revise from annotations** in the command palette does every open annotation in rounds.
 - A failed build's **Ask the agent** sends that problem straight here.
+- Long lines in the Agent's diffs wrap. The wrap button in a diff's toolbar, or `⌥Z`, turns wrapping off and on again, and Lattice remembers the choice.
 
 Threads are kept per project; the clock next to the thread name lists earlier ones. **Settings › Agent › Archived threads** lists archived threads, such as ones archived after a while unused, and can restore one to the history or delete it for good.
 
