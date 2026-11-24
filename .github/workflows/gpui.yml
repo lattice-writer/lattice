@@ -464,3 +464,107 @@ jobs:
           name: gpui-e2e-windows
           path: ${{ runner.temp }}/e2e-windows.json
           if-no-files-found: ignore
+
+  # The native app on Linux: built, unit-tested, launched under Xvfb, and
+  # kept as an unsigned archive (the binary, the Typst helper, PDFium and the
+  # island pages, laid out side by side as structured/resources.rs looks for
+  # them). Not a release: nothing here is signed or published, and it has no
+  # e2e scenario yet (the scenario's native input is macOS and Windows only).
+  #
+  # Ubuntu 22.04, as the Tauri app's AppImage, so the archive runs on that
+  # glibc and later. gpui_linux needs Zed's X11, Wayland, xkbcommon, ALSA and
+  # Vulkan headers; gpui-webview needs WebKitGTK and GTK 3. Under Xvfb, Mesa's
+  # lavapipe stands in for a GPU. The webview islands embed WebKitGTK in an
+  # X11 child window (gpui-webview's README), which Xvfb is.
+  linux:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.gpui != 'false' }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+      # A cold release build of Zed's crates takes most of the runner's free
+      # disk; the preinstalled SDKs it never uses go first.
+      - name: Free disk space
+        working-directory: .
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+      - name: Install the Linux build dependencies
+        timeout-minutes: 15
+        working-directory: .
+        run: >-
+          .github/scripts/apt-install.sh
+          build-essential clang cmake pkg-config
+          libasound2-dev libfontconfig-dev libfreetype-dev libssl-dev libzstd-dev libsqlite3-dev
+          libwayland-dev libx11-xcb-dev libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev
+          libvulkan1 mesa-vulkan-drivers
+          libgtk-3-dev libwebkit2gtk-4.1-dev
+          xvfb
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: gpui
+          # Restore only: the repository's Actions cache is at its 10 GB
+          # limit, and a third multi-GB GPUI cache from main would evict the
+          # Tauri release caches tag builds restore. Saved once Linux ships.
+          save-if: false
+      - run: script/fetch-pdfium
+      - run: cargo build --release --locked
+      # Without TeX, so the ignored latexmk build test stays ignored.
+      - run: cargo test --release --locked --workspace
+      - name: Set up pnpm
+        uses: ./.github/actions/setup-pnpm
+      - name: Build the island pages
+        run: script/build-islands
+      - name: Stage the archive
+        run: |
+          stage="$RUNNER_TEMP/lattice-gpui-linux-x86_64"
+          mkdir -p "$stage"
+          cp target/release/lattice-gpui target/release/lattice-typst "$stage/"
+          cp vendor/pdfium/linux-x64/lib/libpdfium.so "$stage/"
+          cp -R islands/dist "$stage/islands"
+          cp LICENSE "$stage/"
+          echo "STAGE=$stage" >> "$GITHUB_ENV"
+      # From the staged copy, so the smoke also proves the archive's layout:
+      # PDFium and the islands beside the binary, nothing read from the
+      # checkout. The app must open its window on the e2e fixture and stay up.
+      # No screenshot yet: lavapipe's frames read back black from X11 (both
+      # the root and the app's own ARGB window), so the Linux look comes with
+      # the e2e harness, which draws offscreen.
+      - name: Launch smoke
+        timeout-minutes: 5
+        run: |
+          project="$RUNNER_TEMP/smoke-project"
+          cp -R fixtures/e2e "$project"
+          log="$RUNNER_TEMP/linux-smoke.log"
+          status=0
+          xvfb-run -a -s "-screen 0 1440x900x24" bash -c '
+            LATTICE_GPUI_LOG=info "$0/lattice-gpui" "$1" >"$2" 2>&1 &
+            app=$!
+            sleep 30
+            if ! kill -0 "$app" 2>/dev/null; then
+              wait "$app"; echo "the app exited with $? within 30 seconds"; exit 1
+            fi
+            kill -TERM "$app"
+            wait "$app" || true
+          ' "$STAGE" "$project" "$log" || status=$?
+          tail -n 80 "$log"
+          # PDFium from the archive, not the checkout's vendor/pdfium.
+          if [ "$status" -eq 0 ] && ! grep -q "PDFium loaded from $STAGE/libpdfium.so" "$log"; then
+            echo "PDFium did not load from the staged archive"
+            status=1
+          fi
+          exit $status
+      - name: Pack the archive
+        if: ${{ !cancelled() }}
+        run: tar -czf "$RUNNER_TEMP/lattice-gpui-linux-x86_64.tar.gz" -C "$RUNNER_TEMP" lattice-gpui-linux-x86_64
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: lattice-gpui-linux-x86_64
+          path: |
+            ${{ runner.temp }}/lattice-gpui-linux-x86_64.tar.gz
+            ${{ runner.temp }}/linux-smoke.log
+          if-no-files-found: ignore
+          retention-days: 14

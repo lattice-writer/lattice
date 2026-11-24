@@ -140,6 +140,26 @@ export const PROJECT_HOST_ERRORS: readonly HostErrorEntry[] = [
     const item = unnamedPath(name);
     return t`${item} is larger than the 64 MB limit for agent attachments.`;
   }],
+  ["project/imports.rs", "{name} could not be read as an attachment.", ([name]) => {
+    const item = unnamedPath(name);
+    return t`${item} could not be read as an attachment.`;
+  }],
+  ["project/imports.rs", "{name} is a folder. Attach the files inside it instead.", ([name]) => {
+    const item = unnamedPath(name);
+    return t`${item} is a folder. Attach the files inside it instead.`;
+  }],
+  ["project/imports.rs", "{name} is not a regular file, so it cannot be attached.", ([name]) => {
+    const item = unnamedPath(name);
+    return t`${item} is not a regular file, so it cannot be attached.`;
+  }],
+  ["project/imports.rs", "{name} is empty, so it cannot be attached.", ([name]) => {
+    const item = unnamedPath(name);
+    return t`${item} is empty, so it cannot be attached.`;
+  }],
+  ["project/imports.rs", "{name} is larger than the 25 MB limit for agent file attachments.", ([name]) => {
+    const item = unnamedPath(name);
+    return t`${item} is larger than the 25 MB limit for agent file attachments.`;
+  }],
   ["project/imports.rs", "Drop one or more source files first.", () => t`Drop one or more source files first.`],
   ["project/imports.rs", "{name} is not a supported source file.", ([name]) => {
     const item = unnamedPath(name);

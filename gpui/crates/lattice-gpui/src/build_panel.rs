@@ -201,7 +201,6 @@ impl BuildPanel {
     }
 
     /// How many builds have finished, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
     pub fn builds(&self) -> usize {
         self.builds
     }

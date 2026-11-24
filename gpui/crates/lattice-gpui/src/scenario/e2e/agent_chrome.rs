@@ -4,9 +4,11 @@
 //! - the header's permission picker appears once the frame reports its
 //!   mode, follows the report, and a mode chosen in it reaches the page;
 //!   a report without a runtime takes it away;
-//! - a Finder drag of a figure over the panel lights it, leaving puts it
-//!   out, one of files the Agent cannot read never lights it, and a drop
-//!   has the page read that drop's bytes, and only that drop's.
+//! - a Finder drag over the panel lights it and leaving puts it out; any
+//!   file is an attachment (lattice#1254), so a drop of a figure, a .docx,
+//!   an .xlsx or an unknown extension has the page read that drop's bytes,
+//!   and only that drop's, for the composer, never into the project; a
+//!   folder is refused.
 
 #![cfg(target_os = "macos")]
 
@@ -132,13 +134,22 @@ impl Run {
             json!({}),
         );
 
-        // Finder drags over the panel.
+        // Finder drags over the panel: any file is an attachment
+        // (lattice#1254), whatever its format.
         let figure = root.with_file_name("agent-drop-figure.png");
-        let archive = root.with_file_name("agent-drop-archive.zip");
+        let docx = root.with_file_name("agent-drop-report.docx");
+        let xlsx = root.with_file_name("agent-drop-budget.xlsx");
+        let odd = root.with_file_name("agent-drop-trace.qzx");
+        let folder = root.with_file_name("agent-drop-folder");
         std::fs::write(&figure, PIXEL)?;
-        std::fs::write(&archive, b"PK")?;
-        let figure_path = figure.to_string_lossy().into_owned();
-        let archive_path = archive.to_string_lossy().into_owned();
+        std::fs::write(&docx, b"PK\x03\x04word/document.xml\x00\xff\xfe")?;
+        std::fs::write(&xlsx, b"PK\x03\x04xl/workbook.xml\x00\x80\x81")?;
+        std::fs::write(&odd, b"\x00\x01\x02 no known format")?;
+        std::fs::create_dir_all(&folder)?;
+        let path = |path: &Path| path.to_string_lossy().into_owned();
+        let figure_path = path(&figure);
+        let binaries = [path(&docx), path(&xlsx), path(&odd)];
+        let binaries: Vec<&str> = binaries.iter().map(String::as_str).collect();
         drag(cx, &island, "enter", &[&figure_path]);
         drag(cx, &island, "over", &[]);
         let lit = self.page_shows(cx, &island, LIT, true).await;
@@ -149,13 +160,13 @@ impl Run {
             lit && out,
             json!({ "lit": lit, "out": out }),
         );
-        drag(cx, &island, "enter", &[&archive_path]);
-        self.pause(cx, Duration::from_millis(300)).await;
-        let unlit = !self.page_shows(cx, &island, LIT, true).await;
+        drag(cx, &island, "enter", &binaries);
+        drag(cx, &island, "over", &[]);
+        let lit = self.page_shows(cx, &island, LIT, true).await;
         drag(cx, &island, "leave", &[]);
         steps.check(
-            "files the Agent cannot read never light the panel",
-            unlit,
+            "binary and unknown files dragged over the Agent panel light it too",
+            lit,
             json!({}),
         );
         drag(cx, &island, "enter", &[&figure_path]);
@@ -167,10 +178,64 @@ impl Run {
             .await;
         let outcome = cx.update(|cx| surface.read(cx).drop_read().cloned());
         let put_out = self.page_shows(cx, &island, LIT, false).await;
+        let figure_read = Some(Ok(vec![(
+            "agent-drop-figure.png".to_string(),
+            "image/png".to_string(),
+        )]));
         steps.check(
             "a figure dropped on the Agent panel has the page read its bytes for the composer",
-            read && outcome == Some(Ok(1)) && put_out,
+            read && outcome == figure_read && put_out,
             json!({ "outcome": format!("{outcome:?}"), "putOut": put_out }),
+        );
+        // A .docx, an .xlsx and an extension nobody knows go to the composer
+        // as attachments, read as bytes and never into an editor or the
+        // project: no tab opens and the project folder gains no file.
+        let opened = |cx: &mut AsyncApp| {
+            cx.update(|cx| {
+                let shell = self.shell.read(cx);
+                binaries.iter().any(|path| {
+                    let name = Path::new(path).file_name().unwrap_or_default().to_string_lossy();
+                    shell.view_of_document(path, cx).is_some()
+                        || shell.view_of_document(&name, cx).is_some()
+                })
+            })
+        };
+        let entries_before = project_entries(root);
+        drag(cx, &island, "enter", &binaries);
+        drag(cx, &island, "drop", &binaries);
+        let octet = |name: &str| (name.to_string(), "application/octet-stream".to_string());
+        let wanted = Ok(vec![
+            octet("agent-drop-report.docx"),
+            octet("agent-drop-budget.xlsx"),
+            octet("agent-drop-trace.qzx"),
+        ]);
+        let read = self
+            .wait_for(cx, Duration::from_secs(5), |_, cx| {
+                surface.read(cx).drop_read() == Some(&wanted)
+            })
+            .await;
+        self.pause(cx, Duration::from_millis(300)).await;
+        let untouched = !opened(cx) && project_entries(root) == entries_before;
+        steps.check(
+            "binary and unknown files dropped on the Agent panel go to the composer as attachments, not into the project",
+            read && untouched,
+            json!({ "outcome": format!("{:?}", cx.update(|cx| surface.read(cx).drop_read().cloned())),
+                    "untouched": untouched }),
+        );
+        drag(cx, &island, "enter", &[&path(&folder)]);
+        drag(cx, &island, "drop", &[&path(&folder)]);
+        let refused = self
+            .wait_for(cx, Duration::from_secs(5), |_, cx| {
+                surface
+                    .read(cx)
+                    .drop_read()
+                    .is_some_and(|read| read.as_ref().is_err_and(|error| error.contains("folder")))
+            })
+            .await;
+        steps.check(
+            "a folder dropped on the Agent panel is refused with a reason",
+            refused,
+            json!({ "outcome": format!("{:?}", cx.update(|cx| surface.read(cx).drop_read().cloned())) }),
         );
         // A page's read with no drop behind it reads nothing.
         let again = self
@@ -208,7 +273,7 @@ impl Run {
         .await;
         let forged = self
             .wait_for(cx, Duration::from_secs(3), |_, cx| {
-                surface.read(cx).drop_read() == Some(&Ok(2))
+                surface.read(cx).drop_read().is_some_and(|read| read.as_ref().is_ok_and(|files| files.len() == 2))
             })
             .await;
         steps.check(
@@ -216,8 +281,10 @@ impl Run {
             !forged,
             json!({ "outcome": format!("{:?}", cx.update(|cx| surface.read(cx).drop_read().cloned())) }),
         );
-        std::fs::remove_file(&figure).ok();
-        std::fs::remove_file(&archive).ok();
+        for file in [&figure, &docx, &xlsx, &odd] {
+            std::fs::remove_file(file).ok();
+        }
+        std::fs::remove_dir(&folder).ok();
         Ok(())
     }
 
@@ -271,6 +338,15 @@ impl Run {
         }
         false
     }
+}
+
+/// The names in the project folder, to see a drop added none.
+fn project_entries(root: &Path) -> Vec<std::ffi::OsString> {
+    let mut entries: Vec<_> = std::fs::read_dir(root)
+        .map(|entries| entries.flatten().map(|entry| entry.file_name()).collect())
+        .unwrap_or_default();
+    entries.sort();
+    entries
 }
 
 /// A phase of a Finder drag, as the island's drag handler hands it on

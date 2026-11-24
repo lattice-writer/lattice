@@ -140,7 +140,7 @@ pub struct SynaraSurface {
     endpoint_saved: bool,
     /// The paths of the Finder drop the page may read (`drops.rs`).
     dropped: Vec<String>,
-    drop_read: Option<Result<usize, String>>,
+    drop_read: Option<Result<Vec<(String, String)>, String>>,
     /// The project's annotations as the page last heard (`annotations.rs`).
     annotations: annotations::PageAnnotations,
     /// The Agent's page zoom, from Settings › Agent › Display's font size

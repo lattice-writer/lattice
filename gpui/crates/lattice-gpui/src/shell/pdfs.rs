@@ -502,7 +502,6 @@ impl Shell {
     }
 
     /// The root documents' tabs, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
     pub fn root_pdf_tabs(&self) -> Vec<(String, Entity<PdfPanel>)> {
         self.root_pdfs.clone()
     }
