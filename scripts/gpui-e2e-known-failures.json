@@ -1004,22 +1004,6 @@
       "followup": "LEO-15"
     },
     {
-      "step": "a file's row dragged out of the Project panel is carried by Trellis into the documents",
-      "platforms": [
-        "windows"
-      ],
-      "reason": "Windows: failed in every main run (44162980527, 44213516921); observed {\"placed\":null}",
-      "followup": "LEO-15"
-    },
-    {
-      "step": "a row released before Trellis carries it is let go at the next move, its tab closed again",
-      "platforms": [
-        "windows"
-      ],
-      "reason": "Windows: failed in every main run (44162980527, 44213516921); observed {\"lifted\":null,\"left\":null}",
-      "followup": "LEO-15"
-    },
-    {
       "step": "a name pasted into the rename field longer than 24 characters keeps its first 24, and ⌘Z undoes the paste",
       "platforms": [
         "windows"
