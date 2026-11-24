@@ -6,7 +6,8 @@
 //! takes only figures and sources), so the page lights the panel for any
 //! drag and on the drop asks for its bytes (`read_agent_composer_files`,
 //! answered by [`lattice_core::project::read_agent_attachments`]), which
-//! it relays into the composer as its "+" menu would. The bytes go to the
+//! it relays into the composer as its "+" menu would, with the count of
+//! files past the composer's cap that were never read. The bytes go to the
 //! composer alone, never into an editor or the project.
 //!
 //! The bytes read are only those of the drop that just happened: a page
@@ -52,17 +53,16 @@ impl SynaraSurface {
                 async move { lattice_core::project::read_agent_attachments(&dropped) },
             );
         cx.spawn(async move |this, cx| {
-            let files = read.await;
+            let attachments = read.await;
             this.update(cx, |this, cx| {
-                this.drop_read = Some(files.as_ref().map_err(Clone::clone).map(|files| {
-                    files
+                this.drop_read = Some(attachments.as_ref().map_err(Clone::clone).map(|read| {
+                    read.files
                         .iter()
                         .map(|file| (file.name.clone(), file.mime_type.clone()))
                         .collect()
                 }));
-                let answer = files.and_then(|files| {
-                    serde_json::to_value(files).map_err(|error| error.to_string())
-                });
+                let answer = attachments
+                    .and_then(|read| serde_json::to_value(read).map_err(|error| error.to_string()));
                 this.respond(id, answer, cx);
             })
             .ok();

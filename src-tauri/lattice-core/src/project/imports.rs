@@ -15,6 +15,7 @@ use base64::{engine::general_purpose::STANDARD, Engine};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::fs;
+use std::io::Read as _;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
@@ -137,50 +138,17 @@ pub struct AgentComposerFile {
 /// touches the project. Accepts both figure files and text source files —
 /// the composer attaches images as images and everything else as documents.
 pub fn read_agent_composer_files(sources: &[String]) -> Result<Vec<AgentComposerFile>, String> {
-    read_composer_files(sources, |source| {
-        let mime_type = asset_mime_type(source).or_else(|| source_kind(source)?.mime);
-        mime_type.filter(|_| source.is_file()).ok_or_else(|| {
-            let name = display_name(source);
-            format!("{name} is not an image, PDF, or text file the agent can read.")
-        })
-    })
-}
-
-/// The native app's Agent attachments (lattice#1254): any regular file,
-/// whatever its format, under the same size cap. Bytes go to the composer
-/// alone, never into an editor or the project index; a type Lattice does not
-/// know travels as `application/octet-stream`, and Synara hands its path to
-/// the provider's tools. An empty file is refused here because the composer
-/// drops a whole relay that holds one.
-pub fn read_agent_attachments(sources: &[String]) -> Result<Vec<AgentComposerFile>, String> {
-    read_composer_files(sources, |source| {
-        let name = display_name(source);
-        let metadata = fs::metadata(source).map_err(err)?;
-        if metadata.is_dir() {
-            return Err(format!("{name} is a folder. Attach the files inside it instead."));
-        }
-        if !metadata.is_file() {
-            return Err(format!("{name} is not a file."));
-        }
-        if metadata.len() == 0 {
-            return Err(format!("{name} is empty."));
-        }
-        Ok(asset_mime_type(source)
-            .or_else(|| source_kind(source)?.mime)
-            .unwrap_or("application/octet-stream"))
-    })
-}
-
-fn read_composer_files(
-    sources: &[String], mime_type: impl Fn(&Path) -> Result<&'static str, String>,
-) -> Result<Vec<AgentComposerFile>, String> {
     if sources.is_empty() {
         return Err("Drop one or more files first.".to_string());
     }
     let mut files = Vec::new();
     for source in sources {
         let source = Path::new(source);
-        let mime_type = mime_type(source)?;
+        let mime_type = asset_mime_type(source).or_else(|| source_kind(source)?.mime);
+        let Some(mime_type) = mime_type.filter(|_| source.is_file()) else {
+            let name = display_name(source);
+            return Err(format!("{name} is not an image, PDF, or text file the agent can read."));
+        };
         let name = file_name(source, "A dropped file")?;
         if fs::metadata(source).map_err(err)?.len() > MAX_AGENT_COMPOSER_FILE_BYTES {
             return Err(format!("{name} is larger than the 64 MB limit for agent attachments."));
@@ -192,6 +160,83 @@ fn read_composer_files(
         });
     }
     Ok(files)
+}
+
+/// The composer takes at most this many files from one relay; keep in sync
+/// with `MAX_AGENT_COMPOSER_FILES` in `agent-composer-files.ts`.
+pub const MAX_AGENT_ATTACHMENTS: usize = 20;
+
+/// Synara's cap on a non-image attachment (`PROVIDER_SEND_TURN_MAX_FILE_BYTES`
+/// in its contracts): a bigger one would be dropped there without a word.
+const MAX_AGENT_FILE_ATTACHMENT_BYTES: u64 = 25 * 1024 * 1024;
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentAttachments {
+    pub files: Vec<AgentComposerFile>,
+    /// Dropped files past [`MAX_AGENT_ATTACHMENTS`], never read.
+    pub skipped: usize,
+}
+
+/// The native app's Agent attachments (lattice#1254): any regular file,
+/// whatever its format. Bytes go to the composer alone, never into an editor
+/// or the project index; a type Lattice does not know travels as
+/// `application/octet-stream`, and Synara hands its path to the provider's
+/// tools. Only the first [`MAX_AGENT_ATTACHMENTS`] files are read. Images
+/// keep the 64 MB cap and other files take Synara's 25 MB one, both read
+/// through a bounded reader so a file growing meanwhile cannot pass them. An
+/// empty file is refused because the composer drops a whole relay that holds
+/// one; a fifo or device is refused without being opened.
+pub fn read_agent_attachments(sources: &[String]) -> Result<AgentAttachments, String> {
+    if sources.is_empty() {
+        return Err("Drop one or more files first.".to_string());
+    }
+    let taken = &sources[..sources.len().min(MAX_AGENT_ATTACHMENTS)];
+    let mut files = Vec::with_capacity(taken.len());
+    for source in taken {
+        let source = Path::new(source);
+        let name = file_name(source, "A dropped file")?;
+        let Ok(metadata) = fs::metadata(source) else {
+            return Err(format!("{name} could not be read."));
+        };
+        if metadata.is_dir() {
+            return Err(format!("{name} is a folder. Attach the files inside it instead."));
+        }
+        if !metadata.is_file() {
+            return Err(format!("{name} is not a regular file."));
+        }
+        if metadata.len() == 0 {
+            return Err(format!("{name} is empty."));
+        }
+        let mime_type = asset_mime_type(source)
+            .or_else(|| source_kind(source)?.mime)
+            .unwrap_or("application/octet-stream");
+        let image = mime_type.starts_with("image/");
+        let cap =
+            if image { MAX_AGENT_COMPOSER_FILE_BYTES } else { MAX_AGENT_FILE_ATTACHMENT_BYTES };
+        let mut bytes = Vec::new();
+        let read =
+            fs::File::open(source).and_then(|file| file.take(cap + 1).read_to_end(&mut bytes));
+        if read.is_err() {
+            return Err(format!("{name} could not be read."));
+        }
+        if bytes.len() as u64 > cap {
+            return Err(if image {
+                format!("{name} is larger than the 64 MB limit for agent attachments.")
+            } else {
+                format!("{name} is larger than the 25 MB limit for agent file attachments.")
+            });
+        }
+        if bytes.is_empty() {
+            return Err(format!("{name} is empty."));
+        }
+        files.push(AgentComposerFile {
+            name: name.to_string(),
+            mime_type: mime_type.to_string(),
+            bytes_base64: STANDARD.encode(bytes),
+        });
+    }
+    Ok(AgentAttachments { files, skipped: sources.len() - taken.len() })
 }
 
 pub fn import_sources(

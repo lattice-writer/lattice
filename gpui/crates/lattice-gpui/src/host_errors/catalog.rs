@@ -322,6 +322,31 @@ pub(super) static ENTRIES: &[Entry] = &[
     },
     Entry {
         file: "project/imports.rs",
+        literal: "{name} could not be read.",
+        text: Text::Message("{item} could not be read.", &[("item", Arg::Helper(Helper::UnnamedPath, 0))]),
+    },
+    Entry {
+        file: "project/imports.rs",
+        literal: "{name} is a folder. Attach the files inside it instead.",
+        text: Text::Message("{item} is a folder. Attach the files inside it instead.", &[("item", Arg::Helper(Helper::UnnamedPath, 0))]),
+    },
+    Entry {
+        file: "project/imports.rs",
+        literal: "{name} is not a regular file.",
+        text: Text::Message("{item} is not a regular file.", &[("item", Arg::Helper(Helper::UnnamedPath, 0))]),
+    },
+    Entry {
+        file: "project/imports.rs",
+        literal: "{name} is empty.",
+        text: Text::Message("{item} is empty.", &[("item", Arg::Helper(Helper::UnnamedPath, 0))]),
+    },
+    Entry {
+        file: "project/imports.rs",
+        literal: "{name} is larger than the 25 MB limit for agent file attachments.",
+        text: Text::Message("{item} is larger than the 25 MB limit for agent file attachments.", &[("item", Arg::Helper(Helper::UnnamedPath, 0))]),
+    },
+    Entry {
+        file: "project/imports.rs",
         literal: "Drop one or more source files first.",
         text: Text::Message("Drop one or more source files first.", &[]),
     },

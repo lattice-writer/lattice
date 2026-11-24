@@ -81,57 +81,112 @@ fn agent_attachments_take_any_regular_file_whatever_its_format() {
     let fixture = Fixture::empty("agent-attachments");
     let docx = b"PK\x03\x04word/document.xml\x00\xff\xfe";
     let xlsx = b"PK\x03\x04xl/workbook.xml\x00\x80\x81";
+    let odd = b"\x00\x01\x02 no known format";
     let sources = paths([
         fixture.outside("report.docx", docx),
         fixture.outside("budget.xlsx", xlsx),
-        fixture.outside("trace.qzx", b"\x00\x01\x02 no known format"),
+        fixture.outside("trace.qzx", odd),
         fixture.outside("plot.png", b"png-bytes"),
         fixture.outside("notes.md", b"# Notes"),
     ]);
-    let files = read_agent_attachments(&sources).unwrap();
-    let summary = files
+    let attachments = read_agent_attachments(&sources).unwrap();
+    let summary = attachments
+        .files
         .iter()
         .map(|file| (file.name.as_str(), file.mime_type.as_str(), file.bytes_base64.clone()))
         .collect::<Vec<_>>();
+    let octet = "application/octet-stream";
     assert_eq!(
         summary,
         vec![
-            ("report.docx", "application/octet-stream", STANDARD.encode(docx)),
-            ("budget.xlsx", "application/octet-stream", STANDARD.encode(xlsx)),
-            (
-                "trace.qzx",
-                "application/octet-stream",
-                STANDARD.encode(b"\x00\x01\x02 no known format")
-            ),
+            ("report.docx", octet, STANDARD.encode(docx)),
+            ("budget.xlsx", octet, STANDARD.encode(xlsx)),
+            ("trace.qzx", octet, STANDARD.encode(odd)),
             ("plot.png", "image/png", STANDARD.encode(b"png-bytes")),
             ("notes.md", "text/markdown", STANDARD.encode(b"# Notes")),
         ]
     );
+    assert_eq!(attachments.skipped, 0);
     // The classic app's reader keeps refusing what it cannot read.
     assert!(read_agent_composer_files(&sources[..1]).is_err());
 }
 
 #[test]
-fn agent_attachments_refuse_folders_empty_files_and_oversized_files() {
+fn agent_attachments_read_only_the_first_twenty_files() {
+    let fixture = Fixture::empty("agent-attachments-count");
+    let sources = paths((0..23).map(|index| fixture.outside(&format!("f{index}.bin"), b"x")));
+    // Past the cap a path is never opened, so a missing one is no error.
+    let mut sources = sources;
+    sources.push(fixture.parent.join("missing.bin").to_string_lossy().to_string());
+    let attachments = read_agent_attachments(&sources).unwrap();
+    assert_eq!(attachments.files.len(), MAX_AGENT_ATTACHMENTS);
+    assert_eq!(attachments.files.last().unwrap().name, "f19.bin");
+    assert_eq!(attachments.skipped, 4);
+}
+
+#[test]
+fn agent_attachments_refuse_folders_empty_unreadable_and_oversized_files() {
     let fixture = Fixture::empty("agent-attachments-refused");
+    let refusal = |path: &Path| read_agent_attachments(&paths([path])).unwrap_err();
     let folder = fixture.outside("figures/plot.png", b"png").parent().unwrap().to_path_buf();
-    let error = read_agent_attachments(&paths([&folder])).unwrap_err();
-    assert!(error.contains("figures") && error.contains("folder"), "{error}");
-    let error = read_agent_attachments(&paths([fixture.outside("blank.bin", b"")])).unwrap_err();
-    assert!(error.contains("blank.bin is empty"), "{error}");
+    assert_eq!(refusal(&folder), "figures is a folder. Attach the files inside it instead.");
+    assert_eq!(refusal(&fixture.outside("blank.bin", b"")), "blank.bin is empty.");
     let missing = fixture.outside("gone.docx", b"x");
     fs::remove_file(&missing).unwrap();
-    assert!(read_agent_attachments(&paths([&missing])).is_err());
-    let big = fixture.outside("huge.bin", b"x");
-    fs::File::options()
-        .write(true)
-        .open(&big)
-        .unwrap()
-        .set_len(MAX_AGENT_COMPOSER_FILE_BYTES + 1)
-        .unwrap();
-    let error = read_agent_attachments(&paths([&big])).unwrap_err();
-    assert!(error.contains("64 MB"), "{error}");
+    assert_eq!(refusal(&missing), "gone.docx could not be read.");
+    let grow = |name: &str, len: u64| {
+        let path = fixture.outside(name, b"x");
+        fs::File::options().write(true).open(&path).unwrap().set_len(len).unwrap();
+        path
+    };
+    let file_cap = MAX_AGENT_FILE_ATTACHMENT_BYTES;
+    assert_eq!(
+        read_agent_attachments(&paths([grow("edge.bin", file_cap)])).unwrap().files.len(),
+        1
+    );
+    assert_eq!(
+        refusal(&grow("big.bin", file_cap + 1)),
+        "big.bin is larger than the 25 MB limit for agent file attachments."
+    );
+    assert_eq!(
+        read_agent_attachments(&paths([grow("photo.png", file_cap + 1)])).unwrap().files.len(),
+        1
+    );
+    assert_eq!(
+        refusal(&grow("huge.png", MAX_AGENT_COMPOSER_FILE_BYTES + 1)),
+        "huge.png is larger than the 64 MB limit for agent attachments."
+    );
     assert!(read_agent_attachments(&[]).is_err());
+}
+
+#[cfg(unix)]
+#[test]
+fn agent_attachments_follow_symlinks_and_refuse_fifos_and_unreadable_files() {
+    use std::os::unix::fs::{symlink, PermissionsExt};
+    let fixture = Fixture::empty("agent-attachments-unix");
+    let target = fixture.outside("target.docx", b"docx");
+    let link = fixture.parent.join("link.docx");
+    symlink(&target, &link).unwrap();
+    let files = read_agent_attachments(&paths([&link])).unwrap().files;
+    assert_eq!(
+        (files[0].name.as_str(), files[0].bytes_base64.clone()),
+        ("link.docx", STANDARD.encode(b"docx"))
+    );
+    // A fifo would block a read forever: it is refused without being opened.
+    let fifo = fixture.parent.join("pipe.bin");
+    let fifo_path = std::ffi::CString::new(fifo.to_string_lossy().as_bytes()).unwrap();
+    assert_eq!(unsafe { libc::mkfifo(fifo_path.as_ptr(), 0o600) }, 0);
+    let error = read_agent_attachments(&paths([&fifo])).unwrap_err();
+    assert_eq!(error, "pipe.bin is not a regular file.");
+    let locked = fixture.outside("locked.xlsx", b"xlsx");
+    fs::set_permissions(&locked, fs::Permissions::from_mode(0o000)).unwrap();
+    let readable = fs::File::open(&locked).is_ok();
+    let outcome = read_agent_attachments(&paths([&locked]));
+    fs::set_permissions(&locked, fs::Permissions::from_mode(0o600)).unwrap();
+    // Root reads through any mode bits; everyone else is refused.
+    if !readable {
+        assert_eq!(outcome.unwrap_err(), "locked.xlsx could not be read.");
+    }
 }
 
 #[test]
