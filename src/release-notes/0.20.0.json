@@ -30,8 +30,8 @@
         "zh": "代码使用 VS Code 配色，代码主题可选"
       },
       "body": {
-        "en": "Code is now coloured like VS Code's Light+ and Dark+ by default. Settings › Appearance › Code theme switches to GitHub, Weft & Warp, One, Solarized, Catppuccin, Tokyo Night, Dracula, Nord or Monokai. A code block in the visual editor follows the same code theme, so a .py file and a Python block in a note have the same colours. Selecting text in a code block no longer paints the block's padding.",
-        "zh": "代码现在默认使用 VS Code 的 Light+ 和 Dark+ 配色。在 设置 › 外观 › 代码主题 中可以改用 GitHub、Weft & Warp、One、Solarized、Catppuccin、Tokyo Night、Dracula、Nord 或 Monokai。可视编辑器里的代码块使用同一个代码主题，所以 .py 文件和笔记里的 Python 代码块颜色完全一致。在代码块里选中文字时，不再把代码块的内边距也涂上选区颜色。"
+        "en": "VS Code's Light+ and Dark+ colours are the new default code theme. A code theme you already have, the earlier default GitHub included, stays as it is: choose VS Code under Settings › Appearance › Code theme to switch, or GitHub, Weft & Warp, One, Solarized, Catppuccin, Tokyo Night, Dracula, Nord or Monokai. A code block in the visual editor follows the same code theme, so a .py file and a Python block in a note have the same colours. Selecting text in a code block no longer paints the block's padding.",
+        "zh": "VS Code 的 Light+ 和 Dark+ 配色成为新的默认代码主题。已有的代码主题（包括之前的默认主题 GitHub）保持不变：在 设置 › 外观 › 代码主题 中选择 VS Code 即可切换，也可以选 GitHub、Weft & Warp、One、Solarized、Catppuccin、Tokyo Night、Dracula、Nord 或 Monokai。可视编辑器里的代码块使用同一个代码主题，所以 .py 文件和笔记里的 Python 代码块颜色完全一致。在代码块里选中文字时，不再把代码块的内边距也涂上选区颜色。"
       }
     },
     {
