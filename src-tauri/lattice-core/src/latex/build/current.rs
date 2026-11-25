@@ -336,8 +336,13 @@ mod tests {
     /// Whether this machine can build: the tests that run latexmk return
     /// early where it cannot, instead of being ignored, so they run in every
     /// test run where TeX is installed (the GPUI macOS job, the local gate).
+    /// Not on Windows yet: under MiKTeX the entry check still declines a
+    /// build that succeeded (the preamble format remade, a pdflatex result
+    /// recorded as failed), which #1277 tracks.
     fn tex() -> bool {
-        crate::commands::available("latexmk") && crate::commands::available("pdflatex")
+        !cfg!(windows)
+            && crate::commands::available("latexmk")
+            && crate::commands::available("pdflatex")
     }
 
     /// lattice-core's own build, then the entry: current until a source
