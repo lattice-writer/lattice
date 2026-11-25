@@ -223,7 +223,9 @@ impl WebView {
         }
         #[cfg(target_os = "linux")]
         let rect = linux::device_bounds(document, self.scale_factor.get());
-        #[cfg(not(target_os = "linux"))]
+        #[cfg(all(feature = "gpui-fast", target_os = "windows"))]
+        let rect = self.cutouts.device_rect(document);
+        #[cfg(not(any(target_os = "linux", all(feature = "gpui-fast", target_os = "windows"))))]
         let rect = Rect {
             position: wry::dpi::LogicalPosition::new(
                 f64::from(document.origin.x),
@@ -525,11 +527,10 @@ impl Element for WebViewElement {
         }
         #[cfg(target_os = "linux")]
         parent.origin.set(bounds.origin);
-        // Wry places the child window in the display's logical pixels.
+        // GPUI's device pixels, the interface zoom included, which the child
+        // window is placed in and its cutouts are measured in.
         #[cfg(all(feature = "gpui-fast", target_os = "windows"))]
-        parent
-            .cutouts
-            .set_scale_factor(window.scale_factor() / window.interface_zoom());
+        parent.cutouts.set_scale_factor(window.scale_factor());
         let clip = window.content_mask().bounds;
         if let Err(error) = parent.set_geometry(bounds, clip) {
             if !parent.geometry_failed.replace(true) {

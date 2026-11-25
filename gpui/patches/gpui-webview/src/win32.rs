@@ -35,9 +35,9 @@ struct Cutouts {
     visible: Bounds<Pixels>,
     scale_factor: f32,
     overlays: Vec<Bounds<Pixels>>,
-    /// The rectangles last cut away, in the child window's pixels: none
-    /// means the region was cleared.
-    applied: Option<Vec<[i32; 4]>>,
+    /// The child window's size and the rectangles last cut away from it, in
+    /// its pixels: none means the region was cleared.
+    applied: Option<([i32; 2], Vec<[i32; 4]>)>,
 }
 
 impl OverlayCutouts {
@@ -53,7 +53,7 @@ impl OverlayCutouts {
         }
         let state = Rc::new(RefCell::new(Cutouts {
             hwnd,
-            scale_factor: window.scale_factor() / window.interface_zoom(),
+            scale_factor: window.scale_factor(),
             ..Default::default()
         }));
         let observer: Rc<OverlayBoundsObserver> = Rc::new({
@@ -71,9 +71,30 @@ impl OverlayCutouts {
         }
     }
 
-    /// Note the display's scale, which wry places the child window by.
+    /// Note the window's scale factor, the interface zoom included.
     pub(crate) fn set_scale_factor(&self, scale_factor: f32) {
         self.state.borrow_mut().scale_factor = scale_factor;
+    }
+
+    /// Where to place the child window for `document`: in GPUI's device
+    /// pixels, so it covers its element at any interface zoom, as GPUI draws
+    /// the overlays cut out of it. Wry's logical pixels would leave out the
+    /// zoom.
+    pub(crate) fn device_rect(&self, document: Bounds<Pixels>) -> wry::Rect {
+        let scale = f64::from(self.state.borrow().scale_factor);
+        let device = |value: Pixels| (f64::from(value) * scale).round();
+        wry::Rect {
+            position: wry::dpi::PhysicalPosition::new(
+                device(document.origin.x),
+                device(document.origin.y),
+            )
+            .into(),
+            size: wry::dpi::PhysicalSize::new(
+                device(document.size.width),
+                device(document.size.height),
+            )
+            .into(),
+        }
     }
 
     /// Note where the page is placed and the part of it shown.
@@ -119,7 +140,10 @@ impl Cutouts {
                 .map(device),
         );
         cut.retain(|[left, top, right, bottom]| left < right && top < bottom);
-        let cut = (!cut.is_empty()).then_some(cut);
+        // The region is the child window's whole size less the holes, so a
+        // resized page needs a new one even when the holes stay.
+        let [_, _, width, height] = device(self.document);
+        let cut = (!cut.is_empty()).then_some(([width, height], cut));
         if cut == self.applied {
             return;
         }
@@ -129,9 +153,8 @@ impl Cutouts {
         unsafe {
             let region = match &cut {
                 None => HRGN::default(),
-                Some(cut) => {
-                    let [_, _, width, height] = device(self.document);
-                    let region = CreateRectRgn(0, 0, width, height);
+                Some(([width, height], cut)) => {
+                    let region = CreateRectRgn(0, 0, *width, *height);
                     for &[left, top, right, bottom] in cut {
                         let hole = CreateRectRgn(left, top, right, bottom);
                         CombineRgn(Some(region), Some(region), Some(hole), RGN_DIFF);
