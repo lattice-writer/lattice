@@ -798,45 +798,50 @@
       "step": "with the caret in inline math, a card above it shows KaTeX's picture of the formula",
       "platforms": [
         "macos",
-        "windows"
+        "windows",
+        "linux"
       ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"first_ms\":null,\"placement\":null} | Windows: failed in every main run (44162980527, 44213516921); observed {\"first_ms\":null,\"placement\":null}",
+      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"first_ms\":null,\"placement\":null} | Windows: failed in every main run (44162980527, 44213516921); observed {\"first_ms\":null,\"placement\":null} | Linux: failed twice (its module rerun) in branch run 45603069391, main 979526541's GPUI sources plus the Linux input layer; observed {\"first_ms\":null,\"placement\":null}",
       "followup": "LEO-14"
     },
     {
       "step": "typing in the formula updates the card's picture as it is typed, and a burst of keys ends on the last",
       "platforms": [
         "macos",
-        "windows"
+        "windows",
+        "linux"
       ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"keystroke_ms\":[null,null],\"burst_of_4_ms\":null} | Windows: failed in every main run (44162980527, 44213516921); observed {\"keystroke_ms\":[null,null],\"burst_of_4_ms\":null}",
+      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"keystroke_ms\":[null,null],\"burst_of_4_ms\":null} | Windows: failed in every main run (44162980527, 44213516921); observed {\"keystroke_ms\":[null,null],\"burst_of_4_ms\":null} | Linux: failed twice (its module rerun) in branch run 45603069391, main 979526541's GPUI sources plus the Linux input layer; observed {\"keystroke_ms\":[null,null],\"burst_of_4_ms\":null}",
       "followup": "LEO-14"
     },
     {
       "step": "half-typed math keeps the last good picture, dimmed, and loses the dim once whole",
       "platforms": [
         "macos",
-        "windows"
+        "windows",
+        "linux"
       ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"dimmed\":false,\"whole\":false,\"typed\":\"\\\\newcommand{\\\\area}{\\\\mathcal{A}}\\n\\\\section{Math preview}\\nEnergy $E = mc^2$ is the line typed in.\\n\\nSome prose comes before the display math, so it has room above it.\\n\\\\begin{a… | Windows: failed in every main run (44162980527, 44213516921); observed {\"dimmed\":false,\"whole\":false,\"typed\":\"\\\\newcommand{\\\\area}{\\\\mathcal{A}}\\n\\\\section{Math preview}\\nEnergy $E = mc^2+1+x_3\\\\frac{$ is the line typed in.\\n\\nSome prose comes before the display math, so it has room above i…",
+      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"dimmed\":false,\"whole\":false,\"typed\":\"\\\\newcommand{\\\\area}{\\\\mathcal{A}}\\n\\\\section{Math preview}\\nEnergy $E = mc^2$ is the line typed in.\\n\\nSome prose comes before the display math, so it has room above it.\\n\\\\begin{a… | Windows: failed in every main run (44162980527, 44213516921); observed {\"dimmed\":false,\"whole\":false,\"typed\":\"\\\\newcommand{\\\\area}{\\\\mathcal{A}}\\n\\\\section{Math preview}\\nEnergy $E = mc^2+1+x_3\\\\frac{$ is the line typed in.\\n\\nSome prose comes before the display math, so it has room above i… | Linux: failed twice (its module rerun) in branch run 45603069391, main 979526541's GPUI sources plus the Linux input layer; observed {\"dimmed\":false,\"whole\":false,\"typed\":\"\\\\newcommand{\\\\area}{\\\\mathcal{A}}\\n\\\\section{Math preview}\\nEnergy $E = mc^2+1+x_3\\\\frac{$ is the line typed in.\\n\\nSome prose comes before the display math, so it has room above it.\\n\\\\begin{align}\\n  a &= \\\\int_0^1 x^2\\\\,dx \\\\\\\\\\n  b &= \\\\area\\n\\\\end{align}\\…",
       "followup": "LEO-14"
     },
     {
       "step": "Escape puts the card away until the caret leaves the formula; in an align it shows display math with the project's macro above the environment",
       "platforms": [
         "macos",
-        "windows"
+        "windows",
+        "linux"
       ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"away\":true,\"still_away\":true,\"display\":false,\"placement\":null} | Windows: failed in every main run (44162980527, 44213516921); observed {\"away\":true,\"still_away\":true,\"display\":false,\"placement\":null}",
+      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"away\":true,\"still_away\":true,\"display\":false,\"placement\":null} | Windows: failed in every main run (44162980527, 44213516921); observed {\"away\":true,\"still_away\":true,\"display\":false,\"placement\":null} | Linux: failed twice (its module rerun) in branch run 45603069391, main 979526541's GPUI sources plus the Linux input layer; observed {\"away\":true,\"still_away\":true,\"display\":false,\"placement\":null}",
       "followup": "LEO-14"
     },
     {
       "step": "the card shows again in a formula Escape had left, and hides outside math and while the editor lacks the keyboard",
       "platforms": [
         "macos",
-        "windows"
+        "windows",
+        "linux"
       ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"again\":false,\"outside\":true,\"blurred\":true} | Windows: failed in every main run (44162980527, 44213516921); observed {\"again\":false,\"outside\":true,\"blurred\":true}",
+      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"again\":false,\"outside\":true,\"blurred\":true} | Windows: failed in every main run (44162980527, 44213516921); observed {\"again\":false,\"outside\":true,\"blurred\":true} | Linux: failed twice (its module rerun) in branch run 45603069391, main 979526541's GPUI sources plus the Linux input layer; observed {\"again\":false,\"outside\":true,\"blurred\":true}",
       "followup": "LEO-14"
     },
     {
@@ -1913,6 +1918,14 @@
       ],
       "tier": "flaky",
       "reason": "Linux: passed in branch runs 45483277041 and 45505858441 and failed twice (its module rerun) in branch run 45531114205, all on the same GPUI sources; observed {\"build\":{\"running\":false,\"finished\":true},\"back\":true,\"start_in_layout\":false,\"question_left_open\":true}",
+      "followup": "LEO-129"
+    },
+    {
+      "step": "after the manuscript steps the manifest is as it was and main.tex the live PDF again, with no tab of the manuscript's left",
+      "platforms": [
+        "linux"
+      ],
+      "reason": "Linux: failed twice (its module rerun) in branch run 45603069391, main 979526541's GPUI sources plus the Linux input layer; observed {\"root_pdf_tabs\":[\"figure-check.tex\",\"cite-check.tex\"]}",
       "followup": "LEO-129"
     }
   ]
