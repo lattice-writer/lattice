@@ -44,12 +44,12 @@ main blockquote { margin: 12px 0; padding: 2px 16px; border-left: 3px solid var(
 <li>打开 Lattice。它会自动更新：新版本下载好后，<strong>Lattice › 重新启动以更新…</strong> 即可安装。可在 <strong>设置 › 编辑编译 › 更新</strong> 中修改。</li>
 </ol>
 <p>Lattice 需要 macOS 14 或更高版本。Linux（AppImage）和 Windows 版本仍是实验性的，没有 AI 助手。</p>
-<h2 id="apple-芯片-mac-上的原生-lattice">Apple 芯片 Mac 上的原生 Lattice</h2>
-<p>在搭载 Apple 芯片的 Mac 上，Lattice 可以切换到它的原生版本：界面由 Mac 直接绘制，而不再是网页，外观和用法都一样。带来这个功能的更新之后，Lattice 会询问一次；选了 <strong>以后再说</strong> 或 <strong>不再询问</strong> 之后，也可以随时在 <strong>设置 › 编辑编译 › 切换到新的 Lattice</strong> 中切换。</p>
+<h2 id="原生-lattice">原生 Lattice</h2>
+<p>在 Mac 上，Lattice 就是原生版本：界面由 Mac 直接绘制，而不是网页，Apple 芯片和 Intel 芯片的 Mac 都一样。从 0.20.0 起，它取代了经典版本；Windows 和 Linux 继续使用经典版本。更新经典版本时，会直接把原生版本装在原处，不需要做任何选择；0.20.0 及以后的经典版本一启动就会安装原生版本，下载时会显示一条简短的提示。</p>
 <ul>
-<li><strong>会带过去的：</strong> 第一次切换时，最近的项目、设置、主题、插件、项目模板、Agent 技能和 Overleaf 关联。Agent 对话也会带过去：原生版本每次启动 Agent 时，都会加入经典版本里它还没有的对话，并用一条简短的提示说明加入了多少个。项目文件夹本身无论如何都不受影响。</li>
-<li><strong>不一样的地方：</strong> 原生版本用 macOS 自带的检查器检查拼写，没有语法检查，也没有其他语言的词典。</li>
-<li><strong>切换回去：</strong> 在原生版本中打开 <strong>设置 › 编辑编译 › 切换回经典版本</strong>，就会把经典版本装回原处。经典版本打开时，数据和切换前一样；在原生版本里做的改动不会同步回来。以后再次切换时，原生版本保留它自己的设置、主题、插件和 Overleaf 登录，并加入你在经典版本里打开过的最近项目和新开始的 Agent 对话。</li>
+<li><strong>会带过去的：</strong> 最近的项目、设置、主题、插件、项目模板、Agent 技能和 Overleaf 关联。Agent 对话也会带过去：原生版本每次启动 Agent 时，都会加入经典版本里它还没有的对话，并用一条简短的提示说明加入了多少个。项目文件夹本身无论如何都不受影响。</li>
+<li><strong>如果你切换回去过：</strong> 0.19.0 到 0.19.4 可以切换回经典版本。如果你这样做过，原生版本保留它自己的设置，并加入你之后在经典版本里做的事：打开过的项目、改过的设置（原生版本里已有自己取值的设置保持原样，包括它第一次从经典版本带过来的值），以及新增的主题、插件、模板和技能。</li>
+<li><strong>不一样的地方：</strong> 原生版本用 macOS 自带的检查器检查拼写，没有语法检查，也没有其他语言的词典。在 Mac 上无法再回到经典版本；经典版本的数据仍留在你的 Mac 上，原封不动。</li>
 </ul>
 <h2 id="配置-tex">配置 TeX</h2>
 <p>Lattice 使用你自己的 TeX 发行版（MacTeX 或 TeX Live）编译 PDF。如果还没有安装，Lattice 可以帮你安装 <strong>BasicTeX</strong>：这是「上手」清单的第一步，找不到 TeX 的编译也会提示安装。编译时发现缺少的 LaTeX 宏包，也可以直接在编译问题里安装。</p>
@@ -59,13 +59,16 @@ main blockquote { margin: 12px 0; padding: 2px 16px; border-left: 3px solid var(
 <p>左上角的项目名菜单和 <strong>文件</strong> 菜单里有相同的操作：</p>
 <ul>
 <li><strong>打开文件夹</strong>（<code>⌘O</code>）：任何包含 <code>.tex</code> 文件的文件夹，Lattice 直接在原处编辑。</li>
-<li><strong>新建项目</strong>（<code>⌘⇧N</code>）：起个名字，选一个会议模板（NeurIPS、ICML、ICLR、ACL、CVPR、AAAI 或学位论文模板）或你自己保存的模板，再点 <strong>选择位置</strong>。</li>
+<li><strong>新建项目</strong>（<code>⌘⇧N</code>）：起个名字，选一个会议模板（NeurIPS、ICML、ICLR、ACL、CVPR、AAAI 或学位论文模板）或你自己保存的模板，再点 <strong>选择位置</strong>。原生版 Lattice 里这个按钮叫 <strong>选择上级文件夹…</strong>：你选的文件夹里会新建项目自己的文件夹，点 <strong>创建项目</strong> 之前对话框会写明将要创建什么（例如 <strong>将创建 ProjectA/Manuscript/</strong>）。如果上级文件夹已经和项目同名，它会提醒你，免得建出 <code>Manuscript/Manuscript/</code>。</li>
 <li><strong>克隆仓库…</strong>：来自 GitHub 或其他地方的 Git 仓库。</li>
 <li><strong>从 Overleaf 打开</strong>：见 <a href="overleaf.html">Overleaf 同步</a>。</li>
 <li><strong>导入 Overleaf ZIP…</strong>：从 Overleaf 下载的 ZIP 项目。</li>
 </ul>
 <p><img src="../images/en-new-project.webp" alt="新建项目：名称、会议模板和选择位置"></p>
 <p>最近的项目在 <strong>文件 › 打开最近使用</strong>。一个窗口可以在标题栏以标签形式打开多个项目。</p>
+<h3 id="一个仓库里放多篇稿件">一个仓库里放多篇稿件</h3>
+<p>项目就是一个文件夹，所以它可以是整个代码仓库：分析代码、数据和一篇或几篇论文放在一起。把仓库根目录作为项目打开，Agent 就能在整个仓库里工作，比如先拿 <code>analysis/</code> 的输出核对结果部分的一个数字，再在同一个对话里修改论文。</p>
+<p>在原生版 Lattice 里，每篇论文都可以用 <strong>从模板新建稿件…</strong> 开始。它在文件夹的右键菜单、项目面板空白处的右键菜单、面板的 <strong>+</strong> 菜单和命令面板里。选一个模板（和新建项目里的一样，也包括你保存的模板）和文件夹名，需要的话勾上 <strong>设为主文档</strong>，这样 <strong>编译</strong> 会编译它。Lattice 把模板文件写进这个文件夹并打开主文件。当前项目保持打开，设置、历史和 Agent 对话都不变，也不会另建项目。如果其中有文件已经存在，就什么也不写，对话框会列出这些文件。</p>
 <h2 id="上手清单">「上手」清单</h2>
 <p>项目菜单中的 <strong>新手教程</strong> 会打开一篇示例论文，旁边是 <strong>上手</strong> 清单，共六步：安装 LaTeX、修改标题并编译、在 PDF 和源码之间跳转、引用一篇论文、让 AI 助手修改一段话、开始写你自己的论文。每一步都有 <strong>指给我看</strong>，自己完成的步骤会自动打勾。可以从 <strong>面板 › 上手</strong> 重新打开清单。</p>
 <p><img src="../images/zh-get-started.webp" alt="教程论文：左边是「上手」清单，右边是 PDF"></p>
