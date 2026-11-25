@@ -210,12 +210,15 @@ profile instead of the stages the diff picks. Text is `TEXT_ONLY` in
 `scripts/ci-local-select.mjs` and nothing else: `docs/` (the user guide is
 `docs/guide/`), `gpui/docs/`, top-level Markdown but
 `THIRD_PARTY_NOTICES.md`, the release notes (`.github/release-notes/*.md`,
-`src/release-notes/*.json`) and the i18n catalogs (`src/locales/<lang>/*`,
+`src/release-notes/*.json`) and the i18n catalogs (`src/locales/<lang>/*.json` and `*.po`,
 `gpui/crates/lattice-i18n/locales/<lang>/*.po`). The profile runs the
 headless stages those files alone pick (the tests that read them and the
 gate's checks; the GPUI build and unit tests for a GPUI catalog) and
 `pnpm build`, never the e2e or the WebKit benchmark, and prints
-`CI-local: macos <tree> docs from=<gate sha>`. On that trailer CI takes the
+`CI-local: macos <tree> docs from=<gate sha>`, under `--headless` too since
+nothing in it opens a window. A catalog is compiled into both apps, so its
+build and unit tests run but its e2e does not: a catalog entry that breaks
+only at run time shows up in the nightly full gate below. On that trailer CI takes the
 gate's own trailer for the rest of the branch, so a release-path branch
 keeps its skip only when the gate recorded the full gate, provided the gate
 is an ancestor of HEAD and every file since it is text
@@ -247,7 +250,7 @@ whole scenario runs on main once a night instead:
 `.github/workflows/nightly-e2e.yml`, at 18:37 UTC (02:37 in Taipei), on the
 Mac mini through runner-up's `lattice-mac` pool
 ([`release-process.md`](release-process.md)), under the in-app lock (it
-waits up to three hours for crew gates to free it). `scripts/gpui-nightly.mjs
+waits up to 90 minutes for crew gates to free it). `scripts/gpui-nightly.mjs
 run` records main with `scripts/gpui-main-baseline.mjs` (the gate, the
 release build and the whole e2e, which also leaves the Mac's main baseline
 for that commit), judges the e2e as gpui.yml judges main (the known failures
@@ -255,8 +258,8 @@ apart, the flaky tier counted, one rerun of a new failure's module) and
 writes `nightly@<sha>.json` beside the baseline. `report` keeps one issue
 labelled `nightly-e2e` in step: opened on the first failure, rewritten every
 night they persist with a comment for each new one, closed on the first
-green night. A run that wrote no record (the lock never came free, the Mac
-was off) counts as a failure. A nightly failure is fixed the next day; a
+green night. A run that wrote no record of its own (the lock never came
+free, the disk was under its floor, a crash) counts as a failure. A nightly failure is fixed the next day; a
 step that fails there and is pre-existing joins
 `scripts/gpui-e2e-known-failures.json` as below. `gh workflow run
 nightly-e2e.yml` runs it by hand.

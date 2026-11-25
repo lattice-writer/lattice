@@ -13,20 +13,25 @@
  *           Mac's main baseline for that commit), judges the e2e as gpui.yml
  *           judges main (scripts/gpui-e2e-known-failures.json, the flaky tier
  *           counted, one rerun of a new failure's module on a fresh fixture),
- *           and writes nightly@<sha>.json beside the baseline. The scenario
- *           and the rerun open windows: run it under scripts/inapp-lock.
+ *           and writes nightly@<sha>.json beside the baseline, with this
+ *           run's id, or a record of why it stopped. The rerun takes the
+ *           scratch HOME and lab switches gpui/script/e2e gives the
+ *           scenario. The scenario and the rerun open windows: run it under
+ *           scripts/inapp-lock.
  *   report  reads that record and keeps one GitHub issue, labelled
  *           `nightly-e2e`, in step (planIssue): it opens one for the first
  *           failures, rewrites its body every night they persist and comments
  *           when a failure is new since the night before, and comments and
- *           closes it on the first green night. A missing record (the run
- *           died or never got the lock) is a failure too.
+ *           closes it on the first green night. A record that is missing or
+ *           from another run (the run died or never got the lock) is a
+ *           failure too.
  *
  * Options:
  *   report --dry-run   print what it would do to the issue, and do nothing
  */
 import { execFileSync, spawnSync } from "node:child_process";
-import { appendFileSync, existsSync, readFileSync, statfsSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdtempSync, readFileSync, rmSync, statfsSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { judge, knownFailures, rerun, rerunModules, settle } from "./gpui-e2e-verdict.mjs";
@@ -97,16 +102,37 @@ export function planIssue({ issue, failures, sha, subject, flaky = [], run = "" 
 }
 
 const recordFile = (sha) => path.join(baselineDir(), `nightly@${sha}.json`);
+// Which run wrote a record: report takes only its own run's, so a night that
+// wrote none never reports an older night's record for the same commit.
+const runId = () => process.env.GITHUB_RUN_ID ?? "local";
+
+/** The nightly record `report` reads for this run, or a failure that says why there is none. */
+export function nightlyFor(saved, { sha, subject, run }) {
+  if (saved?.sha === sha && saved.run === run) return saved;
+  return { sha, subject, run, failures: [saved ? "the nightly run wrote no record of its own (the one on disk is another run's)" : "the nightly run wrote no record (see the run's log: the in-app lock, the disk floor or a crash)"], flaky: [] };
+}
 
 function runNightly() {
   const sha = git("rev-parse", "HEAD");
+  const subject = git("log", "-1", "--format=%s", sha);
+  const started = new Date().toISOString();
+  rmSync(recordFile(sha), { force: true });
+  const stop = (why) => {
+    writeFileSync(recordFile(sha), `${JSON.stringify({ sha, subject, run: runId(), finished: new Date().toISOString(), failures: [why], flaky: [], fixed: [] }, null, 2)}\n`);
+    console.log(`gpui-nightly: ${why}`);
+    process.exitCode = 1;
+  };
   const { bavail, bsize } = statfsSync("/");
   const freeGb = (bavail * bsize) / 1e9;
-  if (freeGb < MIN_FREE_GB) throw new Error(`the system disk has ${freeGb.toFixed(1)} GB free, under the ${MIN_FREE_GB} GB floor`);
-  spawnSync("node", [path.join(repo, "scripts", "gpui-main-baseline.mjs")], { cwd: repo, stdio: "inherit" });
+  if (freeGb < MIN_FREE_GB) return stop(`the system disk has ${freeGb.toFixed(1)} GB free, under the ${MIN_FREE_GB} GB floor`);
+  const baseline = spawnSync("node", [path.join(repo, "scripts", "gpui-main-baseline.mjs")], { cwd: repo, stdio: "inherit" });
   const dir = baselineDir();
   const baselineFile = path.join(dir, `known-failures@${sha}.json`);
   const record = existsSync(baselineFile) ? JSON.parse(readFileSync(baselineFile, "utf8")) : null;
+  // gpui-main-baseline.mjs exits 0 whether or not main is green; anything
+  // else, or a record older than this run (another checkout's, for the same
+  // commit), means it did not record this run.
+  if (baseline.status !== 0 || !record || record.started < started) return stop(`scripts/gpui-main-baseline.mjs did not record this run (exit ${baseline.status ?? baseline.signal})`);
   let verdict = null;
   if (record?.e2e?.result) {
     let result = null;
@@ -117,9 +143,17 @@ function runNightly() {
     }
     verdict = judge(result, knownFailures(), "macos", { strict: true });
     const retry = [...verdict.fresh, ...verdict.quarantined];
-    if (retry.length && !verdict.error) verdict = settle(verdict, rerun(path.join(repo, "gpui", "target", "release", "lattice-gpui"), path.join(repo, "gpui", "fixtures", "e2e"), rerunModules(result, retry)));
+    if (retry.length && !verdict.error) {
+      const home = mkdtempSync(path.join(tmpdir(), "gpui-nightly-home-"));
+      const env = { ...process.env, HOME: home, GPUI_LAB_IGNORE_OCCLUSION: "1", GPUI_LAB_ASSUME_KEY: "1", PATH: `${process.env.PATH}:/Library/TeX/texbin` };
+      try {
+        verdict = settle(verdict, rerun(path.join(repo, "gpui", "target", "release", "lattice-gpui"), path.join(repo, "gpui", "fixtures", "e2e"), rerunModules(result, retry), env));
+      } finally {
+        rmSync(home, { recursive: true, force: true });
+      }
+    }
   }
-  const nightly = { sha, subject: git("log", "-1", "--format=%s", sha), finished: new Date().toISOString(), baseline: record ? path.basename(baselineFile) : null, failures: failuresOf(record, verdict), flaky: verdict?.flaky ?? [], fixed: verdict?.fixed ?? [] };
+  const nightly = { sha, subject, run: runId(), finished: new Date().toISOString(), baseline: record ? path.basename(baselineFile) : null, failures: failuresOf(record, verdict), flaky: verdict?.flaky ?? [], fixed: verdict?.fixed ?? [] };
   writeFileSync(recordFile(sha), `${JSON.stringify(nightly, null, 2)}\n`);
   const lines = [`Nightly full gate at ${sha.slice(0, 9)}: ${nightly.failures.length ? `${nightly.failures.length} failure(s)` : "green"}`, ...nightly.failures.map((failure) => `- ${failure}`), ...nightly.flaky.map((step) => `- flaky: ${step}`), ...nightly.fixed.map((step) => `- known failure that passed: ${step}`)];
   console.log(lines.join("\n"));
@@ -130,7 +164,7 @@ function runNightly() {
 function report({ dryRun }) {
   const sha = git("rev-parse", "HEAD");
   const file = recordFile(sha);
-  const nightly = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : { sha, subject: git("log", "-1", "--format=%s", sha), failures: failuresOf(null), flaky: [] };
+  const nightly = nightlyFor(existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : null, { sha, subject: git("log", "-1", "--format=%s", sha), run: runId() });
   const run = process.env.GITHUB_RUN_ID ? `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}` : "";
   const gh = (...args) => execFileSync("gh", args, { cwd: repo, encoding: "utf8" }).trim();
   const [issue = null] = dryRun ? [] : JSON.parse(gh("issue", "list", "--label", LABEL, "--state", "open", "--limit", "1", "--json", "number,body") || "[]");

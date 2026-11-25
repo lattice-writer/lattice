@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { failuresOf, issueBody, listedFailures, planIssue } from "./gpui-nightly.mjs";
+import { failuresOf, issueBody, listedFailures, nightlyFor, planIssue } from "./gpui-nightly.mjs";
 
 const green = { gate: { failing: [] }, build: { status: "ok" }, e2e: { status: "ok", result: "e2e@x.json" } };
 const clean = { error: null, fresh: [], quarantined: [], flaky: [], fixed: [] };
@@ -22,6 +22,14 @@ describe("gpui-nightly: what failed", () => {
   it("fails closed: no record, or a built app with no e2e result, is a failure", () => {
     expect(failuresOf(null)).toEqual(["the nightly run wrote no baseline record"]);
     expect(failuresOf({ ...green, e2e: { status: "timed out" } }, null)).toEqual(["e2e: timed out"]);
+  });
+
+  it("fails closed on a record from another run or another commit, so a night that wrote none never reports an older green one", () => {
+    const saved = { sha, run: "41", failures: [], flaky: [] };
+    expect(nightlyFor(saved, { sha, subject: "x", run: "41" })).toBe(saved);
+    expect(nightlyFor(saved, { sha, subject: "x", run: "42" }).failures).toEqual([expect.stringMatching(/another run's/)]);
+    expect(nightlyFor({ ...saved, sha: "fedcba" }, { sha, subject: "x", run: "41" }).failures).toHaveLength(1);
+    expect(nightlyFor(null, { sha, subject: "x", run: "42" }).failures).toEqual([expect.stringMatching(/wrote no record/)]);
   });
 
   it("does not count flaky steps that passed on the rerun, or known failures", () => {
@@ -66,7 +74,8 @@ describe("gpui-nightly: the workflow", () => {
 
   it("runs on main every night on the Mac mini, under the in-app lock, and reports even when the run failed", () => {
     expect(workflow).toMatch(/schedule:\n\s+#.*\n\s+- cron: "\d+ \d+ \* \* \*"/);
-    expect(workflow).toMatch(/runs-on: lattice-mac\n/);
+    expect(workflow).toMatch(/runs-on: \$\{\{ vars\.LATTICE_MACOS_RUNNER \|\| 'lattice-mac' \}\}\n/);
+    expect(workflow).toMatch(/fetch-depth: 0\n/);
     expect(workflow).toMatch(/ref: main\n/);
     expect(workflow).toMatch(/scripts\/inapp-lock --thread .* -- node scripts\/gpui-nightly\.mjs run/);
     expect(workflow).toMatch(/if: \$\{\{ !cancelled\(\) \}\}\n(.*\n){0,3}\s+run: node scripts\/gpui-nightly\.mjs report/);
