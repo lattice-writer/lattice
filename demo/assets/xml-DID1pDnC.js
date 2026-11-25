@@ -1,1 +1,0 @@
-import{Gi as e,Ki as t}from"./shiki-stubs-BMJehVMd.js";e();export{t as default};

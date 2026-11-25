@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-C0FnF6B9.js";import{a as t,i as n}from"./core-Cf5DhrDM.js";function r(){return t(`check_native_app`).catch(()=>null)}function i(e){t(`plugin:resources|close`,{rid:e.rid}).catch(()=>{})}async function a(){return await t(`take_native_move`).catch(()=>!1)?r():null}function o(){return(o=e((()=>{n()})))()}export{a as n,i as r,o as t};

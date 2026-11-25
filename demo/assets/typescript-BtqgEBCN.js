@@ -1,0 +1,1 @@
+import{n as e,t}from"./typescript-Do_RuUS-.js";t();export{e as default};

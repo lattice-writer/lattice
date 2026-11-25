@@ -1,1 +1,0 @@
-import{Nc as e,Pc as t}from"./shiki-stubs-BMJehVMd.js";e();export{t as default};

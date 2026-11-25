@@ -1,1 +1,0 @@
-import{ip as e,rp as t}from"./shiki-stubs-BMJehVMd.js";e();export{t as default};

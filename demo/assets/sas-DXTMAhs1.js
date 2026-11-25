@@ -1,1 +1,0 @@
-import{Uo as e,Wo as t}from"./shiki-stubs-BMJehVMd.js";e();export{t as default};

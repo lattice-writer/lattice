@@ -1,1 +1,0 @@
-import{Uc as e,Wc as t}from"./shiki-stubs-BMJehVMd.js";e();export{t as default};

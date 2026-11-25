@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-C0FnF6B9.js";import{Li as t,Ri as n}from"./shiki-stubs-CvV_dDoj.js";function r(){return(r=e((()=>{t()})))()}r();export{n as default};
