@@ -12,10 +12,11 @@
 //! window-level draws (menus, popovers, dialogs, tooltips, the palette).
 //!
 //! The rectangles cover what is seen: shadows are left out, as is a quad
-//! with nothing to draw (a transparent layer catching presses), but a
-//! dialog's dimming backdrop counts, so a page under a modal dialog is cut
-//! away with the rest of the window and the backdrop dims what GPUI draws
-//! there instead of leaving the page bright beside the card.
+//! nobody sees (a transparent layer catching presses, a backdrop at the end
+//! of its fade), but a dialog's dimming backdrop counts, so a page under a
+//! modal dialog is cut away with the rest of the window and the backdrop
+//! dims what GPUI draws there instead of leaving the page bright beside the
+//! card.
 
 use std::rc::{Rc, Weak};
 
@@ -29,6 +30,11 @@ use super::CompositionSurfaceId;
 
 /// What [`Window::observe_overlay_bounds`] calls.
 pub type OverlayBoundsObserver = dyn Fn(&[Bounds<Pixels>]);
+
+/// A quad more see-through than this draws nothing anyone sees: a layer
+/// catching presses, or a dialog's backdrop at the end of its fade, which
+/// can stay drawn at an alpha within rounding of zero.
+const INVISIBLE_ALPHA: f32 = 0.02;
 
 /// Past this many rectangles the frame's overlays are reported as the one
 /// rectangle around them all.
@@ -167,7 +173,7 @@ fn covers(primitive: &Primitive) -> bool {
         Primitive::Shadow(_) => false,
         Primitive::Quad(quad) => {
             let background = &quad.background;
-            let invisible = background.tag == BackgroundTag::Solid && background.solid.a == 0.;
+            let invisible = background.tag == BackgroundTag::Solid && background.solid.a < INVISIBLE_ALPHA;
             let border = !quad.border_color.is_transparent()
                 && (quad.border_widths.top.0 > 0.
                     || quad.border_widths.right.0 > 0.
@@ -214,9 +220,10 @@ mod tests {
         // The root view: not an overlay.
         scene.insert_primitive(quad(scaled(0., 0., 2000., 2000.), 1.));
         let overlay_start = scene.len();
-        // A transparent layer catching presses, a menu's shadow, the menu,
-        // and the menu's content.
+        // A transparent layer catching presses, a backdrop faded out but
+        // still drawn, a menu's shadow, the menu, and the menu's content.
         scene.insert_primitive(quad(scaled(0., 0., 2000., 2000.), 0.));
+        scene.insert_primitive(quad(scaled(0., 0., 2000., 2000.), 6e-8));
         scene.insert_primitive(Shadow {
             order: 0,
             blur_radius: ScaledPixels(24.),
