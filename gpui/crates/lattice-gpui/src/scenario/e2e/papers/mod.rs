@@ -43,12 +43,17 @@ impl Run {
         let bibliography = root.join("references.bib");
         let original = std::fs::read_to_string(&bibliography)
             .context("the e2e project needs references.bib")?;
+        let papers = cx.update(|cx| self.shell.read(cx).papers().clone());
+        std::fs::write(&bibliography, "")?;
+        let first = self.first_paper(cx, steps, &papers).await;
         std::fs::create_dir_all(root.join(BUNDLE))?;
         std::fs::write(root.join(BUNDLE).join("paper.md"), PAPER)?;
         std::fs::write(&bibliography, format!("{original}{ENTRY}"))?;
-        let papers = cx.update(|cx| self.shell.read(cx).papers().clone());
 
-        let outcome = self.papers_panel_steps(cx, steps, root, &papers).await;
+        let outcome = match first {
+            Ok(()) => self.papers_panel_steps(cx, steps, root, &papers).await,
+            Err(error) => Err(error),
+        };
         std::fs::write(&bibliography, original)?;
         std::fs::remove_dir_all(root.join(BUNDLE))?;
         outcome?;
@@ -291,6 +296,65 @@ impl Run {
 }
 
 impl Run {
+    /// An empty library's "Add your first paper", clicked where it is drawn,
+    /// opens Add papers as the field's + does (lattice#1280); it used to
+    /// focus the box alone and leave the empty state up. The sheet is closed
+    /// again for the steps after.
+    async fn first_paper(
+        &self,
+        cx: &mut AsyncApp,
+        steps: &mut Steps,
+        papers: &gpui::Entity<crate::papers::PapersPanel>,
+    ) -> Result<()> {
+        lattice_ui::parity::enable();
+        lattice_ui::parity::forget("papers/first");
+        self.with_window(cx, |shell, window, cx| {
+            shell.update(cx, |shell, cx| shell.show_view("papers", false, window, cx))
+        })?;
+        let emptied = self
+            .wait_for(cx, Duration::from_secs(15), |_, cx| {
+                let panel = papers.read(cx);
+                panel.papers.is_empty() && panel.settled(cx)
+            })
+            .await;
+        let button = self
+            .wait_for(cx, Duration::from_secs(5), |_, _| {
+                lattice_ui::parity::regions()
+                    .get("papers/first")
+                    .is_some_and(|region| region.bounds.is_some())
+            })
+            .await
+            .then(|| lattice_ui::parity::regions()["papers/first"].bounds)
+            .flatten();
+        self.papers_shot(cx, "papers-0-empty").await;
+        if let Some(button) = button {
+            self.click_at(cx, button.center())?;
+        }
+        let opened = self
+            .wait_for(cx, Duration::from_secs(5), |shell, cx| {
+                shell.read(cx).add_papers().is_some()
+            })
+            .await;
+        self.papers_shot(cx, "papers-0b-first-paper-clicked").await;
+        steps.check(
+            "an empty library's Add your first paper opens Add papers",
+            emptied && button.is_some() && opened,
+            json!({ "empty": emptied, "button": format!("{button:?}"), "opened": opened }),
+        );
+        let sheet = cx.update(|cx| self.shell.read(cx).add_papers().cloned());
+        if let Some(sheet) = sheet {
+            self.with_window(cx, |_, window, cx| {
+                sheet.update(cx, |sheet, cx| sheet.cancel(window, cx))
+            })?;
+            self.wait_for(cx, Duration::from_secs(5), |shell, cx| {
+                shell.read(cx).add_papers().is_none()
+            })
+            .await;
+        }
+        lattice_ui::parity::forget("papers/first");
+        Ok(())
+    }
+
     /// Add papers, offline: a pasted BibTeX entry is read as it stands and
     /// an id the library already holds needs no lookup, so neither reaches
     /// the network. Closing it adds nothing.

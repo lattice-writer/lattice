@@ -416,10 +416,10 @@ impl PapersPanel {
         if let Some(status) = self.render_load_status(window, cx) {
             return body.child(status).into_any_element();
         }
-        let input = self.input().clone();
+        let view = cx.entity().downgrade();
         let palette = cx.palette().clone();
-        // The card-index drawing over its heading and the action that takes
-        // the writer to the box above, centred in the room under it
+        // The card-index drawing over its heading and the action that opens
+        // Add papers, centred in the room under it
         // (`.papers-empty-state`); straight on the panel, which is already
         // the card.
         body = body
@@ -451,15 +451,23 @@ impl PapersPanel {
                             .child(t!("No papers yet")),
                     )
                     .child(
-                        div().mt(px(4.)).max_w_full().child(
-                            // Only focuses the box: what to add is the writer's
-                            // to type.
-                            Button::new("papers-first", t!("Add your first paper"))
-                                .compact()
-                                .on_click(move |_, window, cx| {
-                                    input.update(cx, |input, cx| input.focus(window, cx));
-                                }),
-                        ),
+                        div()
+                            .relative()
+                            .mt(px(4.))
+                            .max_w_full()
+                            .child(
+                                // Opens Add papers the way the field's + does
+                                // (lattice#1280): focusing the box left the
+                                // empty state on screen, so the click looked
+                                // like it did nothing.
+                                Button::new("papers-first", t!("Add your first paper"))
+                                    .compact()
+                                    .on_click(move |_, window, cx| {
+                                        view.update(cx, |this, cx| this.open_add_sheet(window, cx))
+                                            .ok();
+                                    }),
+                            )
+                            .children(lattice_ui::parity::probe("papers/first")),
                     ),
                 cx,
             ));
