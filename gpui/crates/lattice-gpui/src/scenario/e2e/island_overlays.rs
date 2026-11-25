@@ -99,6 +99,19 @@ impl Run {
         let drawn = |overlays: &std::rc::Rc<std::cell::RefCell<Vec<Bounds<Pixels>>>>| {
             format!("{:?}", overlays.borrow())
         };
+        // Start with nothing drawn above the page: what an earlier module
+        // left open closed, and its exit played out.
+        let found = drawn(&overlays);
+        self.with_window(cx, |shell, window, cx| {
+            shell.update(cx, |shell, cx| shell.close_overlays(window, cx))
+        })?;
+        let cleared = self
+            .wait_for(cx, Duration::from_secs(5), {
+                let overlays = overlays.clone();
+                move |_, _| overlays.borrow().is_empty()
+            })
+            .await;
+        self.snapshot(cx, "island-overlay-start").await;
 
         let shown = share(cx, self)?;
         let overlays_before = drawn(&overlays);
@@ -112,7 +125,7 @@ impl Run {
         steps.check(
             "on Windows the command palette opened over a webview island is drawn above the page",
             loaded && shown > 0.9 && under_palette < shown - 0.05,
-            json!({ "loaded": loaded, "page_share": shown, "under_palette": under_palette, "bounds": format!("{bounds:?}"), "overlays_before": overlays_before }),
+            json!({ "loaded": loaded, "page_share": shown, "under_palette": under_palette, "bounds": format!("{bounds:?}"), "overlays_found": found, "cleared": cleared, "overlays_before": overlays_before }),
         );
 
         let host = cx.update(confirm::install);
