@@ -3,20 +3,30 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { failuresOf, issueBody, listedFailures, nightlyFor, planIssue } from "./gpui-nightly.mjs";
 
-const green = { gate: { failing: [] }, build: { status: "ok" }, e2e: { status: "ok", result: "e2e@x.json" } };
+const green = { gate: { status: "ok", failing: [] }, build: { status: "ok" }, e2e: { status: "ok", result: "e2e@x.json" } };
 const clean = { error: null, fresh: [], quarantined: [], flaky: [], fixed: [] };
 const sha = "0123456789abcdef";
 
 describe("gpui-nightly: what failed", () => {
-  it("is nothing for a green gate, build and e2e", () => {
-    expect(failuresOf(green, clean)).toEqual([]);
+  it("is nothing for a green gate, build and e2e that saved on quit", () => {
+    expect(failuresOf(green, clean, "saved")).toEqual([]);
+  });
+
+  it("fails closed on the save on quit: lost, or not checked, even beside known failures", () => {
+    expect(failuresOf(green, { ...clean, known: ["settings: theme"] }, "lost")).toEqual(["e2e: quitting did not save the typed text"]);
+    expect(failuresOf(green, clean, "unknown")).toEqual(["e2e: could not check that quitting saved the typed text"]);
+    expect(failuresOf(green, clean, null)).toEqual(["e2e: could not check that quitting saved the typed text"]);
+  });
+
+  it("counts a gate that failed without naming a stage", () => {
+    expect(failuresOf({ ...green, gate: { status: "failed", failing: [] } }, clean, "saved")).toEqual(["gate: failed"]);
   });
 
   it("counts gate stages, the build, a scenario that did not finish, new steps and flaky-tier steps that failed twice", () => {
-    expect(failuresOf({ ...green, gate: { failing: ["knip"] } }, { ...clean, fresh: ["pdf: zoom"], quarantined: ["clipboard: paste"] })).toEqual(["gate stage knip", "e2e step pdf: zoom", "e2e step clipboard: paste (flaky tier, failed twice)"]);
+    expect(failuresOf({ ...green, gate: { failing: ["knip"] } }, { ...clean, fresh: ["pdf: zoom"], quarantined: ["clipboard: paste"] })).toEqual(["gate stage knip", "e2e step pdf: zoom", "e2e step clipboard: paste (flaky tier, failed twice)", "e2e: could not check that quitting saved the typed text"]);
     expect(failuresOf({ ...green, build: { status: "failed" }, e2e: { status: "not run", reason: "the build failed" } }, null)).toEqual(["release build: failed"]);
-    expect(failuresOf(green, { ...clean, error: "the app crashed" })).toEqual(["e2e did not finish: the app crashed"]);
-    expect(failuresOf({ ...green, e2e: { status: "failed", after_quit: "e2e: not saved" } }, clean)).toEqual(["e2e: quitting did not save the typed text"]);
+    expect(failuresOf(green, { ...clean, error: "the app crashed" }, "unknown")).toEqual(["e2e did not finish: the app crashed"]);
+    expect(failuresOf({ ...green, e2e: { status: "failed", after_quit: "e2e: not saved" } }, clean, "saved")).toEqual(["e2e: quitting did not save the typed text"]);
   });
 
   it("fails closed: no record, or a built app with no e2e result, is a failure", () => {
@@ -33,7 +43,7 @@ describe("gpui-nightly: what failed", () => {
   });
 
   it("does not count flaky steps that passed on the rerun, or known failures", () => {
-    expect(failuresOf(green, { ...clean, flaky: ["tree: rename"], fixed: ["settings: theme"] })).toEqual([]);
+    expect(failuresOf(green, { ...clean, flaky: ["tree: rename"], fixed: ["settings: theme"] }, "saved")).toEqual([]);
   });
 });
 

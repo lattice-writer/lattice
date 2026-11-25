@@ -52,7 +52,18 @@ app="$root/target/release/lattice-gpui"
 "$root/script/build-islands"
 
 scratch="$(mktemp -d -t lattice-gpui-e2e)"
-trap 'rm -rf "$scratch"' EXIT
+# LATTICE_E2E_QUIT_RESULT=<file> (scripts/gpui-nightly.mjs): on the way out,
+# whatever the steps did, write whether quitting saved the text typed just
+# before (saved, lost, or unknown without a result), while the scratch project
+# is still there. The check below runs only when every step passed.
+record_quit() {
+  [ -n "${LATTICE_E2E_QUIT_RESULT:-}" ] || return 0
+  local file text
+  file="$(jq -r '.after_quit.file // empty' "${out:-}" 2>/dev/null)" || file=""
+  text="$(jq -r '.after_quit.text // empty' "${out:-}" 2>/dev/null)" || text=""
+  if [ -z "$file" ] || [ -z "$text" ]; then echo unknown; elif grep -qF "$text" "$file" 2>/dev/null; then echo saved; else echo lost; fi >"$LATTICE_E2E_QUIT_RESULT"
+}
+trap 'record_quit; rm -rf "$scratch"' EXIT
 project="$scratch/project"
 out="${1:-$scratch/e2e.json}"
 mkdir -p "$scratch/home"

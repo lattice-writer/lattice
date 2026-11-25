@@ -45,15 +45,21 @@ export const LABEL = "nightly-e2e";
 const MIN_FREE_GB = Number(process.env.LATTICE_NIGHTLY_MIN_FREE_GB ?? 20);
 
 /** What failed tonight, one line each: gate stages, the build, and the e2e steps the verdict counts. */
-export function failuresOf(record, verdict) {
+export function failuresOf(record, verdict, quit = null) {
   if (!record) return ["the nightly run wrote no baseline record"];
   const failures = (record.gate?.failing ?? []).map((stage) => `gate stage ${stage}`);
+  // A gate that died before it printed a stage names none.
+  if (record.gate?.status !== "ok" && !failures.length) failures.push(`gate: ${record.gate?.status ?? "not run"}`);
   if (record.build?.status !== "ok") failures.push(`release build: ${record.build?.status ?? "not run"}`);
   else if (!verdict) failures.push(`e2e: ${record.e2e?.status ?? "not run"}${record.e2e?.reason ? ` (${record.e2e.reason})` : ""}`);
   if (verdict?.error) failures.push(`e2e did not finish: ${verdict.error}`);
   for (const step of verdict?.fresh ?? []) failures.push(`e2e step ${step}`);
   for (const step of verdict?.quarantined ?? []) failures.push(`e2e step ${step} (flaky tier, failed twice)`);
-  if (record.e2e?.after_quit) failures.push("e2e: quitting did not save the typed text");
+  // gpui/script/e2e checks the save on quit only when every step passed, so
+  // a known failure would hide a lost save; LATTICE_E2E_QUIT_RESULT has it
+  // checked whatever the steps did.
+  if (record.e2e?.after_quit || quit === "lost") failures.push("e2e: quitting did not save the typed text");
+  else if (verdict && !verdict.error && quit !== "saved") failures.push("e2e: could not check that quitting saved the typed text");
   return failures;
 }
 
@@ -125,8 +131,15 @@ function runNightly() {
   const { bavail, bsize } = statfsSync("/");
   const freeGb = (bavail * bsize) / 1e9;
   if (freeGb < MIN_FREE_GB) return stop(`the system disk has ${freeGb.toFixed(1)} GB free, under the ${MIN_FREE_GB} GB floor`);
-  const baseline = spawnSync("node", [path.join(repo, "scripts", "gpui-main-baseline.mjs")], { cwd: repo, stdio: "inherit" });
   const dir = baselineDir();
+  // gpui-main-baseline.mjs writes e2e@<sha>.json over an earlier run's for
+  // the same commit; a scenario that wrote none tonight must not be judged
+  // by that one.
+  const resultFile = path.join(dir, `e2e@${sha}.json`);
+  const quitFile = path.join(dir, `quit@${sha}.txt`);
+  rmSync(resultFile, { force: true });
+  rmSync(quitFile, { force: true });
+  const baseline = spawnSync("node", [path.join(repo, "scripts", "gpui-main-baseline.mjs")], { cwd: repo, stdio: "inherit", env: { ...process.env, LATTICE_E2E_QUIT_RESULT: quitFile } });
   const baselineFile = path.join(dir, `known-failures@${sha}.json`);
   const record = existsSync(baselineFile) ? JSON.parse(readFileSync(baselineFile, "utf8")) : null;
   // gpui-main-baseline.mjs exits 0 whether or not main is green; anything
@@ -137,7 +150,7 @@ function runNightly() {
   if (record?.e2e?.result) {
     let result = null;
     try {
-      result = JSON.parse(readFileSync(path.join(dir, record.e2e.result), "utf8"));
+      result = JSON.parse(readFileSync(resultFile, "utf8"));
     } catch {
       // judge() reports the missing result.
     }
@@ -153,7 +166,7 @@ function runNightly() {
       }
     }
   }
-  const nightly = { sha, subject, run: runId(), finished: new Date().toISOString(), baseline: record ? path.basename(baselineFile) : null, failures: failuresOf(record, verdict), flaky: verdict?.flaky ?? [], fixed: verdict?.fixed ?? [] };
+  const nightly = { sha, subject, run: runId(), finished: new Date().toISOString(), baseline: record ? path.basename(baselineFile) : null, failures: failuresOf(record, verdict, existsSync(quitFile) ? readFileSync(quitFile, "utf8").trim() : null), flaky: verdict?.flaky ?? [], fixed: verdict?.fixed ?? [] };
   writeFileSync(recordFile(sha), `${JSON.stringify(nightly, null, 2)}\n`);
   const lines = [`Nightly full gate at ${sha.slice(0, 9)}: ${nightly.failures.length ? `${nightly.failures.length} failure(s)` : "green"}`, ...nightly.failures.map((failure) => `- ${failure}`), ...nightly.flaky.map((step) => `- flaky: ${step}`), ...nightly.fixed.map((step) => `- known failure that passed: ${step}`)];
   console.log(lines.join("\n"));

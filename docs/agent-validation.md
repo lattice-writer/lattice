@@ -254,7 +254,8 @@ waits up to 90 minutes for crew gates to free it). `scripts/gpui-nightly.mjs
 run` records main with `scripts/gpui-main-baseline.mjs` (the gate, the
 release build and the whole e2e, which also leaves the Mac's main baseline
 for that commit), judges the e2e as gpui.yml judges main (the known failures
-apart, the flaky tier counted, one rerun of a new failure's module) and
+apart, the flaky tier counted, one rerun of a new failure's module, and
+the save on quit checked whatever the steps did) and
 writes `nightly@<sha>.json` beside the baseline. `report` keeps one issue
 labelled `nightly-e2e` in step: opened on the first failure, rewritten every
 night they persist with a comment for each new one, closed on the first
