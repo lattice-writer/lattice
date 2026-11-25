@@ -389,7 +389,14 @@ mod tests {
     /// latexmk's record never lists it: the format's own record does.
     #[test]
     fn a_package_in_the_preamble_format_changed_is_not_current() {
-        if !tex() {
+        // The format needs mylatexformat, which a minimal TeX Live (the
+        // hosted runner's scheme-basic) may lack; without it every build is
+        // plain and there is no format to test.
+        let mylatexformat = crate::commands::command("kpsewhich")
+            .arg("mylatexformat.ltx")
+            .output()
+            .is_ok_and(|output| output.status.success());
+        if !tex() || !mylatexformat {
             return;
         }
         let root = TempDir::new("current-build-format");

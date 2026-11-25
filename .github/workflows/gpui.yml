@@ -157,7 +157,8 @@ jobs:
       - run: cargo build --release --locked
       # A small TeX Live on PATH, where the app looks first. scheme-basic has
       # no `synctex` binary (its own package, as in lattice-core's TeX Live
-      # install), and the e2e scenario's SyncTeX steps run it.
+      # install), and the e2e scenario's SyncTeX steps run it. mylatexformat
+      # makes the preamble format, whose entry check lattice-core tests below.
       - name: Install TeX Live
         uses: TeX-Live/setup-texlive-action@v4
         with:
@@ -165,6 +166,7 @@ jobs:
           packages: |
             scheme-basic
             latexmk
+            mylatexformat
             synctex
       # TexLab, for the editor's diagnostics, which the e2e scenario checks
       # (the Windows job has none and skips that step).
