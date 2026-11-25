@@ -6,6 +6,8 @@ mod composition;
 mod linux;
 #[cfg(target_os = "macos")]
 mod macos;
+#[cfg(any(test, all(feature = "gpui-fast", target_os = "windows")))]
+mod region;
 #[cfg(all(feature = "gpui-fast", target_os = "windows"))]
 mod win32;
 
@@ -77,7 +79,7 @@ pub struct WebView {
     scale_factor: Cell<f32>,
     /// The window's interface zoom the page zoom was last matched to: the
     /// page is zoomed with the interface, as GPUI's own pixels are.
-    #[cfg(all(feature = "gpui-fast", target_os = "macos"))]
+    #[cfg(all(feature = "gpui-fast", any(target_os = "macos", target_os = "windows")))]
     interface_zoom: Cell<f64>,
     /// The window-relative origin that page clicks are forwarded to GPUI from.
     #[cfg(target_os = "linux")]
@@ -137,7 +139,7 @@ impl WebView {
             composition: None,
             #[cfg(target_os = "linux")]
             scale_factor: Cell::new(window.scale_factor()),
-            #[cfg(all(feature = "gpui-fast", target_os = "macos"))]
+            #[cfg(all(feature = "gpui-fast", any(target_os = "macos", target_os = "windows")))]
             interface_zoom: Cell::new(1.0),
             #[cfg(target_os = "linux")]
             origin,
@@ -373,9 +375,12 @@ impl WebView {
         // GTK's integer one, so the page zoom is applied on top of it.
         #[cfg(target_os = "linux")]
         linux::match_scale_factor(&self.webview, self.scale_factor.get(), zoom);
-        #[cfg(all(feature = "gpui-fast", target_os = "macos"))]
+        #[cfg(all(feature = "gpui-fast", any(target_os = "macos", target_os = "windows")))]
         self.webview.zoom(zoom * self.interface_zoom.get())?;
-        #[cfg(not(any(target_os = "linux", all(feature = "gpui-fast", target_os = "macos"))))]
+        #[cfg(not(any(
+            target_os = "linux",
+            all(feature = "gpui-fast", any(target_os = "macos", target_os = "windows"))
+        )))]
         self.webview.zoom(zoom)?;
         Ok(())
     }
@@ -527,6 +532,15 @@ impl Element for WebViewElement {
         }
         #[cfg(target_os = "linux")]
         parent.origin.set(bounds.origin);
+        // The page is zoomed with the interface, as on macOS: its child window
+        // is sized in GPUI's device pixels, the interface zoom included.
+        #[cfg(all(feature = "gpui-fast", target_os = "windows"))]
+        {
+            let zoom = f64::from(window.interface_zoom());
+            if parent.interface_zoom.replace(zoom) != zoom {
+                let _ = parent.webview.zoom(parent.zoom.get() * zoom);
+            }
+        }
         // GPUI's device pixels, the interface zoom included, which the child
         // window is placed in and its cutouts are measured in.
         #[cfg(all(feature = "gpui-fast", target_os = "windows"))]

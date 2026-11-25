@@ -40,28 +40,62 @@ const INVISIBLE_ALPHA: f32 = 0.02;
 /// rectangle around them all.
 const MAX_RECTANGLES: usize = 64;
 
-/// The window's observers, and the rectangles they were last given.
+/// The window's observers, and the rectangles they were last given: none
+/// while nothing observes, since frames then go unmeasured and what was last
+/// measured may be stale.
 #[derive(Default)]
 pub(crate) struct OverlayBounds {
     observers: Vec<Weak<OverlayBoundsObserver>>,
-    last: Vec<Bounds<Pixels>>,
+    last: Option<Vec<Bounds<Pixels>>>,
+}
+
+impl OverlayBounds {
+    /// Add `observer`, giving back what it should be told at once, if
+    /// anything is known.
+    fn subscribe(&mut self, observer: &Rc<OverlayBoundsObserver>) -> Option<Vec<Bounds<Pixels>>> {
+        self.observers.push(Rc::downgrade(observer));
+        self.last.clone()
+    }
+
+    /// The observers still held, the others forgotten; with none, what was
+    /// last measured is forgotten too.
+    fn live(&mut self) -> Vec<Rc<OverlayBoundsObserver>> {
+        self.observers
+            .retain(|observer| observer.strong_count() > 0);
+        let live: Vec<_> = self.observers.iter().filter_map(Weak::upgrade).collect();
+        if live.is_empty() {
+            self.last = None;
+        }
+        live
+    }
+
+    /// Whether `bounds` differ from what the observers were last told,
+    /// noting them as told.
+    fn changed(&mut self, bounds: &[Bounds<Pixels>]) -> bool {
+        if self.last.as_deref() == Some(bounds) {
+            return false;
+        }
+        self.last = Some(bounds.to_vec());
+        true
+    }
 }
 
 impl Window {
     /// Call `observer` with the rectangles, in window space, of what the
     /// window draws above its root view (deferred and window-level draws):
-    /// at once with the last presented frame's, then whenever a presented
-    /// frame changes them, for as long as the caller holds `observer`.
+    /// at once with the last presented frame's when they are known, then
+    /// whenever a presented frame changes them, for as long as the caller
+    /// holds `observer`.
     pub fn observe_overlay_bounds(&self, observer: &Rc<OverlayBoundsObserver>) {
-        let last = {
-            let mut state = self.fast_composition.0.borrow_mut();
-            state
-                .overlay_bounds
-                .observers
-                .push(Rc::downgrade(observer));
-            state.overlay_bounds.last.clone()
-        };
-        observer(&last);
+        let last = self
+            .fast_composition
+            .0
+            .borrow_mut()
+            .overlay_bounds
+            .subscribe(observer);
+        if let Some(last) = last {
+            observer(&last);
+        }
     }
 }
 
@@ -69,15 +103,7 @@ impl Window {
 /// view, when it changed.
 pub(super) fn presented(window: &Window) {
     let state = window.fast_composition.0.clone();
-    let observers = {
-        let mut state = state.borrow_mut();
-        let observers = &mut state.overlay_bounds.observers;
-        observers.retain(|observer| observer.strong_count() > 0);
-        observers
-            .iter()
-            .filter_map(Weak::upgrade)
-            .collect::<Vec<_>>()
-    };
+    let observers = state.borrow_mut().overlay_bounds.live();
     if observers.is_empty() {
         return;
     }
@@ -88,12 +114,8 @@ pub(super) fn presented(window: &Window) {
         state.borrow().overlay_surface,
         window.scale_factor(),
     );
-    {
-        let mut state = state.borrow_mut();
-        if state.overlay_bounds.last == bounds {
-            return;
-        }
-        state.overlay_bounds.last = bounds.clone();
+    if !state.borrow_mut().overlay_bounds.changed(&bounds) {
+        return;
     }
     // Nothing is borrowed while the observers run.
     for observer in observers {
@@ -173,7 +195,8 @@ fn covers(primitive: &Primitive) -> bool {
         Primitive::Shadow(_) => false,
         Primitive::Quad(quad) => {
             let background = &quad.background;
-            let invisible = background.tag == BackgroundTag::Solid && background.solid.a < INVISIBLE_ALPHA;
+            let invisible =
+                background.tag == BackgroundTag::Solid && background.solid.a < INVISIBLE_ALPHA;
             let border = !quad.border_color.is_transparent()
                 && (quad.border_widths.top.0 > 0.
                     || quad.border_widths.right.0 > 0.
@@ -188,10 +211,8 @@ fn covers(primitive: &Primitive) -> bool {
 #[cfg(test)]
 mod tests {
     use super::overlay_rectangles;
-    use crate::{
-        Bounds, ContentMask, Quad, ScaledPixels, Scene, Shadow, black, point, px, size,
-    };
     use crate::fast::composition::{CompositionSurfaceKind, CompositionTree};
+    use crate::{Bounds, ContentMask, Quad, ScaledPixels, Scene, Shadow, black, point, px, size};
 
     fn scaled(x: f32, y: f32, width: f32, height: f32) -> Bounds<ScaledPixels> {
         Bounds::new(
@@ -271,7 +292,45 @@ mod tests {
         dialog.finish();
         assert_eq!(
             overlay_rectangles(&dialog, &[(overlay, 0)], overlay, 2.),
-            [Bounds::new(point(px(0.), px(0.)), size(px(1000.), px(1000.)))]
+            [Bounds::new(
+                point(px(0.), px(0.)),
+                size(px(1000.), px(1000.))
+            )]
         );
+    }
+
+    #[test]
+    fn observers_hear_a_change_once_and_a_late_one_hears_nothing_stale() {
+        use super::{OverlayBounds, OverlayBoundsObserver};
+        use std::{cell::RefCell, rc::Rc};
+
+        let heard = Rc::new(RefCell::new(Vec::new()));
+        let observer: Rc<OverlayBoundsObserver> = Rc::new({
+            let heard = heard.clone();
+            move |bounds: &[Bounds<crate::Pixels>]| heard.borrow_mut().push(bounds.to_vec())
+        });
+        let menu = Bounds::new(point(px(10.), px(10.)), size(px(100.), px(40.)));
+        let mut state = OverlayBounds::default();
+        // Nothing is known yet, so nothing is told at once.
+        assert_eq!(state.subscribe(&observer), None);
+        assert_eq!(state.live().len(), 1);
+        assert!(state.changed(&[menu]));
+        assert!(!state.changed(&[menu]), "an unchanged frame tells nobody");
+        assert!(state.changed(&[]));
+        // A later observer is told the last frame's at once.
+        let other: Rc<OverlayBoundsObserver> = Rc::new(|_: &[Bounds<crate::Pixels>]| {});
+        assert_eq!(state.subscribe(&other), Some(Vec::new()));
+        assert_eq!(state.live().len(), 2);
+
+        // Observers let go are forgotten, and with them what was measured,
+        // which frames no longer keep up to date.
+        drop(observer);
+        drop(other);
+        assert!(state.live().is_empty());
+        assert!(state.observers.is_empty());
+        let late: Rc<OverlayBoundsObserver> = Rc::new(|_: &[Bounds<crate::Pixels>]| {});
+        assert_eq!(state.subscribe(&late), None);
+        assert!(state.changed(&[]), "the first frame measured is told");
+        let _ = heard;
     }
 }

@@ -13,9 +13,13 @@
 use std::{cell::RefCell, rc::Rc};
 
 use gpui::{Bounds, OverlayBoundsObserver, Pixels, Window};
+
+use crate::region;
 use windows::Win32::{
     Foundation::HWND,
-    Graphics::Gdi::{CombineRgn, CreateRectRgn, DeleteObject, HRGN, RGN_DIFF, SetWindowRgn},
+    Graphics::Gdi::{
+        CombineRgn, CreateRectRgn, DeleteObject, HRGN, RGN_DIFF, RGN_ERROR, SetWindowRgn,
+    },
 };
 use wry::WebViewExtWindows as _;
 
@@ -37,7 +41,7 @@ struct Cutouts {
     overlays: Vec<Bounds<Pixels>>,
     /// The child window's size and the rectangles last cut away from it, in
     /// its pixels: none means the region was cleared.
-    applied: Option<([i32; 2], Vec<[i32; 4]>)>,
+    applied: Option<region::Region>,
 }
 
 impl OverlayCutouts {
@@ -111,39 +115,12 @@ impl Cutouts {
         let Some(hwnd) = self.hwnd else {
             return;
         };
-        let device = |bounds: Bounds<Pixels>| {
-            let origin = bounds.origin - self.document.origin;
-            let scale = self.scale_factor;
-            [
-                (f32::from(origin.x) * scale).floor() as i32,
-                (f32::from(origin.y) * scale).floor() as i32,
-                (f32::from(origin.x + bounds.size.width) * scale).ceil() as i32,
-                (f32::from(origin.y + bounds.size.height) * scale).ceil() as i32,
-            ]
-        };
-        let mut cut = Vec::new();
-        if self.visible != self.document {
-            let [left, top, right, bottom] = device(self.document);
-            let [shown_left, shown_top, shown_right, shown_bottom] = device(self.visible);
-            cut.extend([
-                [left, top, right, shown_top],
-                [left, shown_bottom, right, bottom],
-                [left, shown_top, shown_left, shown_bottom],
-                [shown_right, shown_top, right, shown_bottom],
-            ]);
-        }
-        cut.extend(
-            self.overlays
-                .iter()
-                .map(|overlay| overlay.intersect(&self.visible))
-                .filter(|overlay| !overlay.is_empty())
-                .map(device),
+        let cut = region::region(
+            self.document,
+            self.visible,
+            &self.overlays,
+            self.scale_factor,
         );
-        cut.retain(|[left, top, right, bottom]| left < right && top < bottom);
-        // The region is the child window's whole size less the holes, so a
-        // resized page needs a new one even when the holes stay.
-        let [_, _, width, height] = device(self.document);
-        let cut = (!cut.is_empty()).then_some(([width, height], cut));
         if cut == self.applied {
             return;
         }
@@ -155,10 +132,25 @@ impl Cutouts {
                 None => HRGN::default(),
                 Some(([width, height], cut)) => {
                     let region = CreateRectRgn(0, 0, *width, *height);
+                    let mut made = !region.is_invalid();
                     for &[left, top, right, bottom] in cut {
+                        if !made {
+                            break;
+                        }
                         let hole = CreateRectRgn(left, top, right, bottom);
-                        CombineRgn(Some(region), Some(region), Some(hole), RGN_DIFF);
-                        let _ = DeleteObject(hole.into());
+                        made = !hole.is_invalid()
+                            && CombineRgn(Some(region), Some(region), Some(hole), RGN_DIFF)
+                                != RGN_ERROR;
+                        if !hole.is_invalid() {
+                            let _ = DeleteObject(hole.into());
+                        }
+                    }
+                    if !made {
+                        log::warn!("making the WebView2's region for GPUI's overlays failed");
+                        if !region.is_invalid() {
+                            let _ = DeleteObject(region.into());
+                        }
+                        return;
                     }
                     region
                 }
