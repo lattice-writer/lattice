@@ -1886,6 +1886,33 @@
       "tier": "flaky",
       "reason": "Linux: passed in branch run 45483277041 and failed twice (its module rerun) in branch run 45505858441, whose GPUI sources are the same; observed {\"tree_dragging\":false,\"tree_aimed\":null,\"editor_lit_before\":\"Some(Open)\",\"editor_dragging\":true,\"editor_lit\":\"None\"}",
       "followup": "LEO-129"
+    },
+    {
+      "step": "the tab_policy module runs to its end",
+      "platforms": [
+        "linux"
+      ],
+      "tier": "flaky",
+      "reason": "Linux: passed in branch runs 45483277041 and 45505858441 and failed twice (its module rerun) in branch run 45531114205, all on the same GPUI sources; observed {\"error\":\"gamma.md's row is laid out\"}",
+      "followup": "LEO-129"
+    },
+    {
+      "step": "opening the tutorial shows the checklist with the sample",
+      "platforms": [
+        "linux"
+      ],
+      "tier": "flaky",
+      "reason": "Linux: passed in branch runs 45483277041 and 45505858441 and failed twice (its module rerun) in branch run 45531114205, all on the same GPUI sources; observed {}",
+      "followup": "LEO-129"
+    },
+    {
+      "step": "the writer's own project, opened again, leaves the sample's checklist out",
+      "platforms": [
+        "linux"
+      ],
+      "tier": "flaky",
+      "reason": "Linux: passed in branch runs 45483277041 and 45505858441 and failed twice (its module rerun) in branch run 45531114205, all on the same GPUI sources; observed {\"build\":{\"running\":false,\"finished\":true},\"back\":true,\"start_in_layout\":false,\"question_left_open\":true}",
+      "followup": "LEO-129"
     }
   ]
 }
