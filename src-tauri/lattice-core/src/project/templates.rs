@@ -222,9 +222,8 @@ pub fn save(store: &Path, source: &Path, mut item: LocalTemplate) -> Result<Loca
     result
 }
 
-pub fn instantiate(
-    store: &Path, id: &str, parent: &Path, name: &str,
-) -> Result<std::path::PathBuf, String> {
+/// The saved template `id` and its files, every one it lists.
+fn load(store: &Path, id: &str) -> Result<(LocalTemplate, BTreeMap<String, Vec<u8>>), String> {
     let folder = template_dir(store, id)?;
     let item: LocalTemplate = serde_json::from_slice(
         &fs::read(paths::safe_path(&folder, "template.json")?).map_err(err)?,
@@ -235,6 +234,21 @@ pub fn instantiate(
     if item.files.iter().any(|file| !files.contains_key(file)) {
         return Err("Template files are missing.".into());
     }
+    Ok((item, files))
+}
+
+/// The saved template `id`'s compile root and the files it lists, for a
+/// manuscript added to a project (`manuscript.rs`).
+pub(super) fn saved_files(store: &Path, id: &str) -> Result<(String, create::Files), String> {
+    let (item, mut files) = load(store, id)?;
+    let listed = item.files.iter().filter_map(|file| files.remove_entry(file)).collect();
+    Ok((item.root, listed))
+}
+
+pub fn instantiate(
+    store: &Path, id: &str, parent: &Path, name: &str,
+) -> Result<std::path::PathBuf, String> {
+    let (item, files) = load(store, id)?;
     let name = name.trim();
     if !paths::is_plain_segment(name) {
         return Err("Choose a simple project name without path separators.".into());

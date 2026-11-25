@@ -50,6 +50,12 @@ export const CORE_SOFTWARE: readonly Credit[] = [
   { name: "KaTeX", url: "https://katex.org", pkg: { closure: "npm", name: "katex" } },
   { name: "Pele", url: "https://pele.run", pkg: { closure: "npm", name: "pele" } },
   { name: "Shiki", url: "https://shiki.style", pkg: { closure: "npm", name: "shiki" } },
+  {
+    name: "VS Code and GitHub themes",
+    role: msg`Code theme colours from Microsoft's Light+ and Dark+ and GitHub's Light and Dark Default, as Shiki packages them`,
+    url: "https://github.com/shikijs/textmate-grammars-themes",
+    pkg: { closure: "npm", name: "@shikijs/themes" },
+  },
   { name: "Harper", url: "https://writewithharper.com", pkg: { closure: "crates", name: "harper-core" } },
   { name: "tantivy", url: "https://github.com/quickwit-oss/tantivy", pkg: { closure: "crates", name: "tantivy" } },
   { name: "jieba-rs", url: "https://github.com/messense/jieba-rs", pkg: { closure: "crates", name: "jieba-rs" } },

@@ -78,11 +78,9 @@ pub fn newer_release(text: &str, running: &str) -> Result<Option<Release>, Strin
     Ok(platform_release(text)?.filter(|release| is_newer(&release.version, running)))
 }
 
-/// This platform's release in a manifest, whatever its version: the switch
-/// back to the classic version installs the Tauri app's release though it
-/// carries the same number as the one running (both apps ship each version).
-/// None when the manifest has nothing for this platform.
-pub fn platform_release(text: &str) -> Result<Option<Release>, String> {
+/// This platform's release in a manifest, whatever its version; None when
+/// the manifest has nothing for this platform.
+fn platform_release(text: &str) -> Result<Option<Release>, String> {
     let manifest: Manifest =
         serde_json::from_str(text).map_err(|error| format!("the release manifest: {error}"))?;
     let platform = platform_keys()
@@ -123,23 +121,5 @@ mod tests {
             r#"{"version":"9.0.0","platforms":{"plan9-mips":{"url":"u","signature":"s"}}}"#;
         assert_eq!(newer_release(elsewhere, "0.1.0").unwrap(), None);
         assert!(newer_release("not json", "0.1.0").is_err());
-    }
-
-    #[test]
-    fn the_classic_version_is_taken_whatever_its_version() {
-        let [_, key] = platform_keys();
-        let text = format!(
-            r#"{{"version":"0.19.0","platforms":{{"{key}":{{"url":"https://e/c.tar.gz","signature":"c2ln"}}}}}}"#
-        );
-        // Not an update to the native 0.19.0 or a later one...
-        assert_eq!(newer_release(&text, "0.19.0").unwrap(), None);
-        assert_eq!(newer_release(&text, "0.20.0").unwrap(), None);
-        // ...but the classic version all the same.
-        let release = platform_release(&text).unwrap().unwrap();
-        assert_eq!(release.version, "0.19.0");
-        assert_eq!(release.platform.url, "https://e/c.tar.gz");
-        let elsewhere =
-            r#"{"version":"0.19.0","platforms":{"plan9-mips":{"url":"u","signature":"s"}}}"#;
-        assert_eq!(platform_release(elsewhere).unwrap(), None);
     }
 }

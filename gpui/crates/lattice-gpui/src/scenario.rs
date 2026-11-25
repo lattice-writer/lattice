@@ -17,6 +17,7 @@ use serde_json::json;
 
 use crate::{editor_panel::EditorPanel, native, shell::Shell};
 
+mod capture;
 mod drag;
 mod e2e;
 mod input_lock;

@@ -1825,10 +1825,11 @@
     {
       "step": "a panel whose last tab closes (a split document, the PDF, the last document) goes at once, with no Empty panel drawn",
       "platforms": [
+        "windows",
         "linux"
       ],
-      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"documents_closed\":6,\"docs_empty_in_update\":[],\"docs_empty_after_frame\":[],\"split\":\"panel-3csr4kp\",\"split_gone\":true,\"empty_in_update\":[],\"empty_after_frame\":[],\"pdf_gone\":false,\"pdf_empty_in_update\":[],\"pdf_empty_after_frame\":[]}",
-      "followup": "LEO-129"
+      "reason": "Windows: failed in main runs 45505984609 (a2d78773a) and 45507027636; observed {\"split_gone\":true,\"pdf_gone\":false} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"documents_closed\":6,\"docs_empty_in_update\":[],\"docs_empty_after_frame\":[],\"split\":\"panel-3csr4kp\",\"split_gone\":true,\"empty_in_update\":[],\"empty_after_frame\":[],\"pdf_gone\":false,\"pdf_empty_in_update\":[],\"pdf_empty_after_frame\":[]}",
+      "followup": "LEO-15"
     },
     {
       "step": "Export ZIP writes the checked pack and closes the sheet",

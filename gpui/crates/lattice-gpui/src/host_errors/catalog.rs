@@ -36,6 +36,11 @@ pub(super) static ENTRIES: &[Entry] = &[
         text: Text::Message("Choose a simple name without folders or a leading dot.", &[]),
     },
     Entry {
+        file: "project/manuscript.rs",
+        literal: "Choose a folder name whose parts are not empty and do not start with a dot.",
+        text: Text::Message("Choose a folder name whose parts are not empty and do not start with a dot.", &[]),
+    },
+    Entry {
         file: "project/paths.rs",
         literal: "History records cannot edit themselves.",
         text: Text::Message("History records cannot edit themselves.", &[]),

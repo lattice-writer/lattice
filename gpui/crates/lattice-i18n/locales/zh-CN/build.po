@@ -51,6 +51,10 @@ msgid "Not built yet. Press {0} to build"
 msgstr "尚未编译。按 {0} 开始编译"
 
 #: lattice-gpui/src/typst.rs
+msgid "Not now"
+msgstr "以后再说"
+
+#: lattice-gpui/src/typst.rs
 msgid "Remove Typst support?"
 msgstr "移除 Typst 支持？"
 

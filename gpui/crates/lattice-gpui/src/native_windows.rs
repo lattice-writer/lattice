@@ -21,16 +21,20 @@ use anyhow::{Result, anyhow};
 use gpui::{Pixels, Point, Window};
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use windows::Win32::{
-    Foundation::{HWND, LPARAM, POINT, WPARAM},
-    Graphics::Gdi::ClientToScreen,
+    Foundation::{HWND, LPARAM, POINT, RECT, WPARAM},
+    Graphics::Gdi::{
+        BI_RGB, BITMAPINFO, BITMAPINFOHEADER, BitBlt, CAPTUREBLT, ClientToScreen,
+        CreateCompatibleBitmap, CreateCompatibleDC, DIB_RGB_COLORS, DeleteDC, DeleteObject, GetDC,
+        GetDIBits, ROP_CODE, ReleaseDC, SRCCOPY, SelectObject,
+    },
     UI::{
         Input::KeyboardAndMouse::{
             GetKeyboardState, MAPVK_VK_TO_VSC, MapVirtualKeyW, SetKeyboardState, VK_CONTROL,
             VK_ESCAPE, VK_LCONTROL, VK_LSHIFT, VK_RETURN, VK_RIGHT, VK_SHIFT, VkKeyScanW,
         },
         WindowsAndMessaging::{
-            PostMessageW, SendMessageW, SetForegroundWindow, WM_CLOSE, WM_KEYDOWN, WM_KEYUP,
-            WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_RBUTTONDOWN,
+            GetClientRect, PostMessageW, SendMessageW, SetForegroundWindow, WM_CLOSE, WM_KEYDOWN,
+            WM_KEYUP, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_RBUTTONDOWN,
             WM_RBUTTONUP,
         },
     },
@@ -239,6 +243,81 @@ pub fn bring_to_front(native: Native) {
     unsafe {
         let _ = SetForegroundWindow(native.hwnd);
     }
+}
+
+/// The window's client area as the screen shows it, WebView2 pages and
+/// anything drawn over them included: copied from the screen (with
+/// `CAPTUREBLT`, so layered windows such as a page's popups come along),
+/// after bringing the window forward. The runner's session composites
+/// windows whether or not anyone looks at it.
+pub fn capture_client(native: Native) -> Result<image::RgbaImage> {
+    bring_to_front(native);
+    let mut rect = RECT::default();
+    let mut origin = POINT { x: 0, y: 0 };
+    unsafe {
+        GetClientRect(native.hwnd, &mut rect)?;
+        let _ = ClientToScreen(native.hwnd, &mut origin);
+    }
+    let (width, height) = (rect.right - rect.left, rect.bottom - rect.top);
+    if width <= 0 || height <= 0 {
+        return Err(anyhow!("the window has no client area to capture"));
+    }
+    let mut pixels = vec![0u8; width as usize * height as usize * 4];
+    let mut info = BITMAPINFO {
+        bmiHeader: BITMAPINFOHEADER {
+            biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+            biWidth: width,
+            // Negative: rows top to bottom, as an image is stored.
+            biHeight: -height,
+            biPlanes: 1,
+            biBitCount: 32,
+            biCompression: BI_RGB.0,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let (copied, lines) = unsafe {
+        let screen = GetDC(None);
+        let memory = CreateCompatibleDC(Some(screen));
+        let bitmap = CreateCompatibleBitmap(screen, width, height);
+        let previous = SelectObject(memory, bitmap.into());
+        let copied = BitBlt(
+            memory,
+            0,
+            0,
+            width,
+            height,
+            Some(screen),
+            origin.x,
+            origin.y,
+            ROP_CODE(SRCCOPY.0 | CAPTUREBLT.0),
+        );
+        SelectObject(memory, previous);
+        let lines = GetDIBits(
+            memory,
+            bitmap,
+            0,
+            height as u32,
+            Some(pixels.as_mut_ptr().cast()),
+            &mut info,
+            DIB_RGB_COLORS,
+        );
+        let _ = DeleteObject(bitmap.into());
+        let _ = DeleteDC(memory);
+        ReleaseDC(None, screen);
+        (copied, lines)
+    };
+    copied?;
+    if lines != height {
+        return Err(anyhow!("read {lines} of the capture's {height} rows"));
+    }
+    // GDI's pixels are BGRA with an undefined alpha.
+    for pixel in pixels.chunks_exact_mut(4) {
+        pixel.swap(0, 2);
+        pixel[3] = 255;
+    }
+    image::RgbaImage::from_raw(width as u32, height as u32, pixels)
+        .ok_or_else(|| anyhow!("the capture's pixels do not fill its size"))
 }
 
 /// The scenario's foreground sections (`scenario/input_lock.rs`) matter on

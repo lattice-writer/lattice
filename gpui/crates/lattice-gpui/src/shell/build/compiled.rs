@@ -4,7 +4,6 @@
 
 use std::{
     collections::HashMap,
-    hash::{Hash as _, Hasher as _},
     path::{Path, PathBuf},
 };
 
@@ -24,16 +23,16 @@ pub(super) fn flatten(nodes: &[FileNode], out: &mut Vec<String>) {
 
 /// What a PDF holds, to tell whether a failed build wrote a new one. Not its
 /// time: lattice-core puts the last good PDF back after a failed build
-/// (`shown_pdf.rs`), which writes the file without a new page in it.
-fn fingerprint(path: &Path) -> Option<u64> {
+/// (`shown_pdf.rs`), which writes the file without a new page in it. The
+/// viewer's digest of the PDF it shows, so a build that left the bytes on
+/// screen loads nothing again.
+fn fingerprint(path: &Path) -> Option<String> {
     let bytes = std::fs::read(path).ok()?;
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    bytes.hash(&mut hasher);
-    Some(hasher.finish())
+    Some(lattice_core::review_pdf::digest(&bytes))
 }
 
 /// The PDF of each document a build could compile, fingerprinted before it.
-pub(super) fn fingerprint_pdfs(root: &Path, documents: &[String]) -> HashMap<PathBuf, u64> {
+pub(super) fn fingerprint_pdfs(root: &Path, documents: &[String]) -> HashMap<PathBuf, String> {
     documents
         .iter()
         .filter_map(|document| {
@@ -43,10 +42,12 @@ pub(super) fn fingerprint_pdfs(root: &Path, documents: &[String]) -> HashMap<Pat
         .collect()
 }
 
-/// The build wrote `pdf` anew: it holds other bytes than before the build,
-/// or there was none.
-pub(super) fn rewrote(pdf: &Path, before: &HashMap<PathBuf, u64>) -> bool {
-    fingerprint(pdf) != before.get(pdf).copied()
+/// What the build left at `pdf`: its fingerprint, and whether it wrote it
+/// anew, other bytes than before the build, or where there were none.
+pub(super) fn written(pdf: &Path, before: &HashMap<PathBuf, String>) -> (Option<String>, bool) {
+    let after = fingerprint(pdf);
+    let rewritten = after.as_ref() != before.get(pdf);
+    (after, rewritten)
 }
 
 /// The text of each project file the diagnostics name, keyed as they name
@@ -99,15 +100,17 @@ mod tests {
         let main = root.join("main.pdf");
         let chapter = root.join("chapters/intro.pdf");
 
-        let left_in_place = rewrote(&plot, &before);
+        let (kept, left_in_place) = written(&plot, &before);
         std::fs::write(&main, "the paper, typeset again").unwrap();
-        let typeset = rewrote(&main, &before);
+        let typeset = written(&main, &before).1;
         std::fs::create_dir_all(root.join("chapters")).unwrap();
         std::fs::write(&chapter, "a first chapter").unwrap();
-        let first = rewrote(&chapter, &before);
+        let first = written(&chapter, &before).1;
         std::fs::remove_dir_all(&root).ok();
 
         assert!(!left_in_place);
+        // The viewer's digest of the same bytes: a PDF it shows already.
+        assert_eq!(kept, Some(lattice_core::review_pdf::digest(b"the figure")));
         assert!(typeset);
         assert!(first);
     }

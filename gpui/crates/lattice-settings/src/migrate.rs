@@ -15,13 +15,16 @@
 //! kind that could not be written leaves no marker, so the next launch tries
 //! again, and the merges make a second pass add nothing twice.
 //!
-//! Lattice (the main flavor) can be switched back to the Tauri app and
-//! then to itself again; the first pass's marker is there by then, so
-//! nothing above runs twice. Only the recent projects follow a later switch
-//! ([`merge_recent_projects`]): the folders opened in the Tauri app in the
-//! meantime join the GPUI app's own list. Settings, themes, plugins, the
-//! Overleaf session and the rest stay as the GPUI app had them, and nothing
-//! the GPUI app changed flows back to the Tauri app.
+//! Before 0.20.0 Lattice (the main flavor) could be switched back to the
+//! Tauri app and then to itself again, and from 0.20.0 every Mac moves to it
+//! whether or not it ran before, so a writer who switched back meanwhile
+//! arrives with work done in the Tauri app since the first pass. The first
+//! pass's marker is there by then, so [`migrate`] does not run again;
+//! [`catch_up`] carries what changed there instead, once each time the
+//! Tauri app has run since: the recent projects joined to the GPUI app's own,
+//! the settings the writer changed there, and every plugin, theme, template,
+//! skill, linked Overleaf folder and Overleaf file the GPUI app does not have
+//! yet. Nothing the GPUI app changed flows back to the Tauri app.
 
 use std::{
     collections::BTreeMap,
@@ -93,21 +96,68 @@ pub fn migrate(tauri: &Tauri, gpui: &Gpui) -> Option<Report> {
     // Taken before the read, so a later launch tells a Tauri app that ran
     // since from the storage this pass read.
     let stamp = storage_stamp(tauri.website_data.as_deref());
-    let storage = tauri
+    let storage = read_tauri_storage(tauri);
+    let stored = |key: &str| storage.get(key).map(String::as_str);
+    let mut steps = vec![(
+        "recent projects",
+        recent_projects(
+            stored(RECENT_PROJECTS),
+            &gpui.state.join("recent-projects.json"),
+        ),
+    )];
+    steps.extend(carry_the_rest(tauri, gpui, &storage));
+    let report = Report::from_steps(steps);
+    if report.failed.is_empty() {
+        let body = json!({
+            "version": MARKER_VERSION,
+            "from": tauri.data,
+            "carried": report.carried,
+            "storage": stamp,
+            "settings": settings_items(&storage),
+        });
+        if let Err(error) = write_atomic(&marker, &pretty(&body)) {
+            log::warn!("could not write {}: {error:#}", marker.display());
+        }
+    }
+    Some(report)
+}
+
+/// The Tauri app's localStorage values this module reads: the lists it
+/// carries and the settings [`crate::import`] reads, from a copy.
+fn read_tauri_storage(tauri: &Tauri) -> BTreeMap<String, String> {
+    let keys: Vec<&str> = STORAGE_KEYS
+        .iter()
+        .chain(crate::import::KEYS)
+        .copied()
+        .collect();
+    tauri
         .website_data
         .as_deref()
-        .and_then(|dir| crate::import::read_storage(dir, STORAGE_KEYS))
+        .and_then(|dir| crate::import::read_storage(dir, &keys))
         .map(|(_, items)| items)
-        .unwrap_or_default();
+        .unwrap_or_default()
+}
+
+/// The settings values among `storage`, kept in the marker as what the
+/// Tauri app held when it was last carried, so [`catch_up`] can tell the
+/// settings changed there since from the ones it never touched.
+fn settings_items(storage: &BTreeMap<String, String>) -> BTreeMap<&str, &str> {
+    crate::import::KEYS
+        .iter()
+        .filter_map(|key| Some((*key, storage.get(*key)?.as_str())))
+        .collect()
+}
+
+/// Everything but the recent projects and the settings, which each pass
+/// treats in its own way: each kind adds only what the GPUI app does not
+/// have yet, so running it again adds nothing twice.
+fn carry_the_rest(
+    tauri: &Tauri,
+    gpui: &Gpui,
+    storage: &BTreeMap<String, String>,
+) -> Vec<(&'static str, anyhow::Result<usize>)> {
     let stored = |key: &str| storage.get(key).map(String::as_str);
-    let steps: [(&'static str, anyhow::Result<usize>); 11] = [
-        (
-            "recent projects",
-            recent_projects(
-                stored(RECENT_PROJECTS),
-                &gpui.state.join("recent-projects.json"),
-            ),
-        ),
+    vec![
         (
             "recent commands",
             verbatim(
@@ -176,44 +226,41 @@ pub fn migrate(tauri: &Tauri, gpui: &Gpui) -> Option<Report> {
                 &gpui.data.join("synara/skills"),
             ),
         ),
-    ];
-    let mut report = Report::default();
-    for (kind, result) in steps {
-        match result {
-            Ok(0) => {}
-            Ok(count) => {
-                report.carried.insert(kind, count);
-            }
-            Err(error) => {
-                log::warn!("could not carry the Tauri app's {kind} over: {error:#}");
-                report.failed.push((kind, format!("{error:#}")));
-            }
-        }
-    }
-    if report.failed.is_empty() {
-        let body = json!({
-            "version": MARKER_VERSION,
-            "from": tauri.data,
-            "carried": report.carried,
-            "storage": stamp,
-        });
-        if let Err(error) = write_atomic(&marker, &pretty(&body)) {
-            log::warn!("could not write {}: {error:#}", marker.display());
-        }
-    }
-    Some(report)
+    ]
 }
 
-/// After the first pass (its marker there), the Tauri app's recent
-/// projects merged into the GPUI app's own ([`recent_projects_union`]),
-/// once each time the Tauri app has run since: when its localStorage was
-/// last written is kept in the marker (`storage`), so a launch that finds it
-/// unchanged reads nothing more than the files' times. `None` when there is
-/// nothing to do (no marker yet, the storage unchanged, or folders that
-/// overlap the Tauri app's); otherwise how many entries the list gained or
-/// refreshed. A list that could not be written leaves the marker as it was,
-/// so the next launch tries again.
-pub fn merge_recent_projects(tauri: &Tauri, gpui: &Gpui) -> Option<anyhow::Result<usize>> {
+impl Report {
+    fn from_steps(steps: Vec<(&'static str, anyhow::Result<usize>)>) -> Report {
+        let mut report = Report::default();
+        for (kind, result) in steps {
+            match result {
+                Ok(0) => {}
+                Ok(count) => {
+                    report.carried.insert(kind, count);
+                }
+                Err(error) => {
+                    log::warn!("could not carry the Tauri app's {kind} over: {error:#}");
+                    report.failed.push((kind, format!("{error:#}")));
+                }
+            }
+        }
+        report
+    }
+}
+
+/// After the first pass (its marker there), what changed in the Tauri app
+/// since it was last carried: once each time it has run since, which the
+/// marker tells from when its localStorage was last written (`storage`), so
+/// a launch that finds that unchanged reads nothing more than the files'
+/// times. The recent projects join the GPUI app's own
+/// ([`recent_projects_union`]), the settings the writer changed there
+/// replace the GPUI app's ([`settings_changed_there`]), and every other
+/// kind adds what the GPUI app does not have yet ([`carry_the_rest`]).
+/// `None` when there is nothing to do (no marker yet, the storage
+/// unchanged, or folders that overlap the Tauri app's). A kind that could
+/// not be written leaves the marker as it was, so the next launch tries
+/// again.
+pub fn catch_up(tauri: &Tauri, gpui: &Gpui) -> Option<Report> {
     let marker = gpui.state.join(MARKER);
     let mut body: Value = serde_json::from_slice(&std::fs::read(&marker).ok()?)
         .ok()
@@ -226,18 +273,102 @@ pub fn merge_recent_projects(tauri: &Tauri, gpui: &Gpui) -> Option<anyhow::Resul
     if body.get("storage").and_then(Value::as_u64) == Some(stamp) {
         return None;
     }
-    let stored = tauri
-        .website_data
-        .as_deref()
-        .and_then(|dir| crate::import::read_storage(dir, &[RECENT_PROJECTS]))
-        .and_then(|(_, mut items)| items.remove(RECENT_PROJECTS));
-    let result = recent_projects_union(stored.as_deref(), &gpui.state.join("recent-projects.json"))
-        .and_then(|merged| {
-            body["storage"] = stamp.into();
-            write_atomic(&marker, &pretty(&body))?;
-            Ok(merged)
-        });
-    Some(result)
+    let storage = read_tauri_storage(tauri);
+    // A marker from before 0.20.0 kept no settings, so which app changed a
+    // value cannot be told: the baseline is the defaults, and a value the
+    // GPUI app has changed from its default is kept over the Tauri app's.
+    let baseline: Option<BTreeMap<String, String>> = body
+        .get("settings")
+        .and_then(|settings| serde_json::from_value(settings.clone()).ok());
+    let mut steps = vec![
+        (
+            "recent projects",
+            recent_projects_union(
+                storage.get(RECENT_PROJECTS).map(String::as_str),
+                &gpui.state.join("recent-projects.json"),
+            ),
+        ),
+        (
+            "settings",
+            settings_changed_there(&storage, baseline.as_ref(), &crate::file_in(&gpui.state)),
+        ),
+    ];
+    steps.extend(carry_the_rest(tauri, gpui, &storage));
+    let report = Report::from_steps(steps);
+    if report.failed.is_empty() {
+        body["storage"] = stamp.into();
+        body["settings"] = json!(settings_items(&storage));
+        if let Err(error) = write_atomic(&marker, &pretty(&body)) {
+            log::warn!("could not write {}: {error:#}", marker.display());
+        }
+    }
+    Some(report)
+}
+
+/// The settings the writer changed in the Tauri app since `baseline` (what
+/// it held when last carried), written over the GPUI app's own file at
+/// `path`: a value the Tauri app still holds as it was leaves the GPUI
+/// app's as it is, so a change made only in the GPUI app survives, and one
+/// made in the Tauri app since, the later of the two, wins. With no
+/// baseline (a 0.19 marker) each value is merged on its own: one the GPUI
+/// app has changed from its default stays, and any other takes the Tauri
+/// app's. Without a file there is nothing to change: the first read imports
+/// the Tauri app's whole (`crate::load`). How many values changed.
+fn settings_changed_there(
+    storage: &BTreeMap<String, String>,
+    baseline: Option<&BTreeMap<String, String>>,
+    path: &Path,
+) -> anyhow::Result<usize> {
+    let items: BTreeMap<String, String> = crate::import::KEYS
+        .iter()
+        .filter_map(|key| Some((key.to_string(), storage.get(*key)?.clone())))
+        .collect();
+    if items.is_empty() || !path.exists() {
+        return Ok(0);
+    }
+    let Some(own) = crate::read(path) else {
+        return Ok(0);
+    };
+    let mut value = own.to_value();
+    let there = crate::import::settings_from_items(&items).to_value();
+    let before = match baseline {
+        Some(baseline) => crate::import::settings_from_items(baseline).to_value(),
+        None => crate::Settings::default().to_value(),
+    };
+    let changed = overlay(&mut value, &there, &before, baseline.is_none());
+    if changed > 0 {
+        crate::write(path, &crate::Settings::from_value(&value))?;
+    }
+    Ok(changed)
+}
+
+/// Write into `own` each value of `there` that differs from `before`,
+/// field by field through nested objects (the appearance, the live preview's
+/// projects), but with `keep_own_changes` only where `own` still holds
+/// `before`; how many values of `own` that changed.
+fn overlay(own: &mut Value, there: &Value, before: &Value, keep_own_changes: bool) -> usize {
+    if let (Value::Object(own), Value::Object(there)) = (&mut *own, there) {
+        return there
+            .iter()
+            .map(|(key, there)| {
+                let before = before.get(key).unwrap_or(&Value::Null);
+                match own.get_mut(key) {
+                    Some(own) => overlay(own, there, before, keep_own_changes),
+                    None if there != before => {
+                        own.insert(key.clone(), there.clone());
+                        1
+                    }
+                    None => 0,
+                }
+            })
+            .sum();
+    }
+    if there != before && own != there && (!keep_own_changes || own == before) {
+        *own = there.clone();
+        1
+    } else {
+        0
+    }
 }
 
 /// Whether a GPUI folder sits inside the Tauri app's, or holds it: every
@@ -400,17 +531,26 @@ fn verbatim(
     Ok(1)
 }
 
-/// One of the Overleaf folder's single-value files, copied when the GPUI
-/// app has none and the Tauri app's is a JSON object holding `field`. The
-/// session keeps the owner-only mode lattice-core gives it, as it is as good
-/// as a browser login; signing out of either app afterwards deletes only
-/// that app's copy (`overleaf::disconnect`).
+/// One of the Overleaf folder's single-value files, copied when the Tauri
+/// app's is a JSON object holding `field` and the GPUI app has none, or an
+/// older one: a writer who signed in again or picked another folder in the
+/// Tauri app after switching back keeps that. The copy is newer than the
+/// file it came from, so a later pass leaves it alone. The session keeps the
+/// owner-only mode lattice-core gives it, as it is as good as a browser
+/// login; signing out of either app afterwards deletes only that app's copy
+/// (`overleaf::disconnect`).
 fn overleaf_file(from: &Path, to: &Path, name: &str, field: &str) -> anyhow::Result<usize> {
     let target = to.join(name);
-    if target.exists() {
+    let source = from.join(name);
+    let modified = |path: &Path| {
+        std::fs::metadata(path)
+            .and_then(|meta| meta.modified())
+            .ok()
+    };
+    if target.exists() && modified(&source) <= modified(&target) {
         return Ok(0);
     }
-    let Ok(text) = std::fs::read_to_string(from.join(name)) else {
+    let Ok(text) = std::fs::read_to_string(&source) else {
         return Ok(0);
     };
     let readable = serde_json::from_str::<Value>(&text)

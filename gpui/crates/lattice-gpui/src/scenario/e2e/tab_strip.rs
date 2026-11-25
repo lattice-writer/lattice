@@ -467,15 +467,12 @@ impl Run {
 
     /// Save the window as `name`.png into `LATTICE_E2E_SHOTS`, when set.
     async fn tab_strip_shot(&self, cx: &mut AsyncApp, name: &str) {
-        #[cfg(any(target_os = "macos", target_os = "linux"))]
         if let Some(dir) = std::env::var_os("LATTICE_E2E_SHOTS") {
             let out = Path::new(&dir).join(format!("{name}.png"));
             if let Err(error) = self.capture(cx, &out.to_string_lossy()).await {
                 log::warn!("e2e shot {name}: {error:#}");
             }
         }
-        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
-        let _ = (cx, name);
     }
 }
 

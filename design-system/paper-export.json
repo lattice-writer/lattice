@@ -1211,157 +1211,157 @@
       "name": "--color-syntax-github-ink",
       "type": "color",
       "value": "#1F2328",
-      "description": "GitHub code theme (the default): ink: plain code and brackets · app: code-theme github --code-ink (light)"
+      "description": "GitHub code theme: ink: plain code and brackets · app: code-theme github --code-ink (light)"
     },
     {
       "name": "--color-dark-syntax-github-ink",
       "type": "color",
       "value": "#E6EDF3",
-      "description": "GitHub code theme (the default): ink: plain code and brackets · app: code-theme github --code-ink (dark)"
+      "description": "GitHub code theme: ink: plain code and brackets · app: code-theme github --code-ink (dark)"
     },
     {
       "name": "--color-syntax-github-line-number",
       "type": "color",
       "value": "#89929C",
-      "description": "GitHub code theme (the default): line numbers in the gutter · app: code-theme github --code-line-number (light)"
+      "description": "GitHub code theme: line numbers in the gutter · app: code-theme github --code-line-number (light)"
     },
     {
       "name": "--color-dark-syntax-github-line-number",
       "type": "color",
       "value": "#6E7681",
-      "description": "GitHub code theme (the default): line numbers in the gutter · app: code-theme github --code-line-number (dark)"
+      "description": "GitHub code theme: line numbers in the gutter · app: code-theme github --code-line-number (dark)"
     },
     {
       "name": "--color-syntax-github-caret",
       "type": "color",
       "value": "#0969DA",
-      "description": "GitHub code theme (the default): the caret · app: code-theme github --code-caret (light)"
+      "description": "GitHub code theme: the caret · app: code-theme github --code-caret (light)"
     },
     {
       "name": "--color-dark-syntax-github-caret",
       "type": "color",
       "value": "#2F81F7",
-      "description": "GitHub code theme (the default): the caret · app: code-theme github --code-caret (dark)"
+      "description": "GitHub code theme: the caret · app: code-theme github --code-caret (dark)"
     },
     {
       "name": "--color-syntax-github-keyword",
       "type": "color",
       "value": "#CF222E",
-      "description": "GitHub code theme (the default): LaTeX commands, keywords · app: code-theme github --syntax-keyword (light)"
+      "description": "GitHub code theme: LaTeX commands, keywords · app: code-theme github --syntax-keyword (light)"
     },
     {
       "name": "--color-dark-syntax-github-keyword",
       "type": "color",
       "value": "#FF7B72",
-      "description": "GitHub code theme (the default): LaTeX commands, keywords · app: code-theme github --syntax-keyword (dark)"
+      "description": "GitHub code theme: LaTeX commands, keywords · app: code-theme github --syntax-keyword (dark)"
     },
     {
       "name": "--color-syntax-github-operator",
       "type": "color",
       "value": "#CF222E",
-      "description": "GitHub code theme (the default): operators · app: code-theme github --syntax-operator (light)"
+      "description": "GitHub code theme: operators · app: code-theme github --syntax-operator (light)"
     },
     {
       "name": "--color-dark-syntax-github-operator",
       "type": "color",
       "value": "#FF7B72",
-      "description": "GitHub code theme (the default): operators · app: code-theme github --syntax-operator (dark)"
+      "description": "GitHub code theme: operators · app: code-theme github --syntax-operator (dark)"
     },
     {
       "name": "--color-syntax-github-function",
       "type": "color",
       "value": "#804DDC",
-      "description": "GitHub code theme (the default): sectioning, functions · app: code-theme github --syntax-function (light)"
+      "description": "GitHub code theme: sectioning, functions · app: code-theme github --syntax-function (light)"
     },
     {
       "name": "--color-dark-syntax-github-function",
       "type": "color",
       "value": "#D2A8FF",
-      "description": "GitHub code theme (the default): sectioning, functions · app: code-theme github --syntax-function (dark)"
+      "description": "GitHub code theme: sectioning, functions · app: code-theme github --syntax-function (dark)"
     },
     {
       "name": "--color-syntax-github-type",
       "type": "color",
-      "value": "#116329",
-      "description": "GitHub code theme (the default): environment names, types · app: code-theme github --syntax-type (light)"
+      "value": "#953800",
+      "description": "GitHub code theme: environment names, types · app: code-theme github --syntax-type (light)"
     },
     {
       "name": "--color-dark-syntax-github-type",
       "type": "color",
-      "value": "#7EE787",
-      "description": "GitHub code theme (the default): environment names, types · app: code-theme github --syntax-type (dark)"
+      "value": "#FFA657",
+      "description": "GitHub code theme: environment names, types · app: code-theme github --syntax-type (dark)"
     },
     {
       "name": "--color-syntax-github-variable",
       "type": "color",
-      "value": "#0550AE",
-      "description": "GitHub code theme (the default): math, variables · app: code-theme github --syntax-variable (light)"
+      "value": "#953800",
+      "description": "GitHub code theme: math, variables · app: code-theme github --syntax-variable (light)"
     },
     {
       "name": "--color-dark-syntax-github-variable",
       "type": "color",
-      "value": "#79C0FF",
-      "description": "GitHub code theme (the default): math, variables · app: code-theme github --syntax-variable (dark)"
+      "value": "#FFA657",
+      "description": "GitHub code theme: math, variables · app: code-theme github --syntax-variable (dark)"
     },
     {
       "name": "--color-syntax-github-string",
       "type": "color",
       "value": "#0A3069",
-      "description": "GitHub code theme (the default): strings, arguments · app: code-theme github --syntax-string (light)"
+      "description": "GitHub code theme: strings, arguments · app: code-theme github --syntax-string (light)"
     },
     {
       "name": "--color-dark-syntax-github-string",
       "type": "color",
       "value": "#A5D6FF",
-      "description": "GitHub code theme (the default): strings, arguments · app: code-theme github --syntax-string (dark)"
+      "description": "GitHub code theme: strings, arguments · app: code-theme github --syntax-string (dark)"
     },
     {
       "name": "--color-syntax-github-comment",
       "type": "color",
-      "value": "#59636E",
-      "description": "GitHub code theme (the default): comments · app: code-theme github --syntax-comment (light)"
+      "value": "#656D77",
+      "description": "GitHub code theme: comments · app: code-theme github --syntax-comment (light)"
     },
     {
       "name": "--color-dark-syntax-github-comment",
       "type": "color",
       "value": "#8B949E",
-      "description": "GitHub code theme (the default): comments · app: code-theme github --syntax-comment (dark)"
+      "description": "GitHub code theme: comments · app: code-theme github --syntax-comment (dark)"
     },
     {
       "name": "--color-syntax-github-number",
       "type": "color",
       "value": "#0550AE",
-      "description": "GitHub code theme (the default): numbers, constants · app: code-theme github --syntax-number (light)"
+      "description": "GitHub code theme: numbers, constants · app: code-theme github --syntax-number (light)"
     },
     {
       "name": "--color-dark-syntax-github-number",
       "type": "color",
       "value": "#79C0FF",
-      "description": "GitHub code theme (the default): numbers, constants · app: code-theme github --syntax-number (dark)"
+      "description": "GitHub code theme: numbers, constants · app: code-theme github --syntax-number (dark)"
     },
     {
       "name": "--color-syntax-github-citation",
       "type": "color",
-      "value": "#0A3069",
-      "description": "GitHub code theme (the default): citation keys · app: code-theme github --syntax-citation (light)"
+      "value": "#0550AE",
+      "description": "GitHub code theme: citation keys · app: code-theme github --syntax-citation (light)"
     },
     {
       "name": "--color-dark-syntax-github-citation",
       "type": "color",
-      "value": "#A5D6FF",
-      "description": "GitHub code theme (the default): citation keys · app: code-theme github --syntax-citation (dark)"
+      "value": "#79C0FF",
+      "description": "GitHub code theme: citation keys · app: code-theme github --syntax-citation (dark)"
     },
     {
       "name": "--color-syntax-github-reference",
       "type": "color",
-      "value": "#953800",
-      "description": "GitHub code theme (the default): cross-references · app: code-theme github --syntax-reference (light)"
+      "value": "#0550AE",
+      "description": "GitHub code theme: cross-references · app: code-theme github --syntax-reference (light)"
     },
     {
       "name": "--color-dark-syntax-github-reference",
       "type": "color",
-      "value": "#FFA657",
-      "description": "GitHub code theme (the default): cross-references · app: code-theme github --syntax-reference (dark)"
+      "value": "#79C0FF",
+      "description": "GitHub code theme: cross-references · app: code-theme github --syntax-reference (dark)"
     },
     {
       "name": "--color-side-panel",

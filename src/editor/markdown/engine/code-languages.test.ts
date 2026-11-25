@@ -1,6 +1,7 @@
 /** Clean implementation for Lattice; spec: docs/visual-editor-spec.md */
 import { describe, expect, it } from "vitest";
 import { CODE_LANGUAGES, codeLanguageLabel, resolveCodeLanguage } from "./code-languages";
+import { hasGrammar } from "./shiki-code";
 
 describe("code block languages (R-BLK-7, R-FMT-8)", () => {
   it("offers Plain text first and Mermaid among the named languages", () => {
@@ -39,7 +40,8 @@ describe("code block languages (R-BLK-7, R-FMT-8)", () => {
     expect(codeLanguageLabel("brainfuck-ish", "Plain text")).toBe("brainfuck-ish");
   });
 
-  it("highlights every named language with a grammar lowlight has", () => {
+  it("highlights every named language with a grammar Shiki has", () => {
+    for (const language of CODE_LANGUAGES) if (language.grammar) expect(hasGrammar(language.grammar)).toBe(true);
     const grammars = CODE_LANGUAGES.flatMap((language) => (language.grammar ? [language.grammar] : []));
     expect(grammars).toContain("typescript");
     expect(grammars).not.toContain("plaintext");

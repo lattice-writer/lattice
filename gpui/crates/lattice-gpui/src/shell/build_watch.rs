@@ -74,7 +74,8 @@ impl Shell {
     }
 
     /// A project was entered: follow its watcher's reports, and build it, as
-    /// the Tauri app's `enterProject` does, whatever Settings › Builds says.
+    /// the Tauri app's `enterProject` does, whatever Settings › Builds says,
+    /// unless its last build is current (`BuildRequest::entry`).
     pub(super) fn watch_builds(
         &mut self,
         project: &Entity<Project>,
@@ -94,7 +95,7 @@ impl Shell {
         watch.marks.clear();
         watch._project = Some(subscription);
         self.repair_left_project(cx);
-        self.run_build(BuildRequest::default(), window, cx);
+        self.run_build(BuildRequest::entry(), window, cx);
     }
 
     fn watched_files_changed(

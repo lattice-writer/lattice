@@ -28,10 +28,12 @@ use std::time::{Instant, SystemTime};
 
 mod active;
 mod beside;
+mod current;
 mod unchanged;
 pub(crate) use active::begin_active;
 pub use active::{abort, is_running, ActiveBuild};
 use active::{finish_active, stop_stalled, terminate, was_stalled, BuildSession};
+pub use current::current_build;
 
 /// Run `command` as this project's build and capture its output, reporting
 /// whether it was cancelled. The error texts prefix the spawn/wait error.

@@ -23,6 +23,7 @@ mod field;
 pub mod local_templates;
 mod mark;
 mod more_projects;
+pub mod new_manuscript;
 pub mod new_project;
 pub mod save_template;
 

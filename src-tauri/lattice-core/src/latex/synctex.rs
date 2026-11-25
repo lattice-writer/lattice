@@ -1,5 +1,6 @@
 //! SyncTeX lookups between the compiled PDF and its sources.
 
+mod highlighted;
 mod records;
 
 use super::aux_files;
@@ -43,16 +44,26 @@ pub fn inverse_search_in(
     // that placed it, or failing that the nearest one that has a line.
     let pdf = root.join(&pdf);
     let synctex = read_map(root, &document);
-    let (input, line) = parse_synctex_edit(&output)
+    let (input, mut line) = parse_synctex_edit(&output)
         .or_else(|| {
-            synctex.as_deref().and_then(|synctex| records::source_at(synctex, page, (x, y)))
+            synctex
+                .as_deref()
+                .and_then(|synctex| records::source_at(synctex, page, (x, y), |_| true))
+                .map(|(input, line, _)| (input, line))
         })
         .ok_or_else(|| "No LaTeX source was found for this PDF position.".to_string())?;
     let canonical_root = root.canonicalize().map_err(|error| error.to_string())?;
-    let canonical_input = Inputs::new(synctex.as_deref(), &pdf)
-        .path(&input)
-        .canonicalize()
-        .map_err(|error| error.to_string())?;
+    let inputs = Inputs::new(synctex.as_deref(), &pdf);
+    let mut canonical_input =
+        inputs.path(&input).canonicalize().map_err(|error| error.to_string())?;
+    // Code minted highlighted is typeset from the file it generated for it,
+    // so that is the file SyncTeX names, which the writer never edits.
+    if let Some((source, source_line)) = synctex.as_deref().and_then(|synctex| {
+        highlighted::source(synctex, &inputs, &canonical_root, &canonical_input, line, page, (x, y))
+    }) {
+        canonical_input = source;
+        line = source_line;
+    }
     let relative = canonical_input
         .strip_prefix(&canonical_root)
         .map_err(|_| "SyncTeX returned a source file outside this project.".to_string())?;

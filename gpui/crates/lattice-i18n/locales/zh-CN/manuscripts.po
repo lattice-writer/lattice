@@ -1,0 +1,59 @@
+#: lattice-gpui/src/welcome/new_manuscript.rs
+msgid "Build compiles this manuscript"
+msgstr "编译时使用这份稿件"
+
+#: lattice-gpui/src/welcome/new_project.rs
+msgid "Change…"
+msgstr "更改…"
+
+#: lattice-gpui/src/welcome/new_project.rs
+msgid "Choose parent folder"
+msgstr "选择上级文件夹"
+
+#: lattice-gpui/src/welcome/new_project.rs
+msgid "Choose parent folder…"
+msgstr "选择上级文件夹…"
+
+#: lattice-gpui/src/welcome/new_manuscript.rs
+msgid "Create manuscript"
+msgstr "创建稿件"
+
+#: lattice-gpui/src/welcome/new_project.rs
+msgid "Create project"
+msgstr "创建项目"
+
+#: lattice-gpui/src/welcome/new_manuscript.rs
+msgid "Folder"
+msgstr "文件夹"
+
+#: lattice-gpui/src/welcome/new_project.rs
+msgid "In {folder}"
+msgstr "位于 {folder}"
+
+#: lattice-gpui/src/welcome/new_manuscript.rs
+msgid "New manuscript from template"
+msgstr "从模板新建稿件"
+
+#: lattice-gpui/src/file_tree/new_entries.rs
+msgid "New manuscript from template…"
+msgstr "从模板新建稿件…"
+
+#: lattice-gpui/src/welcome/new_manuscript.rs
+msgid "Template"
+msgstr "模板"
+
+#: lattice-gpui/src/welcome/new_project.rs
+msgid "The parent folder is already named “{name}”, so this makes {name}/{name}/."
+msgstr "上级文件夹已名为“{name}”，这样会生成 {name}/{name}/。"
+
+#: lattice-gpui/src/welcome/new_manuscript.rs
+msgid "These files are already there, so nothing was created:"
+msgstr "以下文件已存在，因此未创建任何文件："
+
+#: lattice-gpui/src/welcome/new_project.rs
+msgid "Will create {path}"
+msgstr "将创建 {path}"
+
+#: lattice-gpui/src/shell/palette_commands.rs
+msgid "template venue paper journal conference thesis"
+msgstr "模板 期刊 会议 论文 学位论文 稿件 template venue paper journal conference thesis"

@@ -19,13 +19,9 @@
 //! feed, for rehearsing a release); what it offers is still checked against
 //! that key and installed only when newer.
 //!
-//! Lattice on a Mac also switches back to the classic (Tauri) version when
-//! the writer asks in Settings (`switch_to_classic`): it reads the Tauri
-//! app's feed (`classic_channel`), takes its release for this Mac whatever
-//! its version (both apps ship the same numbers), checks it against the same
-//! key, installs it over this bundle as an update would be and restarts into
-//! it. `LATTICE_CLASSIC_UPDATER_ENDPOINT` names another manifest to read
-//! instead, for a rehearsal; the key still decides what installs.
+//! From 0.20.0 Lattice is the only app on a Mac: the classic (Tauri) app's
+//! feed hands every Mac the native archive, and there is no way back to the
+//! classic version from here.
 
 pub mod install;
 pub mod manifest;
@@ -62,26 +58,6 @@ pub fn channel() -> Option<Channel> {
             .map(ToString::to_string)
             .collect(),
     )
-}
-
-/// The Tauri app's own feeds (`plugins.updater.endpoints` in
-/// tauri.conf.json, in its order), or the one
-/// `LATTICE_CLASSIC_UPDATER_ENDPOINT` names, checked with the same key:
-/// where the switch back to the classic version finds its release.
-pub fn classic_channel() -> Option<Channel> {
-    let endpoints = tauri_updater()?["endpoints"]
-        .as_array()?
-        .iter()
-        .map(|endpoint| endpoint.as_str().map(str::to_string))
-        .collect::<Option<Vec<_>>>()?;
-    channel_from("LATTICE_CLASSIC_UPDATER_ENDPOINT", endpoints)
-}
-
-/// Whether this app offers the switch back to the classic version: only
-/// Lattice, which a writer switched to from the Tauri app, and only on a
-/// Mac, the one place it ships.
-pub fn offers_classic() -> bool {
-    cfg!(target_os = "macos") && crate::flavor::current().native_lattice
 }
 
 /// The Tauri app's updater settings (`plugins.updater` in tauri.conf.json),
@@ -324,63 +300,15 @@ impl Updater {
         else {
             return;
         };
-        self.install_release(release, channel.public_key, false, cx);
-    }
-
-    /// Settings › Switch back to the classic version, once the writer
-    /// confirmed it: read the Tauri app's feed, then install its release for
-    /// this Mac over this bundle and restart into it, as an update installs,
-    /// whatever its version. Nothing while a download or an install is under
-    /// way.
-    pub fn switch_to_classic(&mut self, cx: &mut Context<Self>) {
-        let Some(channel) = classic_channel().filter(|_| offers_classic()) else {
-            return;
-        };
-        if matches!(self.phase, Phase::Downloading { .. } | Phase::Installing(_)) {
-            return;
-        }
-        self.phase = Phase::Checking;
-        cx.notify();
-        show_running(
-            t!("Switching to the classic version…").to_string(),
-            String::new(),
-            cx,
-        );
-        let found = cx.background_spawn(async move {
-            install::fetch_first(&channel.endpoints)
-                .and_then(|text| manifest::platform_release(&text))
-        });
-        self._task = Some(cx.spawn(async move |this, cx| {
-            let found = found.await.and_then(|release| {
-                release.ok_or_else(|| {
-                    t!("The classic version has no release for this Mac").to_string()
-                })
-            });
-            this.update(cx, |this, cx| match found {
-                Ok(release) => this.install_release(release, channel.public_key, true, cx),
-                Err(error) => {
-                    this.phase = Phase::Error(error.clone());
-                    show(
-                        ToastLevel::Error,
-                        t!("Couldn’t switch to the classic version").to_string(),
-                        error,
-                        Vec::new(),
-                        cx,
-                    );
-                }
-            })
-            .ok();
-        }));
+        self.install_release(release, channel.public_key, cx);
     }
 
     /// Download `release`, check it against `public_key`, put it in place of
-    /// this bundle and restart into it: an update, or the classic version
-    /// (`classic`, which names it so in the notices).
+    /// this bundle and restart into it.
     fn install_release(
         &mut self,
         release: manifest::Release,
         public_key: String,
-        classic: bool,
         cx: &mut Context<Self>,
     ) {
         let version = release.version.clone();
@@ -390,11 +318,7 @@ impl Updater {
             progress: None,
         };
         show_running(
-            if classic {
-                t!("Downloading the classic version…").to_string()
-            } else {
-                t!("Downloading update…").to_string()
-            },
+            t!("Downloading update…").to_string(),
             version_line.clone(),
             cx,
         );
@@ -443,11 +367,7 @@ impl Updater {
                     this.phase = Phase::Error(error.clone());
                     show(
                         ToastLevel::Error,
-                        if classic {
-                            t!("Couldn’t switch to the classic version").to_string()
-                        } else {
-                            t!("Lattice update failed").to_string()
-                        },
+                        t!("Lattice update failed").to_string(),
                         error,
                         Vec::new(),
                         cx,
@@ -557,19 +477,5 @@ mod tests {
         let config: serde_json::Value =
             serde_json::from_str(include_str!("../../../../src-tauri/tauri.conf.json")).unwrap();
         assert_eq!(channel.public_key, config["plugins"]["updater"]["pubkey"]);
-    }
-
-    #[test]
-    fn the_classic_channel_is_the_tauri_apps_feed_with_the_same_key() {
-        let classic = super::classic_channel().unwrap();
-        let config: serde_json::Value =
-            serde_json::from_str(include_str!("../../../../src-tauri/tauri.conf.json")).unwrap();
-        assert_eq!(
-            serde_json::json!(classic.endpoints),
-            config["plugins"]["updater"]["endpoints"]
-        );
-        assert_eq!(classic.public_key, super::channel().unwrap().public_key);
-        // A binary outside a bundle is Lattice Beta, which never offers it.
-        assert!(!super::offers_classic());
     }
 }

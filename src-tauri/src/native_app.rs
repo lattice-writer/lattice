@@ -1,27 +1,41 @@
-//! The native Lattice, offered from here on Apple silicon.
+//! The native Lattice, which from 0.20.0 is Lattice on every Mac.
 //!
-//! Each release also carries the native (GPUI) app for Apple-silicon Macs, with
-//! its own updater feed (`latest-native.json`) beside this app's. Switching to
-//! it is the writer's choice: the offer dialog asks `check_native_app`, which
-//! finds the native release and leaves it in the window's resources table the
-//! way the updater plugin's own `check` does, so the same claim, install and
-//! restart path (`app_restart.rs`, `restart_lattice`) puts it in place of
-//! this bundle. The native archive unpacks to Lattice.app with this app's
-//! bundle identifier, so the updater replaces the bundle at the same path.
+//! Each release carries the native (GPUI) app for Macs, with its own updater
+//! feed (`latest-native.json`) beside this app's, and from 0.20.0 this app's
+//! feed (`latest.json`) names the native archive for Macs too, so an older
+//! copy updates straight into it. A copy of this version that still starts on
+//! a Mac moves itself at launch (`take_native_move`): the page asks
+//! `check_native_app`, which finds the native release and leaves it in the
+//! window's resources table the way the updater plugin's own `check` does, so
+//! the same claim, install and restart path (`app_restart.rs`,
+//! `restart_lattice`) puts it in place of this bundle. The native archive
+//! unpacks to Lattice.app with this app's bundle identifier, so the updater
+//! replaces the bundle at the same path.
 //!
-//! Both apps share version numbers (0.19.0 is both), so the check accepts any
-//! version the feed names: switching is never an "update" in the semver sense.
+//! Both apps share version numbers (0.20.0 is both), so the check accepts any
+//! version the feed names: moving is never an "update" in the semver sense.
 //! The signature is still checked against the pinned updater key, which is why
 //! a rehearsal may point `LATTICE_NATIVE_UPDATER_ENDPOINT` at another feed.
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use tauri::{Manager, ResourceId, Url, Webview};
 use tauri_plugin_updater::UpdaterExt;
 
-/// Only Apple-silicon Macs get the native app; Intel Macs, Windows and Linux
-/// never hear of it (Linux does not even register the updater plugin).
-const SUPPORTED: bool = cfg!(all(target_os = "macos", target_arch = "aarch64"));
+/// Only Macs get the native app (Apple silicon and Intel alike); Windows and
+/// Linux keep this one (Linux does not even register the updater plugin).
+const SUPPORTED: bool = cfg!(target_os = "macos");
+
+/// Whether this build moves itself to the native app: a release build for a
+/// Mac, which release.yml and macos-intel.yml mark with
+/// `LATTICE_MIGRATES_TO_NATIVE` at build time, so a development build, the
+/// e2e and the perf lab never replace themselves with the native app.
+const MIGRATES: bool = SUPPORTED
+    && matches!(option_env!("LATTICE_MIGRATES_TO_NATIVE"), Some(value) if !value.is_empty());
+
+/// Set once a window took this launch's move, so only the first one shows it.
+static MIGRATION_TAKEN: AtomicBool = AtomicBool::new(false);
 
 /// The native feed, asked in order: the repository's home in the
 /// lattice-writer organization, then its address before the move. GitHub
@@ -55,15 +69,16 @@ fn native_feeds(override_endpoint: Option<String>) -> Result<Vec<Url>, String> {
     .map_err(|error| error.to_string())
 }
 
-/// Whether this build may offer the native app at all; the page asks before
-/// drawing the Settings row, which must not wait on the network.
+/// Whether the asking window moves Lattice to the native app this launch:
+/// true once per launch in a release build on a Mac, to the first window that
+/// asks; false everywhere else.
 #[tauri::command]
-pub fn native_app_supported() -> bool {
-    SUPPORTED
+pub fn take_native_move() -> bool {
+    MIGRATES && !MIGRATION_TAKEN.swap(true, Ordering::SeqCst)
 }
 
-/// The native release to switch to, or null off Apple silicon and when the
-/// feed has nothing for darwin-aarch64.
+/// The native release to move to, or null off a Mac and when the feed has
+/// nothing for this Mac (darwin-aarch64 or darwin-x86_64).
 #[tauri::command]
 pub async fn check_native_app(webview: Webview) -> Result<Option<NativeAppRelease>, String> {
     if !SUPPORTED {
@@ -86,7 +101,7 @@ pub async fn check_native_app(webview: Webview) -> Result<Option<NativeAppReleas
 
 #[cfg(test)]
 mod tests {
-    use super::{native_feeds, NATIVE_FEEDS, SUPPORTED};
+    use super::{native_feeds, MIGRATES, NATIVE_FEEDS, SUPPORTED};
 
     fn addresses(feeds: Vec<tauri::Url>) -> Vec<String> {
         feeds.into_iter().map(String::from).collect()
@@ -113,8 +128,16 @@ mod tests {
     }
 
     #[test]
-    fn only_apple_silicon_macs_are_offered_the_native_app() {
-        assert_eq!(SUPPORTED, cfg!(all(target_os = "macos", target_arch = "aarch64")));
-        assert_eq!(super::native_app_supported(), SUPPORTED);
+    fn only_macs_move_to_the_native_app_and_only_release_builds_by_themselves() {
+        assert_eq!(SUPPORTED, cfg!(target_os = "macos"));
+        assert_eq!(
+            MIGRATES,
+            SUPPORTED
+                && option_env!("LATTICE_MIGRATES_TO_NATIVE").is_some_and(|value| !value.is_empty())
+        );
+        // Once per launch at most, to the first window that asks.
+        let first = super::take_native_move();
+        assert_eq!(first, MIGRATES);
+        assert!(!super::take_native_move());
     }
 }

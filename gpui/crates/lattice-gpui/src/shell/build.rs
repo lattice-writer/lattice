@@ -23,10 +23,14 @@ use lattice_core::typst_wire::Reply;
 use lattice_i18n::{n, t, tr};
 use lattice_ui::components::ToastLevel;
 
+mod automatic;
 mod compiled;
 mod oplog;
+mod request;
 
-use compiled::{fingerprint_pdfs, flatten, read_sources, rewrote};
+pub(super) use request::BuildRequest;
+
+use compiled::{fingerprint_pdfs, flatten, read_sources, written};
 
 use super::{Build, Shell};
 use crate::{
@@ -41,88 +45,12 @@ const NO_DOCUMENT: &str = n!(
      set one as the root document in project settings."
 );
 
-/// How long typing in a `.typ` file pauses before its live build runs.
-const TYPST_LIVE_PAUSE: Duration = Duration::from_millis(150);
-
 /// How long a build runs before Lattice says so and offers to stop it.
 const SLOW_BUILD: Duration = Duration::from_secs(10 * 60);
 const SLOW_BUILD_NOTICE: &str = "build-still-running";
 /// A build that could not run: each autosave's failure replaces the last, and
 /// a build that succeeds takes it down.
 const BUILD_FAILED_NOTICE: &str = "build-failed";
-
-/// How a build was asked for, which decides what it may do.
-#[derive(Clone, Copy, Debug, Default)]
-pub(super) struct BuildRequest {
-    /// Typeset from scratch.
-    pub(super) force: bool,
-    /// Delete the auxiliary files first (a clean rebuild).
-    pub(super) clean: bool,
-    /// Lattice started it (a save, an outside edit), nobody asked: a failing
-    /// document nothing changed in is not typeset again (`latex::build`).
-    unattended: bool,
-    /// The writer asked (Build, the chip): its failure comes back even when
-    /// dismissed, and the editor goes to its first error.
-    pub(super) requested: bool,
-    /// An automatic build the live preview's pause in typing let through:
-    /// no spinner on the Build button (`live_preview::quiet_builds`).
-    pub(super) quiet: bool,
-    /// It waited behind another build (the log's trigger "queued").
-    queued: bool,
-    /// Typst's live preview: compile the open buffers as they are, saving
-    /// nothing.
-    live: bool,
-}
-
-impl BuildRequest {
-    pub(super) fn automatic() -> Self {
-        Self {
-            unattended: true,
-            ..Self::default()
-        }
-    }
-
-    pub(super) fn requested() -> Self {
-        Self {
-            requested: true,
-            ..Self::default()
-        }
-    }
-
-    /// The writer's clean rebuild: auxiliary files deleted, typeset from
-    /// scratch.
-    pub(super) fn clean_rebuild() -> Self {
-        Self {
-            force: true,
-            clean: true,
-            requested: true,
-            ..Self::default()
-        }
-    }
-
-    /// Typst's live build, after a pause in typing: quiet, unattended, and
-    /// from the buffers.
-    pub(super) fn typst_live() -> Self {
-        Self {
-            live: true,
-            quiet: true,
-            ..Self::automatic()
-        }
-    }
-
-    /// The build queued behind a running one stands for both asks.
-    fn merge(self, other: Self) -> Self {
-        Self {
-            live: self.live && other.live,
-            force: self.force || other.force,
-            clean: self.clean || other.clean,
-            unattended: self.unattended && other.unattended,
-            requested: self.requested || other.requested,
-            quiet: self.quiet && other.quiet,
-            queued: true,
-        }
-    }
-}
 
 impl Shell {
     /// Build and the build chip: save, then build, bringing the problems up if
@@ -215,39 +143,15 @@ impl Shell {
             .or_else(|| open_document.clone())
             .unwrap_or_default();
         let candidates: Vec<String> = main.iter().chain(&open_document).cloned().collect();
-        self.build_panel.update(cx, |panel, cx| {
-            panel.set_quiet(request.quiet, cx);
-            panel.set_project_files(files.clone());
-            panel.started(&root, &label, cx);
-        });
-
-        // A build still going after minutes may be looping: say so, with Stop.
-        self.slow_build = Some(cx.spawn(async move |_, cx| {
-            cx.background_executor().timer(SLOW_BUILD).await;
-            cx.update(|cx| {
-                let stop = NoticeAction::new(t!("Stop"), |window, cx| {
-                    window.dispatch_action(Box::new(super::StopBuild), cx)
-                });
-                let notice = Notice::new(
-                    ToastLevel::Warning,
-                    t!(
-                        "Still building after {minutes} minutes. Something in the document may be \
-                         looping; stop the build if it does not finish.",
-                        minutes = SLOW_BUILD.as_secs() / 60
-                    ),
-                )
-                .action(stop)
-                .key(SLOW_BUILD_NOTICE)
-                .persistent();
-                notices::show(notice, cx);
-            });
-        }));
+        // Until entering a project knows it has to typeset, no build shows.
+        self.build_panel
+            .update(cx, |panel, _| panel.set_project(&root, files.clone()));
+        if !request.entry {
+            self.show_build_running(request.quiet, &root, &label, cx);
+        }
         let build_panel = self.build_panel.clone();
         // Read now: a switch flipped while the build waits applies to the next one.
         let aux_files = crate::settings::aux_files(cx);
-        self.pdf
-            .update(cx, |panel, cx| panel.set_building(true, cx));
-        crate::build::tex_setup::reminder::building(cx.entity_id(), true, cx);
         self.build_trace = Some(oplog::start(request, cx));
         let live_preview = self.live_preview.clone();
         // Typst documents compile in the helper Typst support installs
@@ -283,6 +187,28 @@ impl Shell {
             let (revision, active) = project.read_with(cx, |project, _| {
                 (project.input_revision(), project.active_build().clone())
             });
+            // Entering a project whose last build is current takes that
+            // build, of these inputs, and shows the PDF already on screen; the
+            // inputs are read after their revision, so an edit meanwhile
+            // still counts as one the PDF lacks.
+            let current = if request.entry {
+                cx.background_spawn({
+                    let root = root.clone();
+                    let open_document = open_document.clone();
+                    async move { latex::current_build(&root, open_document.as_deref(), aux_files) }
+                })
+                .await
+            } else {
+                None
+            };
+            if request.entry && current.is_none() {
+                let shown = this.update(cx, |this, cx| {
+                    this.show_build_running(request.quiet, &root, &label, cx)
+                });
+                if shown.is_err() {
+                    return;
+                }
+            }
             this.update(cx, |this, _| this.build_pass_started()).ok();
             // latexmk reads the inputs after this: the live preview's token
             // for the files as they are now.
@@ -294,6 +220,24 @@ impl Shell {
             let build = cx.background_spawn({
                 let root = root.clone();
                 async move {
+                    if let Some(result) = current {
+                        let sources = read_sources(
+                            &root,
+                            &result.diagnostics,
+                            &result.root_document,
+                            &files,
+                            &saved,
+                        );
+                        return Ok(Finished {
+                            result,
+                            rewritten: false,
+                            pdf_digest: None,
+                            current: true,
+                            sources,
+                            live,
+                            needs_typst: false,
+                        });
+                    }
                     let before = fingerprint_pdfs(&root, &candidates);
                     let mut needs_typst = false;
                     let result = match latex::choose_document(&root, open_document.as_deref()) {
@@ -325,7 +269,7 @@ impl Shell {
                     };
                     result.map(|result| {
                         let pdf = root.join(&result.root_document).with_extension("pdf");
-                        let rewritten = rewrote(&pdf, &before);
+                        let (pdf_digest, rewritten) = written(&pdf, &before);
                         let sources = read_sources(
                             &root,
                             &result.diagnostics,
@@ -336,6 +280,8 @@ impl Shell {
                         Finished {
                             result,
                             rewritten,
+                            pdf_digest,
+                            current: false,
                             sources,
                             live,
                             needs_typst,
@@ -377,6 +323,45 @@ impl Shell {
             }
         }));
         cx.notify();
+    }
+
+    /// What a running build shows: its passes on the Build button, the PDF
+    /// pane's busy state, and after minutes the notice that offers to stop it.
+    fn show_build_running(
+        &mut self,
+        quiet: bool,
+        root: &std::path::Path,
+        label: &str,
+        cx: &mut Context<Self>,
+    ) {
+        self.build_panel.update(cx, |panel, cx| {
+            panel.set_quiet(quiet, cx);
+            panel.started(root, label, cx);
+        });
+        // A build still going after minutes may be looping: say so, with Stop.
+        self.slow_build = Some(cx.spawn(async move |_, cx| {
+            cx.background_executor().timer(SLOW_BUILD).await;
+            cx.update(|cx| {
+                let stop = NoticeAction::new(t!("Stop"), |window, cx| {
+                    window.dispatch_action(Box::new(super::StopBuild), cx)
+                });
+                let notice = Notice::new(
+                    ToastLevel::Warning,
+                    t!(
+                        "Still building after {minutes} minutes. Something in the document may be \
+                         looping; stop the build if it does not finish.",
+                        minutes = SLOW_BUILD.as_secs() / 60
+                    ),
+                )
+                .action(stop)
+                .key(SLOW_BUILD_NOTICE)
+                .persistent();
+                notices::show(notice, cx);
+            });
+        }));
+        self.pdf
+            .update(cx, |panel, cx| panel.set_building(true, cx));
+        crate::build::tex_setup::reminder::building(cx.entity_id(), true, cx);
     }
 
     /// The .tex or .typ in the editor the writer was last in, and whether it
@@ -454,6 +439,8 @@ impl Shell {
             Some(Ok(Finished {
                 result,
                 rewritten,
+                pdf_digest,
+                current: current_build,
                 sources,
                 live,
                 ..
@@ -470,6 +457,11 @@ impl Shell {
                     && (result.success || result.unchanged || rewritten);
                 self.show_build_marks(&result, &sources, cx);
                 self.build_panel.update(cx, |panel, cx| {
+                    // The last build, taken on entry, ran nothing now: the
+                    // Build button shows it without a build's flourish.
+                    if current_build {
+                        panel.set_quiet(true, cx);
+                    }
                     panel.finished(&result, wrote_pdf, request.requested, sources, cx)
                 });
                 self.build_pass_finished(&result, revision, cx);
@@ -510,17 +502,37 @@ impl Shell {
                     self.get_started_built(cx);
                 }
                 if result.has_pdf {
+                    // The viewer holds the PDF the build left already (the
+                    // same bytes, or the current build's on entry): nothing
+                    // to read or load again (lattice#1267).
+                    let pdf = project
+                        .read(cx)
+                        .root()
+                        .join(&result.root_document)
+                        .with_extension("pdf");
+                    // The PDF in its own window loads again, as before.
+                    let panel = self.pdf.read(cx);
+                    let view = (!panel.in_window()).then(|| panel.live_view().read(cx));
+                    let shown = match (view, current_build, pdf_digest.as_deref()) {
+                        (Some(view), true, _) => view.holds(&pdf, None),
+                        (Some(view), false, Some(digest)) => view.holds(&pdf, Some(digest)),
+                        _ => false,
+                    };
                     // The PDF the viewer loads now holds the files as of the
                     // build's token; the live preview stops painting those
-                    // edits once it is shown.
+                    // edits once it is shown, at once when it already is.
                     if !result.one_off {
                         self.live_preview.update(cx, |preview, cx| {
-                            preview.base_loading(live, request.quiet, cx)
+                            preview.base_loading(live, request.quiet, cx);
+                            if shown {
+                                preview.base_promoted(result.pages, cx);
+                            }
                         });
                     }
                     self.show_built_pdf(
                         result.root_document.clone(),
                         request.requested,
+                        !shown,
                         window,
                         cx,
                     );
@@ -583,97 +595,6 @@ impl Shell {
             }
         }
         cx.notify();
-    }
-
-    /// An automatic build asks to run: false when it should run now, as it
-    /// does without a live preview; otherwise it runs once typing pauses,
-    /// quietly if the live preview is still live (`quiet-builds.ts`'s
-    /// `defer`).
-    pub(super) fn defer_automatic_build(
-        &mut self,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> bool {
-        if !self.live_on_tex(cx) {
-            log::info!(
-                "automatic build runs now: live {} in {:?}",
-                self.live_preview.read(cx).is_live(),
-                self.active_editor()
-                    .map(|editor| editor.read(cx).relative().to_string())
-            );
-            self.quiet_builds.cancel();
-            return false;
-        }
-        log::info!("automatic build waits for typing to pause");
-        let now = std::time::Instant::now();
-        self.quiet_builds.saved(now);
-        if self.quiet_builds.due(now) {
-            self.fire_quiet_build(window, cx);
-        } else {
-            self.wait_for_typing_pause(window, cx);
-        }
-        true
-    }
-
-    /// rtex draws .tex files only: a .bib or a figure the writer saves is
-    /// seen in the next build alone.
-    fn live_on_tex(&self, cx: &App) -> bool {
-        self.live_preview.read(cx).is_live()
-            && self.active_editor().is_some_and(|editor| {
-                editor
-                    .read(cx)
-                    .relative()
-                    .to_ascii_lowercase()
-                    .ends_with(".tex")
-            })
-    }
-
-    fn wait_for_typing_pause(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let timer = cx.spawn_in(window, async move |this, cx| {
-            cx.background_executor()
-                .timer(crate::live_preview::quiet_builds::IDLE)
-                .await;
-            this.update_in(cx, |this, window, cx| {
-                // Typed since the save: another save restarts the wait when
-                // they pause. Checked anyway, as a completion menu holds the
-                // save off.
-                let typing = this
-                    .active_editor()
-                    .is_some_and(|editor| editor.read(cx).is_dirty(cx));
-                let due = this.quiet_builds.due(std::time::Instant::now());
-                if typing && this.live_on_tex(cx) && !due {
-                    this.wait_for_typing_pause(window, cx);
-                } else {
-                    this.fire_quiet_build(window, cx);
-                }
-            })
-            .ok();
-        });
-        self.quiet_builds.set_timer(timer);
-    }
-
-    /// An edit to a `.typ` file: its live build runs once typing pauses for
-    /// [`TYPST_LIVE_PAUSE`]; each edit before then restarts the wait.
-    pub(super) fn schedule_typst_live(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.typst_live = Some(cx.spawn_in(window, async move |this, cx| {
-            cx.background_executor().timer(TYPST_LIVE_PAUSE).await;
-            this.update_in(cx, |this, window, cx| {
-                this.typst_live = None;
-                this.run_build(BuildRequest::typst_live(), window, cx);
-            })
-            .ok();
-        }));
-    }
-
-    fn fire_quiet_build(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let quiet = self.live_on_tex(cx);
-        log::info!("the waiting build runs, quiet: {quiet}");
-        self.quiet_builds.cancel();
-        let request = BuildRequest {
-            quiet,
-            ..BuildRequest::automatic()
-        };
-        self.run_build(request, window, cx);
     }
 
     /// Tell whoever waits for the builds that they are over.
@@ -754,24 +675,15 @@ impl Shell {
 pub(super) struct Finished {
     pub(super) result: BuildResult,
     rewritten: bool,
+    /// The SHA-256 of the PDF the build left, as the viewer keeps the one it
+    /// shows.
+    pdf_digest: Option<String>,
+    /// The project's last build, current on entering it: the PDF is the one
+    /// the viewer opened then.
+    current: bool,
     sources: HashMap<String, String>,
     /// The live preview's token for the files the build read.
     live: Option<(u64, usize)>,
     /// A Typst document Typst support is not installed for.
     needs_typst: bool,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn a_queued_build_stands_for_every_ask() {
-        let queued = BuildRequest::automatic().merge(BuildRequest::requested());
-        assert!(queued.requested && !queued.unattended && !queued.force);
-        let automatic = BuildRequest::automatic().merge(BuildRequest::automatic());
-        assert!(automatic.unattended && !automatic.requested);
-        let clean = BuildRequest::automatic().merge(BuildRequest::clean_rebuild());
-        assert!(clean.clean && clean.force && clean.requested && !clean.unattended);
-    }
 }

@@ -5,9 +5,6 @@
 //! itself and reads it back from Metal, so the screen may be locked and the
 //! window covered; otherwise it asks `screencapture -l` for the window
 //! server's copy of the window, which needs the window on an unlocked screen.
-//! On Linux it reads the window back from the X server (`native_linux.rs`):
-//! gpui_linux has no `render_to_image` at the gpui-fast pin, so the window
-//! must be mapped, as it is on the runner's Xvfb display.
 //!
 //! `LATTICE_SHOT_OUT=PATH.png` names the image (default `shot.png`),
 //! `LATTICE_APPEARANCE=light|dark` fixes the appearance (see `app.rs`), and
@@ -55,62 +52,5 @@ impl Run {
             shell.read(cx).pdf().read(cx).page_count(cx) > 0
         })
         .await
-    }
-
-    #[cfg(all(target_os = "macos", feature = "offscreen-shots"))]
-    pub(super) async fn capture(&self, cx: &mut AsyncApp, out: &str) -> Result<()> {
-        // A covered window gets no frames, so frames are drawn here: each one
-        // asks PDFium for the pages it shows, and the images land a little
-        // later, so draw until two pages are on screen (or give up after 8 s),
-        // then once more for anything the last draw scheduled.
-        let started = std::time::Instant::now();
-        loop {
-            self.with_window(cx, |_, window, cx| {
-                window.refresh();
-                let _ = window.draw(cx);
-            })?;
-            sleep(cx, Duration::from_millis(250)).await;
-            let drawn = cx.update(|cx| self.shell.read(cx).pdf().read(cx).pages_drawn(cx));
-            if drawn >= 2 || started.elapsed() > Duration::from_secs(8) {
-                break;
-            }
-        }
-        self.with_window(cx, |_, window, cx| {
-            window.refresh();
-            let _ = window.draw(cx);
-        })?;
-        let image = self.with_window(cx, |_, window, _| window.render_to_image())??;
-        image.save(out)?;
-        Ok(())
-    }
-
-    #[cfg(all(target_os = "macos", not(feature = "offscreen-shots")))]
-    pub(super) async fn capture(&self, cx: &mut AsyncApp, out: &str) -> Result<()> {
-        use anyhow::anyhow;
-        use std::process::Command;
-
-        let number = native::window_number(self.native(cx)?);
-        let status = Command::new("screencapture")
-            .args(["-x", "-o", &format!("-l{number}"), out])
-            .status()?;
-        if !status.success() {
-            return Err(anyhow!(
-                "screencapture failed ({status}); a locked screen composites no windows, \
-                 build with --features offscreen-shots"
-            ));
-        }
-        Ok(())
-    }
-
-    /// The window as the X server holds it, once the frame a change asked
-    /// for has had time to reach it (GPUI draws a mapped window on its own
-    /// clock, so it is asked for one and given a few of them).
-    #[cfg(target_os = "linux")]
-    pub(super) async fn capture(&self, cx: &mut AsyncApp, out: &str) -> Result<()> {
-        let native = self.native(cx)?;
-        native::order_front(native);
-        self.with_window(cx, |_, window, _| window.refresh())?;
-        sleep(cx, Duration::from_millis(300)).await;
-        native::capture(native, out)
     }
 }

@@ -543,7 +543,10 @@ export function loadAppearance(): AppearanceSettings {
     accent: "graphite",
     theme: "",
     translucency: "subtle",
-    codeTheme: "github",
+    // GitHub was the default before VS Code. A stored "github" stays: the whole
+    // object is written on any change, so a defaulted one cannot be told
+    // from one the writer picked.
+    codeTheme: "vscode",
     codeThemeVariant: "auto",
   };
   return safely(() => {

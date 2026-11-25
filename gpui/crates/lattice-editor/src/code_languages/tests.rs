@@ -102,8 +102,38 @@ fn python() {
             ("None", "constant"),
             ("Shape", "type"),
             ("print", "function"),
-            ("True", "number"),
+            ("True", "constant"),
         ],
+    );
+}
+
+/// Python's captures follow the scopes VS Code's grammar gives the same
+/// tokens, which the visual editor's code blocks are highlighted with.
+#[test]
+fn python_matches_the_textmate_grammars_roles() {
+    let text = "def solve(lines, Model, *rest, **options):\n    out = int(lines[0])\n    out.append(len(out))\n    key = lambda item: item\nif __name__ == \"__main__\":\n    solve(out)\n";
+    let captured = captures(build("python"), text);
+    for (token, capture) in [
+        ("lines", "variable"),
+        ("Model", "variable"),
+        ("rest", "variable"),
+        ("options", "variable"),
+        ("item", "variable"),
+        ("int", "type"),
+        ("len", "function"),
+        ("append", "function"),
+        ("__name__", "variable.special"),
+    ] {
+        assert!(
+            captured
+                .iter()
+                .any(|(run, name)| run == token && name == capture),
+            "{token:?} should be {capture}: {captured:?}"
+        );
+    }
+    assert!(
+        !captured.iter().any(|(run, _)| run == "out"),
+        "a plain name stays in the ink: {captured:?}"
     );
 }
 

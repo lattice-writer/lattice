@@ -399,7 +399,7 @@ pub fn run() {
             app_restart::install_update,
             app_restart::set_agent_turn_running,
             app_restart::restart_impact,
-            native_app::native_app_supported,
+            native_app::take_native_move,
             native_app::check_native_app,
             ipc::windows::set_window_material,
             ipc::windows::set_native_locale,

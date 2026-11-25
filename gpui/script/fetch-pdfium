@@ -1,17 +1,20 @@
 #!/usr/bin/env bash
 # Download the PDFium build the prototype is pinned to (bblanchon/pdfium-binaries
 # chromium/8125, matching pdfium-render's `pdfium_8125` feature) into
-# vendor/pdfium/<platform>/, verifying its SHA-256.
+# vendor/pdfium/<platform>/, verifying its SHA-256. The platform is this Mac's,
+# or the one named (mac-arm64, mac-x64): scripts/gpui-bundle.mjs --arch x86_64
+# asks for the Intel build on any Mac.
 set -euo pipefail
 
 release="chromium%2F8125"
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-case "$(uname -s)-$(uname -m)" in
-  Darwin-arm64) platform=mac-arm64; library=libpdfium.dylib; sha=4939bd935ac83ddc09a3a4f038bc43a19cea1660316a3667f26cb07a070e139d ;;
+case "${1:-$(uname -s)-$(uname -m)}" in
+  Darwin-arm64 | mac-arm64) platform=mac-arm64; library=libpdfium.dylib; sha=4939bd935ac83ddc09a3a4f038bc43a19cea1660316a3667f26cb07a070e139d ;;
+  Darwin-x86_64 | mac-x64) platform=mac-x64; library=libpdfium.dylib; sha=8a5193535b80c7215d8932f6647ae5097465b6dba2811602c21e120c2af112b0 ;;
   Linux-x86_64) platform=linux-x64; library=libpdfium.so; sha=e1c3ce6e270cb5e0c20816b379ad9f2c1309972697c505f508de92bf5e7d6659 ;;
   Linux-aarch64) platform=linux-arm64; library=libpdfium.so; sha=8b8818f2ec57d1b213d952ca6d7f0ffeca9d0110487d0e20ad83ba918bc92efa ;;
-  *) echo "fetch-pdfium: no pinned PDFium build for $(uname -s)-$(uname -m); add one to this script" >&2; exit 1 ;;
+  *) echo "fetch-pdfium: no pinned PDFium build for ${1:-$(uname -s)-$(uname -m)}; add one to this script" >&2; exit 1 ;;
 esac
 
 target="$root/vendor/pdfium/$platform"

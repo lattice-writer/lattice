@@ -152,7 +152,11 @@ impl Run {
     pub(super) async fn papers_looks(&self, cx: &mut AsyncApp, name: &str) -> Result<()> {
         use lattice_settings::InterfaceLanguage;
         use lattice_ui::{Appearance, LatticeTheme};
-        if std::env::var_os("LATTICE_E2E_SHOTS").is_none() {
+        // Only macOS saves these (`papers_shot`); elsewhere the round of
+        // themes and languages would only disturb the steps after it (on
+        // Windows, the right-click on a citation key that follows found no
+        // "Why cited" once the shots were turned on there).
+        if !cfg!(target_os = "macos") || std::env::var_os("LATTICE_E2E_SHOTS").is_none() {
             return Ok(());
         }
         for (appearance, language, look) in [

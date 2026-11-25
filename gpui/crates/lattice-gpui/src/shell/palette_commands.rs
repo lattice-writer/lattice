@@ -38,6 +38,7 @@ actions!(
         NewMarkdownFileInProject,
         NewTypstFileInProject,
         NewFolderInProject,
+        NewManuscriptInProject,
         ImportFilesIntoProject,
         NewSpreadsheetInProject,
         NewBoardInProject,
@@ -64,6 +65,13 @@ fn entry_command(entry: NewEntry) -> Command {
             Command::new("new-typst", label, Section::Project, NewTypstFileInProject)
         }
         NewEntry::Folder => Command::new("new-folder", label, Section::Project, NewFolderInProject),
+        NewEntry::Manuscript => Command::new(
+            "new-manuscript",
+            label,
+            Section::Project,
+            NewManuscriptInProject,
+        )
+        .keywords(t!("template venue paper journal conference thesis")),
         NewEntry::Import => Command::new(
             "new-import",
             label,
@@ -275,6 +283,11 @@ pub(super) const PART: Part = Part {
             .on_action(
                 cx.listener(|this: &mut Shell, _: &NewFolderInProject, window, cx| {
                     this.new_entry(NewEntry::Folder, window, cx)
+                }),
+            )
+            .on_action(
+                cx.listener(|this: &mut Shell, _: &NewManuscriptInProject, window, cx| {
+                    this.new_entry(NewEntry::Manuscript, window, cx)
                 }),
             )
             .on_action(

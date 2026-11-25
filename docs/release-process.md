@@ -8,8 +8,9 @@ and `src-tauri/tauri.conf.json`; if you change one of those, change this
 document with it.
 
 Releases target **Apple silicon macOS** (`--target aarch64-apple-darwin`,
-`minimumSystemVersion: 14.0`). An **Intel-based Mac** build (`x86_64-apple-darwin`,
-[below](#macos-intelyml)) and an **experimental x86_64 Linux AppImage**
+`minimumSystemVersion: 14.0`). An **Intel-based Mac** build of both apps, the
+classic and the native (`x86_64-apple-darwin`,
+[below](#macos-intelyml)), and an **experimental x86_64 Linux AppImage**
 ([below](#linux-appimageyml)) are added to the release afterwards, each only
 when its own checks pass; neither ever delays or blocks the Apple silicon
 release.
@@ -109,7 +110,7 @@ assets: **release** builds the Tauri app on the Mac mini (Apple silicon; see
 [Where the macOS jobs run](#where-the-macos-jobs-run)) and creates the draft (steps 1 to 15 below); **gpui** builds the native app
 (the GPUI app as Lattice) through `.github/workflows/gpui-package.yml` with
 `flavor: main`, beside it; **publish** runs only when both succeeded and
-adds the native app to the draft before publishing it (steps 16 to 19).
+adds the native app to the draft before publishing it (steps 16 to 20).
 
 1. **Checkout** with `fetch-depth: 0` — the release notes need the full tag
    history.
@@ -167,7 +168,7 @@ adds the native app to the draft before publishing it (steps 16 to 19).
     licensed fonts. `gpui-package.yml` ends the same way.
 16. **Use public download URLs in `latest.json`**
     (`scripts/normalize-updater-manifest.mjs`) and upload it again.
-    `latest.json` stays the Tauri app's on every platform.
+    Its Mac entries name the classic archive until step 18.
 17. **Upload the native app beside the Tauri app.**
     `scripts/check-native-feed.mjs` checks the `gpui` job's artifact: the
     files are all there, the archive's signature verifies against
@@ -176,11 +177,25 @@ adds the native app to the draft before publishing it (steps 16 to 19).
     signature. Then `Lattice-native_<version>_aarch64.dmg`, `.app.tar.gz`
     and `.app.tar.gz.sig` go up with `--clobber`, and `latest-native.json`
     last. A missing or failing native file fails the job, so the release
-    stays a draft rather than shipping without the native app.
-18. **Check the release assets for font files.** Downloads the draft's assets
+    stays a draft rather than shipping without the native app. The Typst
+    helper, `Lattice-typst_<version>_aarch64.tar.gz` and its `.sig`, goes up
+    after `check-native-feed.mjs --typst` verifies it.
+18. **Hand Macs the native app.** `scripts/hand-macs-native.mjs` replaces
+    `latest.json`'s `darwin-aarch64` and `darwin-aarch64-app` entries with
+    `latest-native.json`'s for the same keys, refusing a native manifest for
+    another version, one that lacks a key, or an entry that is not this
+    version's `Lattice-native_<version>_aarch64.app.tar.gz`, and leaves every
+    other key (a `windows-*` or `linux-*` one, if any) as it was. Then
+    `latest.json` goes up again. From v0.20.0 every classic copy, 0.19.x and
+    older included, is offered the native archive as its update: the classic
+    updater installs whatever signed `.app.tar.gz` the feed names over
+    `Lattice.app` and relaunches the executable the new `Info.plist` names, and
+    the archive is signed with the same updater key. The classic Apple silicon
+    DMG is still attached for download.
+19. **Check the release assets for font files.** Downloads the draft's assets
     and runs `node scripts/check-font-leaks.mjs assets <dir>`: only the signed
     artifacts, `latest.json` and `latest-native.json`, none of them a font.
-19. **Publish** with `gh release edit "$GITHUB_REF_NAME" --draft=false`. A tag
+20. **Publish** with `gh release edit "$GITHUB_REF_NAME" --draft=false`. A tag
     with a suffix (`v0.19.0-rc.1`) rehearses the workflow: it uses its
     version's release lead and its draft stays a draft. Delete the draft and
     the tag afterwards.
@@ -193,24 +208,30 @@ reaches users.
 Every release carries two updater feeds:
 
 - `https://github.com/lattice-writer/lattice/releases/latest/download/latest.json`,
-  the Tauri app's (`plugins.updater.endpoints` in `tauri.conf.json`), on
-  every platform, which `macos-intel.yml` extends with its Intel entries.
+  the classic app's feed (`plugins.updater.endpoints` in `tauri.conf.json`),
+  read by every classic copy. From v0.20.0 its Mac entries name the native
+  archive: `release.yml` hands `darwin-aarch64` and `darwin-aarch64-app`
+  the native entries, `macos-intel.yml` adds `darwin-x86_64` and
+  `darwin-x86_64-app` the same way, so a classic copy on either Mac updates
+  into the native app (`scripts/hand-macs-native.mjs`). It never lists the
+  classic Mac archives again. Windows and Linux are unchanged.
 - `https://github.com/lattice-writer/lattice/releases/latest/download/latest-native.json`,
-  the native app's, Apple silicon only.
+  the native app's, on Apple silicon from `release.yml` and on Intel from
+  `macos-intel.yml`, which merges its `darwin-x86_64` entries in.
 
 Each app asks the lattice-writer address first and then the same path under
 `leo1oel/lattice`, the repository's address before the move, so neither
 depends on GitHub's redirect from the old name. The archive URLs inside a
 feed name the repository the release ran in (`GITHUB_REPOSITORY`).
 
-Moving to the native app is the writer's choice. On Apple silicon the Tauri
-app offers it when the native feed answers with a `darwin-aarch64` entry,
-and installs the native archive in place through the signed updater (same
-bundle name and identifier, the same version accepted); the native app
-updates from its own feed and offers "Switch back to the classic version",
-which installs the Tauri archive from `latest.json` the same way. Intel
-Macs, Windows and Linux never see the offer, and the downstream workflows
-below never touch the native files. See
+From v0.20.0 every Mac moves to the native app. A classic copy installs the
+native archive from `latest.json` as its next update, through the signed
+updater (same bundle name and identifier); a classic copy of 0.20.0 or later
+that still starts on a Mac moves itself at launch from `latest-native.json`,
+which only builds made with `LATTICE_MIGRATES_TO_NATIVE` set do (the
+Tauri build steps of `release.yml` and `macos-intel.yml` set it). The
+native app updates from its own feed and has no way back to the classic
+version. Windows and Linux never see the native files. See
 [`gpui/docs/updater.md`](../gpui/docs/updater.md).
 
 ### `linux-appimage.yml`
@@ -285,8 +306,10 @@ does a manual `workflow_dispatch` run.
 
 The Intel-based Mac build follows the Linux AppImage's pattern: `release.yml` does
 not mention it, and it starts from Release's `workflow_run` event only once a
-tag's Release run has **succeeded**. An Intel failure leaves the published
-release without its `_x64` assets and `latest.json` without `darwin-x86_64`:
+tag's Release run has **succeeded**. It builds both apps for Intel: the
+classic app (**build**, **smoke**) and the native app (**native**). An Intel
+failure, the native build's included, leaves the published release without
+its `_x64` assets and both feeds without `darwin-x86_64`:
 Intel copies stay on their version until a release whose Intel build passes,
 and nothing changes for Apple silicon. It is a separate app rather than a
 universal binary, which would double the Apple silicon download.
@@ -317,15 +340,29 @@ From the release's commit, on GitHub's runners:
    `x64`), checks Gatekeeper accepts the app, launches it, and requires a
    Lattice window on screen and the frontend's events in `lattice.log`. Its
    screenshot and log are uploaded as `macos-intel-smoke-evidence`.
-3. **attach**, only after both: stops if `latest.json` already lists a
-   `darwin-x86_64` archive with a different signature (a full re-run's new
-   build), then uploads `Lattice_<version>_x64.dmg`,
-   `Lattice_<version>_x64.app.tar.gz` and its `.sig` with `--clobber`, then
-   `scripts/add-updater-platform.mjs` verifies the archive's signature against
-   `plugins.updater.pubkey` and adds `darwin-x86_64` and `darwin-x86_64-app`
-   to the release's `latest.json`, leaving the `darwin-aarch64` entries as
-   they were; finally it appends an "Install (Intel-based Mac)" section to the
-   release notes once.
+3. **native**: `gpui-package.yml` with `flavor: main`, `arch: x86_64` and the
+   release's commit as `ref`, on `macos-15-intel` for the same reason as
+   **build** (the staged Synara runtime is the host's). It makes
+   `Lattice-native_<version>_x64.dmg`, `.app.tar.gz`, `.app.tar.gz.sig`, the
+   Typst helper `Lattice-typst_<version>_x64.tar.gz` with its `.sig`, and a
+   `latest-native.json` listing `darwin-x86_64` and `darwin-x86_64-app`, and
+   checks every Mach-O file in the app, and the helper, for x86_64. Its
+   artifact is `lattice-gpui-macos-x86_64-main`.
+4. **attach**, only after all three: `check-native-feed.mjs --arch x86_64`
+   (and `--typst --arch x86_64`) checks the native files and their
+   signatures, `check-font-leaks.mjs assets` the files to upload; it stops if
+   `latest.json` or `latest-native.json` already lists a `darwin-x86_64`
+   archive with a different signature (a full re-run's new build). Then it
+   uploads `Lattice_<version>_x64.dmg`, `Lattice_<version>_x64.app.tar.gz`
+   and its `.sig` (the classic app, still downloadable) and the native and
+   Typst files with `--clobber`. `scripts/add-updater-platform.mjs` verifies
+   the native archive's signature against `plugins.updater.pubkey` and adds
+   `darwin-x86_64` and `darwin-x86_64-app` to the release's
+   `latest-native.json`, and `scripts/hand-macs-native.mjs` hands
+   `latest.json` the same entries; `latest-native.json` goes up first. The
+   `darwin-aarch64` entries stay as they were. Finally it appends an
+   "Install (Intel-based Mac)" section naming the native DMG to the release
+   notes once.
 
 The Apple silicon asset names are unchanged, so the website's main Download
 and the `darwin-aarch64` updater URLs keep working; the website links the
@@ -339,7 +376,8 @@ succeeded is left alone, and a second failure stays red.
 A pull request that changes this packaging, or a manual `workflow_dispatch`
 run, runs build and smoke with the open-licensed fonts, no baked-in keys and
 no updater key (so no updater archive) — signed and notarized when the
-repository's secrets are available — and attaches nothing.
+repository's secrets are available — builds the native app as
+`gpui-package.yml` does, and attaches nothing.
 
 ### `web-demo.yml`
 
@@ -366,12 +404,13 @@ Changing the Synara pin or preparation script creates a new cache key; the first
 
 ## Where the macOS jobs run
 
-`release.yml`'s **release** job and `gpui-package.yml`'s **macos** job (which
-`release.yml` calls as **gpui**) run on the Mac mini, through
+`release.yml`'s **release** job and `gpui-package.yml`'s **macos** job for
+Apple silicon (which `release.yml` calls as **gpui**) run on the Mac mini, through
 [runner-up](https://github.com/kunchenguid/runner-up), instead of waiting in
 GitHub's macOS queue. They ask for `runs-on: lattice-mac`, runner-up's pool
 label. **publish** stays on `ubuntu-latest`: it only edits the draft. The
-Intel, Windows and Linux workflows still run on GitHub.
+Intel (including `gpui-package.yml` with `arch: x86_64`), Windows and Linux
+workflows still run on GitHub.
 
 **Fall back to GitHub's runners** by setting a repository variable, then
 re-running the failed jobs or pushing the tag again:

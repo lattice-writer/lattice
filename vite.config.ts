@@ -28,7 +28,8 @@ if (webDemo !== "" && webDemo !== "1") throw new Error(`LATTICE_WEB_DEMO=${webDe
  * ~450 chunks, ~13 MB of the built app. At runtime only a closed set is ever
  * loadable: src/history/pierre-diff.ts is the only module that calls
  * registerCustomLanguage/registerCustomTheme, and its pierreLanguageForPath
- * clamps every filetype outside tex/bibtex/markdown to "text". Everything
+ * clamps every filetype outside tex/bibtex/markdown to "text"; the Markdown
+ * editor's code blocks load the grammars shiki-code.ts names. Everything
  * outside that set is replaced with an inert stub grammar/theme so the chunks
  * shrink to ~100 bytes.
  *
@@ -44,12 +45,20 @@ function shikiTrimPlugin(): {
   isStubbed: (id: string) => boolean;
 } {
   const keepLangs = new Set([
-    // The only grammars any runtime path can reach. src/history/pierre-diff.ts is
-    // the sole caller of registerCustomLanguage, and pierreLanguageForPath
-    // clamps every other filetype to "text", which needs no grammar.
+    // Pierre's grammars: src/history/pierre-diff.ts is the sole caller of
+    // registerCustomLanguage, and pierreLanguageForPath clamps every other
+    // filetype to "text", which needs no grammar.
     "tex",
     "bibtex",
     "markdown",
+    // The Markdown editor's code blocks (src/editor/markdown/engine/shiki-code.ts)
+    // load each grammar its registry names on demand, so read the names from it.
+    ...Array.from(
+      readFileSync(path.resolve("src/editor/markdown/engine/shiki-code.ts"), "utf8").matchAll(
+        /import\("@shikijs\/langs\/([\w.+-]+)"\)/g,
+      ),
+      (match) => match[1],
+    ),
   ]);
   const keepThemes = new Set([
     // Pierre themes (src/history/pierre-diff.ts), the sole caller of
@@ -110,7 +119,10 @@ function shikiTrimPlugin(): {
       const srcRoot = path.resolve("src") + path.sep;
       const offenders = [...this.getModuleIds()].flatMap((id) => {
         if (!isStubbed(id)) return [];
-        const importers = this.getModuleInfo(id)?.importers.filter((importer) => importer.startsWith(srcRoot)) ?? [];
+        const info = this.getModuleInfo(id);
+        const importers = [...(info?.importers ?? []), ...(info?.dynamicImporters ?? [])].filter((importer) =>
+          importer.startsWith(srcRoot),
+        );
         return importers.map((importer) => `${path.relative(".", importer)} imports ${path.basename(id, ".mjs")}`);
       });
       if (offenders.length > 0) {

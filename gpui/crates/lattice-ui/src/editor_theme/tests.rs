@@ -39,7 +39,11 @@ fn the_themes_are_the_apps_in_its_order() {
 
 #[test]
 fn every_theme_has_a_family_with_both_appearances() {
-    let families = zed_theme_families(Tint::Graphite, Accent::Graphite);
+    let families = zed_theme_families(&Palette::new(
+        Appearance::Light,
+        Tint::Graphite,
+        Accent::Graphite,
+    ));
     assert_eq!(families.len(), CodeTheme::ALL.len());
     for (theme, family) in CodeTheme::ALL.into_iter().zip(&families) {
         let family: Value = serde_json::from_slice(family).unwrap();
@@ -62,6 +66,81 @@ fn every_theme_has_a_family_with_both_appearances() {
             ]
         );
     }
+}
+
+/// Nord with a keyword colour of #FFDC84 in both appearances (lattice#1268).
+fn installed_theme() -> std::sync::Arc<lattice_theme::ThemeFile> {
+    let mut theme = lattice_theme::bundled()
+        .into_iter()
+        .find(|theme| theme.id == "app.lattice.nord")
+        .expect("Nord is bundled");
+    for variant in &mut theme.variants {
+        variant
+            .syntax
+            .insert("keyword".into(), lattice_theme::Color::opaque(0xFFDC84));
+    }
+    std::sync::Arc::new(theme)
+}
+
+/// An installed theme's syntax colours win over the code theme's in the
+/// source editor, in the current appearance and the other one alike: the
+/// keyword as the theme resolves it there (fitted to 4.5:1 on the editor,
+/// so #FFDC84 itself in dark).
+#[test]
+fn an_installed_themes_syntax_reaches_every_zed_theme() {
+    let theme = installed_theme();
+    let rgb = |color: Hsla| {
+        let color = gpui::Rgba::from(color);
+        let channel = |value: f32| (value * 255.).round() as u32;
+        channel(color.r) << 16 | channel(color.g) << 8 | channel(color.b)
+    };
+    let palettes = [Appearance::Light, Appearance::Dark].map(|appearance| {
+        Palette::new(appearance, Tint::Graphite, Accent::Blue).with_theme(Some(theme.clone()))
+    });
+    assert_eq!(
+        palettes[1].themed.as_ref().unwrap().syntax["keyword"].hex(),
+        "#ffdc84"
+    );
+    let palette =
+        Palette::new(Appearance::Dark, Tint::Sage, Accent::Blue).with_theme(Some(theme.clone()));
+    for (code_theme, family) in CodeTheme::ALL.into_iter().zip(zed_theme_families(&palette)) {
+        let family: Value = serde_json::from_slice(&family).unwrap();
+        for (zed, palette) in family["themes"].as_array().unwrap().iter().zip(&palettes) {
+            let keyword = &zed["style"]["syntax"]["keyword"]["color"];
+            let themed = palette.themed.as_ref().unwrap().syntax["keyword"];
+            let code = CodePalette::new(code_theme, palette);
+            if code.ground == palette.editor {
+                assert_eq!(*keyword, format!("{}ff", themed.hex()), "{}", zed["name"]);
+            } else {
+                let drawn = u32::from_str_radix(&keyword.as_str().unwrap()[1..7], 16).unwrap();
+                let ratio = crate::accent_fit::contrast_ratio(drawn, rgb(code.ground));
+                assert!(ratio >= 4.45, "{}: {keyword} {ratio}", zed["name"]);
+            }
+        }
+    }
+}
+
+/// On a dark-only code theme's own ground in a light app, an installed
+/// theme's keyword the colour of that ground is fitted to read on it.
+#[test]
+fn an_installed_themes_syntax_reads_on_a_dark_only_code_themes_ground() {
+    let mut theme = (*installed_theme()).clone();
+    for variant in &mut theme.variants {
+        variant
+            .syntax
+            .insert("keyword".into(), lattice_theme::Color::opaque(0x282A36));
+    }
+    let palette = Palette::new(Appearance::Light, Tint::Graphite, Accent::Graphite)
+        .with_theme(Some(std::sync::Arc::new(theme)));
+    let code = CodePalette::new(CodeTheme::Dracula, &palette);
+    assert_eq!(code.kind, Appearance::Dark);
+    let rgb = |color: Hsla| {
+        let color = gpui::Rgba::from(color);
+        let channel = |value: f32| (value * 255.).round() as u32;
+        channel(color.r) << 16 | channel(color.g) << 8 | channel(color.b)
+    };
+    let ratio = crate::accent_fit::contrast_ratio(rgb(code.syntax.keyword), rgb(code.ground));
+    assert!(ratio >= 4.45, "{ratio}");
 }
 
 #[test]

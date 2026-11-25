@@ -2456,8 +2456,8 @@ msgid "Another file in this project"
 msgstr "项目里另一个文件"
 
 #: src/app/native-app-dialog.tsx
-msgid "Another Lattice window is installing an update. Try again when it finishes."
-msgstr "另一个 Lattice 窗口正在安装更新。等它完成后再试。"
+msgid "Another Lattice window is installing an update."
+msgstr "另一个 Lattice 窗口正在安装更新。"
 
 #: src/telemetry/app-updater.tsx
 #: src/telemetry/update-recovery.ts
@@ -3800,6 +3800,10 @@ msgstr "请选择 PDF 的保存位置"
 msgid "Choose a folder"
 msgstr "选择一个分类"
 
+#: src/platform/host-errors-project.ts
+msgid "Choose a folder name whose parts are not empty and do not start with a dot."
+msgstr "文件夹名的每一级都不能为空，也不能以点开头"
+
 #: src/platform/host-errors-workspace.ts
 msgid "Choose a folder or ZIP containing LaTeX source files."
 msgstr "请选择包含 LaTeX 源文件的文件夹或 ZIP"
@@ -4241,6 +4245,7 @@ msgstr "克隆仓库…"
 msgid "Cloning…"
 msgstr "正在克隆…"
 
+#: src/app/native-app-dialog.tsx
 #: src/app/project-tabs.tsx
 #: src/editor/codemirror-host.tsx
 #: src/overleaf/overleaf-margin-review.tsx
@@ -4368,6 +4373,10 @@ msgstr "标题"
 #: src/settings/settings-search-index.ts
 msgid "Code theme"
 msgstr "代码主题"
+
+#: src/settings/acknowledged-software.ts
+msgid "Code theme colours from Microsoft's Light+ and Dark+ and GitHub's Light and Dark Default, as Shiki packages them"
+msgstr "代码主题配色取自 Microsoft 的 Light+ 与 Dark+ 及 GitHub 的 Light 与 Dark Default，由 Shiki 打包"
 
 #: src/papers/zotero-browser.tsx
 msgid "Collapse {name}"
@@ -5950,10 +5959,6 @@ msgstr "DOI 信息可修正"
 msgid "DOIs, arXiv IDs, links, titles or BibTeX"
 msgstr "DOI、arXiv ID、链接、标题或 BibTeX"
 
-#: src/app/native-app-dialog.tsx
-msgid "Don’t ask again"
-msgstr "不再询问"
-
 #: src/app/whats-new-dialog.tsx
 #: src/canvas/proofread-card.tsx
 #: src/editor/markdown/engine/chrome/link-chrome.tsx
@@ -6136,10 +6141,6 @@ msgstr "DPI 未知"
 #: src/trellis/trellis-build-sequence.tsx
 msgid "draft pass {run}"
 msgstr "草稿第 {run} 遍"
-
-#: src/app/native-app-dialog.tsx
-msgid "Drawn natively by your Mac instead of as a web page: faster and lighter, with the same look and the same ways of working."
-msgstr "由 Mac 原生绘制，而不是网页：更快、更轻，外观和用法都不变。"
 
 #: src/app/use-project-tree.ts
 msgid "Drop figures onto a TeX or Markdown editor, or the Project pane"
@@ -7309,6 +7310,10 @@ msgstr "来自 macOS 代理设置"
 #: src/settings/acknowledged-software.ts
 msgid "From the official conference author kits, bundled unmodified with their authors' credits"
 msgstr "取自会议官方作者模板包，原样内置，保留作者署名"
+
+#: src/app/native-app-dialog.tsx
+msgid "From this version, Lattice on the Mac is the native app: drawn by your Mac instead of as a web page, faster and lighter, with the same look and the same ways of working."
+msgstr "从这个版本起，Mac 上的 Lattice 就是原生 Lattice：由 Mac 直接绘制，而不是网页，更快更轻，外观和用法都和以前一样。"
 
 #: src/settings/agent-environment-settings.tsx
 msgid "From your login shell"
@@ -9179,6 +9184,10 @@ msgstr "Lattice 无法写入 {file}"
 msgid "Lattice goes back to its own colors. Installing the file again brings the theme back."
 msgstr "Lattice 会恢复自己的配色。再次安装该文件即可找回这个主题。"
 
+#: src/app/native-app-dialog.tsx
+msgid "Lattice is moving to its native version"
+msgstr "Lattice 正在换成原生版本"
+
 #. placeholder {0}: props.host
 #: src/overleaf/overleaf-pasted-link.tsx
 msgid "Lattice is signed in to {0}. To open projects from another Overleaf server, sign in to it in Settings → Overleaf."
@@ -9213,6 +9222,10 @@ msgstr "Lattice 会像终端一样在 PATH 里找到它并运行。装在别处�
 #: src/settings/theme-file-actions.tsx
 msgid "Lattice theme"
 msgstr "Lattice 主题"
+
+#: src/app/native-app-dialog.tsx
+msgid "Lattice tries again the next time it starts."
+msgstr "下次启动时 Lattice 会再试一次。"
 
 #: src/platform/host-errors-plugins.ts
 #: src/plugins/plugin-details.tsx
@@ -9802,10 +9815,6 @@ msgstr "长引文"
 msgid "Look up and add"
 msgstr "查找并添加"
 
-#: src/app/native-app-dialog.tsx
-msgid "Looking for the native Lattice…"
-msgstr "正在查找原生 Lattice…"
-
 #: src/papers/bib-entry-detail.tsx
 msgid "Looking through the manuscript…"
 msgstr "正在查找稿件中的引用…"
@@ -10254,6 +10263,10 @@ msgstr "把{title}移到"
 msgid "Move left"
 msgstr "左移"
 
+#: src/app/native-app-dialog.tsx
+msgid "Move progress"
+msgstr "切换进度"
+
 #: src/trellis/trellis-workspace-switch.tsx
 msgid "Move right"
 msgstr "右移"
@@ -10351,11 +10364,6 @@ msgstr "按接口中的写法填写名称。测试连接会使用第一个。"
 #: src/settings/acknowledgements-settings.tsx
 msgid "Native app"
 msgstr "原生应用"
-
-#. Search words for the Switch to the new Lattice setting, space-separated
-#: src/settings/settings-search-index.ts
-msgid "native app faster"
-msgstr "原生 应用 更快"
 
 #: src/editor/latex/latex-vocabulary.ts
 msgid "Natural"
@@ -10705,8 +10713,8 @@ msgid "No full text to download"
 msgstr "没有可下载的全文"
 
 #: src/app/native-app-dialog.tsx
-msgid "No grammar check and no dictionaries for other languages: spell check uses macOS’s own checker. Apple silicon Macs only."
-msgstr "没有语法检查，也没有其他语言的词典：拼写检查使用 macOS 自带的检查器。仅支持 Apple 芯片的 Mac。"
+msgid "No grammar check and no dictionaries for other languages: spell check uses macOS’s own checker."
+msgstr "没有语法检查，也没有其他语言的词典：拼写检查使用 macOS 自带的检查器。"
 
 #: src/project/paper-list-toolbar.tsx
 msgid "No grouping"
@@ -11178,10 +11186,6 @@ msgstr "未安装，显示默认字体"
 #: src/onboarding/get-started-panel.tsx
 msgid "Not needed here"
 msgstr "演示中无需安装"
-
-#: src/app/native-app-dialog.tsx
-msgid "Not now"
-msgstr "以后再说"
 
 #: src/pdf/review-pdf-sheet.tsx
 msgid "Not on this PDF"
@@ -16091,21 +16095,9 @@ msgstr "曲面 / 面积积分"
 msgid "SVG insertion needs rsvg-convert or ImageMagick. The figure can still be previewed in Lattice."
 msgstr "插入 SVG 需要 rsvg-convert 或 ImageMagick；在 Lattice 中仍可预览这张图"
 
-#: src/app/native-app-dialog.tsx
-msgid "Switch anyway"
-msgstr "仍然切换"
-
 #: src/app/leave-project.ts
 msgid "Switch away from “{name}”?"
 msgstr "离开“{name}”？"
-
-#: src/app/native-app-dialog.tsx
-msgid "Switch now"
-msgstr "立即切换"
-
-#: src/app/native-app-dialog.tsx
-msgid "Switch progress"
-msgstr "切换进度"
 
 #: src/app/app-titlebar.tsx
 #: src/app/leave-project.ts
@@ -16132,11 +16124,6 @@ msgstr "切换到那个窗口"
 msgid "Switch to the Bibliography layout"
 msgstr "参考文献布局"
 
-#: src/settings/settings-dialog.tsx
-#: src/settings/settings-search-index.ts
-msgid "Switch to the new Lattice"
-msgstr "切换到新的 Lattice"
-
 #: src/app/use-command-table.ts
 msgid "Switch to the Reading layout"
 msgstr "阅读布局"
@@ -16144,10 +16131,6 @@ msgstr "阅读布局"
 #: src/app/use-command-table.ts
 msgid "Switch to the Writing layout"
 msgstr "写作布局"
-
-#: src/settings/settings-dialog.tsx
-msgid "Switch…"
-msgstr "切换…"
 
 #: src/build/build-log-messages.ts
 msgid "Switched this project from {from} to pdfLaTeX: the document uses `{command}`, which only works in pdfLaTeX, and loads nothing that needs {from}."
@@ -16160,10 +16143,6 @@ msgstr "切换会中断其中仍在运行的{list}。"
 #: src/app/use-project-lifecycle.ts
 msgid "Switching project…"
 msgstr "正在切换项目…"
-
-#: src/app/native-app-dialog.tsx
-msgid "Switching restarts Lattice and stops {running}."
-msgstr "切换会重启 Lattice，并中断 {running}。"
 
 #: src/project/references-panel.tsx
 msgid "Symbol references"
@@ -17267,13 +17246,8 @@ msgid "The native Lattice is installed and opens the next time Lattice starts."
 msgstr "原生 Lattice 已安装，下次启动 Lattice 时打开。"
 
 #: src/app/native-app-dialog.tsx
-msgid "The native Lattice isn’t available right now. Check your connection and try again."
-msgstr "暂时无法获取原生 Lattice。请检查网络连接后重试。"
-
-#: src/settings/settings-dialog.tsx
-#: src/settings/settings-search-index.ts
-msgid "The native Mac app: faster and lighter, with the same look."
-msgstr "原生 Mac 应用：更快、更轻，外观不变。"
+msgid "The native Lattice is installed. Restarting now stops {running}; otherwise it opens the next time Lattice starts."
+msgstr "原生 Lattice 已安装。现在重启会中断 {running}；不重启的话，下次启动 Lattice 时打开。"
 
 #: src/overleaf/use-overleaf-realtime-connection.ts
 msgid "the network became available"
@@ -18383,10 +18357,6 @@ msgstr "请更新 Lattice 后使用校对"
 msgid "This version of the agent runtime cannot revise annotations yet. Update Lattice to use revisions."
 msgstr "当前版本的 AI 助手运行时还不能根据批注修改。请更新 Lattice 后使用。"
 
-#: src/app/native-app-dialog.tsx
-msgid "This version’s data stays as it is, and changes you make in the native app don’t come back here. If you switch back and later switch again, the native app keeps its own settings, themes, plugins and Overleaf session, and adds the recent projects you opened here."
-msgstr "这个版本的数据保持原样，在原生应用里做的更改不会同步回这里。如果你切换回来、之后再次切换，原生应用会保留它自己的设置、主题、插件和 Overleaf 登录，并加入你在这里打开过的最近项目。"
-
 #: src/agent/synara-unsupported-notice.tsx
 msgid "This Windows build cannot yet protect .bib files from direct agent edits. Use Claude Code or Codex in the Terminal panel. Features that require the built-in agent are unavailable."
 msgstr "此 Windows 版本暂时无法防止AI 助手直接修改 .bib 文件。可在终端面板中使用 Claude Code 或 Codex。依赖内置AI 助手的功能暂不可用。"
@@ -18652,10 +18622,6 @@ msgstr "立即重试"
 #: src/build/tex-setup-wizard.tsx
 msgid "Try that again now"
 msgstr "现在可以再试一次了"
-
-#: src/app/native-app-dialog.tsx
-msgid "Try the new native Lattice"
-msgstr "试用新的原生 Lattice"
 
 #: src/telemetry/update-recovery.ts
 msgid "Trying again ({next} of 3)…"
@@ -19834,10 +19800,6 @@ msgstr "你仍处于登录状态。请确认在 Overleaf 上还能打开这个�
 msgid "You can close this once the transfer finishes"
 msgstr "传完即可关闭"
 
-#: src/app/native-app-dialog.tsx
-msgid "You can switch back any time from the native app’s Settings."
-msgstr "随时可以在原生应用的设置里切换回来。"
-
 #: src/platform/host-errors-overleaf.ts
 msgid "You have read-only access to this Overleaf project, so edits stay on this machine."
 msgstr "你对这个 Overleaf 项目只有只读权限，修改只保留在本机"
@@ -19874,10 +19836,6 @@ msgstr "可以开始写了"
 #: src/papers/bibliography-audit.tsx
 msgid "Your {BIBITEM} differs: {fields}"
 msgstr "你的 {BIBITEM} 有出入：{fields}"
-
-#: src/app/native-app-dialog.tsx
-msgid "Your Agent conversations come along too, and any you start here later join them in the native app."
-msgstr "Agent 对话也会一起带过去，之后在这里开始的对话也会加入原生版本。"
 
 #: src/editor/comments/editor-comments-panel.tsx
 msgid "Your answer…"
@@ -19962,8 +19920,8 @@ msgid "Your project files are safe"
 msgstr "你的文件都在，没有丢失"
 
 #: src/app/native-app-dialog.tsx
-msgid "Your recent projects, settings, themes, plugins, templates, Agent skills and Overleaf links come along the first time you switch."
-msgstr "第一次切换时，最近项目、设置、主题、插件、模板、Agent 技能和 Overleaf 关联都会一起带过去。"
+msgid "Your recent projects, settings, themes, plugins, templates, Agent skills, Agent conversations and Overleaf links come along. Your projects stay where they are."
+msgstr "最近项目、设置、主题、插件、模板、Agent 技能、Agent 对话和 Overleaf 关联都会一起带过去。你的项目留在原处。"
 
 #: src/app/use-tex-update-reminder.ts
 msgid "Your TeX packages are out of date"

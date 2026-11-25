@@ -7,11 +7,12 @@ name: Release
 # Every release also carries the native app for Apple silicon (the GPUI app
 # as Lattice, gpui/docs/updater.md) beside the Tauri app, under its own names:
 # Lattice-native_<version>_aarch64.dmg, .app.tar.gz and .sig, and its own feed,
-# latest-native.json. latest.json stays the Tauri app's on every platform;
-# moving to the native app is the writer's choice, which the Tauri app offers
-# from latest-native.json on Apple silicon. Intel Macs, Windows and Linux
-# never see it (macos-intel.yml and the others add their entries to
-# latest.json afterwards and leave the native files alone).
+# latest-native.json. From v0.20.0 every Mac runs the native app: the publish
+# job points latest.json's darwin-aarch64 entries, which every classic copy
+# reads, at the native archive (scripts/hand-macs-native.mjs). The classic
+# Apple silicon DMG is still built and attached. macos-intel.yml adds the
+# Intel native app and its darwin-x86_64 entries afterwards; Windows and
+# Linux keep the classic app.
 on:
   push:
     tags:
@@ -101,7 +102,8 @@ jobs:
 
           ## Install (Apple silicon Mac)
 
-          Download the **.dmg** below, open it, and drag Lattice to Applications.
+          Download **Lattice-native_*_aarch64.dmg** below (the native app, which
+          every Mac runs from 0.20.0), open it, and drag Lattice to Applications.
 
           Lattice is signed with an Apple Developer ID and notarized by Apple.
 
@@ -266,6 +268,10 @@ jobs:
           # compile time (option_env! in firecrawl.rs). Extractable from the
           # shipped app — acceptable for small-scale use, rotate on abuse.
           LATTICE_FIRECRAWL_KEY: ${{ secrets.LATTICE_FIRECRAWL_KEY }}
+          # From 0.20.0 a classic copy that starts on a Mac moves itself to
+          # the native app (src-tauri/src/native_app.rs); only release builds
+          # carry this, so no development build, e2e or perf lab does.
+          LATTICE_MIGRATES_TO_NATIVE: "1"
           # tauri-action defaults this to true, so bundle_dmg.sh lays out the
           # dmg window through Finder by AppleScript. On the Mac mini that
           # opens a Finder window and waits on an Automation prompt nobody
@@ -429,6 +435,22 @@ jobs:
           mapfile -t files < <(node scripts/check-native-feed.mjs --typst "$GITHUB_REF_NAME" "$RUNNER_TEMP/gpui")
           test "${#files[@]}" -eq 2
           gh release upload "$GITHUB_REF_NAME" "${files[@]}" --clobber
+
+      # From v0.20.0 every Mac runs the native app: latest.json, the feed
+      # every classic copy reads (0.19.x and older included), names the
+      # native archive under darwin-aarch64 and darwin-aarch64-app, the entry
+      # latest-native.json carries for this tag. The classic updater installs
+      # whatever signed archive the feed names over Lattice.app and relaunches
+      # the executable its Info.plist names, so classic copies move on update.
+      # It runs after normalize-updater-manifest (the upload above) and after
+      # the native files and latest-native.json are up, so the feed never
+      # names an archive that is not there yet. Windows entries stay as they
+      # are; macos-intel.yml hands Intel Macs theirs the same way.
+      - name: Hand Macs the native app in latest.json
+        run: |
+          set -euo pipefail
+          node scripts/hand-macs-native.mjs "$MANIFEST_DIR/latest.json" "$RUNNER_TEMP/gpui/latest-native.json" darwin-aarch64 darwin-aarch64-app
+          gh release upload "$GITHUB_REF_NAME" "$MANIFEST_DIR/latest.json" --clobber
 
       # Check what the release actually offers for download: only the signed
       # artifacts, none of them a font. Failing here leaves the release a draft.

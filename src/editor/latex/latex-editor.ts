@@ -64,7 +64,9 @@ export const latexHighlightStyle = HighlightStyle.define([
   { tag: tags.string, color: "var(--syntax-string)" },
   { tag: tags.comment, color: "var(--syntax-comment)", fontStyle: "italic" },
   { tag: [tags.docComment, tags.meta], color: "var(--syntax-comment-doc)", fontStyle: "italic" },
-  { tag: tags.bool, color: "var(--syntax-number)", fontWeight: "500" },
+  // `True`, `false`: language constants, as VS Code's themes and GPUI's
+  // tree-sitter queries have them (settings/syntax-scopes.ts).
+  { tag: tags.bool, color: "var(--syntax-constant)" },
   { tag: tags.number, color: "var(--syntax-number)" },
   { tag: tags.constant(tags.name), color: "var(--syntax-constant)" },
   { tag: tags.bracket, color: "var(--syntax-bracket)" },

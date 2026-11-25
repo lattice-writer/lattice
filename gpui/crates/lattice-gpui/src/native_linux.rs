@@ -349,10 +349,9 @@ fn raise(display: &Display, native: Native) -> Result<()> {
     Ok(())
 }
 
-/// The window's pixels as the X server holds them, saved as a PNG at `out`,
-/// fully opaque: GPUI draws into an ARGB window, whose alpha a look review
-/// has no use for.
-pub fn capture(native: Native, out: &str) -> Result<()> {
+/// The window's pixels as the X server holds them, fully opaque: GPUI draws
+/// into an ARGB window, whose alpha a look review has no use for.
+pub fn capture_client(native: Native) -> Result<image::RgbaImage> {
     let display = display()?;
     let connection = &display.connection;
     let geometry = connection.get_geometry(native.window)?.reply()?;
@@ -404,9 +403,7 @@ pub fn capture(native: Native, out: &str) -> Result<()> {
         ]);
     }
     image::RgbaImage::from_raw(u32::from(geometry.width), u32::from(geometry.height), rgba)
-        .context("the window's image is shorter than its size")?
-        .save(out)?;
-    Ok(())
+        .context("the window's image is shorter than its size")
 }
 
 /// The scenario's foreground sections (`scenario/input_lock.rs`) matter on

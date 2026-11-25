@@ -11,7 +11,7 @@ use lattice_ui::{
     components::{Menu, MenuAction},
 };
 
-use super::{FileTreeEvent, FileTreePanel, including};
+use super::{FileTreeEvent, FileTreePanel, including, new_entries::NewEntry};
 use crate::confirm::{self, Confirm};
 
 #[cfg(target_os = "macos")]
@@ -61,26 +61,49 @@ impl FileTreePanel {
         );
     }
 
-    /// New file, New folder and Import files…, in `directory`.
-    fn creation_items(view: &WeakEntity<Self>, directory: &str, menu: Menu) -> Menu {
-        let (file, folder, import) = (
+    /// New file, New folder and Import files…, in `directory`; with
+    /// `manuscript` (a folder's menu and the tree's own), New manuscript
+    /// from template… after New folder.
+    fn creation_items(
+        view: &WeakEntity<Self>,
+        directory: &str,
+        manuscript: bool,
+        menu: Menu,
+    ) -> Menu {
+        let (file, folder, import, template) = (
+            directory.to_string(),
             directory.to_string(),
             directory.to_string(),
             directory.to_string(),
         );
+        let menu = menu
+            .item(item(
+                view,
+                Icon::FILE_PLUS,
+                t!("New file"),
+                Box::new(move |this, window, cx| this.begin_create(&file, false, window, cx)),
+            ))
+            .item(item(
+                view,
+                Icon::FOLDER_PLUS,
+                t!("New folder"),
+                Box::new(move |this, window, cx| this.begin_create(&folder, true, window, cx)),
+            ));
+        let menu = if manuscript {
+            menu.item(item(
+                view,
+                NewEntry::Manuscript.icon(),
+                NewEntry::Manuscript.label(),
+                Box::new(move |_, _, cx| {
+                    cx.emit(FileTreeEvent::NewManuscript {
+                        directory: template.clone(),
+                    })
+                }),
+            ))
+        } else {
+            menu
+        };
         menu.item(item(
-            view,
-            Icon::FILE_PLUS,
-            t!("New file"),
-            Box::new(move |this, window, cx| this.begin_create(&file, false, window, cx)),
-        ))
-        .item(item(
-            view,
-            Icon::FOLDER_PLUS,
-            t!("New folder"),
-            Box::new(move |this, window, cx| this.begin_create(&folder, true, window, cx)),
-        ))
-        .item(item(
             view,
             Icon::FOLDER_INPUT,
             t!("Import files…"),
@@ -138,7 +161,7 @@ impl FileTreePanel {
                 .map(|(parent, _)| parent.to_string())
                 .unwrap_or_default()
         };
-        let mut menu = Self::creation_items(view, &directory, menu);
+        let mut menu = Self::creation_items(view, &directory, folder, menu);
         // A folder's imports make things too (`project-file-tree.tsx`).
         if folder {
             let target = path.clone();
@@ -249,7 +272,7 @@ impl FileTreePanel {
             .is_some_and(|project| project.read(cx).show_hidden());
         // The Tauri app's tree background: New file, New folder, Import
         // files…, then the view items.
-        let menu = Self::creation_items(view, "", menu).separator();
+        let menu = Self::creation_items(view, "", true, menu).separator();
         Self::view_items(view, show_hidden, menu)
     }
 

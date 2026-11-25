@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
-import { EXECUTABLE, FLAVORS, infoPlist, releaseRepository, typstHelperFiles, updaterManifest } from "./gpui-bundle.mjs";
+import { ARCHES, archOf, EXECUTABLE, FLAVORS, infoPlist, releaseRepository, typstHelperFiles, updaterManifest } from "./gpui-bundle.mjs";
 
 // The GPUI package ships two ways. Lattice Beta never reaches the Tauri app's
 // users: it installs under its own identity and its feed is not the Tauri
@@ -75,6 +75,20 @@ describe("the GPUI bundle", () => {
     expect(FLAVORS.beta.manifest).toBe("latest.json");
     for (const endpoint of tauri.plugins.updater.endpoints) expect(endpoint.startsWith(feed)).toBe(false);
   });
+
+  it("names the Intel build as tauri-action names the Tauri app's (_x64) and lists it under darwin-x86_64", () => {
+    expect(ARCHES.aarch64).toMatchObject({ suffix: "aarch64", platform: "darwin-aarch64", pdfium: "mac-arm64" });
+    expect(ARCHES.x86_64).toMatchObject({ suffix: "x64", platform: "darwin-x86_64", pdfium: "mac-x64" });
+    expect(() => archOf("arm64")).toThrow(/--arch is one of aarch64, x86_64/);
+    const manifest = updaterManifest({ version: "1.2.3", signature: "sig", url: "u", arch: "x86_64", pubDate: "2026-01-01T00:00:00Z" });
+    expect(Object.keys(manifest.platforms)).toEqual(["darwin-x86_64", "darwin-x86_64-app"]);
+    expect(manifest.platforms["darwin-x86_64-app"]).toEqual({ signature: "sig", url: "u" });
+    // The PDFium folders fetch-pdfium pins and the app looks in (pdf/engine.rs).
+    for (const { pdfium } of Object.values(ARCHES)) {
+      expect(read("gpui/script/fetch-pdfium")).toContain(`platform=${pdfium};`);
+      expect(read("gpui/crates/lattice-gpui/src/pdf/engine.rs")).toContain(`"${pdfium}/lib"`);
+    }
+  });
 });
 
 describe("the GPUI package workflow", () => {
@@ -86,6 +100,21 @@ describe("the GPUI package workflow", () => {
     expect(Object.keys(package_.on).sort()).toEqual(["workflow_call", "workflow_dispatch"]);
     expect(package_.permissions).toEqual({ contents: "read" });
     expect(scripts).toContain('--flavor "$FLAVOR"');
+    expect(scripts).toContain('--arch "$ARCH"');
+  });
+
+  it("builds aarch64 on the Mac mini and x86_64 on GitHub's Intel runner, checking every Intel Mach-O", () => {
+    const call = package_.on.workflow_call as { inputs: Record<string, { default?: string }> };
+    const dispatch = package_.on.workflow_dispatch as { inputs: Record<string, { default?: string; options?: string[] }> };
+    expect(call.inputs.arch.default).toBe("aarch64");
+    expect(dispatch.inputs.arch).toMatchObject({ default: "aarch64", options: ["aarch64", "x86_64"] });
+    const runsOn = String((package_.jobs.macos as { "runs-on"?: string })["runs-on"]);
+    expect(runsOn).toContain("inputs.arch == 'x86_64' && 'macos-15-intel'");
+    expect(runsOn).toContain("vars.LATTICE_MACOS_RUNNER || 'lattice-mac'");
+    expect(scripts).toContain(".github/scripts/check-macos-arch.sh \"$app_path\" x86_64");
+    expect(steps.find((step) => step.uses?.startsWith("actions/checkout"))?.with?.ref).toBe("${{ inputs.ref || github.sha }}");
+    const upload = steps.find((step) => step.uses?.startsWith("actions/upload-artifact"));
+    expect(upload?.with?.name).toBe("lattice-gpui-macos-${{ inputs.arch }}-${{ inputs.flavor }}");
   });
 
   it("publishes nothing: no release, tag or upload, only the run's artifact", () => {
@@ -99,7 +128,7 @@ describe("the GPUI package workflow", () => {
     expect(scripts).toContain("--typst-helper gpui/target/release/lattice-typst");
     expect(scripts).toContain("codesign --verify --strict --verbose=2 \"$helper_dir/lattice-typst\"");
     const upload = steps.find((step) => step.uses?.startsWith("actions/upload-artifact"));
-    expect(String(upload?.with?.path)).toContain("gpui-bundle/Lattice-typst_*_aarch64.tar.gz.sig");
+    expect(String(upload?.with?.path)).toContain("gpui-bundle/Lattice-typst_*_${{ env.SUFFIX }}.tar.gz.sig");
     expect(read("gpui/Cargo.toml")).toMatch(/default-members = \[[^\]]*"crates\/lattice-typst"/);
   });
 
@@ -108,7 +137,14 @@ describe("the GPUI package workflow", () => {
       archive: "Lattice-typst_1.2.3_aarch64.tar.gz",
       signature: "Lattice-typst_1.2.3_aarch64.tar.gz.sig",
     });
-    expect(read("gpui/crates/lattice-gpui/src/typst/install.rs")).toContain('format!("Lattice-typst_{}_aarch64.tar.gz", lattice_core::VERSION)');
+    expect(typstHelperFiles("1.2.3", "x86_64")).toEqual({
+      archive: "Lattice-typst_1.2.3_x64.tar.gz",
+      signature: "Lattice-typst_1.2.3_x64.tar.gz.sig",
+    });
+    const install = read("gpui/crates/lattice-gpui/src/typst/install.rs");
+    expect(install).toContain('"Lattice-typst_{}_{suffix}.tar.gz"');
+    expect(install).toContain('("macos", "aarch64") => "aarch64"');
+    expect(install).toContain('("macos", "x86_64") => "x64"');
   });
 
   it("keeps either flavor's manifest in the artifact (latest.json or latest-native.json)", () => {
@@ -157,5 +193,49 @@ describe("the release workflow", () => {
     expect(at("Upload Typst support")).toBeLessThan(at("Check the release assets"));
     expect(script("Upload Typst support")).toContain('node scripts/check-native-feed.mjs --typst "$GITHUB_REF_NAME"');
     expect(script("Upload Typst support")).toContain('test "${#files[@]}" -eq 2');
+  });
+
+  it("hands Macs the native app in latest.json once the native files and normalized latest.json are up", () => {
+    const hand = at("Hand Macs the native app");
+    expect(hand).toBeGreaterThan(at("Use public download URLs"));
+    expect(hand).toBeGreaterThan(at("Upload the updater manifest"));
+    expect(hand).toBeGreaterThan(at("Upload the native app"));
+    expect(hand).toBeGreaterThan(at("Upload Typst support"));
+    expect(hand).toBeLessThan(at("Check the release assets"));
+    expect(script("Hand Macs the native app")).toContain(
+      'node scripts/hand-macs-native.mjs "$MANIFEST_DIR/latest.json" "$RUNNER_TEMP/gpui/latest-native.json" darwin-aarch64 darwin-aarch64-app',
+    );
+    expect(script("Hand Macs the native app")).toContain('gh release upload "$GITHUB_REF_NAME" "$MANIFEST_DIR/latest.json" --clobber');
+  });
+});
+
+describe("the macOS Intel workflow", () => {
+  const intel = workflow(".github/workflows/macos-intel.yml");
+  const attach = intel.jobs.attach.steps ?? [];
+  const scripts = attach.map((step) => step.run ?? "").join("\n");
+
+  it("builds the native app for x86_64 from the release's commit", () => {
+    expect(intel.jobs.native).toMatchObject({
+      uses: "./.github/workflows/gpui-package.yml",
+      with: { flavor: "main", arch: "x86_64", ref: "${{ github.event.workflow_run.head_sha || github.sha }}" },
+    });
+    expect(intel.jobs.native.if).toBe(intel.jobs.build.if);
+  });
+
+  it("attaches nothing for Intel unless the native build passed and launched on Intel too", () => {
+    expect(intel.jobs.attach.needs).toEqual(["build", "smoke", "native", "native-smoke"]);
+    expect(attach.find((step) => step.with?.name === "lattice-gpui-macos-x86_64-main")).toBeTruthy();
+  });
+
+  it("checks the native files, then merges darwin-x86_64 into latest-native.json and hands it to latest.json", () => {
+    expect(scripts).toContain('node scripts/check-native-feed.mjs --arch x86_64 "$TAG"');
+    expect(scripts).toContain('node scripts/check-native-feed.mjs --typst --arch x86_64 "$TAG"');
+    const merge = scripts.indexOf("node scripts/add-updater-platform.mjs");
+    const hand = scripts.indexOf("node scripts/hand-macs-native.mjs");
+    expect(merge).toBeGreaterThan(scripts.indexOf("gh release upload"));
+    expect(hand).toBeGreaterThan(merge);
+    expect(scripts.slice(merge, hand)).toContain('"$manifest_dir/latest-native.json"');
+    expect(scripts.slice(hand)).toContain("darwin-x86_64 darwin-x86_64-app");
+    expect(scripts.indexOf('upload "$TAG" "$manifest_dir/latest-native.json"')).toBeLessThan(scripts.indexOf('upload "$TAG" "$manifest_dir/latest.json"'));
   });
 });
