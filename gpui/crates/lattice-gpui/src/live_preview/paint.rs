@@ -392,9 +392,10 @@ pub enum JobSource {
 pub struct PageJob {
     pub width_px: u32,
     pub height_px: u32,
-    /// Where the pixmap's top-left sits on the page, in device pixels: a
-    /// part of a page drawn at full size over its capped image.
-    pub origin: (u32, u32),
+    /// Where the pixmap's top-left sits on the page, in device pixels, for
+    /// a part of a page drawn at full size over its capped image; `None`
+    /// for the whole page.
+    pub origin: Option<(u32, u32)>,
     /// Device pixels per sp.
     pub k: f64,
     pub source: JobSource,
@@ -454,15 +455,8 @@ fn row_bands(rows: &[OverlayRow]) -> Vec<[f64; 4]> {
 /// through.
 pub fn compose(job: PageJob) -> Option<Pixmap> {
     let mut pixmap = Pixmap::new(job.width_px.max(1), job.height_px.max(1))?;
-    let base = Mat([
-        1.,
-        0.,
-        0.,
-        1.,
-        -f64::from(job.origin.0),
-        -f64::from(job.origin.1),
-    ])
-    .mul(Mat::scale(job.k));
+    let (ox, oy) = job.origin.unwrap_or_default();
+    let base = Mat([1., 0., 0., 1., -f64::from(ox), -f64::from(oy)]).mul(Mat::scale(job.k));
     let hidden: HashSet<usize> = job
         .overlays
         .iter()
@@ -507,6 +501,17 @@ pub fn compose(job: PageJob) -> Option<Pixmap> {
                         let (x, y, w, h) = device_rect(base, src);
                         if w < 1 || h < 1 {
                             continue;
+                        }
+                        // A part holds only its own pixels of the fallback:
+                        // a picture taken from beyond them would come back
+                        // cut or blank, so the part is not drawn and the
+                        // page's whole image shows instead.
+                        let inside = x >= 0
+                            && y >= 0
+                            && x + w <= pixmap.width() as i32
+                            && y + h <= pixmap.height() as i32;
+                        if job.origin.is_some() && !inside {
+                            return None;
                         }
                         let rect = tiny_skia::IntRect::from_xywh(x, y, w as u32, h as u32);
                         if let Some(snap) = rect.and_then(|rect| pixmap.clone_rect(rect)) {
@@ -650,7 +655,7 @@ mod tests {
             overlays: Vec::new(),
             fonts: FontStore::default(),
             images: ImageStore::default(),
-            origin: (0, 0),
+            origin: None,
         })
         .unwrap();
         let at = |x: u32, y: u32| pixmap.pixel(x, y).unwrap();
@@ -710,7 +715,7 @@ mod tests {
             overlays: Vec::new(),
             fonts: FontStore::default(),
             images: ImageStore::default(),
-            origin: (0, 0),
+            origin: None,
         };
         assert!(compose(job).is_none());
     }
@@ -743,7 +748,7 @@ mod tests {
             )],
             fonts: FontStore::default(),
             images: ImageStore::default(),
-            origin: (0, 0),
+            origin: None,
         })
         .unwrap();
         let at = |x: u32, y: u32| pixmap.pixel(x, y).unwrap();
@@ -771,8 +776,8 @@ mod tests {
             images: ImageStore::default(),
             origin,
         };
-        let whole = compose(job(200, 200, (0, 0))).unwrap();
-        let part = compose(job(60, 30, (25, 21))).unwrap();
+        let whole = compose(job(200, 200, None)).unwrap();
+        let part = compose(job(60, 30, Some((25, 21)))).unwrap();
         assert_eq!((part.width(), part.height()), (60, 30));
         for y in 0..30 {
             for x in 0..60 {
@@ -782,6 +787,56 @@ mod tests {
         // The rule (20..80 by 30..40 at 2 px per pt) crosses the part.
         let rule = part.pixel(30, 15).unwrap();
         assert_eq!((rule.red(), rule.green(), rule.blue()), (255, 0, 0));
+    }
+
+    #[test]
+    fn a_part_whose_moved_picture_comes_from_beyond_it_is_not_drawn() {
+        let mut line = page_with_rule().dl.lines[0].clone();
+        line.items.push(Item::Unknown {
+            kind: "cached_picture".into(),
+            detail: serde_json::json!(format!(
+                "1 {} {} {} {}",
+                10. * PT,
+                10. * PT,
+                20. * PT,
+                20. * PT
+            )),
+        });
+        let mut page = page_with_rule();
+        page.dl.lines = vec![line.clone()];
+        let overlay = crate::live_preview::model::Overlay {
+            par_id: 1,
+            dl: Arc::new(page.dl.clone()),
+            fragments: Vec::new(),
+            revision: 2,
+        };
+        let page = Arc::new(page);
+        let job = |(w, h), origin| PageJob {
+            width_px: w,
+            height_px: h,
+            origin,
+            k: 1. / PT,
+            source: JobSource::Fallback {
+                page: page.clone(),
+                pixels: Some(vec![255; (w * h * 4) as usize]),
+            },
+            overlays: vec![(
+                PageOverlay {
+                    overlay: overlay.clone(),
+                    rows: vec![OverlayRow {
+                        line: line.clone(),
+                        dx: 0.,
+                        dy: 40. * PT,
+                    }],
+                },
+                HashSet::from([0]),
+            )],
+            fonts: FontStore::default(),
+            images: ImageStore::default(),
+        };
+        assert!(compose(job((100, 100), None)).is_some());
+        assert!(compose(job((40, 40), Some((5, 50)))).is_none());
+        assert!(compose(job((40, 40), Some((0, 0)))).is_some());
     }
 
     #[test]

@@ -397,7 +397,7 @@ fn plan(
         job: PageJob {
             width_px: region.map_or(width_px, |region| region.w),
             height_px: region.map_or(height_px, |region| region.h),
-            origin: region.map_or((0, 0), |region| (region.x, region.y)),
+            origin: region.map(|region| (region.x, region.y)),
             // Device pixels per sp: the page is `width_px` across its width
             // in PDF points (bp).
             k: f64::from(width_px) / (f64::from(width_pt) * SP_PER_BP),
