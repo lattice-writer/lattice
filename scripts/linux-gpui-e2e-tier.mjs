@@ -86,9 +86,11 @@ const otherPlatform = (file, read) =>
 export function wholeReason(file, read = readRepoFile) {
   if (file.endsWith(".md")) return null;
   if (JOB.test(file)) return "the Linux job or what judges it";
+  if (smokeReason(file, read) === "read by no e2e step") return null;
   if (HARNESS.test(file)) return "the scenario's harness";
   if (MANIFESTS.test(file)) return "the GPUI manifests";
-  if (WEB.test(file)) return "web code the islands render in WebKitGTK";
+  if (WEB.test(file) && !/\.(test|spec)\.[cm]?[jt]sx?$/.test(file))
+    return "web code the islands render in WebKitGTK";
   if (/^gpui\/patches\/[^/]+\.diff$/.test(file)) {
     const targets = [
       ...(read(file) ?? "").matchAll(/^(?:---|\+\+\+) [ab]\/(\S+)/gm),

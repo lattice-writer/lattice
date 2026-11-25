@@ -36,6 +36,8 @@ describe("linux-gpui-e2e-tier", () => {
       "gpui/patches/gpui-fast-lab-occlusion.diff",
       "gpui/script/fetch-pdfium.ps1",
       "gpui/README.md",
+      "gpui/islands/markdown/main.test.tsx",
+      "gpui/crates/lattice-gpui/src/pdf/tests.rs",
     ]) {
       expect(wholeReason(file, read), file).toBeNull();
       expect(e2eFor([file]), file).toBe(SMOKE);
@@ -68,6 +70,7 @@ describe("linux-gpui-e2e-tier", () => {
       "scripts/linux-gpui-e2e-tier.mjs",
     ]) {
       expect(wholeReason(file, read), file).not.toBeNull();
+      expect(ciTier([file], { scan }).jobs.gpui, file).toBe(true);
       expect(e2eFor([file]), file).toBe(WHOLE);
     }
   });
