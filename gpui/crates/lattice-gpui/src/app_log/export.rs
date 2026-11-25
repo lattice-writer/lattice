@@ -12,7 +12,7 @@ use super::Entry;
 
 const PHASES: [&str; 3] = ["started", "progress", "completed"];
 const OUTCOMES: [&str; 3] = ["success", "error", "cancelled"];
-const SAFE_METRICS: [&str; 15] = [
+const SAFE_METRICS: [&str; 16] = [
     "automatic",
     "pulled",
     "pushed",
@@ -23,6 +23,7 @@ const SAFE_METRICS: [&str; 15] = [
     "retry_scheduled",
     "force",
     "compiler_duration_ms",
+    "entry_current",
     "diagnostics",
     "has_pdf",
     "status_code",

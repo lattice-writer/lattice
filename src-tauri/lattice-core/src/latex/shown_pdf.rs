@@ -59,6 +59,12 @@ pub(super) fn replaced(root: &Path, document: &str) -> bool {
     fs::read(pdf).is_ok_and(|bytes| sha256_hex(bytes) != recorded)
 }
 
+/// The SHA-256 of the PDF this copy's last build of `document` left, as
+/// [`replaced`] compares it: what a viewer holding those bytes shows.
+pub fn built_pdf_digest(root: &Path, document: &str) -> Option<String> {
+    read_hashes(root).remove(document)
+}
+
 /// Each PDF this copy's last build of its document left, by path relative
 /// to `root` (`cvpr/main.pdf`) → SHA-256. A file whose bytes still match is
 /// this copy's untouched build output, not something a writer made: Overleaf
