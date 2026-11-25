@@ -1,0 +1,395 @@
+diff --git a/gpui-fast/crates/gpui/src/fast/composition.rs b/gpui-fast/crates/gpui/src/fast/composition.rs
+--- a/gpui-fast/crates/gpui/src/fast/composition.rs
++++ b/gpui-fast/crates/gpui/src/fast/composition.rs
+@@ -53,6 +53,10 @@ use std::{
+     rc::Rc,
+ };
+ 
++#[path = "overlay_bounds.rs"]
++mod overlay_bounds;
++pub use overlay_bounds::OverlayBoundsObserver;
++
+ slotmap::new_key_type! {
+     /// Stable identity for a surface in a window composition tree.
+     pub struct CompositionSurfaceId;
+@@ -754,6 +758,7 @@ pub(crate) struct WindowCompositionState {
+     pointer_capture: Option<CompositionSurfaceId>,
+     pressed_buttons: Vec<MouseButton>,
+     hovered_native: Option<CompositionSurfaceId>,
++    overlay_bounds: overlay_bounds::OverlayBounds,
+ }
+ 
+ /// The surfaces every composition tree holds: the base and the overlay.
+@@ -796,6 +801,7 @@ impl Default for WindowCompositionHandle {
+             pointer_capture: None,
+             pressed_buttons: Vec::new(),
+             hovered_native: None,
++            overlay_bounds: Default::default(),
+         })))
+     }
+ }
+@@ -1422,6 +1428,11 @@ fn ordered_plain_scene(
+ /// Presents the frame last drawn: on its one surface, or split along the
+ /// composition tree while the window composes around another surface.
+ pub(crate) fn present(window: &mut Window) {
++    present_scene(window);
++    overlay_bounds::presented(window);
++}
++
++fn present_scene(window: &mut Window) {
+     let state = window.fast_composition.0.clone();
+     let splits = {
+         let state = state.borrow();
+diff --git a/gpui-fast/crates/gpui/src/fast/overlay_bounds.rs b/gpui-fast/crates/gpui/src/fast/overlay_bounds.rs
+new file mode 100644
+--- /dev/null
++++ b/gpui-fast/crates/gpui/src/fast/overlay_bounds.rs
+@@ -0,0 +1,336 @@
++//! What a window's overlays cover, for a native view composition cannot
++//! order below them.
++//!
++//! A native view the window does not compose (a WebView2 that wry hosts in a
++//! child window: gpui-fast's DirectComposition tree only orders a visual,
++//! which needs a WebView2 composition controller wry does not create) is
++//! above everything GPUI presents. Its owner can still keep GPUI's overlays
++//! above it by cutting it away wherever they are drawn, since the frame
++//! under it holds them already. [`Window::observe_overlay_bounds`] reports,
++//! for each presented frame that changes them, the rectangles in window
++//! space of what the frame painted on the overlay surface: deferred and
++//! window-level draws (menus, popovers, dialogs, tooltips, the palette).
++//!
++//! The rectangles cover what is seen: shadows are left out, as is a quad
++//! nobody sees (a transparent layer catching presses, a backdrop at the end
++//! of its fade), but a dialog's dimming backdrop counts, so a page under a
++//! modal dialog is cut away with the rest of the window and the backdrop
++//! dims what GPUI draws there instead of leaving the page bright beside the
++//! card.
++
++use std::rc::{Rc, Weak};
++
++use crate::{
++    Bounds, Pixels, ScaledPixels, Scene, Window,
++    color::BackgroundTag,
++    scene::{PaintOperation, Primitive},
++};
++
++use super::CompositionSurfaceId;
++
++/// What [`Window::observe_overlay_bounds`] calls.
++pub type OverlayBoundsObserver = dyn Fn(&[Bounds<Pixels>]);
++
++/// A quad more see-through than this draws nothing anyone sees: a layer
++/// catching presses, or a dialog's backdrop at the end of its fade, which
++/// can stay drawn at an alpha within rounding of zero.
++const INVISIBLE_ALPHA: f32 = 0.02;
++
++/// Past this many rectangles the frame's overlays are reported as the one
++/// rectangle around them all.
++const MAX_RECTANGLES: usize = 64;
++
++/// The window's observers, and the rectangles they were last given: none
++/// while nothing observes, since frames then go unmeasured and what was last
++/// measured may be stale.
++#[derive(Default)]
++pub(crate) struct OverlayBounds {
++    observers: Vec<Weak<OverlayBoundsObserver>>,
++    last: Option<Vec<Bounds<Pixels>>>,
++}
++
++impl OverlayBounds {
++    /// Add `observer`, giving back what it should be told at once, if
++    /// anything is known.
++    fn subscribe(&mut self, observer: &Rc<OverlayBoundsObserver>) -> Option<Vec<Bounds<Pixels>>> {
++        self.observers.push(Rc::downgrade(observer));
++        self.last.clone()
++    }
++
++    /// The observers still held, the others forgotten; with none, what was
++    /// last measured is forgotten too.
++    fn live(&mut self) -> Vec<Rc<OverlayBoundsObserver>> {
++        self.observers
++            .retain(|observer| observer.strong_count() > 0);
++        let live: Vec<_> = self.observers.iter().filter_map(Weak::upgrade).collect();
++        if live.is_empty() {
++            self.last = None;
++        }
++        live
++    }
++
++    /// Whether `bounds` differ from what the observers were last told,
++    /// noting them as told.
++    fn changed(&mut self, bounds: &[Bounds<Pixels>]) -> bool {
++        if self.last.as_deref() == Some(bounds) {
++            return false;
++        }
++        self.last = Some(bounds.to_vec());
++        true
++    }
++}
++
++impl Window {
++    /// Call `observer` with the rectangles, in window space, of what the
++    /// window draws above its root view (deferred and window-level draws):
++    /// at once with the last presented frame's when they are known, then
++    /// whenever a presented frame changes them, for as long as the caller
++    /// holds `observer`.
++    pub fn observe_overlay_bounds(&self, observer: &Rc<OverlayBoundsObserver>) {
++        let last = self
++            .fast_composition
++            .0
++            .borrow_mut()
++            .overlay_bounds
++            .subscribe(observer);
++        if let Some(last) = last {
++            observer(&last);
++        }
++    }
++}
++
++/// Tell the observers what the frame just presented draws above its root
++/// view, when it changed.
++pub(super) fn presented(window: &Window) {
++    let state = window.fast_composition.0.clone();
++    let observers = state.borrow_mut().overlay_bounds.live();
++    if observers.is_empty() {
++        return;
++    }
++    let frame = &window.rendered_frame;
++    let bounds = overlay_rectangles(
++        &frame.scene,
++        &frame.fast_composition_starts.0,
++        state.borrow().overlay_surface,
++        window.scale_factor(),
++    );
++    if !state.borrow_mut().overlay_bounds.changed(&bounds) {
++        return;
++    }
++    // Nothing is borrowed while the observers run.
++    for observer in observers {
++        observer(&bounds);
++    }
++}
++
++/// The rectangles, in window space, covering what `scene` paints on
++/// `overlay`, where `starts` says which surface each stretch of it is on.
++pub(crate) fn overlay_rectangles(
++    scene: &Scene,
++    starts: &[(CompositionSurfaceId, usize)],
++    overlay: CompositionSurfaceId,
++    scale_factor: f32,
++) -> Vec<Bounds<Pixels>> {
++    let mut rectangles = Vec::new();
++    for (index, &(surface, start)) in starts.iter().enumerate() {
++        if surface != overlay {
++            continue;
++        }
++        let end = starts
++            .get(index + 1)
++            .map_or(scene.len(), |&(_, end)| end)
++            .min(scene.len());
++        for operation in scene.paint_operations.get(start..end).unwrap_or_default() {
++            if let PaintOperation::Primitive(primitive) = operation
++                && covers(primitive)
++            {
++                let bounds = primitive
++                    .bounds()
++                    .intersect(&primitive.content_mask().bounds);
++                if !bounds.is_empty() {
++                    rectangles.push(bounds);
++                }
++            }
++        }
++    }
++    let mut rectangles = rectangles
++        .into_iter()
++        .map(|bounds: Bounds<ScaledPixels>| {
++            let to_pixels = |value: ScaledPixels| Pixels(value.0 / scale_factor);
++            Bounds::from_corners(
++                bounds.origin.map(to_pixels),
++                bounds.bottom_right().map(to_pixels),
++            )
++        })
++        .collect::<Vec<_>>();
++    // Content usually sits on its card's background, so most rectangles are
++    // inside a larger one.
++    let area = |bounds: &Bounds<Pixels>| bounds.size.width.0 * bounds.size.height.0;
++    rectangles.sort_by(|a, b| area(b).total_cmp(&area(a)));
++    let mut kept: Vec<Bounds<Pixels>> = Vec::new();
++    for rectangle in rectangles {
++        let inside = kept.iter().any(|kept| {
++            kept.origin.x <= rectangle.origin.x
++                && kept.origin.y <= rectangle.origin.y
++                && kept.bottom_right().x >= rectangle.bottom_right().x
++                && kept.bottom_right().y >= rectangle.bottom_right().y
++        });
++        if !inside {
++            kept.push(rectangle);
++        }
++    }
++    if kept.len() > MAX_RECTANGLES {
++        return kept
++            .into_iter()
++            .reduce(|union, bounds| union.union(&bounds))
++            .into_iter()
++            .collect();
++    }
++    kept
++}
++
++/// Whether `primitive` draws anything that should be seen above a page.
++fn covers(primitive: &Primitive) -> bool {
++    match primitive {
++        Primitive::Shadow(_) => false,
++        Primitive::Quad(quad) => {
++            let background = &quad.background;
++            let invisible =
++                background.tag == BackgroundTag::Solid && background.solid.a < INVISIBLE_ALPHA;
++            let border = !quad.border_color.is_transparent()
++                && (quad.border_widths.top.0 > 0.
++                    || quad.border_widths.right.0 > 0.
++                    || quad.border_widths.bottom.0 > 0.
++                    || quad.border_widths.left.0 > 0.);
++            !invisible || border
++        }
++        _ => true,
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::overlay_rectangles;
++    use crate::fast::composition::{CompositionSurfaceKind, CompositionTree};
++    use crate::{Bounds, ContentMask, Quad, ScaledPixels, Scene, Shadow, black, point, px, size};
++
++    fn scaled(x: f32, y: f32, width: f32, height: f32) -> Bounds<ScaledPixels> {
++        Bounds::new(
++            point(ScaledPixels(x), ScaledPixels(y)),
++            size(ScaledPixels(width), ScaledPixels(height)),
++        )
++    }
++
++    fn quad(bounds: Bounds<ScaledPixels>, opacity: f32) -> Quad {
++        Quad {
++            bounds,
++            content_mask: ContentMask {
++                bounds: scaled(0., 0., 2000., 2000.),
++            },
++            background: black().opacity(opacity).into(),
++            ..Default::default()
++        }
++    }
++
++    #[test]
++    fn overlay_rectangles_cover_what_the_overlay_surface_draws() {
++        let mut tree = CompositionTree::new();
++        let base = tree.insert(CompositionSurfaceKind::Gpui, None).unwrap();
++        let overlay = tree.insert(CompositionSurfaceKind::Gpui, None).unwrap();
++        let mut scene = Scene::default();
++        // The root view: not an overlay.
++        scene.insert_primitive(quad(scaled(0., 0., 2000., 2000.), 1.));
++        let overlay_start = scene.len();
++        // A transparent layer catching presses, a backdrop faded out but
++        // still drawn, a menu's shadow, the menu, and the menu's content.
++        scene.insert_primitive(quad(scaled(0., 0., 2000., 2000.), 0.));
++        scene.insert_primitive(quad(scaled(0., 0., 2000., 2000.), 6e-8));
++        scene.insert_primitive(Shadow {
++            order: 0,
++            blur_radius: ScaledPixels(24.),
++            bounds: scaled(560., 360., 880., 680.),
++            corner_radii: Default::default(),
++            content_mask: ContentMask {
++                bounds: scaled(0., 0., 2000., 2000.),
++            },
++            color: Default::default(),
++            element_bounds: scaled(600., 400., 800., 600.),
++            element_corner_radii: Default::default(),
++            inset: 0,
++            pad: 0,
++        });
++        scene.insert_primitive(quad(scaled(600., 400., 800., 600.), 1.));
++        scene.insert_primitive(quad(scaled(640., 440., 200., 40.), 1.));
++        // A tooltip, clipped by its content mask.
++        scene.insert_primitive(Quad {
++            content_mask: ContentMask {
++                bounds: scaled(100., 100., 50., 20.),
++            },
++            ..quad(scaled(100., 100., 200., 40.), 0.9)
++        });
++        let back_to_base = scene.len();
++        // The root view again, after the overlay (a scene out of order).
++        scene.insert_primitive(quad(scaled(1800., 1800., 100., 100.), 1.));
++        scene.finish();
++
++        let starts = [(base, 0), (overlay, overlay_start), (base, back_to_base)];
++        let mut rectangles = overlay_rectangles(&scene, &starts, overlay, 2.);
++        rectangles.sort_by(|a, b| a.origin.x.0.total_cmp(&b.origin.x.0));
++        assert_eq!(
++            rectangles,
++            [
++                Bounds::new(point(px(50.), px(50.)), size(px(25.), px(10.))),
++                Bounds::new(point(px(300.), px(200.)), size(px(400.), px(300.))),
++            ]
++        );
++        assert!(overlay_rectangles(&scene, &[(base, 0)], overlay, 2.).is_empty());
++
++        // A modal dialog's dimming backdrop covers the whole window.
++        let mut dialog = Scene::default();
++        dialog.insert_primitive(quad(scaled(0., 0., 2000., 2000.), 0.3));
++        dialog.insert_primitive(quad(scaled(600., 400., 800., 600.), 1.));
++        dialog.finish();
++        assert_eq!(
++            overlay_rectangles(&dialog, &[(overlay, 0)], overlay, 2.),
++            [Bounds::new(
++                point(px(0.), px(0.)),
++                size(px(1000.), px(1000.))
++            )]
++        );
++    }
++
++    #[test]
++    fn observers_hear_a_change_once_and_a_late_one_hears_nothing_stale() {
++        use super::{OverlayBounds, OverlayBoundsObserver};
++        use std::{cell::RefCell, rc::Rc};
++
++        let heard = Rc::new(RefCell::new(Vec::new()));
++        let observer: Rc<OverlayBoundsObserver> = Rc::new({
++            let heard = heard.clone();
++            move |bounds: &[Bounds<crate::Pixels>]| heard.borrow_mut().push(bounds.to_vec())
++        });
++        let menu = Bounds::new(point(px(10.), px(10.)), size(px(100.), px(40.)));
++        let mut state = OverlayBounds::default();
++        // Nothing is known yet, so nothing is told at once.
++        assert_eq!(state.subscribe(&observer), None);
++        assert_eq!(state.live().len(), 1);
++        assert!(state.changed(&[menu]));
++        assert!(!state.changed(&[menu]), "an unchanged frame tells nobody");
++        assert!(state.changed(&[]));
++        // A later observer is told the last frame's at once.
++        let other: Rc<OverlayBoundsObserver> = Rc::new(|_: &[Bounds<crate::Pixels>]| {});
++        assert_eq!(state.subscribe(&other), Some(Vec::new()));
++        assert_eq!(state.live().len(), 2);
++
++        // Observers let go are forgotten, and with them what was measured,
++        // which frames no longer keep up to date.
++        drop(observer);
++        drop(other);
++        assert!(state.live().is_empty());
++        assert!(state.observers.is_empty());
++        let late: Rc<OverlayBoundsObserver> = Rc::new(|_: &[Bounds<crate::Pixels>]| {});
++        assert_eq!(state.subscribe(&late), None);
++        assert!(state.changed(&[]), "the first frame measured is told");
++        let _ = heard;
++    }
++}
+diff --git a/gpui-fast/crates/gpui/src/gpui.rs b/gpui-fast/crates/gpui/src/gpui.rs
+--- a/gpui-fast/crates/gpui/src/gpui.rs
++++ b/gpui-fast/crates/gpui/src/gpui.rs
+@@ -129,7 +129,7 @@ pub use fast::backdrop::{
+ };
+ pub use fast::composition::{
+     ComposedScene, ComposedSceneLayer, CompositionSurfaceId, CompositionSurfaceKind,
+-    PlatformCompositionSurface, PlatformCompositionSurfaceContent, PlatformSurfaceAttachment,
++    OverlayBoundsObserver, PlatformCompositionSurface, PlatformCompositionSurfaceContent, PlatformSurfaceAttachment,
+     WindowComposition, WindowCompositionSurface,
+ };
+ pub use fast::glyph_outline::GlyphOutlineCmd;

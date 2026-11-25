@@ -158,6 +158,7 @@ that stand for them, chosen from the diff against the merge base
 | `src-tauri/` or web code only | the gate (lint, knip, tsc, i18n, notices, the related Vitest tests); rustfmt, clippy `-D warnings` and `cargo test` for the Tauri crates; the bundle budgets and the WebKit benchmark when the bundle's inputs changed. No GPUI stage. |
 | `gpui/` only | GPUI fmt, release build and unit tests, and the e2e below. No WebKit benchmark. |
 | a release path (`RELEASE_PATHS`: release workflows, `src-tauri/tauri*.conf.json`, `Info.plist`, `Entitlements.plist`, the icons, either app's updater, `fetch-pdfium`, the bundle, packaging, signing and release scripts) | everything, as `--full` does, and a trailer that records it (`rust gpui e2e=full webkit`) |
+| only text since a gated commit (below) | the docs-only profile: the build and the tests that read those files, no e2e and no WebKit benchmark, and a `docs from=<gate>` trailer |
 
 The GPUI e2e is the smoke flow (open, build, SyncTeX both ways, edits and ⌘S,
 autosave, a second window, the quit that saves) plus the modules the diff
@@ -166,7 +167,8 @@ in `scripts/ci-local-select.mjs`. A module's own scenario file picks that
 module. What every window is built from runs the whole scenario even where a
 module's `covers` names it: the scenario harness, `gpui/patches/`, the
 manifests, each crate's `main.rs`/`lib.rs` and the app's `app.rs`,
-lattice-ui, lattice-i18n, lattice-core. Any other file picks the modules whose
+the vendored crates under `gpui/compat/` (gpui-fast, which draws every
+window, gpui-pre and libsqlite3-sys), lattice-ui, lattice-i18n, lattice-core. Any other file picks the modules whose
 `covers` name it, else the table's row for it, and a file nothing maps (a
 shared file such as `shell.rs`) runs the whole scenario. Only the whole scenario records this Mac's main baseline for the
 merge base first, in a scratch worktree, when the machine has none (one more
@@ -201,6 +203,31 @@ push to main), and
 `release.yml` and `gpui-package.yml` take no trailer at all.
 `pnpm ci:local --full` runs every stage and the whole e2e.
 
+**Docs-only commits on a gated branch.** When everything since the newest
+commit on HEAD's first-parent line whose trailer names its own tree and
+records its stages (the gate) is text, `ci:local` runs the docs-only
+profile instead of the stages the diff picks. Text is `TEXT_ONLY` in
+`scripts/ci-local-select.mjs` and nothing else: `docs/` (the user guide is
+`docs/guide/`), `gpui/docs/`, top-level Markdown but
+`THIRD_PARTY_NOTICES.md`, the release notes (`.github/release-notes/*.md`,
+`src/release-notes/*.json`) and the i18n catalogs (`src/locales/<lang>/*.json` and `*.po`,
+`gpui/crates/lattice-i18n/locales/<lang>/*.po`). The profile runs the
+headless stages those files alone pick (the tests that read them and the
+gate's checks; the GPUI build and unit tests for a GPUI catalog) and
+`pnpm build`, never the e2e or the WebKit benchmark, and prints
+`CI-local: macos <tree> docs from=<gate sha>`, under `--headless` too since
+nothing in it opens a window. A catalog is compiled into both apps, so its
+build and unit tests run but its e2e does not: a catalog entry that breaks
+only at run time shows up in the nightly full gate below. On that trailer CI takes the
+gate's own trailer for the rest of the branch, so a release-path branch
+keeps its skip only when the gate recorded the full gate, provided the gate
+is an ancestor of HEAD and every file since it is text
+(`resolveCover`). It fails closed: one file since the gate that is not text,
+a gate that is not an ancestor, a gate whose trailer is not for its own
+tree, or a gate that was itself a docs-only pass, and `ci:local` runs the
+stages the diff picks while CI ignores the trailer and runs the macOS jobs.
+Say in the PR body which tree the full gate passed on.
+
 After merging main into a gated branch, `ci:local` re-certifies the merge
 with a quick pass when HEAD is the gated commit plus clean merges of main and
 nothing else, and main changed none of the files the branch changes
@@ -215,6 +242,28 @@ The GPUI e2e, its main baseline and the WebKit benchmark open windows. On a Mac
 someone is using, run `pnpm ci:local --headless`, which skips them and prints
 no trailer, and run `pnpm ci:local` whole on a Mac that may open windows before
 pushing.
+
+### The nightly full gate on main
+
+Branch gates run the smoke flow and the modules their diff picks, so the
+whole scenario runs on main once a night instead:
+`.github/workflows/nightly-e2e.yml`, at 18:37 UTC (02:37 in Taipei), on the
+Mac mini through runner-up's `lattice-mac` pool
+([`release-process.md`](release-process.md)), under the in-app lock (it
+waits up to 90 minutes for crew gates to free it). `scripts/gpui-nightly.mjs
+run` records main with `scripts/gpui-main-baseline.mjs` (the gate, the
+release build and the whole e2e, which also leaves the Mac's main baseline
+for that commit), judges the e2e as gpui.yml judges main (the known failures
+apart, the flaky tier counted, one rerun of a new failure's module, and
+the save on quit checked whatever the steps did) and
+writes `nightly@<sha>.json` beside the baseline. `report` keeps one issue
+labelled `nightly-e2e` in step: opened on the first failure, rewritten every
+night they persist with a comment for each new one, closed on the first
+green night. A run that wrote no record of its own (the lock never came
+free, the disk was under its floor, a crash) counts as a failure. A nightly failure is fixed the next day; a
+step that fails there and is pre-existing joins
+`scripts/gpui-e2e-known-failures.json` as below. `gh workflow run
+nightly-e2e.yml` runs it by hand.
 
 ### A review round's GPUI e2e, and the main baseline
 

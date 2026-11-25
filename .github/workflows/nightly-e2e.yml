@@ -1,0 +1,55 @@
+name: Nightly e2e
+
+# The full gate on main once a night: the gate, the GPUI release build and the
+# whole e2e scenario (scripts/gpui-nightly.mjs, through
+# scripts/gpui-main-baseline.mjs). A branch's gate runs the smoke flow and the
+# e2e modules its diff picks (scripts/ci-local-select.mjs), so this is where
+# the rest of the scenario runs; a failure here is fixed the next day.
+#
+# On the Mac mini through runner-up's lattice-mac pool, as the release jobs
+# (docs/release-process.md), under the in-app lock every windowed run there
+# takes, so no crew gate or hand test drives the screen under it. The
+# repository variable LATTICE_MACOS_RUNNER moves it with the release jobs.
+# Holding runner-up's one place, a release tag pushed meanwhile waits for it.
+#
+# It keeps one issue labelled nightly-e2e in step with what failed: opened on
+# the first failure, rewritten while failures persist with a comment for each
+# new one, closed on the first green night.
+on:
+  schedule:
+    # 18:37 UTC, 02:37 in Taipei: after the day's merges, off the hour.
+    - cron: "37 18 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: nightly-e2e
+  cancel-in-progress: false
+
+jobs:
+  e2e:
+    if: github.repository == 'lattice-writer/lattice' || github.repository == 'leo1oel/lattice'
+    runs-on: ${{ vars.LATTICE_MACOS_RUNNER || 'lattice-mac' }}
+    timeout-minutes: 420
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          # gpui-main-baseline.mjs moves latest.json only to a descendant of
+          # the commit it names, which a shallow clone cannot tell.
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-pnpm
+      # Waits up to 90 minutes for a crew gate or measurement to free the
+      # lock; giving up (exit 75) leaves no record, which the report counts.
+      # Its own timeout leaves the job time for the report.
+      - name: Gate, release build and the whole e2e on main
+        timeout-minutes: 400
+        run: scripts/inapp-lock --thread "nightly-e2e $(git rev-parse --short HEAD)" --wait 5400 -- node scripts/gpui-nightly.mjs run
+      - name: Open, update or close the nightly issue
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/gpui-nightly.mjs report

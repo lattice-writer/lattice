@@ -73,6 +73,7 @@ pub(crate) use build::begin_active as begin_for_test;
 pub use build::{
     abort, build, classify_build_error, clean, current_build, is_running, ActiveBuild,
 };
+pub use shown_pdf::built_pdf_digest;
 
 /// What [`build`] answers for a Typst root document: the native app compiles
 /// those itself (`lattice-typst`), and latexmk cannot.

@@ -57,8 +57,15 @@ const SHELL_CTRL_KEYS: [&str; 26] = [
 /// Ctrl+A, Ctrl+W and Ctrl+K are the shell's own line-editing keys, so the
 /// terminal keeps them, as xterm.js does there.
 pub fn key_bindings() -> Vec<KeyBinding> {
+    // Tab and ⇧Tab stand aside for the shell too (completion, CSI Z), over
+    // the window root's Tab, which walks the window's tab stops and so took
+    // the keyboard out of the terminal (lattice#1272); xterm.js keeps them.
     #[allow(unused_mut)]
-    let mut bindings = vec![KeyBinding::new("ctrl-`", ToggleTerminalPanel, None)];
+    let mut bindings = vec![
+        KeyBinding::new("ctrl-`", ToggleTerminalPanel, None),
+        KeyBinding::new("tab", gpui::NoAction, Some("Terminal")),
+        KeyBinding::new("shift-tab", gpui::NoAction, Some("Terminal")),
+    ];
     #[cfg(target_os = "macos")]
     bindings.extend([
         KeyBinding::new("cmd-f", FindInTerminal, Some("Terminal")),

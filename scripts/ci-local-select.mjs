@@ -31,6 +31,16 @@
  *      can break any module, and the trailer tells GitHub its macOS job
  *      need not run, so it runs everything.
  *
+ * A commit that changes only text on top of a gated commit (TEXT_ONLY: the
+ * documentation, the release notes, the user guide and the i18n catalogs)
+ * takes the docs-only profile instead (docsGate): the build and the tests
+ * that read those files, no e2e and no WebKit benchmark, and a trailer
+ * `CI-local: macos <tree> docs from=<gate>` that stands for whatever the
+ * gate's own trailer stood for (resolveCover), release paths included, as
+ * long as the gate is an ancestor and everything since it is TEXT_ONLY. Any
+ * other file since the gate, a gate without a trailer for its own tree, or a
+ * gate that is itself a docs-only pass, and it does not hold: the full gate.
+ *
  * Release paths (RELEASE_PATHS) always take the full gate, so only a trailer
  * that records it (`rust gpui e2e=full webkit`, written by `pnpm ci:local`
  * for such a diff) stands for their macOS jobs; a tree-only trailer from
@@ -71,10 +81,13 @@ export const E2E_TABLE = [
   [/^gpui\/.*\.md$/, []],
   [/^gpui\/crates\/[^/]+\/(tests|benches)\//, []],
   [/^gpui\/crates\/[^/]+\/src\/(.*\/)?tests?(\.rs$|\/)/, []],
-  [/^gpui\/(parity|compat)\//, []],
+  [/^gpui\/parity\//, []],
   [/^THIRD_PARTY_NOTICES\.md$/, []],
   // What every window is built from.
   [/^gpui\/patches\//, FULL],
+  // The vendored crates under compat/: gpui-fast, the GPUI every window is
+  // drawn with, gpui-pre and libsqlite3-sys. Their notes are read by nothing.
+  [/^gpui\/compat\/(?!.*\.md$)/, FULL],
   [/^gpui\/(Cargo\.(toml|lock)|rust-toolchain\.toml|\.cargo\/)/, FULL],
   [/^gpui\/crates\/[^/]+\/(Cargo\.toml|build\.rs|src\/(main|lib)\.rs)$/, FULL],
   [/^gpui\/crates\/lattice-gpui\/src\/app\.rs$/, FULL],
@@ -136,8 +149,13 @@ export function macosNeeds(tier, files) {
   };
 }
 
-/** The trailer for a pass that ran these groups: `CI-local: macos <tree> rust gpui e2e=… webkit [regate=<sha>]`. */
+/**
+ * The trailer for a pass that ran these groups: `CI-local: macos <tree> rust
+ * gpui e2e=… webkit [regate=<sha>]`, or for a docs-only pass on top of a
+ * gate `CI-local: macos <tree> docs from=<gate sha>`.
+ */
 export function formatTrailer(tree, cover) {
+  if (cover.docs) return `CI-local: macos ${tree} docs from=${cover.from}`;
   const e2e = cover.e2e === FULL ? "e2e=full" : cover.e2e ? `e2e=${["smoke", ...cover.e2e].join("+")}` : null;
   const tokens = [cover.rust && "rust", cover.gpui && "gpui", cover.gpui && e2e, cover.webkit && "webkit", cover.regate && `regate=${cover.regate}`].filter(Boolean);
   return `CI-local: macos ${tree}${tokens.length ? ` ${tokens.join(" ")}` : ""}`;
@@ -154,10 +172,11 @@ export function parseTrailer(message) {
   if (!lines.length) return null;
   const [line, tree, rest] = lines.at(-1);
   const tokens = rest.trim().split(/\s+/).filter(Boolean);
-  if (!tokens.length) return { line, tree, rust: true, gpui: true, e2e: FULL, webkit: true, regate: null, legacy: true };
-  const cover = { line, tree, rust: false, gpui: false, e2e: null, webkit: false, regate: null, legacy: false };
+  if (!tokens.length) return { line, tree, rust: true, gpui: true, e2e: FULL, webkit: true, regate: null, legacy: true, docs: false, from: null };
+  const cover = { line, tree, rust: false, gpui: false, e2e: null, webkit: false, regate: null, legacy: false, docs: false, from: null };
   for (const token of tokens) {
-    if (token === "rust" || token === "gpui" || token === "webkit") cover[token] = true;
+    if (token === "rust" || token === "gpui" || token === "webkit" || token === "docs") cover[token] = true;
+    else if (token.startsWith("from=")) cover.from = token.slice(5);
     else if (token === "e2e=full") cover.e2e = FULL;
     else if (token.startsWith("e2e=")) cover.e2e = token.slice(4).split("+").filter((module) => module && module !== "smoke");
     else if (token.startsWith("regate=")) cover.regate = token.slice(7);
@@ -251,4 +270,74 @@ export function mainMergeRegate({ base = "origin/main", cwd = process.cwd(), max
     commit = first;
   }
   return { ok: false, reason: `no passing gate within ${maxMerges} merges of HEAD` };
+}
+
+/**
+ * What a docs-only pass may change on top of a gated commit: the
+ * documentation (docs/, the user guide under docs/guide/, gpui/docs/,
+ * top-level Markdown but THIRD_PARTY_NOTICES.md), the release notes
+ * (.github/release-notes/*.md, src/release-notes/*.json) and the i18n
+ * catalogs (src/locales/<lang>/*, lattice-i18n's locales/<lang>/*.po). A
+ * path not named here is not text, so a docs-only pass fails closed.
+ */
+export const TEXT_ONLY = /^(docs\/.+|gpui\/docs\/.+|\.github\/release-notes\/[^/]+\.md|src\/release-notes\/[^/]+\.json|src\/locales\/[^/]+\/[^/]+\.(json|po)|gpui\/crates\/lattice-i18n\/locales\/[^/]+\/[^/]+\.po|(?!THIRD_PARTY_NOTICES\.md$)[^/]+\.md)$/;
+
+const isGate = (cover, tree) => Boolean(cover && !cover.docs && !cover.legacy && tree.startsWith(cover.tree));
+
+/**
+ * The newest commit on HEAD's first-parent line whose CI-local trailer names
+ * its own tree and records its stages (not a docs-only pass, not a bare
+ * tree), or null.
+ */
+export function findGate({ cwd = process.cwd(), maxCommits = 50 } = {}) {
+  const git = gitIn(cwd);
+  for (const sha of git("rev-list", "--first-parent", `--max-count=${maxCommits}`, "HEAD").split("\n").filter(Boolean)) {
+    if (isGate(parseTrailer(git("log", "-1", "--format=%B", sha)), git("rev-parse", `${sha}^{tree}`))) return sha;
+  }
+  return null;
+}
+
+/**
+ * Whether a docs-only pass may stand on `gate`: it is a commit and an
+ * ancestor of `to`, its trailer names its own tree and records its stages,
+ * and every file changed since it (in the working tree and untracked ones
+ * too with `worktree`) is TEXT_ONLY. Returns `{ ok: true, gate, cover,
+ * files }` with the gate's cover and the text files, or `{ ok: false,
+ * reason }`.
+ */
+export function docsGate(gate, { cwd = process.cwd(), to = "HEAD", worktree = false } = {}) {
+  const git = gitIn(cwd);
+  let sha;
+  try {
+    sha = git("rev-parse", "--verify", "--quiet", `${gate}^{commit}`);
+  } catch {
+    return { ok: false, reason: `the gate ${gate} is not a commit in this checkout` };
+  }
+  try {
+    git("merge-base", "--is-ancestor", sha, to);
+  } catch {
+    return { ok: false, reason: `the gate ${sha.slice(0, 9)} is not an ancestor of ${to}` };
+  }
+  const cover = parseTrailer(git("log", "-1", "--format=%B", sha));
+  if (!isGate(cover, git("rev-parse", `${sha}^{tree}`))) return { ok: false, reason: `${sha.slice(0, 9)} carries no CI-local trailer that names its own tree and records its stages` };
+  const list = (...args) => git("-c", "core.quotePath=false", ...args).split("\n").filter(Boolean);
+  const files = worktree ? [...new Set([...list("diff", "--no-renames", "--name-only", sha), ...list("ls-files", "--others", "--exclude-standard")])] : list("diff", "--no-renames", "--name-only", sha, to);
+  const other = files.filter((file) => !TEXT_ONLY.test(file));
+  if (other.length) return { ok: false, reason: `${other.length} file(s) since the gate at ${sha.slice(0, 9)} are not docs, release notes, the user guide or i18n strings (${other.slice(0, 3).join(", ")})` };
+  return { ok: true, gate: sha, cover, files };
+}
+
+/**
+ * The cover a head commit's trailer stands for. An ordinary trailer stands
+ * for itself. A docs-only one (`docs from=<gate>`) stands for its gate's
+ * cover when docsGate holds for it, and `docsFiles` lists the text files
+ * the docs-only pass checked, which the gate's cover need not cover; when
+ * it does not hold the cover is null, with the reason.
+ */
+export function resolveCover(cover, { cwd = process.cwd() } = {}) {
+  if (!cover?.docs) return { cover, docsFiles: [], reason: null };
+  if (!cover.from) return { cover: null, docsFiles: [], reason: "the docs-only trailer names no gate (from=)" };
+  const check = docsGate(cover.from, { cwd });
+  if (!check.ok) return { cover: null, docsFiles: [], reason: check.reason };
+  return { cover: { ...check.cover, line: cover.line, tree: cover.tree, docs: false, from: check.gate }, docsFiles: check.files, reason: null };
 }

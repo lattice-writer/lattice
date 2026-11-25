@@ -97,13 +97,13 @@ export function settle(verdict, rerun) {
   return { ...settled, ok: passes(settled) };
 }
 
-function rerun(app, fixture, modules) {
+export function rerun(app, fixture, modules, env = process.env) {
   const dir = mkdtempSync(path.join(tmpdir(), "gpui-e2e-rerun-"));
   const project = path.join(dir, "e2e-project");
   const out = path.join(dir, "rerun.json");
   cpSync(fixture, project, { recursive: true });
   console.log(`gpui-e2e-verdict: rerunning ${modules.join(", ")} once`);
-  spawnSync(app, [project, "--scenario", "e2e", "--only", modules.join(","), "--out", out], { stdio: "inherit", timeout: 15 * 60_000 });
+  spawnSync(app, [project, "--scenario", "e2e", "--only", modules.join(","), "--out", out], { stdio: "inherit", env, timeout: 15 * 60_000 });
   try {
     return JSON.parse(readFileSync(out, "utf8"));
   } catch {

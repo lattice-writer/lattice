@@ -463,18 +463,18 @@ impl PdfView {
         self.document.is_none() && !self.loading && self.message.is_none()
     }
 
-    /// Whether this viewer shows `path`: with `digest`, those very bytes,
-    /// loaded; without, any copy of it, loaded or loading.
-    pub fn holds(&self, path: &Path, digest: Option<&str>) -> bool {
+    /// Whether this viewer shows `path` with those very bytes (their
+    /// SHA-256 `digest`), loaded.
+    pub fn holds(&self, path: &Path, digest: &str) -> bool {
         self.source.as_deref() == Some(path)
-            && match digest {
-                Some(digest) => {
-                    self.document.is_some()
-                        && !self.loading
-                        && self.shown_digest.as_deref() == Some(digest)
-                }
-                None => self.document.is_some() || self.loading,
-            }
+            && self.document.is_some()
+            && !self.loading
+            && self.shown_digest.as_deref() == Some(digest)
+    }
+
+    /// Whether this viewer is reading `path` from disk now.
+    pub fn loading(&self, path: &Path) -> bool {
+        self.source.as_deref() == Some(path) && self.loading
     }
 
     /// Show nothing, for a project without a built PDF.

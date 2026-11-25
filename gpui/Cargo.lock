@@ -5211,6 +5211,7 @@ dependencies = [
  "objc2 0.6.3",
  "objc2-app-kit 0.3.2",
  "objc2-foundation 0.3.2",
+ "windows 0.61.3",
  "x11",
 ]
 
@@ -7200,7 +7201,7 @@ dependencies = [
 
 [[package]]
 name = "lattice-core"
-version = "0.19.4"
+version = "0.20.0"
 dependencies = [
  "anydoc",
  "axum",

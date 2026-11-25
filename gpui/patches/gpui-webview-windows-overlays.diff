@@ -1,0 +1,444 @@
+diff --git a/gpui-webview/Cargo.toml b/gpui-webview/Cargo.toml
+--- a/gpui-webview/Cargo.toml
++++ b/gpui-webview/Cargo.toml
+@@ -69,6 +69,13 @@ version = "0.18"
+ version = "2.21"
+ features = ["xlib"]
+ 
++[target.'cfg(target_os = "windows")'.dependencies.windows]
++version = "0.61"
++features = [
++    "Win32_Foundation",
++    "Win32_Graphics_Gdi",
++]
++
+ [target.'cfg(target_os = "macos")'.dependencies.objc2]
+ version = "0.6"
+ optional = true
+diff --git a/gpui-webview/src/lib.rs b/gpui-webview/src/lib.rs
+--- a/gpui-webview/src/lib.rs
++++ b/gpui-webview/src/lib.rs
+@@ -6,6 +6,10 @@ mod composition;
+ mod linux;
+ #[cfg(target_os = "macos")]
+ mod macos;
++#[cfg(any(test, all(feature = "gpui-fast", target_os = "windows")))]
++mod region;
++#[cfg(all(feature = "gpui-fast", target_os = "windows"))]
++mod win32;
+ 
+ #[cfg(all(feature = "gpui-fast", target_os = "macos"))]
+ use composition::NativeWebViewSurface;
+@@ -75,11 +79,14 @@ pub struct WebView {
+     scale_factor: Cell<f32>,
+     /// The window's interface zoom the page zoom was last matched to: the
+     /// page is zoomed with the interface, as GPUI's own pixels are.
+-    #[cfg(all(feature = "gpui-fast", target_os = "macos"))]
++    #[cfg(all(feature = "gpui-fast", any(target_os = "macos", target_os = "windows")))]
+     interface_zoom: Cell<f64>,
+     /// The window-relative origin that page clicks are forwarded to GPUI from.
+     #[cfg(target_os = "linux")]
+     origin: Rc<Cell<gpui::Point<Pixels>>>,
++    /// The child window's cutouts for GPUI's overlays and the element's clip.
++    #[cfg(all(feature = "gpui-fast", target_os = "windows"))]
++    cutouts: win32::OverlayCutouts,
+ }
+ 
+ impl Drop for WebView {
+@@ -111,7 +118,12 @@ impl WebView {
+         linux::forward_mouse_down(&webview, origin.clone(), window, cx);
+         #[cfg(target_os = "linux")]
+         linux::match_scale_factor(&webview, window.scale_factor(), 1.0);
+-        #[cfg(not(any(all(feature = "gpui-fast", target_os = "macos"), target_os = "linux")))]
++        #[cfg(all(feature = "gpui-fast", target_os = "windows"))]
++        let cutouts = win32::OverlayCutouts::new(&webview, window);
++        #[cfg(not(any(
++            all(feature = "gpui-fast", any(target_os = "macos", target_os = "windows")),
++            target_os = "linux"
++        )))]
+         let _ = window;
+ 
+         Self {
+@@ -127,10 +139,12 @@ impl WebView {
+             composition: None,
+             #[cfg(target_os = "linux")]
+             scale_factor: Cell::new(window.scale_factor()),
+-            #[cfg(all(feature = "gpui-fast", target_os = "macos"))]
++            #[cfg(all(feature = "gpui-fast", any(target_os = "macos", target_os = "windows")))]
+             interface_zoom: Cell::new(1.0),
+             #[cfg(target_os = "linux")]
+             origin,
++            #[cfg(all(feature = "gpui-fast", target_os = "windows"))]
++            cutouts,
+         }
+     }
+ 
+@@ -211,7 +225,9 @@ impl WebView {
+         }
+         #[cfg(target_os = "linux")]
+         let rect = linux::device_bounds(document, self.scale_factor.get());
+-        #[cfg(not(target_os = "linux"))]
++        #[cfg(all(feature = "gpui-fast", target_os = "windows"))]
++        let rect = self.cutouts.device_rect(document);
++        #[cfg(not(any(target_os = "linux", all(feature = "gpui-fast", target_os = "windows"))))]
+         let rect = Rect {
+             position: wry::dpi::LogicalPosition::new(
+                 f64::from(document.origin.x),
+@@ -225,6 +241,8 @@ impl WebView {
+             .into(),
+         };
+         self.set_bounds(rect)?;
++        #[cfg(all(feature = "gpui-fast", target_os = "windows"))]
++        self.cutouts.set_geometry(document, visible);
+         self.set_native_visible(true)?;
+         Ok(())
+     }
+@@ -357,9 +375,12 @@ impl WebView {
+         // GTK's integer one, so the page zoom is applied on top of it.
+         #[cfg(target_os = "linux")]
+         linux::match_scale_factor(&self.webview, self.scale_factor.get(), zoom);
+-        #[cfg(all(feature = "gpui-fast", target_os = "macos"))]
++        #[cfg(all(feature = "gpui-fast", any(target_os = "macos", target_os = "windows")))]
+         self.webview.zoom(zoom * self.interface_zoom.get())?;
+-        #[cfg(not(any(target_os = "linux", all(feature = "gpui-fast", target_os = "macos"))))]
++        #[cfg(not(any(
++            target_os = "linux",
++            all(feature = "gpui-fast", any(target_os = "macos", target_os = "windows"))
++        )))]
+         self.webview.zoom(zoom)?;
+         Ok(())
+     }
+@@ -511,6 +532,19 @@ impl Element for WebViewElement {
+         }
+         #[cfg(target_os = "linux")]
+         parent.origin.set(bounds.origin);
++        // The page is zoomed with the interface, as on macOS: its child window
++        // is sized in GPUI's device pixels, the interface zoom included.
++        #[cfg(all(feature = "gpui-fast", target_os = "windows"))]
++        {
++            let zoom = f64::from(window.interface_zoom());
++            if parent.interface_zoom.replace(zoom) != zoom {
++                let _ = parent.webview.zoom(parent.zoom.get() * zoom);
++            }
++        }
++        // GPUI's device pixels, the interface zoom included, which the child
++        // window is placed in and its cutouts are measured in.
++        #[cfg(all(feature = "gpui-fast", target_os = "windows"))]
++        parent.cutouts.set_scale_factor(window.scale_factor());
+         let clip = window.content_mask().bounds;
+         if let Err(error) = parent.set_geometry(bounds, clip) {
+             if !parent.geometry_failed.replace(true) {
+diff --git a/gpui-webview/src/region.rs b/gpui-webview/src/region.rs
+new file mode 100644
+--- /dev/null
++++ b/gpui-webview/src/region.rs
+@@ -0,0 +1,136 @@
++//! The region a WebView2's child window keeps (`win32.rs`), as plain
++//! arithmetic so every platform's tests check it: the child window's size,
++//! and the rectangles cut out of it, in its device pixels.
++
++use gpui::{Bounds, Pixels};
++
++/// A region: the child window's width and height, and the rectangles
++/// (left, top, right, bottom) cut out of it.
++pub(crate) type Region = ([i32; 2], Vec<[i32; 4]>);
++
++/// The region for a page placed at `document` of which its element shows
++/// `visible`, under `overlays`, all in window space, at `scale` device
++/// pixels to a GPUI pixel; none when nothing is cut away, so the window
++/// keeps no region at all.
++///
++/// An overlay's hole rounds outward, so nothing of the page shows at its
++/// edge; the bands outside the element's clip round inward, the same way,
++/// so the page shows nowhere past the clip.
++pub(crate) fn region(
++    document: Bounds<Pixels>,
++    visible: Bounds<Pixels>,
++    overlays: &[Bounds<Pixels>],
++    scale: f32,
++) -> Option<Region> {
++    let local = |value: Pixels, origin: Pixels| (f32::from(value) - f32::from(origin)) * scale;
++    let outward = |bounds: Bounds<Pixels>| {
++        [
++            local(bounds.left(), document.left()).floor() as i32,
++            local(bounds.top(), document.top()).floor() as i32,
++            local(bounds.right(), document.left()).ceil() as i32,
++            local(bounds.bottom(), document.top()).ceil() as i32,
++        ]
++    };
++    let size = [
++        (f32::from(document.size.width) * scale).round() as i32,
++        (f32::from(document.size.height) * scale).round() as i32,
++    ];
++    let [width, height] = size;
++    let mut cut = Vec::new();
++    if visible != document {
++        let shown_left = local(visible.left(), document.left()).ceil() as i32;
++        let shown_top = local(visible.top(), document.top()).ceil() as i32;
++        let shown_right = local(visible.right(), document.left()).floor() as i32;
++        let shown_bottom = local(visible.bottom(), document.top()).floor() as i32;
++        cut.extend([
++            [0, 0, width, shown_top],
++            [0, shown_bottom, width, height],
++            [0, shown_top, shown_left, shown_bottom],
++            [shown_right, shown_top, width, shown_bottom],
++        ]);
++    }
++    cut.extend(
++        overlays
++            .iter()
++            .map(|overlay| overlay.intersect(&visible))
++            .filter(|overlay| !overlay.is_empty())
++            .map(outward),
++    );
++    cut.retain(|[left, top, right, bottom]| left < right && top < bottom);
++    (!cut.is_empty()).then_some((size, cut))
++}
++
++#[cfg(test)]
++mod tests {
++    use super::region;
++    use gpui::{Bounds, point, px, size};
++
++    fn bounds(x: f32, y: f32, width: f32, height: f32) -> Bounds<gpui::Pixels> {
++        Bounds::new(point(px(x), px(y)), size(px(width), px(height)))
++    }
++
++    #[test]
++    fn a_page_with_nothing_over_it_keeps_no_region() {
++        let page = bounds(100., 50., 400., 300.);
++        assert_eq!(region(page, page, &[], 2.), None);
++        // An overlay elsewhere in the window cuts nothing.
++        assert_eq!(region(page, page, &[bounds(0., 0., 90., 40.)], 2.), None);
++    }
++
++    #[test]
++    fn an_overlay_cuts_its_hole_rounded_outward_in_the_pages_device_pixels() {
++        let page = bounds(100., 50., 400., 300.);
++        let menu = bounds(150.3, 60.6, 100., 50.);
++        assert_eq!(
++            region(page, page, &[menu], 1.5),
++            Some(([600, 450], vec![[75, 15, 226, 91]]))
++        );
++        // Only the part over the page.
++        let edge = bounds(450., 300., 100., 100.);
++        assert_eq!(
++            region(page, page, &[edge], 1.),
++            Some(([400, 300], vec![[350, 250, 400, 300]]))
++        );
++    }
++
++    #[test]
++    fn the_bands_outside_the_elements_clip_round_inward() {
++        let page = bounds(0., 0., 100., 100.);
++        let shown = bounds(10.4, 20.4, 50., 50.);
++        assert_eq!(
++            region(page, shown, &[], 1.),
++            Some((
++                [100, 100],
++                vec![
++                    [0, 0, 100, 21],
++                    [0, 70, 100, 100],
++                    [0, 21, 11, 70],
++                    [60, 21, 100, 70],
++                ]
++            ))
++        );
++    }
++
++    #[test]
++    fn a_resized_page_under_the_same_holes_needs_a_new_region() {
++        let menu = bounds(20., 20., 40., 40.);
++        let before = region(
++            bounds(0., 0., 200., 200.),
++            bounds(0., 0., 200., 200.),
++            &[menu],
++            2.,
++        );
++        let after = region(
++            bounds(0., 0., 300., 260.),
++            bounds(0., 0., 300., 260.),
++            &[menu],
++            2.,
++        );
++        assert_eq!(
++            before.as_ref().map(|(_, cut)| cut),
++            after.as_ref().map(|(_, cut)| cut)
++        );
++        assert_ne!(before, after);
++        assert_eq!(after.map(|(size, _)| size), Some([600, 520]));
++    }
++}
+diff --git a/gpui-webview/src/win32.rs b/gpui-webview/src/win32.rs
+new file mode 100644
+--- /dev/null
++++ b/gpui-webview/src/win32.rs
+@@ -0,0 +1,168 @@
++//! Keeping GPUI's overlays above a WebView2 on Windows.
++//!
++//! Wry hosts a WebView2 in a child window of its own, which sits above
++//! everything GPUI presents into the window: gpui-fast's DirectComposition
++//! tree can order only a visual, and wry creates no composition controller
++//! to give it one. The frame under the child window holds GPUI's overlays
++//! already, though, so the child window is cut away, with a window region,
++//! wherever the window's overlays are drawn
++//! ([`gpui::Window::observe_overlay_bounds`]) and outside the clip of the
++//! element showing it, so menus, popovers, dialogs and tooltips show above
++//! the page, and presses on them reach GPUI, as with composition on macOS.
++
++use std::{cell::RefCell, rc::Rc};
++
++use gpui::{Bounds, OverlayBoundsObserver, Pixels, Window};
++
++use crate::region;
++use windows::Win32::{
++    Foundation::HWND,
++    Graphics::Gdi::{
++        CombineRgn, CreateRectRgn, DeleteObject, HRGN, RGN_DIFF, RGN_ERROR, SetWindowRgn,
++    },
++};
++use wry::WebViewExtWindows as _;
++
++/// The child window's region, kept to the visible part of the page minus
++/// the window's overlays.
++pub(crate) struct OverlayCutouts {
++    state: Rc<RefCell<Cutouts>>,
++    _observer: Rc<OverlayBoundsObserver>,
++}
++
++#[derive(Default)]
++struct Cutouts {
++    hwnd: Option<HWND>,
++    /// The page's bounds, where the child window is placed, and the part of
++    /// them its element shows, in window space.
++    document: Bounds<Pixels>,
++    visible: Bounds<Pixels>,
++    scale_factor: f32,
++    overlays: Vec<Bounds<Pixels>>,
++    /// The child window's size and the rectangles last cut away from it, in
++    /// its pixels: none means the region was cleared.
++    applied: Option<region::Region>,
++}
++
++impl OverlayCutouts {
++    pub(crate) fn new(webview: &wry::WebView, window: &Window) -> Self {
++        let mut hwnd = HWND::default();
++        // SAFETY: the controller is alive as long as `webview` is.
++        let hwnd = unsafe { webview.controller().ParentWindow(&mut hwnd) }
++            .ok()
++            .map(|()| hwnd)
++            .filter(|hwnd| !hwnd.is_invalid());
++        if hwnd.is_none() {
++            log::warn!("WebView2's child window is unknown: GPUI's overlays stay under the page");
++        }
++        let state = Rc::new(RefCell::new(Cutouts {
++            hwnd,
++            scale_factor: window.scale_factor(),
++            ..Default::default()
++        }));
++        let observer: Rc<OverlayBoundsObserver> = Rc::new({
++            let state = state.clone();
++            move |overlays: &[Bounds<Pixels>]| {
++                let mut state = state.borrow_mut();
++                state.overlays = overlays.to_vec();
++                state.apply();
++            }
++        });
++        window.observe_overlay_bounds(&observer);
++        Self {
++            state,
++            _observer: observer,
++        }
++    }
++
++    /// Note the window's scale factor, the interface zoom included.
++    pub(crate) fn set_scale_factor(&self, scale_factor: f32) {
++        self.state.borrow_mut().scale_factor = scale_factor;
++    }
++
++    /// Where to place the child window for `document`: in GPUI's device
++    /// pixels, so it covers its element at any interface zoom, as GPUI draws
++    /// the overlays cut out of it. Wry's logical pixels would leave out the
++    /// zoom.
++    pub(crate) fn device_rect(&self, document: Bounds<Pixels>) -> wry::Rect {
++        let scale = f64::from(self.state.borrow().scale_factor);
++        let device = |value: Pixels| (f64::from(value) * scale).round();
++        wry::Rect {
++            position: wry::dpi::PhysicalPosition::new(
++                device(document.origin.x),
++                device(document.origin.y),
++            )
++            .into(),
++            size: wry::dpi::PhysicalSize::new(
++                device(document.size.width),
++                device(document.size.height),
++            )
++            .into(),
++        }
++    }
++
++    /// Note where the page is placed and the part of it shown.
++    pub(crate) fn set_geometry(&self, document: Bounds<Pixels>, visible: Bounds<Pixels>) {
++        let mut state = self.state.borrow_mut();
++        state.document = document;
++        state.visible = visible;
++        state.apply();
++    }
++}
++
++impl Cutouts {
++    fn apply(&mut self) {
++        let Some(hwnd) = self.hwnd else {
++            return;
++        };
++        let cut = region::region(
++            self.document,
++            self.visible,
++            &self.overlays,
++            self.scale_factor,
++        );
++        if cut == self.applied {
++            return;
++        }
++        // SAFETY: `hwnd` is the WebView2's child window, alive as long as
++        // the webview; the system owns a region once it is set on a window,
++        // and every other region made here is deleted.
++        unsafe {
++            let region = match &cut {
++                None => HRGN::default(),
++                Some(([width, height], cut)) => {
++                    let region = CreateRectRgn(0, 0, *width, *height);
++                    let mut made = !region.is_invalid();
++                    for &[left, top, right, bottom] in cut {
++                        if !made {
++                            break;
++                        }
++                        let hole = CreateRectRgn(left, top, right, bottom);
++                        made = !hole.is_invalid()
++                            && CombineRgn(Some(region), Some(region), Some(hole), RGN_DIFF)
++                                != RGN_ERROR;
++                        if !hole.is_invalid() {
++                            let _ = DeleteObject(hole.into());
++                        }
++                    }
++                    if !made {
++                        log::warn!("making the WebView2's region for GPUI's overlays failed");
++                        if !region.is_invalid() {
++                            let _ = DeleteObject(region.into());
++                        }
++                        return;
++                    }
++                    region
++                }
++            };
++            if SetWindowRgn(hwnd, Some(region), true) == 0 {
++                log::warn!("cutting GPUI's overlays out of the WebView2 failed");
++                if !region.is_invalid() {
++                    let _ = DeleteObject(region.into());
++                }
++                return;
++            }
++        }
++        self.applied = cut;
++    }
++}

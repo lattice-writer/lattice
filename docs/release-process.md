@@ -408,7 +408,9 @@ Changing the Synara pin or preparation script creates a new cache key; the first
 Apple silicon (which `release.yml` calls as **gpui**) run on the Mac mini, through
 [runner-up](https://github.com/kunchenguid/runner-up), instead of waiting in
 GitHub's macOS queue. They ask for `runs-on: lattice-mac`, runner-up's pool
-label. **publish** stays on `ubuntu-latest`: it only edits the draft. The
+label. So does `nightly-e2e.yml`, the nightly full gate on main
+(`docs/agent-validation.md`), which the same variable moves;
+with one place, a tag pushed while it runs waits for it to finish. **publish** stays on `ubuntu-latest`: it only edits the draft. The
 Intel (including `gpui-package.yml` with `arch: x86_64`), Windows and Linux
 workflows still run on GitHub.
 

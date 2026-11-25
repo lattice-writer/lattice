@@ -201,9 +201,14 @@ impl Shell {
             } else {
                 None
             };
+            // The build runs either way; its running state shows only while
+            // its project is still the one in the window, never over the
+            // project switched to during the check.
             if request.entry && current.is_none() {
                 let shown = this.update(cx, |this, cx| {
-                    this.show_build_running(request.quiet, &root, &label, cx)
+                    if this.project.as_ref() == Some(&project) {
+                        this.show_build_running(request.quiet, &root, &label, cx);
+                    }
                 });
                 if shown.is_err() {
                     return;
@@ -221,6 +226,7 @@ impl Shell {
                 let root = root.clone();
                 async move {
                     if let Some(result) = current {
+                        let pdf_digest = latex::built_pdf_digest(&root, &result.root_document);
                         let sources = read_sources(
                             &root,
                             &result.diagnostics,
@@ -231,7 +237,7 @@ impl Shell {
                         return Ok(Finished {
                             result,
                             rewritten: false,
-                            pdf_digest: None,
+                            pdf_digest,
                             current: true,
                             sources,
                             live,
@@ -513,9 +519,12 @@ impl Shell {
                     // The PDF in its own window loads again, as before.
                     let panel = self.pdf.read(cx);
                     let view = (!panel.in_window()).then(|| panel.live_view().read(cx));
-                    let shown = match (view, current_build, pdf_digest.as_deref()) {
-                        (Some(view), true, _) => view.holds(&pdf, None),
-                        (Some(view), false, Some(digest)) => view.holds(&pdf, Some(digest)),
+                    // On entry, the PDF the viewer started loading then is
+                    // the build's too: the check found it unreplaced.
+                    let shown = match (view, pdf_digest.as_deref()) {
+                        (Some(view), Some(digest)) => {
+                            view.holds(&pdf, digest) || (current_build && view.loading(&pdf))
+                        }
                         _ => false,
                     };
                     // The PDF the viewer loads now holds the files as of the

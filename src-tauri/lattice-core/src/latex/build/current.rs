@@ -26,16 +26,18 @@ use crate::latex::BuildResult;
 use crate::project;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::{Instant, UNIX_EPOCH};
+use std::time::UNIX_EPOCH;
 
 /// The result of building `root` now, when its last build of the document a
 /// build would compile succeeded and nothing that build read changed since:
-/// that build's messages, its PDF and SyncTeX map, marked `unchanged`.
-/// Nothing is typeset or written. `None` when a build has to run to know.
+/// that build's messages, its PDF and SyncTeX map, marked `unchanged`, with
+/// no time spent compiling (`duration_ms` 0). Nothing is typeset; choosing
+/// the document may record the compile root in the manifest, as the start
+/// of any build does (`choose_document`). `None` when a build has to run
+/// to know.
 pub fn current_build(
     root: &Path, open_document: Option<&str>, layout: AuxFiles,
 ) -> Option<BuildResult> {
-    let started = Instant::now();
     if project::has_latexmkrc(root) {
         return None;
     }
@@ -86,7 +88,7 @@ pub fn current_build(
         success: true,
         has_pdf: true,
         log: trim_log(&tex_log),
-        duration_ms: started.elapsed().as_millis(),
+        duration_ms: 0,
         diagnostics,
         outputs: arxiv::written_by_build(root, &document),
         aux_folder: aux_files::relative_folder(&document, layout),
@@ -331,11 +333,25 @@ mod tests {
         assert!(current_build(&root, None, AuxFiles::Beside).is_none());
     }
 
+    /// Whether this machine can build: the tests that run latexmk return
+    /// early where it cannot, instead of being ignored, so they run in every
+    /// test run where TeX is installed (the GPUI macOS job, the local gate).
+    /// Not on Windows yet: under MiKTeX the entry check still declines a
+    /// build that succeeded (the preamble format remade, a pdflatex result
+    /// recorded as failed), which #1277 tracks.
+    fn tex() -> bool {
+        !cfg!(windows)
+            && crate::commands::available("latexmk")
+            && crate::commands::available("pdflatex")
+    }
+
     /// lattice-core's own build, then the entry: current until a source
     /// changes, and again after the next build.
     #[test]
-    #[ignore = "requires latexmk and a working pdfLaTeX installation"]
     fn a_built_project_is_current_until_a_source_changes() {
+        if !tex() {
+            return;
+        }
         for layout in [AuxFiles::Beside, AuxFiles::Hidden] {
             let root = sources();
             project::write_manifest(&root, &project::default_manifest("paper")).unwrap();
@@ -351,6 +367,13 @@ mod tests {
             assert_eq!(current.root_document, built.root_document);
             assert_eq!(current.aux_folder, built.aux_folder);
             assert_eq!(current.pages, Some(1));
+            assert_eq!(current.duration_ms, 0);
+            // The digest a viewer of these bytes shows.
+            let bytes = fs::read(root.join("main.pdf")).unwrap();
+            assert_eq!(
+                crate::latex::built_pdf_digest(&root, &current.root_document),
+                Some(crate::review_pdf::digest(&bytes))
+            );
 
             root.write("ch.tex", "A chapter, edited.\n");
             assert!(current_build(&root, None, layout).is_none());
@@ -365,8 +388,10 @@ mod tests {
     /// A package the preamble format holds is read by the format alone, so
     /// latexmk's record never lists it: the format's own record does.
     #[test]
-    #[ignore = "requires latexmk and a working pdfLaTeX installation"]
     fn a_package_in_the_preamble_format_changed_is_not_current() {
+        if !tex() {
+            return;
+        }
         let root = TempDir::new("current-build-format");
         project::write_manifest(&root, &project::default_manifest("paper")).unwrap();
         root.write(
