@@ -425,6 +425,9 @@ pub enum JobSource {
 pub struct PageJob {
     pub width_px: u32,
     pub height_px: u32,
+    /// Where the pixmap's top-left sits on the page, in device pixels: a
+    /// part of a page drawn at full size over its capped image.
+    pub origin: (u32, u32),
     /// Device pixels per sp.
     pub k: f64,
     pub source: JobSource,
@@ -484,7 +487,15 @@ fn row_bands(rows: &[OverlayRow]) -> Vec<[f64; 4]> {
 /// through.
 pub fn compose(job: PageJob) -> Option<Pixmap> {
     let mut pixmap = Pixmap::new(job.width_px.max(1), job.height_px.max(1))?;
-    let base = Mat::scale(job.k);
+    let base = Mat([
+        1.,
+        0.,
+        0.,
+        1.,
+        -f64::from(job.origin.0),
+        -f64::from(job.origin.1),
+    ])
+    .mul(Mat::scale(job.k));
     let hidden: HashSet<usize> = job
         .overlays
         .iter()
@@ -680,6 +691,7 @@ mod tests {
             overlays: Vec::new(),
             fonts: FontStore::default(),
             images: ImageStore::default(),
+            origin: (0, 0),
         })
         .unwrap();
         let at = |x: u32, y: u32| pixmap.pixel(x, y).unwrap();
@@ -739,6 +751,7 @@ mod tests {
             overlays: Vec::new(),
             fonts: FontStore::default(),
             images: ImageStore::default(),
+            origin: (0, 0),
         };
         assert!(compose(job).is_none());
     }
@@ -771,6 +784,7 @@ mod tests {
             )],
             fonts: FontStore::default(),
             images: ImageStore::default(),
+            origin: (0, 0),
         })
         .unwrap();
         let at = |x: u32, y: u32| pixmap.pixel(x, y).unwrap();
@@ -784,6 +798,31 @@ mod tests {
         let bgra = to_bgra(&pixmap, false);
         let ix = (57 * 100 + 20) * 4;
         assert_eq!(&bgra[ix..ix + 4], &[0, 0, 255, 255]);
+    }
+
+    #[test]
+    fn a_part_of_a_page_is_the_same_pixels_as_the_whole_page_there() {
+        let job = |width_px, height_px, origin| PageJob {
+            width_px,
+            height_px,
+            k: 2. / PT,
+            source: JobSource::DisplayList(Arc::new(page_with_rule())),
+            overlays: Vec::new(),
+            fonts: FontStore::default(),
+            images: ImageStore::default(),
+            origin,
+        };
+        let whole = compose(job(200, 200, (0, 0))).unwrap();
+        let part = compose(job(60, 30, (25, 21))).unwrap();
+        assert_eq!((part.width(), part.height()), (60, 30));
+        for y in 0..30 {
+            for x in 0..60 {
+                assert_eq!(part.pixel(x, y), whole.pixel(x + 25, y + 21), "at {x}, {y}");
+            }
+        }
+        // The rule (20..80 by 30..40 at 2 px per pt) crosses the part.
+        let rule = part.pixel(30, 15).unwrap();
+        assert_eq!((rule.red(), rule.green(), rule.blue()), (255, 0, 0));
     }
 
     #[test]

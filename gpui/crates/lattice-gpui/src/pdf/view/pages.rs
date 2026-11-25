@@ -156,6 +156,9 @@ impl PdfView {
                 // off) is not kept to be shown in them.
                 let slot = &mut self.pages[page];
                 slot.detail.release(window);
+                if let Some(layer) = &mut self.live {
+                    layer.release_detail(page, window);
+                }
                 if !draw.contains(&page) && slot.base.key.is_some_and(|key| key.dark != self.dark) {
                     slot.base.release(window);
                 }
@@ -232,7 +235,15 @@ impl PdfView {
         }
         // The live preview's layer, at the size of the page's image.
         if self.live.is_some() {
-            self.request_live_page(page, base_width, (width_pt, height_pt), dark, window, cx);
+            self.request_live_page(
+                page,
+                base_width,
+                (width_pt, height_pt),
+                dark,
+                None,
+                window,
+                cx,
+            );
         }
         if !on_screen {
             return;
@@ -303,8 +314,30 @@ impl PdfView {
             if !covered && needs(&self.pages[page].detail, detail_key) {
                 self.render(page, detail_key, true, window, cx);
             }
+            // The live layer's part at full size, over the same rectangle.
+            let tile = if covered {
+                self.pages[page].detail.key.and_then(|key| key.region)
+            } else {
+                Some(region)
+            };
+            if self.live.is_some()
+                && let Some(tile) = tile
+            {
+                self.request_live_page(
+                    page,
+                    full_width,
+                    (width_pt, height_pt),
+                    dark,
+                    Some(tile),
+                    window,
+                    cx,
+                );
+            }
         } else if !capped {
             self.pages[page].detail.release(window);
+            if let Some(layer) = &mut self.live {
+                layer.release_detail(page, window);
+            }
         }
     }
 

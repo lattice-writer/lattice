@@ -635,7 +635,7 @@ impl PdfView {
 
     /// Change the scale, keeping the point at `anchor` (in the viewport;
     /// its middle by default) where it is.
-    pub(super) fn zoom_to(
+    pub(crate) fn zoom_to(
         &mut self,
         scale: f32,
         anchor: Option<(f32, f32)>,
