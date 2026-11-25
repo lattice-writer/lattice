@@ -1,6 +1,6 @@
 // One archive pin and checksum source for Synara and the Agent-free Windows host.
 import { chmodSync, cpSync, createWriteStream, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, win32 } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { Readable } from 'node:stream';
 import { run, sha256 } from './util.mjs';
@@ -51,6 +51,16 @@ async function download(url, output) {
   await pipeline(Readable.fromWeb(response.body), createWriteStream(output));
 }
 
+/**
+ * The bsdtar Windows ships (10 1803 and later), which reads zip archives.
+ * A bare `tar` takes whichever is first on PATH, and from Git Bash that is
+ * Git's GNU tar: it cannot read a zip, and it takes the `C:` of an absolute
+ * path for a remote host, so staging failed there with status 128.
+ */
+export function windowsTar(env = process.env) {
+  return win32.join(env.SystemRoot ?? env.windir ?? "C:\\Windows", "System32", "tar.exe");
+}
+
 export async function prepareNodeRuntime(stageRoot, { cacheRoot, target, nodeVersion }) {
   const release = nodeRelease(target, nodeVersion);
   const nodeExecutable = target.includes('windows') ? 'node.exe' : 'node';
@@ -71,7 +81,7 @@ export async function prepareNodeRuntime(stageRoot, { cacheRoot, target, nodeVer
     } else if (process.platform !== "win32") {
       run("unzip", ["-q", archive, "-d", extractionRoot]);
     } else {
-      run("tar", ["-xf", archive, "-C", extractionRoot]);
+      run(windowsTar(), ["-xf", archive, "-C", extractionRoot]);
     }
     const extractedRoot = join(extractionRoot, release.archive.replace(/\.tar\.gz$|\.zip$/g, ""));
     mkdirSync(join(stageRoot, "bin"), { recursive: true });

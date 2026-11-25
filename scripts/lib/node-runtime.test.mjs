@@ -1,8 +1,8 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { NODE_RELEASES, nodeRelease, prepareNodeRuntime } from "./node-runtime.mjs";
+import { NODE_RELEASES, nodeRelease, prepareNodeRuntime, windowsTar } from "./node-runtime.mjs";
 import { projectRoot, readJson } from "./util.mjs";
 
 let scratch;
@@ -16,6 +16,12 @@ describe("shared standalone Node archives", () => {
     expect(nodeRelease("x86_64-pc-windows-msvc", nodeVersion).archive).toMatch(/-win-x64\.zip$/);
     expect(() => nodeRelease("x86_64-pc-windows-msvc", "0.0.0")).toThrow(/No verified Node/);
     expect(() => nodeRelease("unsupported", nodeVersion)).toThrow();
+  });
+  it("unpacks Windows' zip with the system's own tar, whatever shell is first on PATH", () => {
+    expect(windowsTar({ SystemRoot: "D:\\Windows" })).toBe("D:\\Windows\\System32\\tar.exe");
+    expect(windowsTar({ windir: "E:\\WINDOWS" })).toBe("E:\\WINDOWS\\System32\\tar.exe");
+    expect(windowsTar({})).toBe("C:\\Windows\\System32\\tar.exe");
+    if (process.platform === "win32") expect(existsSync(windowsTar())).toBe(true);
   });
   it("refuses an archive with the wrong digest before extraction", async () => {
     scratch = mkdtempSync(join(tmpdir(), "node-runtime-test-"));
