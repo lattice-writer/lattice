@@ -135,8 +135,16 @@ pub(super) struct CodePalette {
 impl CodePalette {
     /// The code theme's colours, under the colours a chosen theme gives the
     /// token roles (`--syntax-*` set after the code theme's in the app).
+    /// The theme fits those to its own editor; on a code theme's own ground
+    /// (a dark-only theme in a light app) they are fitted again to 4.5:1 on
+    /// that ground, or a keyword the colour of Dracula's ground would vanish.
     pub fn new(theme: CodeTheme, palette: &Palette) -> Self {
         let mut colors = Self::of_code_theme(theme, palette);
+        let own_ground = (colors.ground != palette.editor).then(|| {
+            let ground = gpui::Rgba::from(colors.ground);
+            let channel = |value: f32| (value * 255.).round() as u32;
+            channel(ground.r) << 16 | channel(ground.g) << 8 | channel(ground.b)
+        });
         if let Some(themed) = &palette.themed {
             let syntax = &mut colors.syntax;
             for (role, color) in &themed.syntax {
@@ -159,7 +167,13 @@ impl CodePalette {
                     "reference" => &mut syntax.reference,
                     _ => continue,
                 };
-                *slot = crate::token_types::hex(color.rgb).hsla();
+                let rgb = match own_ground {
+                    Some(ground) => {
+                        crate::accent_fit::fit_contrast(color.rgb, &[ground], 4.5, colors.kind)
+                    }
+                    None => color.rgb,
+                };
+                *slot = crate::token_types::hex(rgb).hsla();
             }
         }
         colors

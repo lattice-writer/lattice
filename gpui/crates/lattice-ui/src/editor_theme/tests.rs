@@ -89,27 +89,58 @@ fn installed_theme() -> std::sync::Arc<lattice_theme::ThemeFile> {
 #[test]
 fn an_installed_themes_syntax_reaches_every_zed_theme() {
     let theme = installed_theme();
-    let keyword = |appearance| {
-        let themed = Palette::new(appearance, Tint::Graphite, Accent::Blue)
-            .with_theme(Some(theme.clone()))
-            .themed
-            .unwrap();
-        format!("{}ff", themed.syntax["keyword"].hex())
+    let rgb = |color: Hsla| {
+        let color = gpui::Rgba::from(color);
+        let channel = |value: f32| (value * 255.).round() as u32;
+        channel(color.r) << 16 | channel(color.g) << 8 | channel(color.b)
     };
-    let expected = [keyword(Appearance::Light), keyword(Appearance::Dark)];
-    assert_eq!(expected[1], "#ffdc84ff");
+    let palettes = [Appearance::Light, Appearance::Dark].map(|appearance| {
+        Palette::new(appearance, Tint::Graphite, Accent::Blue).with_theme(Some(theme.clone()))
+    });
+    assert_eq!(
+        palettes[1].themed.as_ref().unwrap().syntax["keyword"].hex(),
+        "#ffdc84"
+    );
     let palette =
         Palette::new(Appearance::Dark, Tint::Sage, Accent::Blue).with_theme(Some(theme.clone()));
-    for family in zed_theme_families(&palette) {
+    for (code_theme, family) in CodeTheme::ALL.into_iter().zip(zed_theme_families(&palette)) {
         let family: Value = serde_json::from_slice(&family).unwrap();
-        for (theme, expected) in family["themes"].as_array().unwrap().iter().zip(&expected) {
-            assert_eq!(
-                theme["style"]["syntax"]["keyword"]["color"], **expected,
-                "{}",
-                theme["name"]
-            );
+        for (zed, palette) in family["themes"].as_array().unwrap().iter().zip(&palettes) {
+            let keyword = &zed["style"]["syntax"]["keyword"]["color"];
+            let themed = palette.themed.as_ref().unwrap().syntax["keyword"];
+            let code = CodePalette::new(code_theme, palette);
+            if code.ground == palette.editor {
+                assert_eq!(*keyword, format!("{}ff", themed.hex()), "{}", zed["name"]);
+            } else {
+                let drawn = u32::from_str_radix(&keyword.as_str().unwrap()[1..7], 16).unwrap();
+                let ratio = crate::accent_fit::contrast_ratio(drawn, rgb(code.ground));
+                assert!(ratio >= 4.45, "{}: {keyword} {ratio}", zed["name"]);
+            }
         }
     }
+}
+
+/// On a dark-only code theme's own ground in a light app, an installed
+/// theme's keyword the colour of that ground is fitted to read on it.
+#[test]
+fn an_installed_themes_syntax_reads_on_a_dark_only_code_themes_ground() {
+    let mut theme = (*installed_theme()).clone();
+    for variant in &mut theme.variants {
+        variant
+            .syntax
+            .insert("keyword".into(), lattice_theme::Color::opaque(0x282A36));
+    }
+    let palette = Palette::new(Appearance::Light, Tint::Graphite, Accent::Graphite)
+        .with_theme(Some(std::sync::Arc::new(theme)));
+    let code = CodePalette::new(CodeTheme::Dracula, &palette);
+    assert_eq!(code.kind, Appearance::Dark);
+    let rgb = |color: Hsla| {
+        let color = gpui::Rgba::from(color);
+        let channel = |value: f32| (value * 255.).round() as u32;
+        channel(color.r) << 16 | channel(color.g) << 8 | channel(color.b)
+    };
+    let ratio = crate::accent_fit::contrast_ratio(rgb(code.syntax.keyword), rgb(code.ground));
+    assert!(ratio >= 4.45, "{ratio}");
 }
 
 #[test]

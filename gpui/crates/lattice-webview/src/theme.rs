@@ -223,8 +223,9 @@ mod tests {
     }
 
     /// An installed theme's syntax colours win in the island's code blocks
-    /// over every code theme (lattice#1268), in a fixed variant's
-    /// appearance too, where the theme resolves its keyword as #FFDC84.
+    /// (lattice#1268), in a fixed variant's appearance too, where the theme
+    /// resolves its keyword as #FFDC84; on a code theme's own ground they are
+    /// the source editor's, fitted to that ground.
     #[test]
     fn a_document_page_gets_an_installed_themes_syntax_colours() {
         let mut nord = lattice_theme::bundled()
@@ -245,15 +246,19 @@ mod tests {
             (rgb >> 8) & 0xFF,
             rgb & 0xFF
         );
+        let payload = document(&palette, CodeTheme::Vscode, None);
+        assert_eq!(payload["vars"]["--syntax-keyword"], keyword);
+        let dark = document(&palette, CodeTheme::Vscode, Some(Appearance::Dark));
+        assert_eq!(
+            dark["vars"]["--syntax-keyword"],
+            "rgba(255, 220, 132, 1.000)"
+        );
         for code_theme in CodeTheme::ALL {
+            let (_, syntax) = editor_theme::syntax_properties(code_theme, &palette);
             let payload = document(&palette, code_theme, None);
             assert_eq!(
-                payload["vars"]["--syntax-keyword"], keyword,
-                "{code_theme:?}"
-            );
-            let dark = document(&palette, code_theme, Some(Appearance::Dark));
-            assert_eq!(
-                dark["vars"]["--syntax-keyword"], "rgba(255, 220, 132, 1.000)",
+                payload["vars"]["--syntax-keyword"],
+                css(syntax[0].1),
                 "{code_theme:?}"
             );
         }
