@@ -244,7 +244,7 @@ impl PdfView {
             && self
                 .live
                 .as_ref()
-                .is_some_and(|layer| layer.image(page).is_some() && layer.has_detail(page));
+                .is_some_and(|layer| layer.has_image(page) && layer.has_detail(page));
         if self.live.is_some() && !tiled {
             self.request_live_page(
                 page,

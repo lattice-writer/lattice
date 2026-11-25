@@ -121,6 +121,43 @@ impl Layer {
         self.slots.get(&page)?.image.clone()
     }
 
+    /// The image to paint over `page`: none under a full-size part drawn
+    /// for a later change, even one given up, as the page's image is not
+    /// drawn again under its part (`view/pages.rs`) and would show its
+    /// stale rows through the part's transparent pixels.
+    pub fn shown(&self, page: usize) -> Option<Arc<RenderImage>> {
+        let slot = self.slots.get(&page)?;
+        let part = self.details.get(&page).and_then(|part| part.drawn);
+        if let (Some(part), Some(drawn)) = (part, slot.drawn)
+            && part.stamp > drawn.stamp
+        {
+            return None;
+        }
+        slot.image.clone()
+    }
+
+    /// Whether `page`'s image has been drawn, as nothing or not, or is on
+    /// its way.
+    pub fn has_image(&self, page: usize) -> bool {
+        self.slots
+            .get(&page)
+            .is_some_and(|slot| slot.drawn.is_some() || slot.pending.is_some())
+    }
+
+    /// The change `page`'s image and its part were drawn for, for the e2e
+    /// scenario.
+    pub fn drawn_stamps(&self, page: usize) -> (Option<u64>, Option<u64>) {
+        let stamp = |slots: &HashMap<usize, Slot>| slots.get(&page)?.drawn.map(|key| key.stamp);
+        (stamp(&self.slots), stamp(&self.details))
+    }
+
+    /// Whether neither `page`'s image nor its part is being drawn.
+    pub fn settled(&self, page: usize) -> bool {
+        [&self.slots, &self.details]
+            .iter()
+            .all(|slots| slots.get(&page).is_none_or(|slot| slot.pending.is_none()))
+    }
+
     /// `page`'s full-size part over its image, with the width of the page
     /// it was drawn for and its place there, in device pixels.
     pub fn detail(&self, page: usize) -> Option<(Arc<RenderImage>, u32, PixelRect)> {
@@ -301,8 +338,14 @@ impl PdfView {
                     // shows the PDF under it.
                     None => slot.image.take(),
                 };
+                // A part given up leaves the page's own image to show, which
+                // is not drawn again while a part covers it: ask for it.
+                let given_up = region.is_some() && slot.image.is_none();
                 if let Some(old) = old {
                     window.drop_image(old).ok();
+                }
+                if given_up {
+                    this.sync_pages_soon(cx);
                 }
                 cx.notify();
             })

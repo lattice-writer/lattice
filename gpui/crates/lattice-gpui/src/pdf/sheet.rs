@@ -382,7 +382,7 @@ impl PdfView {
                 .and_then(|key| key.region.map(|region| (key.width_px, region))),
         );
         let text = slot.text.clone();
-        let live = self.live_layer().and_then(|layer| layer.image(ix));
+        let live = self.live_layer().and_then(|layer| layer.shown(ix));
         let live_detail = self.live_layer().and_then(|layer| layer.detail(ix));
         let ground: Hsla = if dark {
             rgb(DARK_PAGE).into()

@@ -356,33 +356,51 @@ impl Run {
             })
             .await;
         let sizes = cx.update(|cx| live_detail_sizes(&view, cx));
-        // Typing there draws the part again, and not the capped image
-        // under it, which the part covers.
-        // A draw of that image asked for before the part was there may
-        // still land; let it.
-        self.pause(cx, Duration::from_millis(1_000)).await;
-        let images = |cx: &App| {
+        // Typing there draws the part again; the capped image under it is
+        // not drawn again while the part covers it, and is not painted
+        // through the part once older.
+        let tiled_page = |cx: &App| {
             let layer = view.read(cx).live_layer()?;
-            let page = layer
+            layer
                 .drawn_pages()
                 .into_iter()
-                .find(|page| layer.detail(*page).is_some())?;
-            Some((layer.image(page)?, layer.detail(page)?.0))
+                .find(|page| layer.detail(*page).is_some())
         };
-        let tiled_before = cx.update(|cx| images(cx));
-        self.type_text(cx, "x").await?;
+        let tile = |cx: &App| {
+            let layer = view.read(cx).live_layer()?;
+            Some(layer.detail(tiled_page(cx)?)?.0)
+        };
+        // A draw of that image asked for before the part was there may
+        // still land; let it.
+        self.wait_for(cx, Duration::from_secs(10), |_, cx| {
+            let layer = view.read(cx).live_layer();
+            tiled_page(cx).zip(layer).is_some_and(|(page, layer)| layer.settled(page))
+        })
+        .await;
+        let tile_before = cx.update(|cx| tile(cx));
+        self.type_text(cx, "e").await?;
         let tile_redrawn = self
             .wait_for(cx, Duration::from_secs(10), |_, cx| {
-                images(cx).zip(tiled_before.clone()).is_some_and(|((_, tile), (_, old))| {
-                    !Arc::ptr_eq(&tile, &old)
-                })
+                let layer = view.read(cx).live_layer();
+                tile(cx).zip(tile_before.clone()).is_some_and(|(tile, old)| !Arc::ptr_eq(&tile, &old))
+                    && tiled_page(cx).zip(layer).is_some_and(|(page, layer)| layer.settled(page))
             })
             .await;
-        let base_kept = cx.update(|cx| {
-            images(cx)
-                .zip(tiled_before.clone())
-                .is_some_and(|((base, _), (old, _))| Arc::ptr_eq(&base, &old))
-        });
+        // Painted under it: nothing, or an image drawn for the same change
+        // (drawn again when a part was given up for a moment).
+        let (painted_current, skipped, stamps) = cx
+            .update(|cx| {
+                let layer = view.read(cx).live_layer()?;
+                let page = tiled_page(cx)?;
+                let (image, part) = layer.drawn_stamps(page);
+                let shown = layer.shown(page).is_some();
+                Some((
+                    !shown || image >= part,
+                    !shown,
+                    json!({ "image": image, "part": part, "painted": shown }),
+                ))
+            })
+            .unwrap_or((false, false, serde_json::Value::Null));
         self.with_window(cx, {
             let view = view.clone();
             move |_, _, cx| {
@@ -398,9 +416,13 @@ impl Run {
             json!({ "detail_and_base_width_px": sizes }),
         );
         steps.check(
-            "typing on a page drawn at full size redraws that part alone, not the capped image under it",
-            tile_redrawn && base_kept,
-            json!({ "part_redrawn": tile_redrawn, "image_kept": base_kept }),
+            "typing on a page drawn at full size redraws that part, and no older capped image is painted under it",
+            tile_redrawn && painted_current,
+            json!({
+                "part_redrawn": tile_redrawn,
+                "image_skipped": skipped,
+                "stamps": stamps,
+            }),
         );
 
         // The save's build waits for the pause in typing, then runs quietly.
