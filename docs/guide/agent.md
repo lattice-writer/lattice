@@ -17,6 +17,7 @@ Open the **Agent** panel (`⌘⌥3`, or the robot icon on the left). Then use on
 ![The Agent panel: New thread, with Polish, Revise, Proofread and Check references, and the message box](images/en-agent.webp)
 
 - Type what you want in the message box and press Return. Mention a file to point it there.
+- To attach files to a message, choose **+ › Files and folders**, or in the native Lattice drop them from the Finder on the Agent panel. Any kind of file works, such as a Word document or a spreadsheet; the Agent gets the file, and it isn't added to your project.
 - **Polish**, **Revise**, **Proofread** and **Check references** start common tasks. To work on one passage, select it in the editor first.
 - In the editor, select text to **Proofread** (`⌘⌥P`), **Polish** or **Rewrite…** it in place, with a reason for each edit.
 - **Annotate** a passage (select it, choose **Annotate**, write what should change), then **Save and revise now**: the Agent proposes an edit for each annotation and you accept or reject it in place. **Revise from annotations** in the command palette does every open annotation in rounds.
