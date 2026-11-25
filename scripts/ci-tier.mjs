@@ -45,7 +45,11 @@
  * trailer records and whose needs they cover (scripts/ci-local-select.mjs):
  * a GPUI change that needs the whole e2e is covered only by `e2e=full`, one
  * that needs some modules by an e2e that ran them, and a release path only
- * by the full gate (`rust gpui e2e=full webkit`). Linux and Windows always
+ * by the full gate (`rust gpui e2e=full webkit`). A docs-only trailer
+ * (`docs from=<gate>`) stands for its gate's trailer when the gate is an
+ * ancestor and everything since it is text (resolveCover): the gate's cover
+ * must then cover the rest of the branch, release paths included, and the
+ * text files are the docs-only pass's own. Linux and Windows always
  * run, and a push to main or a tag ignores the trailer. GPUI's Windows job runs the whole e2e
  * scenario only for a change that can behave differently on Windows, and
  * for every full run and push to main; otherwise the smoke flow
@@ -59,7 +63,7 @@ import { execFileSync } from "node:child_process";
 import { appendFileSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { coveredJobs, macosNeeds, parseTrailer } from "./ci-local-select.mjs";
+import { coveredJobs, macosNeeds, parseTrailer, resolveCover } from "./ci-local-select.mjs";
 import { changedFiles, rustIncludes } from "./gate-changed.mjs";
 import { isMain } from "./lib/util.mjs";
 import { harnessInputs } from "./perf-bench/harness-inputs.mjs";
@@ -262,16 +266,22 @@ function github() {
   const files = base ? git("-c", "core.quotePath=false", "diff", "--no-renames", "--name-only", base, "HEAD").split("\n").filter(Boolean) : [];
   if (!reason && event === "workflow_dispatch" && files.length === 0) reason = "a dispatch of a branch that changes nothing (a baseline)";
   const tier = ciTier(files, { full: Boolean(reason) });
-  const cover = trailerHonoured({ full: tier.full, event, ref }) && localMacosPass(message, git("rev-parse", "HEAD^{tree}")) ? parseTrailer(message) : null;
-  const local = coveredJobs(cover, macosNeeds(tier, files));
+  const named = trailerHonoured({ full: tier.full, event, ref }) && localMacosPass(message, git("rev-parse", "HEAD^{tree}")) ? parseTrailer(message) : null;
+  // A docs-only pass checked the text files since its gate; the gate's own
+  // cover has to cover everything else the branch changes.
+  const { cover, docsFiles, reason: docsRefused } = resolveCover(named, { cwd: repo });
+  const gated = files.filter((file) => !docsFiles.includes(file));
+  const local = coveredJobs(cover, macosNeeds(docsFiles.length ? ciTier(gated) : tier, gated));
   const windows = windowsE2e(tier.gpuiFiles, { full: tier.full || (event === "push" && branch === "main") });
   const groups = { rust: "Rust", gpui: "GPUI", webkit: "WebKit benchmark" };
   const needed = Object.keys(groups).filter((group) => (group === "webkit" ? tier.jobs["perf-bench"] : tier.jobs[group]));
   const lines = [
     reason ? `Every job: ${reason}.` : `Compared with ${base.slice(0, 9)}: ${files.length} changed file(s).`,
+    ...(docsRefused ? [`The head commit's docs-only trailer is not taken: ${docsRefused}.`] : []),
     ...(cover
       ? [
           `The head commit's CI-local trailer names this tree (${cover.line.trim()}).`,
+          ...(named.docs ? [`It is a docs-only pass on the gate at ${cover.from.slice(0, 9)}, which records ${parseTrailer(git("log", "-1", "--format=%B", cover.from)).line.trim()}; ${docsFiles.length} text file(s) since then.`] : []),
           ...needed.map((group) => (local[group].covered ? `- macOS ${groups[group]}: skipped, the trailer covers it.` : `- macOS ${groups[group]}: runs, ${local[group].reason}.`)),
         ]
       : []),

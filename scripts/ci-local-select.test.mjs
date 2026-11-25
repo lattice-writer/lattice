@@ -1,10 +1,10 @@
 // @vitest-environment node
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { FULL, coveredJobs, e2eNeeds, formatTrailer, fullCover, macosNeeds, mainMergeRegate, parseTrailer } from "./ci-local-select.mjs";
+import { FULL, TEXT_ONLY, coveredJobs, docsGate, e2eNeeds, findGate, formatTrailer, fullCover, macosNeeds, mainMergeRegate, parseTrailer, resolveCover } from "./ci-local-select.mjs";
 import { ciTier } from "./ci-tier.mjs";
 
 const covers = new Map([
@@ -30,6 +30,13 @@ describe("ci-local-select: the e2e a change needs", () => {
     for (const file of ["gpui/crates/lattice-gpui/src/scenario/e2e/registry.rs", "gpui/patches/gpui-fast/crates/gpui/src/window.rs", "gpui/Cargo.lock", "src-tauri/lattice-core/src/lib.rs", "gpui/crates/lattice-gpui/src/shell.rs"]) {
       expect(e2eNeeds([file], covers), file).toMatchObject({ full: true, fullBecause: [file] });
     }
+  });
+
+  it("runs the whole scenario for the vendored crates under gpui/compat/, gpui-fast among them", () => {
+    for (const file of ["gpui/compat/gpui-fast/gpui-fast/src/window.rs", "gpui/compat/gpui-fast/gpui-fast-platform/Cargo.toml", "gpui/compat/gpui-pre/gpui-pre/src/lib.rs", "gpui/compat/sqlite/libsqlite3-sys/build.rs"]) {
+      expect(e2eNeeds([file], covers), file).toMatchObject({ full: true, fullBecause: [file] });
+    }
+    expect(e2eNeeds(["gpui/compat/gpui-fast/README.md"], covers)).toMatchObject({ full: false, modules: [] });
   });
 
   it("runs the whole scenario for what every window is built from, even where a module's covers name it", () => {
@@ -188,5 +195,140 @@ describe.skipIf(process.platform === "win32")("ci-local-select: the quick re-gat
     git("checkout", "-q", "topic");
     commit("branch.txt", "more\n", "another branch commit");
     expect(mainMergeRegate({ base: "main", cwd: dir }).reason).toBe("HEAD is not a merge");
+  });
+});
+
+describe("ci-local-select: what a docs-only pass may change", () => {
+  it("takes the docs, the release notes, the user guide and the i18n catalogs", () => {
+    for (const file of ["docs/agent-validation.md", "docs/guide/zh-CN/editing.md", "docs/guide/images/pdf.png", "gpui/docs/updater.md", ".github/release-notes/v0.20.0.md", "src/release-notes/0.20.0.json", "src/locales/en/messages.json", "src/locales/zh-CN/messages.po", "gpui/crates/lattice-i18n/locales/zh-CN/app.po", "README.md", "CLAUDE.md"]) {
+      expect(TEXT_ONLY.test(file), file).toBe(true);
+    }
+  });
+
+  it("fails closed: code, config, scripts, workflows and anything unnamed are not text", () => {
+    for (const file of [
+      "src/App.tsx",
+      "src/release-notes/index.ts",
+      "src/locales/index.ts",
+      "src/locales/en/nested/messages.json",
+      "gpui/crates/lattice-i18n/locales/unlocalized.txt",
+      "gpui/crates/lattice-i18n/src/lib.rs",
+      "gpui/crates/lattice-i18n/build.rs",
+      "THIRD_PARTY_NOTICES.md",
+      "src-tauri/skills/x/SKILL.md",
+      "scripts/release-notes.mjs",
+      "scripts/i18n-unlocalized-baseline.txt",
+      ".github/workflows/ci.yml",
+      ".github/release-notes/v0.20.0.json",
+      "package.json",
+      "docs",
+      "gpui/compat/gpui-fast/gpui-fast/src/window.rs",
+    ]) {
+      expect(TEXT_ONLY.test(file), file).toBe(false);
+    }
+  });
+
+  it("writes and reads the docs-only trailer, which records no stage of its own", () => {
+    const line = formatTrailer("0123456789ab", { docs: true, from: "fedcba987654" });
+    expect(line).toBe("CI-local: macos 0123456789ab docs from=fedcba987654");
+    const cover = parseTrailer(`docs: x\n\n${line}\n`);
+    expect(cover).toMatchObject({ tree: "0123456789ab", docs: true, from: "fedcba987654", rust: false, gpui: false, webkit: false, e2e: null });
+    // Left unresolved it stands for nothing.
+    expect(coveredJobs(cover, needsFor(["gpui/crates/lattice-gpui/src/pdf/view/notes.rs"])).gpui.covered).toBe(false);
+  });
+});
+
+describe.skipIf(process.platform === "win32")("ci-local-select: the docs-only pass on top of a gate", () => {
+  let dir;
+  const git = (...args) => execFileSync("git", args, { cwd: dir, encoding: "utf8", env: { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" } }).trim();
+  const commit = (file, text, message = `change ${file}`) => {
+    mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
+    writeFileSync(path.join(dir, file), text);
+    git("add", file);
+    git("commit", "-q", "-m", message);
+    return git("rev-parse", "HEAD");
+  };
+  const trailer = (stages) => {
+    git("commit", "-q", "--amend", "--no-edit", "--trailer", `CI-local: macos ${git("rev-parse", "HEAD^{tree}").slice(0, 12)} ${stages}`);
+    return git("rev-parse", "HEAD");
+  };
+  const docsTrailer = (gate) => {
+    git("commit", "-q", "--amend", "--no-edit", "--trailer", formatTrailer(git("rev-parse", "HEAD^{tree}").slice(0, 12), { docs: true, from: gate.slice(0, 12) }));
+    return parseTrailer(git("log", "-1", "--format=%B"));
+  };
+  const gated = (stages = "rust gpui e2e=full webkit") => {
+    dir = mkdtempSync(path.join(tmpdir(), "ci-local-docs-"));
+    git("init", "-q", "-b", "main");
+    commit("base.txt", "base\n");
+    git("checkout", "-q", "-b", "topic");
+    commit("src-tauri/tauri.conf.json", "{}\n");
+    return trailer(stages);
+  };
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  it("stands on the gate when everything since it is text, and covers a release path with the gate's full trailer", () => {
+    const gate = gated();
+    commit("docs/guide/editing.md", "words\n");
+    commit("src/release-notes/0.20.0.json", "{}\n");
+    expect(findGate({ cwd: dir })).toBe(gate);
+    const resolved = resolveCover(docsTrailer(gate), { cwd: dir });
+    expect(resolved).toMatchObject({ reason: null, cover: { rust: true, gpui: true, e2e: FULL, webkit: true, from: gate }, docsFiles: ["docs/guide/editing.md", "src/release-notes/0.20.0.json"] });
+    const rest = ["src-tauri/tauri.conf.json"];
+    expect(coveredJobs(resolved.cover, needsFor(rest))).toEqual({ rust: { covered: true }, gpui: { covered: true }, webkit: { covered: true } });
+  });
+
+  it("does not stand for a release path whose gate recorded less than the full gate", () => {
+    const gate = gated("rust");
+    commit("docs/x.md", "x\n");
+    const resolved = resolveCover(docsTrailer(gate), { cwd: dir });
+    expect(coveredJobs(resolved.cover, needsFor(["src-tauri/tauri.conf.json"])).rust.reason).toMatch(/release paths/);
+  });
+
+  it("fails closed on any file since the gate that is not text", () => {
+    const gate = gated();
+    commit("docs/x.md", "x\n");
+    commit("src/App.tsx", "x\n");
+    const resolved = resolveCover(docsTrailer(gate), { cwd: dir });
+    expect(resolved).toMatchObject({ cover: null, reason: expect.stringMatching(/src\/App\.tsx/) });
+    expect(docsGate(gate, { cwd: dir })).toMatchObject({ ok: false });
+  });
+
+  it("counts uncommitted and untracked files in a working-tree check", () => {
+    const gate = gated();
+    commit("docs/x.md", "x\n");
+    expect(docsGate(gate, { cwd: dir, worktree: true })).toMatchObject({ ok: true, files: ["docs/x.md"] });
+    writeFileSync(path.join(dir, "loose.ts"), "x\n");
+    expect(docsGate(gate, { cwd: dir, worktree: true })).toMatchObject({ ok: false, reason: expect.stringMatching(/loose\.ts/) });
+  });
+
+  it("refuses a gate that is not an ancestor, not a commit, has no trailer for its own tree, or is itself a docs-only pass", () => {
+    const gate = gated();
+    git("checkout", "-q", "main");
+    commit("docs/y.md", "y\n");
+    expect(resolveCover(docsTrailer(gate), { cwd: dir }).reason).toMatch(/not an ancestor/);
+
+    git("checkout", "-q", "topic");
+    commit("docs/x.md", "x\n");
+    expect(resolveCover(parseTrailer("CI-local: macos 0123456789ab docs from=deadbeefdead"), { cwd: dir }).reason).toMatch(/not a commit/);
+    expect(resolveCover(parseTrailer("CI-local: macos 0123456789ab docs"), { cwd: dir }).reason).toMatch(/names no gate/);
+    const plain = commit("docs/z.md", "z\n");
+    commit("docs/v.md", "v\n");
+    expect(resolveCover(docsTrailer(plain), { cwd: dir }).reason).toMatch(/no CI-local trailer/);
+
+    const docsPass = git("rev-parse", "HEAD");
+    commit("docs/w.md", "w\n");
+    expect(resolveCover(docsTrailer(docsPass), { cwd: dir }).reason).toMatch(/no CI-local trailer that names its own tree and records its stages/);
+    // ci:local still finds the real gate behind the docs-only passes.
+    expect(findGate({ cwd: dir })).toBe(gate);
+  });
+
+  it("refuses a gate whose trailer names another tree", () => {
+    const gate = gated();
+    commit("docs/x.md", "x\n");
+    git("checkout", "-q", gate);
+    git("commit", "-q", "--amend", "--allow-empty", "-m", "moved\n\nCI-local: macos 0123456789ab rust gpui e2e=full webkit");
+    const forged = git("rev-parse", "HEAD");
+    git("checkout", "-q", "topic");
+    expect(docsGate(forged, { cwd: dir }).ok).toBe(false);
   });
 });

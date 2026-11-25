@@ -52,6 +52,16 @@
  * the headless stages (the gate, the Rust and GPUI builds and unit tests)
  * and prints the gate's stages again with `regate=<gate sha>`.
  *
+ * When everything since the newest gated commit on HEAD's first-parent line
+ * is text (TEXT_ONLY in scripts/ci-local-select.mjs: the docs, the release
+ * notes, the user guide and the i18n catalogs) and that gate's trailer
+ * covers the rest of the branch, it runs the docs-only profile instead: the
+ * gate's headless stages for the text files alone (the related tests, the
+ * build, and the GPUI build and unit tests when a GPUI catalog changed), no
+ * e2e and no WebKit benchmark, and prints `docs from=<gate>`. This holds on
+ * a release path too, when the gate recorded the full gate. Any other file
+ * since the gate means the stages the diff picks.
+ *
  * A change to a release path (RELEASE_PATHS: release workflows, bundle and
  * signing configuration, the updater) always runs every stage, with no quick
  * re-gate, and its trailer records the full gate (`rust gpui e2e=full
@@ -73,7 +83,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as sleep } from "node:timers/promises";
-import { FULL, RELEASE_PATHS, coveredJobs, formatTrailer, macosNeeds, mainMergeRegate } from "./ci-local-select.mjs";
+import { FULL, RELEASE_PATHS, coveredJobs, docsGate, findGate, formatTrailer, macosNeeds, mainMergeRegate } from "./ci-local-select.mjs";
 import { JOBS, ciTier } from "./ci-tier.mjs";
 import { changedFiles, gateStages, runStages } from "./gate-changed.mjs";
 import { readBaseline } from "./gpui-e2e-light.mjs";
@@ -209,6 +219,41 @@ export function localStages(tier, files, mergeBase, e2eNeed = macosNeeds(tier, f
   return stages;
 }
 
+/**
+ * The docs-only pass this checkout may take: the newest gate on HEAD's
+ * first-parent line when everything since it is text and its trailer covers
+ * the rest of the branch, or null with the reason printed.
+ */
+export function docsOnlyPass(files, cwd = repo) {
+  const gate = findGate({ cwd });
+  if (!gate) return null;
+  const check = docsGate(gate, { cwd, worktree: true });
+  if (!check.ok) {
+    console.log(`ci:local: no docs-only pass: ${check.reason}`);
+    return null;
+  }
+  if (!check.files.length) return null;
+  const rest = files.filter((file) => !check.files.includes(file));
+  const gap = Object.values(coveredJobs(check.cover, macosNeeds(ciTier(rest), rest))).find((group) => !group.covered);
+  if (gap) {
+    console.log(`ci:local: no docs-only pass: the gate at ${gate.slice(0, 9)} does not cover the rest of the branch (${gap.reason})`);
+    return null;
+  }
+  return check;
+}
+
+/**
+ * The docs-only profile: the headless stages the text files alone pick (the
+ * related tests, the gate's checks, the GPUI build and unit tests for a GPUI
+ * catalog) and the production build; never a stage that opens a window.
+ */
+export function docsStages(files, mergeBase) {
+  const tier = ciTier(files);
+  const stages = localStages(tier, files, mergeBase, { full: false, modules: [], why: {}, fullBecause: [] }).filter((stage) => !WINDOWED.has(stage.name));
+  if (!stages.some((stage) => stage.name === "bundle" && !stage.skip)) stages.push({ name: "build", why: "pnpm build, the production bundle", command: "pnpm", args: ["build"], timeout: 900_000 });
+  return { tier, stages };
+}
+
 async function main() {
   const argv = process.argv.slice(2);
   const options = { base: "origin/main", full: false, plan: false, headless: false };
@@ -221,6 +266,11 @@ async function main() {
   }
   const started = Date.now();
   const { mergeBase, files } = changedFiles(options.base);
+  const docs = options.full ? null : docsOnlyPass(files);
+  if (docs) {
+    await docsOnlyMain({ docs, mergeBase, files, options, started });
+    return;
+  }
   const release = files.filter((file) => RELEASE_PATHS.test(file));
   const tier = ciTier(files, { full: options.full || release.length > 0 });
   const needs = macosNeeds(tier, files);
@@ -294,6 +344,32 @@ async function main() {
       : `ci:local: local macOS gate passed at ${head}; the trailer records the stages that ran, and CI skips the macOS jobs they cover. Add it before pushing:`,
   );
   console.log(`  git commit --amend --no-edit --trailer "${formatTrailer(tree, cover)}"`);
+}
+
+async function docsOnlyMain({ docs, mergeBase, files, options, started }) {
+  console.log(`ci:local: ${files.length} changed file(s) against ${options.base} (${mergeBase.slice(0, 9)})`);
+  console.log(`ci:local: docs-only pass: the ${docs.files.length} file(s) since the gate at ${docs.gate.slice(0, 9)} (${docs.cover.line.trim()}) are all text (${docs.files.slice(0, 3).join(", ")}); the build and the tests that read them run, no e2e and no WebKit benchmark`);
+  const install = { name: "install", why: "pnpm install --frozen-lockfile, as CI's setup does", command: "pnpm", args: ["install", "--frozen-lockfile", "--prefer-offline"], timeout: 600_000 };
+  const stages = [install, ...docsStages(docs.files, mergeBase).stages];
+  if (options.plan) {
+    for (const stage of stages) console.log(`  ${stage.name.padEnd(12)} ${stage.skip ? `skip (${stage.skip})` : stage.why}`);
+    return;
+  }
+  const failed = await runStages(stages);
+  const minutes = ((Date.now() - started) / 60_000).toFixed(1);
+  if (failed) {
+    console.log(`ci:local: ${failed} stage(s) failed in ${minutes} min`);
+    process.exitCode = 1;
+    return;
+  }
+  console.log(`ci:local: every stage passed in ${minutes} min`);
+  if (git("status", "--porcelain")) {
+    console.log("ci:local: commit the change and run this again for the CI-local trailer; it names the commit's tree");
+    return;
+  }
+  const tree = git("rev-parse", "HEAD^{tree}").slice(0, 12);
+  console.log(`ci:local: docs-only pass at ${git("rev-parse", "HEAD").slice(0, 9)} on the gate at ${docs.gate.slice(0, 9)}; CI skips the macOS jobs that gate covers. Add the trailer before pushing:`);
+  console.log(`  git commit --amend --no-edit --trailer "${formatTrailer(tree, { docs: true, from: docs.gate.slice(0, 12) })}"`);
 }
 
 if (isMain(import.meta.url)) {

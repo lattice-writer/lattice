@@ -97,7 +97,7 @@ export function settle(verdict, rerun) {
   return { ...settled, ok: passes(settled) };
 }
 
-function rerun(app, fixture, modules) {
+export function rerun(app, fixture, modules) {
   const dir = mkdtempSync(path.join(tmpdir(), "gpui-e2e-rerun-"));
   const project = path.join(dir, "e2e-project");
   const out = path.join(dir, "rerun.json");
