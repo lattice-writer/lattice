@@ -233,8 +233,19 @@ impl PdfView {
         if needs(&self.pages[page].base, base_key) {
             self.render(page, base_key, false, window, cx);
         }
-        // The live preview's layer, at the size of the page's image.
-        if self.live.is_some() {
+        // The live preview's layer, at the size of the page's image. A
+        // capped page on screen shows its full-size part over that image:
+        // the image is drawn again only once the part is gone, so typing
+        // there draws one image, not two, and never an image newer than
+        // the part over it.
+        let tiled = on_screen
+            && capped
+            && self.render_scale == self.scale
+            && self
+                .live
+                .as_ref()
+                .is_some_and(|layer| layer.image(page).is_some() && layer.has_detail(page));
+        if self.live.is_some() && !tiled {
             self.request_live_page(
                 page,
                 base_width,

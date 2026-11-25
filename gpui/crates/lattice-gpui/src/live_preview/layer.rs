@@ -129,6 +129,13 @@ impl Layer {
         Some((slot.image.clone()?, key.width_px, key.region?))
     }
 
+    /// Whether `page` has a full-size part shown or on its way.
+    pub fn has_detail(&self, page: usize) -> bool {
+        self.details
+            .get(&page)
+            .is_some_and(|slot| slot.image.is_some() || slot.pending.is_some())
+    }
+
     fn slots_mut(&mut self, detail: bool) -> &mut HashMap<usize, Slot> {
         if detail {
             &mut self.details

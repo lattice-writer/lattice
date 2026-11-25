@@ -79,6 +79,13 @@ impl PdfView {
                 self.selection = None;
             }
         } else {
+            // The live layer's pages past the new last one are no longer
+            // reached by `release_far_pages`, which walks `self.pages`.
+            if let Some(layer) = &mut self.live {
+                for page in count..self.pages.len() {
+                    layer.release(page, window);
+                }
+            }
             for mut slot in self.pages.drain(..) {
                 slot.base.release(window);
                 slot.detail.release(window);

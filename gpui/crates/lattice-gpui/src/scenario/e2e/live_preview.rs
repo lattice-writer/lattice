@@ -9,7 +9,10 @@
 //! again, and Settings' switch turns it off. The project's engine and text
 //! are put back after.
 
-use std::time::{Duration, Instant};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use anyhow::{Context as _, Result};
 use gpui::{App, AsyncApp, Entity};
@@ -353,6 +356,33 @@ impl Run {
             })
             .await;
         let sizes = cx.update(|cx| live_detail_sizes(&view, cx));
+        // Typing there draws the part again, and not the capped image
+        // under it, which the part covers.
+        // A draw of that image asked for before the part was there may
+        // still land; let it.
+        self.pause(cx, Duration::from_millis(1_000)).await;
+        let images = |cx: &App| {
+            let layer = view.read(cx).live_layer()?;
+            let page = layer
+                .drawn_pages()
+                .into_iter()
+                .find(|page| layer.detail(*page).is_some())?;
+            Some((layer.image(page)?, layer.detail(page)?.0))
+        };
+        let tiled_before = cx.update(|cx| images(cx));
+        self.type_text(cx, "x").await?;
+        let tile_redrawn = self
+            .wait_for(cx, Duration::from_secs(10), |_, cx| {
+                images(cx).zip(tiled_before.clone()).is_some_and(|((_, tile), (_, old))| {
+                    !Arc::ptr_eq(&tile, &old)
+                })
+            })
+            .await;
+        let base_kept = cx.update(|cx| {
+            images(cx)
+                .zip(tiled_before.clone())
+                .is_some_and(|((base, _), (old, _))| Arc::ptr_eq(&base, &old))
+        });
         self.with_window(cx, {
             let view = view.clone();
             move |_, _, cx| {
@@ -366,6 +396,11 @@ impl Run {
             "zoomed past the page cap, the typed page's layer is drawn at full size over the part on screen",
             full_size,
             json!({ "detail_and_base_width_px": sizes }),
+        );
+        steps.check(
+            "typing on a page drawn at full size redraws that part alone, not the capped image under it",
+            tile_redrawn && base_kept,
+            json!({ "part_redrawn": tile_redrawn, "image_kept": base_kept }),
         );
 
         // The save's build waits for the pause in typing, then runs quietly.
