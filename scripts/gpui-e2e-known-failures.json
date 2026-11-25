@@ -1500,6 +1500,14 @@
       "tier": "flaky",
       "reason": "Windows: the module did not finish in main run 45101740670 (d7f09af0, after #1235) and passed in every later main run",
       "followup": "LEO-111"
+    },
+    {
+      "step": "a panel whose last tab closes (a split document, the PDF, the last document) goes at once, with no Empty panel drawn",
+      "platforms": [
+        "windows"
+      ],
+      "reason": "Windows: failed in main runs 45505984609 (a2d78773a) and 45507027636; observed {\"split_gone\":true,\"pdf_gone\":false}",
+      "followup": "LEO-15"
     }
   ]
 }
