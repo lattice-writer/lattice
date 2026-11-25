@@ -22,6 +22,7 @@ import {
 import { createHash } from "node:crypto";
 import { basename, delimiter, dirname, join, relative, resolve } from "node:path";
 import { codesign, signMachOTree, signingIdentity } from "./lib/codesign.mjs";
+import { assertFreshSynaraBuild } from "./lib/synara-build-output.mjs";
 import { pruneServerRuntime } from "./lib/synara-server-prune.mjs";
 import { capture, projectRoot, readJson, removePath, run, sha256, treeBytes, walkFiles, writeJson } from "./lib/util.mjs";
 import { NODE_RELEASES as TARGETS, prepareNodeRuntime } from "./lib/node-runtime.mjs";
@@ -435,7 +436,8 @@ function cachedWebBuildKey() {
 }
 
 const buildStartedAt = Date.now();
-if (cachedWebBuildKey() === webBuildKey) {
+const webBuildReused = cachedWebBuildKey() === webBuildKey;
+if (webBuildReused) {
   console.log("Reusing the existing Synara web build (no change outside apps/server).");
 } else {
   mkdirSync(cacheRoot, { recursive: true });
@@ -458,21 +460,8 @@ if (!deviceHelperTreeMatches(sourceDeviceHelperRoot, join(sourceRoot, "apps/serv
   );
 }
 
-// Belt and braces: even with a working build command, refuse to stage artifacts
-// the build did not just write. Staging stale bytes under a fresh revision is
-// far worse than failing here.
-for (const artifact of ["apps/server/dist/index.mjs", "apps/server/dist/client/index.html"]) {
-  const artifactPath = join(sourceRoot, artifact);
-  if (!existsSync(artifactPath)) {
-    throw new Error(`The Synara build did not produce ${artifact}.`);
-  }
-  if (statSync(artifactPath).mtimeMs < buildStartedAt) {
-    throw new Error(
-      `${artifact} was not rewritten by the build, so the staged runtime would ship stale code. ` +
-        `Check that the workspace build command actually ran.`,
-    );
-  }
-}
+// Belt and braces: refuse to stage artifacts the build did not just write.
+assertFreshSynaraBuild(sourceRoot, { buildStartedAt, webBuildReused });
 
 mkdirSync(cacheRoot, { recursive: true });
 const stageRoot = mkdtempSync(join(dirname(runtimeRoot), ".synara-runtime-"));
