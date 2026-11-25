@@ -44,7 +44,7 @@ diff --git a/gpui-fast/crates/gpui/src/fast/overlay_bounds.rs b/gpui-fast/crates
 new file mode 100644
 --- /dev/null
 +++ b/gpui-fast/crates/gpui/src/fast/overlay_bounds.rs
-@@ -0,0 +1,336 @@
+@@ -0,0 +1,331 @@
 +//! What a window's overlays cover, for a native view composition cannot
 +//! order below them.
 +//!
@@ -347,15 +347,11 @@ new file mode 100644
 +    }
 +
 +    #[test]
-+    fn observers_hear_a_change_once_and_a_late_one_hears_nothing_stale() {
++    fn a_change_is_reported_once_and_a_late_observer_gets_nothing_stale() {
 +        use super::{OverlayBounds, OverlayBoundsObserver};
-+        use std::{cell::RefCell, rc::Rc};
++        use std::rc::Rc;
 +
-+        let heard = Rc::new(RefCell::new(Vec::new()));
-+        let observer: Rc<OverlayBoundsObserver> = Rc::new({
-+            let heard = heard.clone();
-+            move |bounds: &[Bounds<crate::Pixels>]| heard.borrow_mut().push(bounds.to_vec())
-+        });
++        let observer: Rc<OverlayBoundsObserver> = Rc::new(|_: &[Bounds<crate::Pixels>]| {});
 +        let menu = Bounds::new(point(px(10.), px(10.)), size(px(100.), px(40.)));
 +        let mut state = OverlayBounds::default();
 +        // Nothing is known yet, so nothing is told at once.
@@ -378,7 +374,6 @@ new file mode 100644
 +        let late: Rc<OverlayBoundsObserver> = Rc::new(|_: &[Bounds<crate::Pixels>]| {});
 +        assert_eq!(state.subscribe(&late), None);
 +        assert!(state.changed(&[]), "the first frame measured is told");
-+        let _ = heard;
 +    }
 +}
 diff --git a/gpui-fast/crates/gpui/src/gpui.rs b/gpui-fast/crates/gpui/src/gpui.rs

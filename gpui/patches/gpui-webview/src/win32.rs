@@ -87,15 +87,14 @@ impl OverlayCutouts {
     pub(crate) fn device_rect(&self, document: Bounds<Pixels>) -> wry::Rect {
         let scale = f64::from(self.state.borrow().scale_factor);
         let device = |value: Pixels| (f64::from(value) * scale).round();
+        let (left, top) = (device(document.left()), device(document.top()));
+        // The size from the rounded edges, as `region` measures it, so the
+        // child window ends where the element does.
         wry::Rect {
-            position: wry::dpi::PhysicalPosition::new(
-                device(document.origin.x),
-                device(document.origin.y),
-            )
-            .into(),
+            position: wry::dpi::PhysicalPosition::new(left, top).into(),
             size: wry::dpi::PhysicalSize::new(
-                device(document.size.width),
-                device(document.size.height),
+                device(document.right()) - left,
+                device(document.bottom()) - top,
             )
             .into(),
         }

@@ -13,35 +13,44 @@ pub(crate) type Region = ([i32; 2], Vec<[i32; 4]>);
 /// pixels to a GPUI pixel; none when nothing is cut away, so the window
 /// keeps no region at all.
 ///
+/// Everything is measured in the window's device pixels and then made
+/// relative to the child window's origin as `device_rect` places it, at
+/// `round(document.origin × scale)`, so a fractional zoom shifts nothing.
 /// An overlay's hole rounds outward, so nothing of the page shows at its
-/// edge; the bands outside the element's clip round inward, the same way,
-/// so the page shows nowhere past the clip.
+/// edge; the shown area rounds inward, so the page shows nowhere past the
+/// clip.
 pub(crate) fn region(
     document: Bounds<Pixels>,
     visible: Bounds<Pixels>,
     overlays: &[Bounds<Pixels>],
     scale: f32,
 ) -> Option<Region> {
-    let local = |value: Pixels, origin: Pixels| (f32::from(value) - f32::from(origin)) * scale;
+    let device = |value: Pixels| f32::from(value) * scale;
+    let [origin_x, origin_y] = [
+        device(document.left()).round(),
+        device(document.top()).round(),
+    ];
+    let x = |value: Pixels| device(value) - origin_x;
+    let y = |value: Pixels| device(value) - origin_y;
     let outward = |bounds: Bounds<Pixels>| {
         [
-            local(bounds.left(), document.left()).floor() as i32,
-            local(bounds.top(), document.top()).floor() as i32,
-            local(bounds.right(), document.left()).ceil() as i32,
-            local(bounds.bottom(), document.top()).ceil() as i32,
+            x(bounds.left()).floor() as i32,
+            y(bounds.top()).floor() as i32,
+            x(bounds.right()).ceil() as i32,
+            y(bounds.bottom()).ceil() as i32,
         ]
     };
     let size = [
-        (f32::from(document.size.width) * scale).round() as i32,
-        (f32::from(document.size.height) * scale).round() as i32,
+        (device(document.right()).round() - origin_x) as i32,
+        (device(document.bottom()).round() - origin_y) as i32,
     ];
     let [width, height] = size;
     let mut cut = Vec::new();
     if visible != document {
-        let shown_left = local(visible.left(), document.left()).ceil() as i32;
-        let shown_top = local(visible.top(), document.top()).ceil() as i32;
-        let shown_right = local(visible.right(), document.left()).floor() as i32;
-        let shown_bottom = local(visible.bottom(), document.top()).floor() as i32;
+        let shown_left = x(visible.left()).ceil() as i32;
+        let shown_top = y(visible.top()).ceil() as i32;
+        let shown_right = x(visible.right()).floor() as i32;
+        let shown_bottom = y(visible.bottom()).floor() as i32;
         cut.extend([
             [0, 0, width, shown_top],
             [0, shown_bottom, width, height],
@@ -108,6 +117,21 @@ mod tests {
                     [60, 21, 100, 70],
                 ]
             ))
+        );
+    }
+
+    #[test]
+    fn at_a_fractional_zoom_holes_are_measured_from_the_rounded_origin() {
+        // At 1.25 the page's origin falls at 125.625 device pixels and the
+        // child window is placed at 126, so holes are measured from 126.
+        // Measured from 125.625, the menu's left edge would land at 62.
+        let page = bounds(100.5, 0., 200.3, 100.);
+        let menu = bounds(150.3, 10., 50., 20.);
+        // 150.3 × 1.25 = 187.875, less 126 is 61.875: floor 61. Its right,
+        // 200.3 × 1.25 = 250.375, less 126 is 124.375: ceil 125.
+        assert_eq!(
+            region(page, page, &[menu], 1.25),
+            Some(([250, 125], vec![[61, 12, 125, 38]]))
         );
     }
 

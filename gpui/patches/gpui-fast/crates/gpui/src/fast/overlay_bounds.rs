@@ -300,15 +300,11 @@ mod tests {
     }
 
     #[test]
-    fn observers_hear_a_change_once_and_a_late_one_hears_nothing_stale() {
+    fn a_change_is_reported_once_and_a_late_observer_gets_nothing_stale() {
         use super::{OverlayBounds, OverlayBoundsObserver};
-        use std::{cell::RefCell, rc::Rc};
+        use std::rc::Rc;
 
-        let heard = Rc::new(RefCell::new(Vec::new()));
-        let observer: Rc<OverlayBoundsObserver> = Rc::new({
-            let heard = heard.clone();
-            move |bounds: &[Bounds<crate::Pixels>]| heard.borrow_mut().push(bounds.to_vec())
-        });
+        let observer: Rc<OverlayBoundsObserver> = Rc::new(|_: &[Bounds<crate::Pixels>]| {});
         let menu = Bounds::new(point(px(10.), px(10.)), size(px(100.), px(40.)));
         let mut state = OverlayBounds::default();
         // Nothing is known yet, so nothing is told at once.
@@ -331,6 +327,5 @@ mod tests {
         let late: Rc<OverlayBoundsObserver> = Rc::new(|_: &[Bounds<crate::Pixels>]| {});
         assert_eq!(state.subscribe(&late), None);
         assert!(state.changed(&[]), "the first frame measured is told");
-        let _ = heard;
     }
 }
