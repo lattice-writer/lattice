@@ -18,6 +18,7 @@ use serde_json::{Value, json};
 use terminal::{Color, NamedColor};
 
 mod shots;
+mod tab_keys;
 
 use super::{super::Run, Steps};
 use crate::terminal::{NewTerminal, SessionState, ToggleTerminalPanel};
@@ -121,6 +122,8 @@ impl Run {
             in_root,
             json!({ "root": root, "tail": tail(&self.terminal_content(cx)) }),
         );
+
+        self.terminal_tab_keys(cx, steps).await?;
 
         self.type_text(cx, "printenv\n").await?;
         let named = self
