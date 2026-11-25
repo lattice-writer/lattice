@@ -18,6 +18,7 @@
 //! (`paint.rs`), the PDF viewer's page layer (`layer.rs`), the status pill
 //! (`status.rs`) and the quiet builds (`quiet_builds.rs`).
 
+mod exact;
 mod fonts;
 pub(crate) mod layer;
 mod model;
