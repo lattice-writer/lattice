@@ -15,17 +15,19 @@ pub(crate) type Region = ([i32; 2], Vec<[i32; 4]>);
 ///
 /// Everything is measured in the window's device pixels and then made
 /// relative to the child window's origin as `device_rect` places it, at
-/// `round(document.origin × scale)`, so a fractional zoom shifts nothing.
+/// `round(document.origin × scale)`, so a fractional zoom shifts nothing;
+/// in f64, as `device_rect` computes it, so both round a product near .5
+/// the same way.
 /// An overlay's hole rounds outward, so nothing of the page shows at its
 /// edge; the shown area rounds inward, so the page shows nowhere past the
-/// clip.
+/// clip, and a side the clip leaves alone stays at the window's own edge.
 pub(crate) fn region(
     document: Bounds<Pixels>,
     visible: Bounds<Pixels>,
     overlays: &[Bounds<Pixels>],
     scale: f32,
 ) -> Option<Region> {
-    let device = |value: Pixels| f32::from(value) * scale;
+    let device = |value: Pixels| f64::from(value) * f64::from(scale);
     let [origin_x, origin_y] = [
         device(document.left()).round(),
         device(document.top()).round(),
@@ -47,10 +49,33 @@ pub(crate) fn region(
     let [width, height] = size;
     let mut cut = Vec::new();
     if visible != document {
-        let shown_left = x(visible.left()).ceil() as i32;
-        let shown_top = y(visible.top()).ceil() as i32;
-        let shown_right = x(visible.right()).floor() as i32;
-        let shown_bottom = y(visible.bottom()).floor() as i32;
+        let inward = |clipped: bool, edge: f64, round: fn(f64) -> f64, window: i32| {
+            if clipped { round(edge) as i32 } else { window }
+        };
+        let shown_left = inward(
+            visible.left() != document.left(),
+            x(visible.left()),
+            f64::ceil,
+            0,
+        );
+        let shown_top = inward(
+            visible.top() != document.top(),
+            y(visible.top()),
+            f64::ceil,
+            0,
+        );
+        let shown_right = inward(
+            visible.right() != document.right(),
+            x(visible.right()),
+            f64::floor,
+            width,
+        );
+        let shown_bottom = inward(
+            visible.bottom() != document.bottom(),
+            y(visible.bottom()),
+            f64::floor,
+            height,
+        );
         cut.extend([
             [0, 0, width, shown_top],
             [0, shown_bottom, width, height],
@@ -132,6 +157,31 @@ mod tests {
         assert_eq!(
             region(page, page, &[menu], 1.25),
             Some(([250, 125], vec![[61, 12, 125, 38]]))
+        );
+    }
+
+    #[test]
+    fn the_origin_rounds_as_device_rect_rounds_it() {
+        // 519.6 × 1.25 is 649.49997 in f64, as `device_rect` places the
+        // window, but 649.5 in f32, which would measure from 650 and leave
+        // the menu's last device column over the page.
+        let page = bounds(519.6, 0., 100., 100.);
+        let menu = bounds(519.6, 10., 20., 20.);
+        assert_eq!(
+            region(page, page, &[menu], 1.25),
+            Some(([125, 125], vec![[0, 12, 26, 38]]))
+        );
+    }
+
+    #[test]
+    fn a_side_the_clip_leaves_alone_cuts_nothing() {
+        // Only the top is clipped; the left edge, at 125.375 device pixels
+        // from a window placed at 125, keeps its column.
+        let page = bounds(100.3, 0., 100., 100.);
+        let shown = bounds(100.3, 10., 100., 90.);
+        assert_eq!(
+            region(page, shown, &[], 1.25),
+            Some(([125, 125], vec![[0, 0, 125, 13]]))
         );
     }
 
