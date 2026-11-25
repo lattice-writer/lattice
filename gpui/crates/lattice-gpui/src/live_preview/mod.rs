@@ -21,6 +21,7 @@
 mod exact;
 mod fonts;
 pub(crate) mod layer;
+mod matrix;
 mod model;
 mod paint;
 mod protocol;
