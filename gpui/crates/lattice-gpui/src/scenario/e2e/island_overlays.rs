@@ -111,21 +111,35 @@ impl Run {
                 move |_, _| overlays.borrow().is_empty()
             })
             .await;
-        self.snapshot(cx, "island-overlay-start").await;
+        // What is drawn across the window, by the regions the look probes
+        // name (recorded while the shots are on).
+        lattice_ui::parity::forget("");
+        self.pause(cx, Duration::from_millis(300)).await;
+        let wide: Vec<String> = lattice_ui::parity::regions()
+            .into_iter()
+            .filter(|(_, region)| {
+                region
+                    .bounds
+                    .is_some_and(|bounds| f32::from(bounds.size.width) > 900.)
+            })
+            .map(|(name, _)| name.to_string())
+            .collect();
+        let run = std::process::id();
+        self.snapshot(cx, &format!("island-overlay-start-{run}")).await;
 
         let shown = share(cx, self)?;
         let overlays_before = drawn(&overlays);
         self.open_palette_now(cx)?;
         self.pause(cx, Duration::from_millis(600)).await;
         let under_palette = share(cx, self)?;
-        self.snapshot(cx, "island-overlay-palette").await;
+        self.snapshot(cx, &format!("island-overlay-palette-{run}")).await;
         self.with_window(cx, |shell, window, cx| {
             shell.update(cx, |shell, cx| shell.close_overlays(window, cx))
         })?;
         steps.check(
             "on Windows the command palette opened over a webview island is drawn above the page",
             loaded && shown > 0.9 && under_palette < shown - 0.05,
-            json!({ "loaded": loaded, "page_share": shown, "under_palette": under_palette, "bounds": format!("{bounds:?}"), "overlays_found": found, "cleared": cleared, "overlays_before": overlays_before }),
+            json!({ "loaded": loaded, "page_share": shown, "under_palette": under_palette, "bounds": format!("{bounds:?}"), "overlays_found": found, "cleared": cleared, "wide_regions": wide, "overlays_before": overlays_before }),
         );
 
         let host = cx.update(confirm::install);
@@ -138,7 +152,7 @@ impl Run {
         self.pause(cx, Duration::from_millis(800)).await;
         let under_dialog = share(cx, self)?;
         let overlays_dialog = drawn(&overlays);
-        self.snapshot(cx, "island-overlay-dialog").await;
+        self.snapshot(cx, &format!("island-overlay-dialog-{run}")).await;
         let answered = self.with_window(cx, {
             let host = host.clone();
             move |_, window, cx| host.update(cx, |host, cx| host.accept(window, cx))
