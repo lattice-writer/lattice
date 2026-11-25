@@ -42,6 +42,16 @@ jobs:
           # the commit it names, which a shallow clone cannot tell.
           fetch-depth: 0
       - uses: ./.github/actions/setup-pnpm
+      # The shared build tree (~/Library/Caches/lattice-gpui-build) lives on
+      # the external SSD. A process runner-up starts needs macOS's Removable
+      # Volumes permission there, and without it the first file access waits
+      # on a prompt nobody answers (run 45659115285 hung 35 min holding the
+      # in-app lock). Fail fast, before the lock, so the report still runs.
+      - name: Reach the shared build tree
+        timeout-minutes: 2
+        run: |
+          dir="${LATTICE_GPUI_BUILD_DIR:-$HOME/Library/Caches/lattice-gpui-build}"
+          mkdir -p "$dir/main-baseline" && ls "$dir/main-baseline" >/dev/null
       # Waits up to 90 minutes for a crew gate or measurement to free the
       # lock; giving up (exit 75) leaves no record, which the report counts.
       # Its own timeout leaves the job time for the report.

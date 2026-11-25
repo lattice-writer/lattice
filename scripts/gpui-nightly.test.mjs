@@ -90,5 +90,8 @@ describe("gpui-nightly: the workflow", () => {
     expect(workflow).toMatch(/scripts\/inapp-lock --thread .* -- node scripts\/gpui-nightly\.mjs run/);
     expect(workflow).toMatch(/if: \$\{\{ !cancelled\(\) \}\}\n(.*\n){0,3}\s+run: node scripts\/gpui-nightly\.mjs report/);
     expect(workflow).toMatch(/issues: write/);
+    // The build tree check runs before the lock, with a short timeout of its own.
+    expect(workflow.indexOf("Reach the shared build tree")).toBeLessThan(workflow.indexOf("scripts/inapp-lock"));
+    expect(workflow).toMatch(/- name: Reach the shared build tree\n\s+timeout-minutes: 2\n/);
   });
 });

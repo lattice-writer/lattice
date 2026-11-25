@@ -558,6 +558,32 @@ jobs:
         uses: ./.github/actions/setup-pnpm
       - name: Build the island pages
         run: script/build-islands
+      # The Agent's Synara runtime and the Open Slide runtime, staged as the
+      # AppImage stages them (linux-appimage.yml). Only on main, tags and a
+      # run started by hand: a branch's run keeps its time for the e2e and
+      # ships an archive without them, whose Agent says its service is
+      # missing. Nothing is cached (Actions' cache is full; see save-if
+      # above), so each such run builds them from the pin.
+      - name: Decide whether the archive carries the runtimes
+        run: echo "PACK_RUNTIMES=${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}" >> "$GITHUB_ENV"
+      - if: env.PACK_RUNTIMES == 'true'
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+      - name: Stage the Synara and Open Slide runtimes
+        if: env.PACK_RUNTIMES == 'true'
+        working-directory: .
+        run: |
+          synara_source="$RUNNER_TEMP/lattice-synara"
+          git init -q "$synara_source"
+          git -C "$synara_source" remote add origin "$(node -p "require('./scripts/synara-runtime.json').repository")"
+          revision="$(node -p "require('./scripts/synara-runtime.json').revision")"
+          git -C "$synara_source" fetch -q --depth=1 origin "$revision"
+          git -C "$synara_source" checkout -q --detach FETCH_HEAD
+          test "$(git -C "$synara_source" rev-parse HEAD)" = "$revision"
+          bun install --cwd "$synara_source" --frozen-lockfile
+          BUN_BIN="$(command -v bun)" SYNARA_SOURCE_DIR="$synara_source" node scripts/prepare-synara-sidecar.mjs
+          node scripts/prepare-presentation-runtime.mjs
       - name: Stage the archive
         run: |
           stage="$RUNNER_TEMP/lattice-gpui-linux-x86_64"
@@ -566,6 +592,15 @@ jobs:
           cp vendor/pdfium/linux-x64/lib/libpdfium.so "$stage/"
           cp -R islands/dist "$stage/islands"
           cp LICENSE "$stage/"
+          # Beside the binary, where structured/resources.rs looks off macOS.
+          if [ "$PACK_RUNTIMES" = true ]; then
+            for runtime in synara-runtime/server/dist/index.mjs synara-runtime/bin/node presentation-runtime/server.mjs; do
+              test -e "../src-tauri/$runtime"
+            done
+            cp -a ../src-tauri/synara-runtime ../src-tauri/presentation-runtime "$stage/"
+            mkdir -p "$stage/src"
+            cp -a ../src-tauri/src/embedded_skills "$stage/src/"
+          fi
           echo "STAGE=$stage" >> "$GITHUB_ENV"
       # From the staged copy, so the smoke also proves the archive's layout:
       # PDFium and the islands beside the binary, nothing read from the
