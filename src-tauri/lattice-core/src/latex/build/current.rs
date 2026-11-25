@@ -71,8 +71,13 @@ pub fn current_build(
         _ => None,
     };
     let tex_log = fs::read_to_string(aux_files::in_layout(root, &document, "log", layout)).ok()?;
-    // A conference template's PDF has its fonts checked, as after a build.
-    let bytes = log_conference_template(&tex_log).and_then(|_| fs::read(&pdf).ok());
+    // A conference template's PDF has its fonts checked, as after a build;
+    // a template in the preamble format is named in the format's log alone.
+    let venue = format
+        .as_ref()
+        .and_then(|format| log_conference_template(&format.log))
+        .or_else(|| log_conference_template(&tex_log));
+    let bytes = venue.and_then(|_| fs::read(&pdf).ok());
     let (diagnostics, _) = diagnose(root, &document, &tex_log, format.as_ref(), bytes.as_deref());
     if diagnostics.iter().any(|diagnostic| diagnostic.level == "error") {
         return None;
@@ -86,7 +91,7 @@ pub fn current_build(
         outputs: arxiv::written_by_build(root, &document),
         aux_folder: aux_files::relative_folder(&document, layout),
         pages: pages_written(&tex_log),
-        venue: log_conference_template(&tex_log),
+        venue,
         synctex: Some(true),
         steps: Vec::new(),
         unchanged: true,
