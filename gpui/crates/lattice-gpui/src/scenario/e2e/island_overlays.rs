@@ -142,21 +142,10 @@ impl Run {
         self.with_window(cx, |shell, window, cx| {
             shell.update(cx, |shell, cx| shell.close_overlays(window, cx))
         })?;
-        let cleared = self
-            .wait_for(cx, Duration::from_secs(5), {
-                let overlays = overlays.clone();
-                move |_, _| {
-                    bounds.is_some_and(|island| {
-                        let area =
-                            |b: Bounds<Pixels>| f32::from(b.size.width) * f32::from(b.size.height);
-                        overlays
-                            .borrow()
-                            .iter()
-                            .all(|overlay| area(overlay.intersect(&island)) < area(island) * 0.1)
-                    })
-                }
-            })
-            .await;
+        let cleared = match bounds {
+            Some(island) => self.wait_for_island_clear(cx, &overlays, island).await,
+            None => false,
+        };
         let run = std::process::id();
         self.snapshot(cx, &format!("island-overlay-start-{run}"))
             .await;
@@ -243,6 +232,25 @@ impl Run {
         Ok(())
     }
 
+    /// Wait until no overlay covers a tenth of the island or more: what
+    /// was open has closed and its exit has played out.
+    async fn wait_for_island_clear(
+        &self,
+        cx: &mut AsyncApp,
+        overlays: &Drawn,
+        island: Bounds<Pixels>,
+    ) -> bool {
+        let overlays = overlays.clone();
+        self.wait_for(cx, Duration::from_secs(5), move |_, _| {
+            let area = |b: Bounds<Pixels>| f32::from(b.size.width) * f32::from(b.size.height);
+            overlays
+                .borrow()
+                .iter()
+                .all(|overlay| area(overlay.intersect(&island)) < area(island) * 0.1)
+        })
+        .await
+    }
+
     /// Open the ⋯ menu of the island's panel, which drops over the page,
     /// and read the screen: the page's colour gone where the overlays are
     /// drawn, and still there everywhere else on the island.
@@ -286,16 +294,22 @@ impl Run {
         let image = native::capture_client(native)?;
         let (inside, outside) = page_shares(&image, island, &holes, scale);
         self.snapshot(cx, shot).await;
-        self.with_window(cx, |shell, window, cx| {
-            shell.update(cx, |shell, cx| shell.close_overlays(window, cx))
-        })?;
-        self.pause(cx, Duration::from_millis(600)).await;
+        // `close_overlays` leaves a panel's menu up, and a menu left open
+        // would cover the page in the steps after this one: Escape closes
+        // it, and a second click on the ⋯ if Escape went elsewhere.
+        self.dispatch_keys(cx, "escape")?;
+        let mut closed = self.wait_for_island_clear(cx, overlays, island).await;
+        if !closed {
+            native::send_click(native, dots)?;
+            closed = self.wait_for_island_clear(cx, overlays, island).await;
+        }
         Ok(MenuCutout {
             island: Some(island),
             strip: Some(strip),
             holes,
             inside,
             outside,
+            closed,
         })
     }
 }
@@ -308,6 +322,7 @@ struct MenuCutout {
     holes: Vec<Bounds<Pixels>>,
     inside: f32,
     outside: f32,
+    closed: bool,
 }
 
 impl MenuCutout {
@@ -319,7 +334,7 @@ impl MenuCutout {
             .holes
             .iter()
             .any(|hole| area(hole) > 4000. && area(hole) < area(&island) * 0.8);
-        menu && self.inside < 0.05 && self.outside > 0.95
+        menu && self.inside < 0.05 && self.outside > 0.95 && self.closed
     }
 
     fn detail(&self) -> serde_json::Value {
@@ -328,6 +343,7 @@ impl MenuCutout {
             "strip": format!("{:?}", self.strip),
             "holes": format!("{:?}", self.holes),
             "page_inside_holes": self.inside,
+            "closed": self.closed,
             "page_outside_holes": self.outside,
         })
     }
