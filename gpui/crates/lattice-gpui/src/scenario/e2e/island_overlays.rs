@@ -111,19 +111,6 @@ impl Run {
                 move |_, _| overlays.borrow().is_empty()
             })
             .await;
-        // What is drawn across the window, by the regions the look probes
-        // name (recorded while the shots are on).
-        lattice_ui::parity::forget("");
-        self.pause(cx, Duration::from_millis(300)).await;
-        let wide: Vec<String> = lattice_ui::parity::regions()
-            .into_iter()
-            .filter(|(_, region)| {
-                region
-                    .bounds
-                    .is_some_and(|bounds| f32::from(bounds.size.width) > 900.)
-            })
-            .map(|(name, _)| name.to_string())
-            .collect();
         let run = std::process::id();
         self.snapshot(cx, &format!("island-overlay-start-{run}")).await;
 
@@ -139,7 +126,7 @@ impl Run {
         steps.check(
             "on Windows the command palette opened over a webview island is drawn above the page",
             loaded && shown > 0.9 && under_palette < shown - 0.05,
-            json!({ "loaded": loaded, "page_share": shown, "under_palette": under_palette, "bounds": format!("{bounds:?}"), "overlays_found": found, "cleared": cleared, "wide_regions": wide, "overlays_before": overlays_before }),
+            json!({ "loaded": loaded, "page_share": shown, "under_palette": under_palette, "bounds": format!("{bounds:?}"), "overlays_found": found, "cleared": cleared, "overlays_before": overlays_before }),
         );
 
         let host = cx.update(confirm::install);

@@ -195,6 +195,13 @@ impl Run {
                 "failure": failure, "annotations": annotations, "untouched": untouched,
             }),
         );
+        // An export that never ran (nothing placed to tick) leaves the sheet
+        // up, over every module after this one.
+        if let Some(sheet) = &sheet
+            && !closed
+        {
+            cx.update(|cx| sheet.update(cx, |sheet, cx| sheet.close_for_scenario(cx)));
+        }
         cx.update(|cx| store.update(cx, |store, cx| store.delete(&project, &id, cx)));
         Ok(())
     }
