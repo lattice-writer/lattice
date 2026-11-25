@@ -195,6 +195,15 @@ fn lacks_synctex(root: &Path, document: &str) -> bool {
         && aux_files::synctex(root, document).is_none()
 }
 
+/// Whether the project's compiled PDF does not exist yet: a project opened
+/// before its first build, or after a clean. The preview asks for it on every
+/// project open and expects this, so `read_compiled_pdf`'s failure then is
+/// routine rather than something to log. False when the root document itself
+/// cannot be resolved; that failure is worth reporting.
+pub fn compiled_pdf_missing(root: &Path) -> bool {
+    compiled_pdf_path(root).is_ok_and(|path| !path.exists())
+}
+
 pub fn read_compiled_pdf(root: &Path) -> Result<Vec<u8>, String> {
     let path = compiled_pdf_path(root)?;
     let bytes =

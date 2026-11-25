@@ -206,7 +206,17 @@ pub async fn read_compiled_pdf(
     state: State<'_, AppState>, window: Window, project_root: String,
 ) -> Result<tauri::ipc::Response, String> {
     let root = pinned_root(&state, &window, &project_root, "its PDF could be loaded")?;
-    let bytes = run_blocking("Compiled PDF read", move || latex::read_compiled_pdf(&root)).await?;
+    // Not `run_blocking`: every project open asks for the PDF already on disk,
+    // and one never built has none. The preview expects that and stays empty
+    // until the first build, so only the other failures are logged.
+    let bytes = run_quietly("Compiled PDF read", move || {
+        latex::read_compiled_pdf(&root).inspect_err(|reason| {
+            if !latex::compiled_pdf_missing(&root) {
+                log::error!(target: "lattice::tasks", "Compiled PDF read failed: {reason}");
+            }
+        })
+    })
+    .await?;
     Ok(tauri::ipc::Response::new(bytes))
 }
 

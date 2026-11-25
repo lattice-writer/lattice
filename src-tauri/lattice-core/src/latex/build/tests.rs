@@ -111,6 +111,20 @@ fn a_latexmkrc_playwright_failure_reaches_the_build_result_as_a_diagnostic() {
 }
 
 #[test]
+fn a_project_never_built_has_its_pdf_missing_rather_than_unreadable() {
+    let parent = TempDir::new("latex");
+    let root = project::create(&parent, "Unbuilt").unwrap();
+    // Every project open reads the PDF already on disk; before the first
+    // build there is none, and the read is not logged as an error.
+    assert!(super::super::compiled_pdf_missing(&root));
+    assert!(super::super::read_compiled_pdf(&root).is_err());
+    std::fs::write(root.join("main.pdf"), b"not a pdf").unwrap();
+    // A file that is there but not a PDF is a real failure, and stays logged.
+    assert!(!super::super::compiled_pdf_missing(&root));
+    assert!(super::super::read_compiled_pdf(&root).is_err());
+}
+
+#[test]
 #[ignore = "requires a local latexmk installation"]
 fn creates_and_builds_a_real_project() {
     let parent = TempDir::new("latex");
