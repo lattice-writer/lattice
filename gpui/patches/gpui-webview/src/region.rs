@@ -49,33 +49,31 @@ pub(crate) fn region(
     let [width, height] = size;
     let mut cut = Vec::new();
     if visible != document {
-        let inward = |clipped: bool, edge: f64, round: fn(f64) -> f64, window: i32| {
-            if clipped { round(edge) as i32 } else { window }
+        // `visible` is `document` intersected with the clip, kept as an
+        // origin and a size, so an edge the clip left alone can come back an
+        // f32 ulp off `document`'s: a side counts as clipped only when it
+        // moved by more than a thousandth of a device pixel.
+        let clipped = |shown: Pixels, edge: Pixels| (device(shown) - device(edge)).abs() > 1e-3;
+        let shown_left = if clipped(visible.left(), document.left()) {
+            x(visible.left()).ceil() as i32
+        } else {
+            0
         };
-        let shown_left = inward(
-            visible.left() != document.left(),
-            x(visible.left()),
-            f64::ceil,
-            0,
-        );
-        let shown_top = inward(
-            visible.top() != document.top(),
-            y(visible.top()),
-            f64::ceil,
-            0,
-        );
-        let shown_right = inward(
-            visible.right() != document.right(),
-            x(visible.right()),
-            f64::floor,
-            width,
-        );
-        let shown_bottom = inward(
-            visible.bottom() != document.bottom(),
-            y(visible.bottom()),
-            f64::floor,
-            height,
-        );
+        let shown_top = if clipped(visible.top(), document.top()) {
+            y(visible.top()).ceil() as i32
+        } else {
+            0
+        };
+        let shown_right = if clipped(visible.right(), document.right()) {
+            x(visible.right()).floor() as i32
+        } else {
+            width
+        };
+        let shown_bottom = if clipped(visible.bottom(), document.bottom()) {
+            y(visible.bottom()).floor() as i32
+        } else {
+            height
+        };
         cut.extend([
             [0, 0, width, shown_top],
             [0, shown_bottom, width, height],
@@ -182,6 +180,18 @@ mod tests {
         assert_eq!(
             region(page, shown, &[], 1.25),
             Some(([125, 125], vec![[0, 0, 125, 13]]))
+        );
+    }
+
+    #[test]
+    fn an_unclipped_bottom_an_ulp_off_after_intersect_cuts_nothing() {
+        // The clip trims the top far from the bottom, and the intersection's
+        // bottom comes back as 746.32007 against the page's 746.32.
+        let page = bounds(0., 0., 100., 746.32);
+        let shown = page.intersect(&bounds(0., 6.4664, 100., 1000.));
+        assert_eq!(
+            region(page, shown, &[], 1.25),
+            Some(([125, 933], vec![[0, 0, 125, 9]]))
         );
     }
 
