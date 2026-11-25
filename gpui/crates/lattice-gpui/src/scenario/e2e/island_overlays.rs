@@ -80,7 +80,13 @@ fn page_shares(
             }
         }
     }
-    let share = |page: usize, all: usize| if all == 0 { 0. } else { page as f32 / all as f32 };
+    let share = |page: usize, all: usize| {
+        if all == 0 {
+            0.
+        } else {
+            page as f32 / all as f32
+        }
+    };
     (share(inside, inside_all), share(outside, outside_all))
 }
 
@@ -141,7 +147,8 @@ impl Run {
                 let overlays = overlays.clone();
                 move |_, _| {
                     bounds.is_some_and(|island| {
-                        let area = |b: Bounds<Pixels>| f32::from(b.size.width) * f32::from(b.size.height);
+                        let area =
+                            |b: Bounds<Pixels>| f32::from(b.size.width) * f32::from(b.size.height);
                         overlays
                             .borrow()
                             .iter()
@@ -151,14 +158,16 @@ impl Run {
             })
             .await;
         let run = std::process::id();
-        self.snapshot(cx, &format!("island-overlay-start-{run}")).await;
+        self.snapshot(cx, &format!("island-overlay-start-{run}"))
+            .await;
 
         let shown = share(cx, self)?;
         let overlays_before = drawn(&overlays);
         self.open_palette_now(cx)?;
         self.pause(cx, Duration::from_millis(600)).await;
         let under_palette = share(cx, self)?;
-        self.snapshot(cx, &format!("island-overlay-palette-{run}")).await;
+        self.snapshot(cx, &format!("island-overlay-palette-{run}"))
+            .await;
         self.with_window(cx, |shell, window, cx| {
             shell.update(cx, |shell, cx| shell.close_overlays(window, cx))
         })?;
@@ -189,7 +198,8 @@ impl Run {
         self.pause(cx, Duration::from_millis(800)).await;
         let under_dialog = share(cx, self)?;
         let overlays_dialog = drawn(&overlays);
-        self.snapshot(cx, &format!("island-overlay-dialog-{run}")).await;
+        self.snapshot(cx, &format!("island-overlay-dialog-{run}"))
+            .await;
         let answered = self.with_window(cx, {
             let host = host.clone();
             move |_, window, cx| host.update(cx, |host, cx| host.accept(window, cx))
@@ -215,7 +225,12 @@ impl Run {
             zoomed_bounds.map_or(0., |bounds| page_share(&image, bounds, zoomed_scale))
         };
         let zoomed_menu = self
-            .island_menu_cutout(cx, &panel, &overlays, &format!("island-overlay-menu-zoomed-{run}"))
+            .island_menu_cutout(
+                cx,
+                &panel,
+                &overlays,
+                &format!("island-overlay-menu-zoomed-{run}"),
+            )
             .await?;
         cx.update(|cx| crate::settings::update_appearance(cx, |a| a.interface_scale = 1.0));
         self.wait_for_zoom(cx, 1.0).await;
@@ -249,7 +264,11 @@ impl Run {
             .get("strip/island-overlays.html")
             .and_then(|region| region.bounds);
         let (Some(island), Some(strip)) = (island, strip) else {
-            return Ok(MenuCutout { island, strip, ..Default::default() });
+            return Ok(MenuCutout {
+                island,
+                strip,
+                ..Default::default()
+            });
         };
         let native = self.native(cx)?;
         // The ⋯ ends the strip: 24px wide, 6px in from its right edge.
