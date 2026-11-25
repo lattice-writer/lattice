@@ -329,11 +329,12 @@ impl MenuCutout {
     fn passed(&self) -> bool {
         let island = self.island.unwrap_or_default();
         let area = |b: &Bounds<Pixels>| f32::from(b.size.width) * f32::from(b.size.height);
-        // A hole bigger than the island's controls, smaller than the island.
+        // A hole bigger than the island's controls that leaves some of the
+        // island around it: at 125% a narrow island can be 86% menu.
         let menu = self
             .holes
             .iter()
-            .any(|hole| area(hole) > 4000. && area(hole) < area(&island) * 0.8);
+            .any(|hole| area(hole) > 4000. && area(&island) - area(hole) > 4000.);
         menu && self.inside < 0.05 && self.outside > 0.95 && self.closed
     }
 
