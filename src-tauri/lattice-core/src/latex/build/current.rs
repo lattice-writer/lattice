@@ -13,10 +13,13 @@
 //! Anything this cannot vouch for builds as before: a failed or cancelled
 //! last run, a missing PDF or SyncTeX map, a PDF something else wrote over
 //! (`shown_pdf::replaced`), an rc file (whose rules latexmk alone knows), the
-//! engine switched since, or a record in a format this does not read.
+//! engine switched since, a preamble format that would be made again, or a
+//! record in a format this does not read. The messages are diagnosed as a
+//! build diagnoses them, the format's and the PDF fonts' included.
 
 use super::super::aux_files::{self, AuxFiles};
 use super::super::build_log::{log_conference_template, pages_written, trim_log};
+use super::super::preamble_format::{self, Prepared};
 use super::super::{arxiv, lacks_synctex, shown_pdf};
 use super::{beside, diagnose};
 use crate::latex::BuildResult;
@@ -42,10 +45,8 @@ pub fn current_build(
     }
     let manifest = project::read_manifest(root).ok()?;
     let layout = beside::layout_for(root, layout);
-    if !root.join(&document).with_extension("pdf").is_file()
-        || lacks_synctex(root, &document)
-        || shown_pdf::replaced(root, &document)
-    {
+    let pdf = root.join(&document).with_extension("pdf");
+    if !pdf.is_file() || lacks_synctex(root, &document) || shown_pdf::replaced(root, &document) {
         return None;
     }
     let database =
@@ -57,8 +58,17 @@ pub fn current_build(
     if !inputs_unchanged(&database, &folder, engine) {
         return None;
     }
+    // The preamble's packages are read into the format, not by this pass:
+    // the format's own record says whether they changed.
+    let format = match preamble_format::existing(root, &manifest, &document, &root.join(&document))?
+    {
+        Prepared::Ready(format) => Some(format),
+        _ => None,
+    };
     let tex_log = fs::read_to_string(aux_files::in_layout(root, &document, "log", layout)).ok()?;
-    let (diagnostics, _) = diagnose(root, &document, &tex_log, None, None);
+    // A conference template's PDF has its fonts checked, as after a build.
+    let bytes = log_conference_template(&tex_log).and_then(|_| fs::read(&pdf).ok());
+    let (diagnostics, _) = diagnose(root, &document, &tex_log, format.as_ref(), bytes.as_deref());
     if diagnostics.iter().any(|diagnostic| diagnostic.level == "error") {
         return None;
     }
@@ -311,5 +321,27 @@ mod tests {
             root.write("main.pdf", "%PDF-1.5 a collaborator's");
             assert!(current_build(&root, None, layout).is_none());
         }
+    }
+
+    /// A package the preamble format holds is read by the format alone, so
+    /// latexmk's record never lists it: the format's own record does.
+    #[test]
+    #[ignore = "requires latexmk and a working pdfLaTeX installation"]
+    fn a_package_in_the_preamble_format_changed_is_not_current() {
+        let root = TempDir::new("current-build-format");
+        project::write_manifest(&root, &project::default_manifest("paper")).unwrap();
+        root.write(
+            "main.tex",
+            "\\documentclass{article}\n\\usepackage{macros}\n\\begin{document}\n\\hello\n\\end{document}\n",
+        );
+        root.write("macros.sty", "\\newcommand{\\hello}{Hello.}\n");
+        let steps = BuildSteps::silent();
+        let run =
+            || build(&root, false, true, &ActiveBuild::default(), None, &steps, AuxFiles::Beside);
+        assert!(run().unwrap().success);
+        assert!(preamble_format::format_file(&root).is_some_and(|format| format.is_file()));
+        assert!(current_build(&root, None, AuxFiles::Beside).is_some());
+        root.write("macros.sty", "\\newcommand{\\hello}{Hello, again.}\n");
+        assert!(current_build(&root, None, AuxFiles::Beside).is_none());
     }
 }

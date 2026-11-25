@@ -144,8 +144,10 @@ impl Shell {
             .unwrap_or_default();
         let candidates: Vec<String> = main.iter().chain(&open_document).cloned().collect();
         // Until entering a project knows it has to typeset, no build shows.
+        self.build_panel
+            .update(cx, |panel, _| panel.set_project(&root, files.clone()));
         if !request.entry {
-            self.show_build_running(request.quiet, &root, &label, files.clone(), cx);
+            self.show_build_running(request.quiet, &root, &label, cx);
         }
         let build_panel = self.build_panel.clone();
         // Read now: a switch flipped while the build waits applies to the next one.
@@ -201,7 +203,7 @@ impl Shell {
             };
             if request.entry && current.is_none() {
                 let shown = this.update(cx, |this, cx| {
-                    this.show_build_running(request.quiet, &root, &label, files.clone(), cx)
+                    this.show_build_running(request.quiet, &root, &label, cx)
                 });
                 if shown.is_err() {
                     return;
@@ -330,12 +332,10 @@ impl Shell {
         quiet: bool,
         root: &std::path::Path,
         label: &str,
-        files: Vec<String>,
         cx: &mut Context<Self>,
     ) {
         self.build_panel.update(cx, |panel, cx| {
             panel.set_quiet(quiet, cx);
-            panel.set_project_files(files);
             panel.started(root, label, cx);
         });
         // A build still going after minutes may be looping: say so, with Stop.

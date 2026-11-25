@@ -374,8 +374,10 @@ impl BuildPanel {
         }
     }
 
-    /// The project's files, which diagnostics are resolved against.
-    pub fn set_project_files(&mut self, files: Vec<String>) {
+    /// The project's folder and files, which diagnostics are resolved
+    /// against, a build's restated on entry as much as one running.
+    pub fn set_project(&mut self, root: &Path, files: Vec<String>) {
+        self.root = root.to_path_buf();
         self.project_files = files;
     }
 

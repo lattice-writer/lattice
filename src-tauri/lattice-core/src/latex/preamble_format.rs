@@ -334,6 +334,33 @@ pub(super) fn prepare(
     prepare_in(&directory, &project, document_path, &root_document, active, steps)
 }
 
+/// The project's format as [`prepare`] would find it, without making one:
+/// `None` when it would make the format again (missing, or the preamble or
+/// a file it read changed since), so a build has to run.
+pub(super) fn existing(
+    root: &Path, manifest: &ProjectManifest, document_path: &str, root_document: &Path,
+) -> Option<Prepared> {
+    if !eligible(root, manifest, document_path) {
+        return Some(Prepared::Plain);
+    }
+    let (Ok(project), Ok(root_document)) = (root.canonicalize(), root_document.canonicalize())
+    else {
+        return Some(Prepared::Plain);
+    };
+    let Some(directory) = directory(&project) else { return Some(Prepared::Plain) };
+    let Ok(source) = fs::read(root_document) else { return Some(Prepared::Plain) };
+    let Some(preamble) = preamble(&source) else { return Some(Prepared::Plain) };
+    let head = head(preamble, &project);
+    let record = Record::read(&directory).filter(|record| record.current(&head, &project))?;
+    if !record.usable {
+        return Some(Prepared::Plain);
+    }
+    match ready(&directory) {
+        ready @ Prepared::Ready(_) => Some(ready),
+        _ => None,
+    }
+}
+
 fn prepare_in(
     directory: &Path, project: &Path, document_path: &str, root_document: &Path,
     active: &ActiveBuild, steps: &BuildSteps,
