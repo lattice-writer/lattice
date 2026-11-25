@@ -62,15 +62,27 @@ pub(crate) fn redact_home(text: &str, home: &str) -> String {
     regex::Regex::new(&pattern).expect("escaped path spellings").replace_all(text, "~").into_owned()
 }
 
-#[cfg(any(windows, test))]
-pub(crate) fn tex_path(path: &std::path::Path) -> String {
+/// `path` without Windows' extended-length prefix: `\\?\C:\…` becomes `C:\…`
+/// and `\\?\UNC\server\…` becomes `\\server\…`. Other paths are unchanged.
+fn without_verbatim_prefix(path: &std::path::Path) -> String {
     let text = path.to_string_lossy();
-    let normal = if let Some(unc) = text.strip_prefix(r"\\?\UNC\") {
+    if let Some(unc) = text.strip_prefix(r"\\?\UNC\") {
         format!(r"\\{unc}")
     } else {
         text.strip_prefix(r"\\?\").unwrap_or(&text).to_string()
-    };
-    normal.replace('\\', "/")
+    }
+}
+
+#[cfg(any(windows, test))]
+pub(crate) fn tex_path(path: &std::path::Path) -> String {
+    without_verbatim_prefix(path).replace('\\', "/")
+}
+
+/// `path` for a log line. On Windows `fs::canonicalize` spells every project
+/// root `\\?\C:\…`, which reads as noise in the log and does not paste into
+/// Explorer, so the prefix is dropped.
+pub(crate) fn log_path(path: &std::path::Path) -> String {
+    without_verbatim_prefix(path)
 }
 
 #[cfg(test)]
@@ -109,5 +121,13 @@ mod tests {
             "//server/share/paper"
         );
         assert_eq!(tex_path(std::path::Path::new(r"\\?\C:\Users\Ada\paper")), "C:/Users/Ada/paper");
+    }
+    #[test]
+    fn log_paths_drop_the_extended_length_prefix_only() {
+        let log = |path: &str| log_path(std::path::Path::new(path));
+        assert_eq!(log(r"\\?\C:\Users\Ada\paper"), r"C:\Users\Ada\paper");
+        assert_eq!(log(r"\\?\UNC\server\share\paper"), r"\\server\share\paper");
+        assert_eq!(log(r"C:\Users\Ada\paper"), r"C:\Users\Ada\paper");
+        assert_eq!(log("/home/ada/paper"), "/home/ada/paper");
     }
 }

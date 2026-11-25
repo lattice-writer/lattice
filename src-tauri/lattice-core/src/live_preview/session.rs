@@ -82,7 +82,7 @@ impl Session {
         let child = Arc::new(Mutex::new(Some(child)));
         let watched = Arc::clone(&child);
         std::thread::spawn(move || forward_events(stdout, &*events, id, &tail, &watched));
-        log::info!(target: "lattice::live-preview", "Started rtex session {id} for {}", root.display());
+        log::info!(target: "lattice::live-preview", "Started rtex session {id} for {}", crate::host_paths::log_path(root));
         Ok(Self { id, child, stdin, build_dir })
     }
 

@@ -178,7 +178,7 @@ fn with_index<T>(
     match attempt(&mut guard) {
         Err(error @ TantivyError::LockFailure(..)) => Err(error.to_string()),
         Err(error) => {
-            log::warn!("Paper index at {} is rebuilt: {error}", dir.display());
+            log::warn!("Paper index at {} is rebuilt: {error}", crate::host_paths::log_path(dir));
             *guard = None;
             let _ = fs::remove_dir_all(dir);
             attempt(&mut guard).map_err(|error| format!("Paper search index error: {error}"))
@@ -608,7 +608,10 @@ pub(crate) fn sync_in_background(
     }
     std::thread::spawn(move || loop {
         if let Err(error) = papers().and_then(|papers| sync(&dir, &papers)) {
-            log::warn!("Paper index sync failed for {}: {error}", dir.display());
+            log::warn!(
+                "Paper index sync failed for {}: {error}",
+                crate::host_paths::log_path(&dir)
+            );
         }
         let mut pending = PENDING.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         if pending.get(&dir) == Some(&true) {
