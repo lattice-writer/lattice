@@ -25,7 +25,7 @@ use super::{beside, diagnose};
 use crate::latex::BuildResult;
 use crate::project;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::{Instant, UNIX_EPOCH};
 
 /// The result of building `root` now, when its last build of the document a
@@ -47,10 +47,15 @@ pub fn current_build(
     let layout = beside::layout_for(root, layout);
     let pdf = root.join(&document).with_extension("pdf");
     if !pdf.is_file() || lacks_synctex(root, &document) || shown_pdf::replaced(root, &document) {
+        log::info!("entry builds: {document} has no PDF and SyncTeX map of its own build");
         return None;
     }
-    let database =
-        fs::read_to_string(aux_files::in_layout(root, &document, "fdb_latexmk", layout)).ok()?;
+    let Ok(database) =
+        fs::read_to_string(aux_files::in_layout(root, &document, "fdb_latexmk", layout))
+    else {
+        log::info!("entry builds: no latexmk record of {document}");
+        return None;
+    };
     // latexmk runs in the document's folder (`-cd`): its record names files
     // from there.
     let folder = root.join(&document).parent()?.to_path_buf();
@@ -123,6 +128,7 @@ fn inputs_unchanged(database: &str, folder: &Path, engine: &str) -> bool {
             // A rule whose last run failed (or never finished) has something
             // left to do.
             if rest.split_whitespace().last() != Some("0") {
+                log::info!("entry builds: latexmk's last run of {name} did not succeed");
                 return false;
             }
             typeset |= name.trim_matches('"') == engine;
@@ -143,12 +149,26 @@ fn inputs_unchanged(database: &str, folder: &Path, engine: &str) -> bool {
         else {
             return false;
         };
-        if !unchanged(&folder.join(path), time, size, md5) {
+        if !unchanged(&recorded_path(folder, path), time, size, md5) {
+            log::info!("entry builds: {path} changed since the last build");
             return false;
         }
         files += 1;
     }
     typeset && files > 0
+}
+
+/// Where a path latexmk recorded is: as written when absolute, else under
+/// `folder` a component at a time, since a Windows folder (`\\?\D:\…`) takes
+/// neither `/` nor `.` as part of a path joined to it.
+fn recorded_path(folder: &Path, path: &str) -> PathBuf {
+    let recorded = Path::new(path);
+    if recorded.is_absolute() || recorded.has_root() {
+        return recorded.to_path_buf();
+    }
+    path.split(['/', '\\'])
+        .filter(|part| !part.is_empty() && *part != ".")
+        .fold(folder.to_path_buf(), |path, part| path.join(part))
 }
 
 /// The quoted name at the start of `entry`, and what follows it.
@@ -276,6 +296,20 @@ mod tests {
         let future = record(&root, 0).replace("# Fdb version 4", "# Fdb version 9");
         assert!(!inputs_unchanged(&future, &root, "pdflatex"));
         assert!(!inputs_unchanged("", &root, "pdflatex"));
+    }
+
+    #[test]
+    fn recorded_paths_are_joined_a_component_at_a_time() {
+        let folder = Path::new("/project/paper");
+        assert_eq!(recorded_path(folder, "./refs.bib"), folder.join("refs.bib"));
+        assert_eq!(
+            recorded_path(folder, "chapters/intro.tex"),
+            folder.join("chapters").join("intro.tex")
+        );
+        assert_eq!(
+            recorded_path(folder, "/usr/share/article.cls"),
+            Path::new("/usr/share/article.cls")
+        );
     }
 
     #[test]
