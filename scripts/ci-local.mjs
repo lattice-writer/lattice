@@ -93,7 +93,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as sleep } from "node:timers/promises";
-import { FULL, RELEASE_PATHS, commentOnlyEdits, coveredJobs, docsGate, findGate, formatTrailer, macosNeeds, mainMergeRegate } from "./ci-local-select.mjs";
+import { FULL, RELEASE_PATHS, coveredJobs, docsGate, findGate, formatTrailer, macosNeeds, mainMergeRegate } from "./ci-local-select.mjs";
 import { JOBS, ciTier, knownFailuresInert, selectorListsEdited } from "./ci-tier.mjs";
 import { changedFiles, gateStages, runStages } from "./gate-changed.mjs";
 import { ancestorBaseline, readBaseline } from "./gpui-e2e-light.mjs";
@@ -257,7 +257,7 @@ function mainBaselineStage(mergeBase, verdict = null) {
 export function localStages(tier, files, mergeBase, e2eNeed = macosNeeds(tier, files, mergeBase).e2e) {
   const { jobs, vitestFiles } = tier;
   const stages = [];
-  if (jobs["lint-build"] || (jobs.vitest && !vitestFiles.length)) stages.push(...gateStages(files, commentOnlyEdits(mergeBase, files)));
+  if (jobs["lint-build"] || (jobs.vitest && !vitestFiles.length)) stages.push(...gateStages(files));
   else if (vitestFiles.length) {
     stages.push({ name: "vitest", why: `${vitestFiles.length} test(s) that read the changed files`, command: "pnpm", args: ["exec", "vitest", "run", ...vitestFiles], timeout: 900_000 });
   }

@@ -78,7 +78,7 @@ const NOT_BENCH_TOOLING = /^(src\/|package\.json$|pnpm-lock\.yaml$|\.github\/act
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // Comments a tool reads: a type checker's, a linter's or formatter's, a
 // bundler's or the test runner's directive, clippy's SAFETY note.
-const DIRECTIVE = /@(ts-|vitest-|jest-|jsx|vite-ignore|__PURE__)|#__PURE__|<reference|eslint|oxlint|prettier|biome|webpack|rustfmt|clippy|SAFETY:|noqa|pragma|cspell/;
+const DIRECTIVE = /^#!|@(ts-|vitest-|jest-|jsx|vite-ignore|__PURE__)|#__PURE__|<reference|eslint|oxlint|prettier|biome|webpack|rustfmt|clippy|SAFETY:|noqa|pragma|cspell/;
 // A diff this wide is not a comment fix; reading every file would only slow the plan.
 const COMMENT_SCAN_MAX = 200;
 // Each base's text of a file, read once per run (macosNeeds and the gate ask more than once).
@@ -108,7 +108,7 @@ export function commentOnlyEdit(base, file, cwd = repoRoot) {
 }
 
 /** The changed files whose change is only comments and spacing (commentOnlyEdit); none for a diff over COMMENT_SCAN_MAX files. */
-export function commentOnlyEdits(base, files, cwd = repoRoot) {
+function commentOnlyEdits(base, files, cwd = repoRoot) {
   if (!base || files.length > COMMENT_SCAN_MAX) return new Set();
   return new Set(files.filter((file) => streamable(file) && existsSync(path.join(cwd, file)) && commentOnlyEdit(base, file, cwd)));
 }

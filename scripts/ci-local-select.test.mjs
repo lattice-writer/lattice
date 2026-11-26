@@ -416,7 +416,7 @@ describe("ci-local-select: a change of comments and whitespace only", () => {
     const git = (...args) => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd: dir, encoding: "utf8" });
     const rust = ["/// Adds one.", "fn add(x: i32) -> i32 {", "    x + 1", "}", "/**", " * The pointer.", " */", "fn set(p: &mut i32) {", "    *p = 1;", "}", 'const JS: &str = r#"', "// one", '"#;', "fn life<'a>(s: &'a str) -> char { let _ = s; 'x' }", ""].join("\n");
     const script = ["/** Doc. */", "export function f() {", "  return 1;", "}", "export const s = `", "// one", "/* two */", "`;", 'export const t = "a b";', ""].join("\n");
-    const files = { "a.rs": rust, "b.ts": script, "c.css": ".a { color: blue; }\n", "e2e": "#!/bin/sh\n# Runs it.\necho hi\n", "d.yml": "a: 1\n" };
+    const files = { "a.rs": rust, "b.ts": script, "c.css": ".a { color: blue; }\n.a .b, .c\\ d { color: red; }\n", "f.tsx": "export const p = <p>x</p>;\n", "g.mjs": "#!/usr/bin/env node\nconsole.log(1);\n", "e2e": "#!/bin/sh\n# Runs it.\necho hi\n", "d.yml": "a: 1\n" };
     try {
       for (const [file, text] of Object.entries(files)) writeFileSync(path.join(dir, file), text);
       git("init", "-q");
@@ -443,7 +443,13 @@ describe("ci-local-select: a change of comments and whitespace only", () => {
       expect(edit("b.ts", script.replace("/* two */", "/*  two */"))).toBe(false);
       expect(edit("b.ts", script.replace('"a b"', '"a  b"'))).toBe(false);
       expect(edit("b.ts", "// @ts-expect-error\n" + script)).toBe(false);
-      expect(edit("c.css", "/* Blue. */\n.a  {\n  color: blue;\n}\n")).toBe(true);
+      expect(edit("c.css", files["c.css"].replace(".a {", "/* Blue. */\n.a  {\n "))).toBe(true);
+      expect(edit("c.css", files["c.css"].replace(".a .b", ".a/**/.b"))).toBe(false);
+      expect(edit("c.css", files["c.css"].replace(".c\\ d", ".c\\  d"))).toBe(false);
+      expect(edit("f.tsx", "// The paragraph.\nexport const p = <p>x</p>; /* Plain. */\n")).toBe(true);
+      expect(edit("f.tsx", "export const p = <p> x</p>;\n")).toBe(false);
+      expect(edit("g.mjs", "#!/usr/bin/env node\n// Logs.\nconsole.log(1);\n")).toBe(true);
+      expect(edit("g.mjs", "#!/usr/bin/env -S node --x\nconsole.log(1);\n")).toBe(false);
       expect(edit("c.css", "// note\n.a { color: blue; }\n")).toBe(false);
       expect(edit("e2e", "#!/bin/sh\n# Runs it, then says so.\necho hi\n")).toBe(false);
       expect(edit("d.yml", "# A.\na: 1\n")).toBe(false);

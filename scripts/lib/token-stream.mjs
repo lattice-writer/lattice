@@ -42,23 +42,28 @@ function scriptStream(file, text) {
     if (node.kind >= ts.SyntaxKind.FirstJSDocNode && node.kind <= ts.SyntaxKind.LastJSDocNode) return;
     const children = node.getChildren(source);
     if (children.length) return children.forEach(walk);
-    const start = node.getStart(source);
+    // A JSX text's leading spaces render on its line; getStart skips them as trivia.
+    const start = node.kind === ts.SyntaxKind.JsxText ? node.getFullStart() : node.getStart(source);
     const breaks = text.slice(node.getFullStart(), start).includes("\n");
     tokens.push(`${breaks ? "\n" : " "}${text.slice(start, node.getEnd())}`);
   };
   walk(source);
-  return tokens.join("");
+  // The first token's mark only says whether a comment comes before it.
+  return tokens.join("").slice(1);
 }
 
 /** Runs `token` over `text`: each call returns [what it adds, where it ends]; comments and spacing add one space. */
 function lexed(text, token) {
   let out = "";
+  let spaced = true;
   for (let at = 0; at < text.length; ) {
     const [piece, end] = token(text, at);
-    out += piece === " " && out.endsWith(" ") ? "" : piece;
+    // An escaped space ends a piece too; only spacing pieces collapse.
+    if (piece !== " " || !spaced) out += piece;
+    if (piece) spaced = piece === " ";
     at = end;
   }
-  return out.trim();
+  return spaced ? out.slice(0, -1) : out;
 }
 
 const SPACE = /\s/;
@@ -115,7 +120,9 @@ function rustToken(text, at) {
 function cssToken(text, at) {
   const char = text[at];
   if (SPACE.test(char)) return [" ", at + 1];
-  if (text.startsWith("/*", at)) return [" ", blockComment(text, at, false)];
+  // A CSS comment is no space: `.a/**/.b` is one compound selector.
+  if (text.startsWith("/*", at)) return ["", blockComment(text, at, false)];
+  if (char === "\\") return [text.slice(at, at + 2), at + 2];
   if (char === '"' || char === "'") {
     const end = quoted(text, at, char);
     return [text.slice(at, end), end];

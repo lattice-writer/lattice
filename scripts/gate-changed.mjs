@@ -176,13 +176,9 @@ function excerpt(log) {
   return [...lines.slice(0, 30), `… ${lines.length - 60} lines omitted …`, ...lines.slice(-30)];
 }
 
-/**
- * The stages for these changed files; a skipped one carries its reason.
- * `commentOnly` (ci:local's commentOnlyEdits) holds the files whose change is
- * only comments and whitespace: lint, knip and tsc read them, no test does.
- */
-export function gateStages(files, commentOnly = new Set()) {
-  const code = files.filter((file) => /^(src|tools|scripts)\/.*\.(ts|tsx|mts|js|jsx|mjs|css|json)$/.test(file) && !commentOnly.has(file));
+/** The stages for these changed files; a skipped one carries its reason. */
+export function gateStages(files) {
+  const code = files.filter((file) => /^(src|tools|scripts)\/.*\.(ts|tsx|mts|js|jsx|mjs|css|json)$/.test(file));
   const sources = files.filter((file) => /^src\/.*\.tsx?$/.test(file) || file.startsWith("src/locales/"));
   // gpui/ is a Cargo workspace of its own, checked by `pnpm signoff`.
   const rust = files.filter((file) => file.startsWith("src-tauri/") && file.endsWith(".rs"));
