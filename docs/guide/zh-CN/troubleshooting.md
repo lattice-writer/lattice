@@ -16,7 +16,7 @@
 
 **AI 助手提示未登录。** 面板会显示哪个服务商没有登录，例如「Claude is not authenticated」。在「终端」里登录一次（Claude Code 用 `claude auth login`）再试，或者在 **设置 › AI 助手 › 模型** 中换一个服务商。
 
-![AI 助手面板：提示 Claude 未登录，并有「模型设置」按钮](../images/zh-agent-signin.webp)
+![AI 助手面板：提示 Claude 未登录，并有「提供商设置」按钮](../images/zh-agent-signin.webp)
 
 **Overleaf 不再同步。** 打开 **设置 › Overleaf**。如果登录过期，点 **重新连接**；如果同步已暂停，点 **继续同步**。含有冲突标记的文件会暂停同步，直到你在每个标记处选择 **保留我的**、**保留对方的** 或 **保留两者**。
 

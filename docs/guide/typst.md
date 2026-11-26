@@ -6,7 +6,7 @@ Lattice also writes and builds [Typst](https://typst.app) documents (`.typ` file
 
 The first time you build a Typst document, or it starts compiling as you type, Lattice asks to download Typst support, a one-time download of about 22 MB. **Download** fetches it, checks its signature and runs the build. **Not now** leaves the file as it was, with highlighting only; typing doesn't ask again until you restart Lattice, and the next build asks again. After an app update, Lattice downloads the matching version on its own.
 
-**Settings › Editor & builds › Typst support** shows whether it is installed, with **Download**, or **Download again** and **Remove**. Typst support is published for Apple silicon Macs; on an Intel Mac, Lattice says it isn't available on this computer.
+**Settings › Editor & builds › Typst support** shows whether it is installed, with **Download**, or **Download again** and **Remove**. Typst support is published for Macs with Apple silicon and for Intel Macs.
 
 ## Start one
 
