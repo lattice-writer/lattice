@@ -59,7 +59,7 @@ type PassiveChunk = {
 export type PassiveModel = { chunks: PassiveChunk[]; headings: DocumentHeadingItem[] };
 
 /** The passive layout of a document, or null when it is small enough (or shaped so) to draw whole. */
-export function passiveModel(doc: PmNode, baseline: MarkdownBaseline, textLength: number, paper: boolean): PassiveModel | null {
+function passiveModel(doc: PmNode, baseline: MarkdownBaseline, textLength: number, paper: boolean): PassiveModel | null {
   const { entries } = baseline;
   if (entries.length < 2 || doc.childCount !== entries.length) return null;
   if (entries.length < PASSIVE_MIN_BLOCKS && textLength < PASSIVE_MIN_LENGTH) return null;
