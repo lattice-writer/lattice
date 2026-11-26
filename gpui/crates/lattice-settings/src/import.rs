@@ -12,6 +12,7 @@
 use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
+    sync::atomic::{AtomicU64, Ordering},
     time::SystemTime,
 };
 
@@ -178,15 +179,23 @@ pub fn read_items(database: &Path) -> anyhow::Result<BTreeMap<String, String>> {
     read_keys(database, KEYS)
 }
 
+/// Numbers each read's scratch directory within this process.
+static SCRATCH: AtomicU64 = AtomicU64::new(0);
+
 /// The values of `keys` in one database, read from a copy.
 pub fn read_keys(database: &Path, keys: &[&str]) -> anyhow::Result<BTreeMap<String, String>> {
+    // The counter keeps two reads at once (the tests run in parallel) out of
+    // one directory: macOS's clock moves in microseconds, so the time alone
+    // gave both the same name, and the second's copy truncated the database
+    // the first had mapped, which crashed the test binary with SIGBUS.
     let scratch = std::env::temp_dir().join(format!(
-        "lattice-gpui-import-{}-{}",
+        "lattice-gpui-import-{}-{}-{}",
         std::process::id(),
         SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .map(|elapsed| elapsed.as_nanos())
-            .unwrap_or_default()
+            .unwrap_or_default(),
+        SCRATCH.fetch_add(1, Ordering::Relaxed)
     ));
     std::fs::create_dir_all(&scratch)?;
     let result = (|| {
