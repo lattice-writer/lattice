@@ -68,11 +68,11 @@ export const OVERLEAF_HOST_ERRORS: readonly HostErrorEntry[] = [
   ["overleaf/review.rs", "Overleaf's full history needs a paid plan on this project.", () => t`Overleaf's full history needs a paid plan on this project.`],
   ["overleaf/review.rs", "Overleaf's history since the last sync is longer than Lattice reads at once.", () => t`Overleaf's history since the last sync is longer than Lattice reads at once.`],
 
-  // Live editing (overleaf_rt/client.rs, ipc/overleaf_realtime.rs)
+  // Live editing (overleaf_rt/client.rs, handshake.rs, client/heartbeat.rs, ipc/overleaf_realtime.rs)
   ["overleaf_rt/client.rs", "You have read-only access to this Overleaf project, so edits stay on this machine.", () => t`You have read-only access to this Overleaf project, so edits stay on this machine.`],
   ["overleaf_rt/client.rs", "The Overleaf realtime connection closed before the server answered.", () => t`The Overleaf realtime connection closed before the server answered.`],
-  ["overleaf_rt/client.rs", "Could not reach Overleaf ({e}).", ([error]) => t`Could not reach Overleaf (${error}).`],
-  ["overleaf_rt/client.rs", "Overleaf refused the realtime handshake (HTTP {}).", ([status]) => t`Overleaf refused the realtime handshake (HTTP ${status}).`],
+  ["overleaf_rt/handshake.rs", "Could not reach Overleaf ({e}).", ([error]) => t`Could not reach Overleaf (${error}).`],
+  ["overleaf_rt/handshake.rs", "Overleaf refused the realtime handshake (HTTP {}).", ([status]) => t`Overleaf refused the realtime handshake (HTTP ${status}).`],
   ["overleaf_rt/client.rs", "The Overleaf realtime connection is closed.", () => t`The Overleaf realtime connection is closed.`],
   ["overleaf_rt/client.rs", "The Overleaf realtime connection closed.", () => t`The Overleaf realtime connection closed.`],
   ["overleaf_rt/client.rs", "The Overleaf server closed the connection: {}", ([reason]) => t`The Overleaf server closed the connection: ${reason}`],

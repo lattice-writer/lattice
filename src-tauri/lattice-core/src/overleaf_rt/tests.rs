@@ -1,4 +1,4 @@
-use super::client::{lock, merge_cookies};
+use super::client::lock;
 use super::codec::*;
 use super::events::*;
 use super::mock_server::*;
@@ -203,18 +203,6 @@ fn origins_switch_scheme_for_websockets() {
     assert_eq!(ws_origin("http://127.0.0.1:8080"), "ws://127.0.0.1:8080");
     assert!(normalize_origin("overleaf.com").is_err());
     assert!(normalize_origin("  ").is_err());
-}
-
-#[test]
-fn cookies_from_the_handshake_join_the_ones_we_had() {
-    // A new cookie is appended, an existing one is replaced in place, and
-    // anything without a name is ignored.
-    let handed_back = ["ol-affinity=instance-7; Path=/; HttpOnly", "other=2; Path=/", "; Path=/"];
-    assert_eq!(
-        merge_cookies("overleaf_session2=abc; other=1", &handed_back.map(String::from)),
-        "overleaf_session2=abc; other=2; ol-affinity=instance-7"
-    );
-    assert_eq!(merge_cookies("session=x", &[]), "session=x");
 }
 
 // -- payload shapes ---------------------------------------------------------

@@ -51,6 +51,7 @@ mod changed_runs;
 mod client;
 mod codec;
 mod events;
+mod handshake;
 #[cfg(test)]
 mod mock_ot;
 #[cfg(test)]

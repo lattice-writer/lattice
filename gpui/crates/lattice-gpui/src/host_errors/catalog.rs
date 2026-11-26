@@ -1616,12 +1616,12 @@ pub(super) static ENTRIES: &[Entry] = &[
         text: Text::Message("The Overleaf realtime connection closed before the server answered.", &[]),
     },
     Entry {
-        file: "overleaf_rt/client.rs",
+        file: "overleaf_rt/handshake.rs",
         literal: "Could not reach Overleaf ({e}).",
         text: Text::Message("Could not reach Overleaf ({error}).", &[("error", Arg::Param(0))]),
     },
     Entry {
-        file: "overleaf_rt/client.rs",
+        file: "overleaf_rt/handshake.rs",
         literal: "Overleaf refused the realtime handshake (HTTP {}).",
         text: Text::Message("Overleaf refused the realtime handshake (HTTP {status}).", &[("status", Arg::Param(0))]),
     },
