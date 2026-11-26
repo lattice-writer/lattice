@@ -9,8 +9,8 @@
         "zh": "Overleaf「请求过多」时按它要求的时间等待，并显示还要等多久"
       },
       "body": {
-        "en": "In the native Lattice, when Overleaf answers live sync with \"too many requests\", the cool-down now lasts as long as Overleaf asks when it says how long, between 30 seconds and 5 minutes, instead of Lattice's own guess of 30 seconds, doubling each time. While it waits, the Overleaf status in the title bar reads Overleaf asked to wait, retrying in N s, and the waiting sync goes out the moment the cool-down ends instead of on the next check up to 45 seconds later. Error messages for such an answer say how long to wait, in English and Chinese. Live sync also no longer asks Overleaf for its latest version a few seconds after it has just read it.",
-        "zh": "在原生 Lattice 中，Overleaf 对实时同步回复「请求过多」时，Overleaf 给出等待时间时，冷却时间现在按它要求的长短来等，在 30 秒到 5 分钟之间，而不是 Lattice 自己从 30 秒起逐次翻倍的估计。等待期间，标题栏里的 Overleaf 状态显示「Overleaf 要求稍候，N 秒后重试」；冷却一结束，等着的同步就会立即发出，而不是等到最多 45 秒后的下一次检查。这类回复的错误信息会写明需要等多久，中英文都有。实时同步也不再在刚读到 Overleaf 最新版本几秒后又去问一次。"
+        "en": "In the native Lattice, when Overleaf answers live sync with \"too many requests\", the cool-down now lasts as long as Overleaf asks when it says how long, between 30 seconds and 5 minutes, instead of Lattice's own guess of 30 seconds, doubling each time. While it waits, pointing at the title bar's Overleaf button shows Overleaf asked to wait, retrying in N s, and the waiting sync goes out the moment the cool-down ends instead of on the next check up to 45 seconds later. In both apps, error messages for such an answer say how long to wait, in English and Chinese. Live sync also no longer asks Overleaf for its latest version a few seconds after it has just read it.",
+        "zh": "在原生 Lattice 中，Overleaf 对实时同步回复「请求过多」并给出等待时间时，冷却时间现在按它要求的时长来等，在 30 秒到 5 分钟之间，而不是 Lattice 自己从 30 秒起逐次翻倍的估计。等待期间，把指针移到标题栏的 Overleaf 按钮上会显示「Overleaf 要求稍候，N 秒后重试」；冷却一结束，等着的同步就会立即发出，而不是等到最多 45 秒后的下一次检查。在两个版本中，这类回复的错误信息都会写明需要等多久，中英文都有。实时同步也不再在刚读到 Overleaf 最新版本几秒后又去问一次。"
       }
     },
     {
@@ -50,8 +50,8 @@
       "zh": "从强制彩色输出的 shell 启动 Lattice 时，AI 助手面板中的模型状态提示显示为纯文本，不再夹着原始的颜色代码；上次运行保存下来的警告，也不会在启动时被当成当前状态显示出来。"
     },
     {
-      "en": "In a Chinese interface, the native Lattice gives the reasons a live Overleaf connection timed out in Chinese.",
-      "zh": "在中文界面下，原生 Lattice 会用中文说明 Overleaf 实时连接超时的原因。"
+      "en": "In a Chinese interface, Lattice gives the reasons a live Overleaf connection timed out in Chinese.",
+      "zh": "在中文界面下，Lattice 会用中文说明 Overleaf 实时连接超时的原因。"
     },
     {
       "en": "A folder too shallow to give to the Agent is now refused with \"The Agent can only be given a folder at least three levels deep.\", in English and Chinese, instead of a message about the home folder.",
