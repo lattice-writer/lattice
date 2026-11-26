@@ -77,6 +77,15 @@ const AGENT_MODULES = [...new Set([...ISLAND_MODULES, ...[...MODULE_COVERS.keys(
  * `covers`; the others apply to files no `covers` names. The first
  * matching row wins; a file no row and no `covers` matches needs FULL.
  */
+/**
+ * Files the macOS scenario cannot show apart from the smoke flow, though
+ * another platform's may: code compiled only for Linux or Windows, and the
+ * Tauri modules' catalogs, which no island module reads in Chinese. Kept out
+ * of E2E_TABLE, whose empty rows the Windows and Linux tiers read as files no
+ * e2e step reads anywhere (windows-e2e-tier.mjs NO_STEP).
+ */
+const MACOS_SMOKE = [/^gpui\/crates\/lattice-gpui\/src\/native_(linux|windows)\.rs$/, /^src\/locales\//];
+
 export const E2E_TABLE = [
   // The scenario's own harness, runner and fixture: every module runs on them.
   [/^gpui\/crates\/lattice-gpui\/src\/scenario(\.rs$|\/)/, FULL],
@@ -107,23 +116,17 @@ export const E2E_TABLE = [
   [/^src-tauri\/lattice-(core|theme)\//, FULL],
   [/^design-system\//, FULL],
   [/^\.github\/workflows\/gpui\.yml$/, FULL],
-  // The string catalogs (lattice-i18n's .po files and the Tauri modules'
-  // src/locales/, which the islands and lattice-i18n compile in): the build
-  // and the unit tests check them (lattice-i18n's coverage test), the smoke
-  // flow runs, and the strings as shown are left to the nightly full gate,
-  // except the zh-CN strings settings and find_in_file read in Chinese. No
-  // island module reads src/locales/ in Chinese.
+  // lattice-i18n's string catalogs: the build and the unit tests check them
+  // (lattice-i18n's coverage test), settings and find_in_file read zh-CN
+  // strings, and the rest of the strings as shown are left to the nightly
+  // full gate.
   [/^gpui\/crates\/lattice-i18n\/locales\//, ["settings", "find_in_file"]],
-  [/^src\/locales\//, []],
   // Project find and replace, which the documents module drives
   // (shell/documents.rs) and find_in_file shares.
   [/^gpui\/crates\/lattice-gpui\/src\/search\/(find|replace)\.rs$/, ["documents", "find_in_file"]],
   // The shared search field: the shortcut sheet, project find and replace,
   // and the pickers type into it.
   [/^gpui\/crates\/lattice-gpui\/src\/search\/field\.rs$/, ["documents", "find_in_file", "focus_trap", "insert_pickers", "shortcut_sheet"]],
-  // Compiled only for Linux and Windows: the macOS scenario cannot reach them
-  // (scripts/windows-e2e-tier.mjs decides the Windows job's).
-  [/^gpui\/crates\/lattice-gpui\/src\/native_(linux|windows)\.rs$/, []],
   // Crates one part of the scenario exercises.
   [/^gpui\/crates\/lattice-board(-core)?\//, ["drawing_drop", "structured"]],
   [/^gpui\/crates\/lattice-webview\//, ISLAND_MODULES],
@@ -180,7 +183,7 @@ export function e2eNeeds(gpuiFiles, covers = MODULE_COVERS) {
       }
     }
     if (!picked.size) {
-      const row = E2E_TABLE.find(([pattern]) => pattern.test(file));
+      const row = MACOS_SMOKE.some((pattern) => pattern.test(file)) ? [null, []] : E2E_TABLE.find(([pattern]) => pattern.test(file));
       const near = row ? [] : dirModules(file, covers);
       if (row?.[1] === FULL || (!row && !near.length)) {
         fullBecause.push(file);
