@@ -105,6 +105,16 @@ impl Run {
         self.build(cx).await?;
         self.wait_for(cx, Duration::from_secs(20), |shell, cx| shell.read(cx).live_document() == Some("main.tex"))
             .await;
+        // main.tex taking the live PDF back leaves cite-check.tex in a root tab of its
+        // own. Close it so later modules (manuscripts, dock) find only the PDFs
+        // they open themselves.
+        cx.update(|cx| {
+            let workspace = self.shell.read(cx).workspace().clone();
+            workspace.update(cx, |workspace, cx| {
+                workspace.close(&[crate::shell::views::root_pdf_id("cite-check.tex")], cx)
+            });
+        });
+        self.pause(cx, Duration::from_millis(300)).await;
         Ok(())
     }
 }
