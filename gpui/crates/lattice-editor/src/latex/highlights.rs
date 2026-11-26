@@ -265,11 +265,24 @@ pub fn highlight_edit(doc: &str, range: Range<usize>, color: Option<&str>) -> Op
 /// painted; a colour by name and soul's `\hl` are the document's to say.
 /// `text` is the document from `offset` on, the stretch around what the
 /// editor shows.
-pub fn paint(text: &str, offset: usize, dark: bool) -> HighlightPaint {
+///
+/// A `\colorbox` is one box TeX never breaks across lines (lattice#1327),
+/// so its text is painted only while it stands on one row of the editor:
+/// `breaks` says whether the bytes from its first character to the start of
+/// its last lie on different rows (the editor soft-wrapped it). A broken box
+/// keeps its swatch and receding wrapper but no paint, rather than a
+/// highlighter wrapping from row to row as nothing in the PDF does.
+pub fn paint(
+    text: &str,
+    offset: usize,
+    dark: bool,
+    breaks: impl Fn(Range<usize>) -> bool,
+) -> HighlightPaint {
     use crate::decorations::{Highlight, Mark, MarkStyle, Underline};
     let mut washes = Vec::new();
     let mut marks = Vec::new();
     let mut swatches = Vec::new();
+    let mut boxes = Vec::new();
     let wrapper = MarkStyle {
         fade: Some(0.55),
         ..MarkStyle::default()
@@ -306,6 +319,15 @@ pub fn paint(text: &str, offset: usize, dark: bool) -> HighlightPaint {
             continue;
         }
         let range = highlight.content_from..highlight.content_to;
+        let last = text[..highlight.content_to - offset]
+            .char_indices()
+            .next_back()
+            .map_or(highlight.content_from, |(at, _)| at + offset);
+        let broken = breaks(highlight.content_from..last);
+        boxes.push((range.clone(), broken));
+        if broken {
+            continue;
+        }
         if dark {
             washes.push(Highlight {
                 range: range.clone(),
@@ -340,6 +362,7 @@ pub fn paint(text: &str, offset: usize, dark: bool) -> HighlightPaint {
         washes,
         marks,
         swatches,
+        boxes,
     }
 }
 
@@ -351,6 +374,9 @@ pub struct HighlightPaint {
     pub washes: Vec<crate::decorations::Highlight>,
     pub marks: Vec<crate::decorations::Mark>,
     pub swatches: Vec<crate::inline_texts::InlineText>,
+    /// Each painted box's text and whether it was broken across rows, so a
+    /// wrap that changes either is painted again.
+    pub boxes: Vec<(Range<usize>, bool)>,
 }
 
 #[cfg(test)]
@@ -394,11 +420,12 @@ mod tests {
             washes,
             marks,
             swatches,
-        } = paint(text, 0, false);
+            ..
+        } = paint(text, 0, false, |_| false);
         let word = text.find("word").unwrap();
         assert_eq!(washes.len(), 1);
         assert_eq!(washes[0].range, word..word + 4);
-        let shifted = paint(&text[1..], 1, false);
+        let shifted = paint(&text[1..], 1, false, |_| false);
         assert_eq!(shifted.washes[0].range, word..word + 4);
         assert_eq!(washes[0].color, gpui::rgb(0xFFF1A6).into());
         assert_eq!(
@@ -408,7 +435,7 @@ mod tests {
                 .count(),
             2
         );
-        let dark = paint(text, 0, true);
+        let dark = paint(text, 0, true, |_| false);
         assert!(dark.washes[0].color.a < 0.2);
         // One swatch, before the `\colorbox` (soul's `\hl` has no colour of
         // its own to show), in the highlight's colour.
@@ -419,5 +446,41 @@ mod tests {
             swatches[0].look,
             crate::inline_texts::InlineLook::Swatch(gpui::rgb(0xFFF1A6).into())
         );
+    }
+
+    #[test]
+    fn a_colorbox_is_painted_only_while_it_stands_on_one_row() {
+        // Rows of 12 bytes: the box's text "one two" (27..34) sits on the
+        // third.
+        let text = r"ab \colorbox[HTML]{FFF1A6}{one two} \hl{a soul highlight}";
+        let rows = |row: usize| move |range: Range<usize>| range.start / row != range.end / row;
+        let content = text.find("one").unwrap();
+        let whole = paint(text, 0, false, rows(12));
+        assert_eq!(content / 12, (content + 6) / 12, "the box fits a row");
+        assert_eq!(whole.washes.len(), 1);
+        assert_eq!(whole.boxes, vec![(content..content + 7, false)]);
+        // Narrower rows split "one two": TeX never breaks a box, so its text
+        // is not painted as a highlighter wrapping onto the next row; its
+        // swatch and receding wrapper stay.
+        let broken = paint(text, 0, false, rows(content + 4));
+        assert!(broken.washes.is_empty());
+        assert_eq!(broken.boxes, vec![(content..content + 7, true)]);
+        assert_eq!(broken.swatches.len(), 1);
+        assert_eq!(
+            broken
+                .marks
+                .iter()
+                .filter(|mark| mark.style.fade.is_some())
+                .count(),
+            2
+        );
+        assert!(broken.marks.iter().all(|mark| mark.style.fade.is_some()));
+        // Soul's \hl breaks across lines in TeX too; it stays the document's
+        // to colour (\sethlcolor), unpainted wherever it wraps.
+        let soul = text.find("a soul").unwrap();
+        let all_rows = paint(text, 0, false, |_| true);
+        assert!(all_rows.washes.iter().all(|wash| wash.range.start < soul));
+        assert!(all_rows.marks.iter().all(|mark| mark.range.end <= soul));
+        assert!(all_rows.boxes.iter().all(|(range, _)| range.end <= soul));
     }
 }

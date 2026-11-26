@@ -70,6 +70,8 @@ As argued before~\\cite{e2e-key}.
 
 Visual citations~\\cite{e2evisual2024}, and its fifth page~\\cite[p.~5]{e2evisual2024}.
 
+A box set as TeX sets it, after enough prose to reach the end of a line, \\colorbox[HTML]{FFF1A6}{a highlighted passage kept on one line}, and soul's \\hl{highlighter}.
+
 \\end{document}
 ";
 
@@ -84,6 +86,18 @@ const DRAWN: &str = "JSON.stringify({ \
     cite: !!document.querySelector('.cm-latex-visual .lx-tex-cite'), \
     text: document.querySelector('.cm-content')?.textContent ?? '', \
     theme: document.documentElement.dataset.theme || null })";
+
+/// The page's `\\colorbox`es (lattice#1327): each one element over its whole
+/// command, laid out on one line and filled in its colour, and none for
+/// soul's `\\hl`.
+const BOXES: &str = "JSON.stringify((() => { \
+    const boxes = [...document.querySelectorAll('.cm-latex-visual .cm-hl-box')]; \
+    const fill = boxes[0]?.querySelector('.cm-hl-box-fill'); \
+    return { \
+      boxes: boxes.map((box) => box.textContent), \
+      lines: boxes[0] ? boxes[0].getClientRects().length : 0, \
+      white_space: boxes[0] ? getComputedStyle(boxes[0]).whiteSpace : null, \
+      fill: fill ? getComputedStyle(fill).backgroundColor : null }; })())";
 
 impl Run {
     pub(super) async fn latex_visual(
@@ -268,6 +282,18 @@ impl Run {
                 && facts["cite"] == true
                 && facts["theme"].is_string(),
             json!({ "state": format!("{state:?}"), "visible": visible, "page": facts }),
+        );
+        let boxes = self.evaluate(cx, &island, BOXES).await;
+        steps.check(
+            "a \\colorbox on the page is one box that never breaks across lines, filled in its colour, as TeX sets it; soul's \\hl is no box",
+            boxes["boxes"]
+                == json!([r"\colorbox[HTML]{FFF1A6}{a highlighted passage kept on one line}"])
+                && boxes["lines"] == 1
+                && boxes["white_space"] == "pre"
+                && boxes["fill"]
+                    .as_str()
+                    .is_some_and(|fill| fill != "rgba(0, 0, 0, 0)" && fill != "transparent"),
+            json!({ "boxes": boxes }),
         );
         Some(island)
     }

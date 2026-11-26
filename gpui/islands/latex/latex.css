@@ -7,3 +7,15 @@
   min-width: 0;
   height: 100%;
 }
+
+/* A `\colorbox` on the page is the box TeX sets (lattice#1327): its command
+   never breaks across lines, and its argument is filled square, `\fboxsep`
+   (3pt) wider either side, rather than the source's rounded, wrapping
+   highlighter. */
+.cm-hl-box {
+  white-space: pre;
+}
+.cm-hl-paint.cm-hl-box-fill {
+  border-radius: 0;
+  padding-inline: 3pt;
+}

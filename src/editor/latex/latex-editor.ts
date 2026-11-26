@@ -127,6 +127,8 @@ export type LatexEditorOptions = {
   onPasteImage?: (file: File) => boolean | void;
   onCreateMissingFile?: (path: string) => void;
   onTexlabGoto?: (path: string, line: number, column?: number) => void;
+  /** Draw each `\colorbox` as one unbreakable box, as TeX sets it (`highlightPaint`). */
+  colorboxes?: boolean;
 };
 
 /**
@@ -435,7 +437,7 @@ export function latexEditorExtensions(options: LatexEditorOptions): Extension[] 
   const reasonsContext = reasons ? { currentPath, api: reasons.api } : undefined;
   return [
     ...textEditorExtensions(options.spellcheck ? "latex" : false, options.live, options.onPasteImage, currentPath),
-    highlightPaint(),
+    highlightPaint({ boxes: options.colorboxes }),
     reasons?.extension ?? [],
     citationTooltips(live, onGotoDefinition, reasonsContext),
     referenceTooltips(live, options.loadReferenceImage, onGotoDefinition),

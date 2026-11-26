@@ -12,6 +12,12 @@ import { latexHighlights } from "./latex-highlights";
  * Only what is on screen is scanned, with a margin either side so a highlight
  * that starts or ends just off screen is still found whole; a document of
  * megabytes costs what its viewport costs.
+ *
+ * With `boxes` (the GPUI app's Visual page) a `\colorbox` is drawn as TeX
+ * sets it, one box that never breaks across lines (lattice#1327): the whole
+ * command is one outer mark the line cannot wrap inside, so a box too long for
+ * the line runs past it as an overfull box does, and its argument is filled
+ * square with `\fboxsep` either side. Soul's `\hl` is left as it is.
  */
 const MARGIN = 2000;
 
@@ -34,40 +40,57 @@ class Swatch extends WidgetType {
   }
 }
 
-function build(view: EditorView): DecorationSet {
-  const marks: Array<[number, number, Decoration]> = [];
-  const seen = new Set<number>();
-  for (const range of view.visibleRanges) {
-    const from = Math.max(0, range.from - MARGIN);
-    const to = Math.min(view.state.doc.length, range.to + MARGIN);
-    for (const highlight of latexHighlights(view.state.sliceDoc(from, to))) {
-      const start = from + highlight.from;
-      const hex = highlight.color && /^#[0-9A-F]{6}$/i.test(highlight.color) ? highlight.color : null;
-      if (!hex || seen.has(start)) continue;
-      seen.add(start);
-      const style = `--hl: ${hex}`;
-      marks.push([start, start, Decoration.widget({ widget: new Swatch(hex), side: -1 })]);
-      marks.push([start, from + highlight.contentFrom, Decoration.mark({ class: "cm-hl-wrap" })]);
-      if (highlight.contentTo > highlight.contentFrom) {
-        marks.push([from + highlight.contentFrom, from + highlight.contentTo, Decoration.mark({ class: "cm-hl-paint", attributes: { style } })]);
-      }
-      marks.push([from + highlight.contentTo, from + highlight.to, Decoration.mark({ class: "cm-hl-wrap" })]);
-    }
-  }
+type Built = { decorations: DecorationSet; boxes: DecorationSet };
+
+function sorted(marks: Array<[number, number, Decoration]>): DecorationSet {
   marks.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
   const builder = new RangeSetBuilder<Decoration>();
   for (const [from, to, decoration] of marks) builder.add(from, to, decoration);
   return builder.finish();
 }
 
-export function highlightPaint() {
-  return ViewPlugin.fromClass(class {
-    decorations: DecorationSet;
+const BOX = Decoration.mark({ class: "cm-hl-box" });
+
+function build(view: EditorView, boxes: boolean): Built {
+  const marks: Array<[number, number, Decoration]> = [];
+  const units: Array<[number, number, Decoration]> = [];
+  const seen = new Set<number>();
+  for (const range of view.visibleRanges) {
+    const from = Math.max(0, range.from - MARGIN);
+    const to = Math.min(view.state.doc.length, range.to + MARGIN);
+    for (const highlight of latexHighlights(view.state.sliceDoc(from, to))) {
+      const start = from + highlight.from;
+      if (seen.has(start)) continue;
+      seen.add(start);
+      const isBox = boxes && highlight.color !== null;
+      if (isBox) units.push([start, from + highlight.to, BOX]);
+      const hex = highlight.color && /^#[0-9A-F]{6}$/i.test(highlight.color) ? highlight.color : null;
+      if (!hex) continue;
+      const style = `--hl: ${hex}`;
+      marks.push([start, start, Decoration.widget({ widget: new Swatch(hex), side: -1 })]);
+      marks.push([start, from + highlight.contentFrom, Decoration.mark({ class: "cm-hl-wrap" })]);
+      if (highlight.contentTo > highlight.contentFrom) {
+        marks.push([from + highlight.contentFrom, from + highlight.contentTo, Decoration.mark({ class: isBox ? "cm-hl-paint cm-hl-box-fill" : "cm-hl-paint", attributes: { style } })]);
+      }
+      marks.push([from + highlight.contentTo, from + highlight.to, Decoration.mark({ class: "cm-hl-wrap" })]);
+    }
+  }
+  return { decorations: sorted(marks), boxes: sorted(units) };
+}
+
+export function highlightPaint({ boxes = false }: { boxes?: boolean } = {}) {
+  const plugin = ViewPlugin.fromClass(class {
+    built: Built;
     constructor(view: EditorView) {
-      this.decorations = build(view);
+      this.built = build(view, boxes);
     }
     update(update: ViewUpdate) {
-      if (update.docChanged || update.viewportChanged) this.decorations = build(update.view);
+      if (update.docChanged || update.viewportChanged) this.built = build(update.view, boxes);
     }
-  }, { decorations: (plugin) => plugin.decorations });
+  }, { decorations: (plugin) => plugin.built.decorations });
+  if (!boxes) return plugin;
+  // Outer decorations wrap every other mark (syntax colours, spelling, the
+  // paint itself), so nothing splits a box into pieces a line could break
+  // between.
+  return [plugin, EditorView.outerDecorations.of((view) => view.plugin(plugin)?.built.boxes ?? Decoration.none)];
 }

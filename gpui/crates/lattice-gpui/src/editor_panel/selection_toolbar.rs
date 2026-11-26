@@ -125,6 +125,10 @@ pub(super) struct ToolbarState {
     /// How many highlights the last paint painted, and the bytes it read.
     painted: usize,
     painted_window: Range<usize>,
+    /// The boxes the last paint read, and whether each was broken.
+    painted_boxes: Vec<(Range<usize>, bool)>,
+    /// The buffer's version the last paint read.
+    painted_version: Option<clock::Global>,
     _paint: Option<gpui::Task<()>>,
 }
 
@@ -286,10 +290,14 @@ impl EditorPanel {
             language::Bias::Right,
         );
         let text = buffer.text_for_range(start..end).collect::<String>();
-        let paint = highlights::paint(&text, start, dark);
+        let version = buffer.version();
+        let breaks = self.box_breaks(cx);
+        let paint = highlights::paint(&text, start, dark, breaks);
         self.toolbar.painted_dark = Some(dark);
         self.toolbar.painted = paint.washes.len();
         self.toolbar.painted_window = start..end;
+        self.toolbar.painted_boxes = paint.boxes;
+        self.toolbar.painted_version = Some(version);
         self.lattice.update(cx, |lattice, cx| {
             lattice.set_highlights(PAINT, paint.washes, cx);
             lattice.set_marks(PAINT_MARKS, paint.marks, cx);
@@ -306,6 +314,42 @@ impl EditorPanel {
         let (shown, painted) = (self.shown_bytes(cx), &self.toolbar.painted_window);
         if shown.start < painted.start || shown.end > painted.end {
             self.paint_highlights(cx);
+            return;
+        }
+        // A box the soft wrap now breaks, or no longer breaks, is painted
+        // again (a resize, a font size). After an edit the boxes' offsets are
+        // stale until the paint that typing pauses for.
+        if self.toolbar.painted_boxes.is_empty()
+            || self.toolbar.painted_version.as_ref() != Some(&self.buffer.read(cx).version())
+        {
+            return;
+        }
+        let breaks = self.box_breaks(cx);
+        if self
+            .toolbar
+            .painted_boxes
+            .iter()
+            .any(|(range, broken)| breaks(range.clone()) != *broken)
+        {
+            self.paint_highlights(cx);
+        }
+    }
+
+    /// Whether the start of a byte range and its end lie on different rows
+    /// of the editor, as [`highlights::paint`] asks of a `\colorbox`.
+    fn box_breaks(&self, cx: &mut Context<Self>) -> impl Fn(Range<usize>) -> bool + use<> {
+        use editor::{MultiBufferOffset, display_map::ToDisplayPoint as _};
+        let snapshot = self
+            .editor
+            .update(cx, |editor, cx| editor.display_snapshot(cx));
+        move |range: Range<usize>| {
+            let len = snapshot.buffer_snapshot().len().0;
+            let row = |offset: usize| {
+                MultiBufferOffset(offset.min(len))
+                    .to_display_point(&snapshot)
+                    .row()
+            };
+            row(range.start) != row(range.end)
         }
     }
 

@@ -243,6 +243,7 @@ function editorExtensions(visual: VisualModule, path: string, spellcheck: boolea
       onRenameEnvironment: askToRenameEnvironment,
       onPasteImage: pasteImage,
       onTexlabGoto: (target, line) => host().post("md:open-location", { path: target, line }),
+      colorboxes: true,
     }),
     // The source session's review layers (`source-session.ts`).
     overleafCursorsExtension({ getCursors: () => presenceCursors }),
