@@ -51,7 +51,11 @@ const context = {
   ],
   keys: new Map([["CloseTab", ["cmd-w"]]]),
   methods: new Map([["sync_overleaf", ["gpui/crates/lattice-gpui/src/shell/overleaf_flow.rs"]]]),
+  contextReaders: ["gpui/crates/lattice-gpui/src/shell/shortcut_sheet.rs"],
 };
+covers.set("shortcut_sheet", ["gpui/crates/lattice-gpui/src/shell/shortcut_sheet.rs"]);
+context.scenario.push({ file: "gpui/crates/lattice-gpui/src/scenario/e2e/journal.rs", text: "shell.command_context(cx)" }, { file: "gpui/crates/lattice-gpui/src/scenario/parity_x.rs", text: "Unused" });
+covers.set("journal", []);
 
 /** A one-hunk -U0 diff replacing old lines [from, from + drop) with `add`. */
 function edit(from, drop, add) {
@@ -90,13 +94,15 @@ describe("gpui-actions-e2e", () => {
   });
 
   it("maps command_context to the palette and the menus, and a handler to its bindings' modules", () => {
-    expect(edit(10, 1, ["            overleaf_linked: self.overleaf.read(cx).linked(),"])).toMatchObject({ full: false, modules: ["palette", "shell_lifecycle"] });
+    expect(edit(10, 1, ["            overleaf_linked: self.overleaf.read(cx).linked(),"])).toMatchObject({ full: false, modules: ["journal", "palette", "shell_lifecycle", "shortcut_sheet"] });
     expect(edit(5, 1, ["        self.workspace.close_focused();"])).toMatchObject({ full: false, modules: ["keys", "tabs"] });
   });
 
   it("runs the smoke flow for a new binding no step reaches, and the whole scenario for an edit of one", () => {
     expect(edit(20, 0, ["            .on_action(cx.listener(|this, _: &PauseSync, _, cx| this.pause(cx)))"])).toMatchObject({ full: false, modules: [] });
     expect(edit(21, 1, ["                this.unused_now(window, cx);"])).toMatchObject({ full: true });
+    expect(edit(21, 0, ["                this.layout.dirty = true;"])).toMatchObject({ full: true });
+
     expect(edit(15, 1, ["        let element = element.id(\"shell\")"])).toMatchObject({ full: true });
   });
 

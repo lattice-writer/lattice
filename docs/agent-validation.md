@@ -183,9 +183,11 @@ every file under `shell/` that no module's `covers` names, `native.rs` and
 `shell/actions.rs`, the command bindings, which `ci:local` reads hunk by
 hunk (`scripts/gpui-actions-e2e.mjs`): a changed binding runs the modules that
 name its action, press its key or cover the method it calls, a change to
-`command_context` runs `palette` and `shell_lifecycle`, an import or a new
-binding no step reaches runs the smoke flow, and anything else in the file
-runs the whole scenario. Any other file picks the modules whose `covers` name it, else
+`command_context` runs `palette`, `shell_lifecycle` and the modules that read
+it or cover a shell file building commands from it, a handler in the file runs
+what its bindings pick and the modules that call it, an import or a binding
+added whole that no step reaches runs the smoke flow, and anything else in the
+file runs the whole scenario. Any other file picks the modules whose `covers` name it, else
 the table's row for it, else the modules that exercise its directory
 (`dirModules`: those covering something under `x/` for `x.rs`, else under
 the nearest directory above it, short of the crate's `src/`, else the module

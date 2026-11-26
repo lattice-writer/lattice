@@ -17,15 +17,17 @@
  *     keymap.rs binds to it, and those whose covers hold the shell file that
  *     defines a method the binding calls (`this.sync_overleaf`) or the crate
  *     module it calls into (`crate::settings::update`);
- *   - `command_context`: the palette and the menus, which read it
- *     (`palette`, `shell_lifecycle`), plus what its changed line calls;
+ *   - `command_context`: the palette and the menus (`palette`, `shell_lifecycle`),
+ *     the modules covering a shell file that builds commands or a sheet from
+ *     it, the modules whose steps read it themselves, and what its changed
+ *     line calls;
  *   - another handler in the file (`close_tab`): what the bindings that call
- *     it pick.
+ *     it pick, and the modules whose steps call it directly.
  *
- * A file outside scenario/e2e/ (the smoke flow's shell_steps.rs, e2e.rs) that
- * names an action counts as the smoke flow's, which every gate runs. A
- * statement that picks nothing is a new binding no step can reach when it was
- * added whole, and needs the whole scenario otherwise; so does any other line.
+ * The smoke flow's own steps (scenario/shell_steps*, scenario/e2e.rs) naming
+ * an action count as the smoke flow's, which every gate runs. A statement
+ * that picks nothing is a new binding no step can reach when every line of it
+ * was added, and needs the whole scenario otherwise; so does any other line.
  */
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
@@ -39,6 +41,8 @@ const SCENARIO = `${SRC}scenario/`;
 const NOT_ACTIONS = new Set(["App", "Context", "Window", "Path", "Self"]);
 const ON_ACTION = /^\s*\.on_action\(/;
 const SWITCH = /^\s*[A-Z]\w* => \d+,?\s*$/;
+// The smoke flow's own steps; parity, mocks and the registry are not it.
+const SMOKE = /^gpui\/crates\/lattice-gpui\/src\/scenario\/(shell_steps(\.rs|\/)|e2e\.rs$)/;
 
 function rustFiles(root, dir) {
   const full = path.join(root, dir);
@@ -57,11 +61,14 @@ export function readContext(root = repo) {
     keys.set(match[3], [...(keys.get(match[3]) ?? []), match[1] ? `cmd-${match[1]}` : match[2]]);
   }
   const methods = new Map();
+  const contextReaders = [];
   for (const file of rustFiles(root, `${SRC}shell`)) {
     if (file === ACTIONS_FILE) continue;
-    for (const match of read(file).matchAll(/\bfn (\w+)\b/g)) methods.set(match[1], [...(methods.get(match[1]) ?? []), file]);
+    const text = read(file);
+    for (const match of text.matchAll(/\bfn (\w+)\b/g)) methods.set(match[1], [...(methods.get(match[1]) ?? []), file]);
+    if (/\bcommand_context\(|\bCommandContext\b/.test(text)) contextReaders.push(file);
   }
-  return { scenario, keys, methods };
+  return { scenario, keys, methods, contextReaders };
 }
 
 /** The new and old line numbers a `git diff -U0` changes. */
@@ -97,7 +104,7 @@ export function statementAt(lines, number) {
   }
   if (fn === "command_context") return { kind: "context", text };
   if (fn !== "register_commands") return { kind: "handler", fn };
-  if (SWITCH.test(text)) return { kind: "binding", text };
+  if (SWITCH.test(text)) return { kind: "binding", text, lines: [number, number] };
   let start = index;
   while (start > fnStart && !ON_ACTION.test(lines[start])) start -= 1;
   if (start === fnStart) return { kind: "other" };
@@ -105,7 +112,7 @@ export function statementAt(lines, number) {
   const closes = (line) => /;\s*$/.test(line) && indent(line) <= indent(lines[start]);
   let end = start;
   while (end + 1 < lines.length && !closes(lines[end]) && !ON_ACTION.test(lines[end + 1]) && !/^\s*\/\//.test(lines[end + 1])) end += 1;
-  return index <= end ? { kind: "binding", text: lines.slice(start, end + 1).join("\n") } : { kind: "other" };
+  return index <= end ? { kind: "binding", text: lines.slice(start, end + 1).join("\n"), lines: [start + 1, end + 1] } : { kind: "other" };
 }
 
 function picks(text, context, covers, scenarioModule) {
@@ -118,7 +125,7 @@ function picks(text, context, covers, scenarioModule) {
       if (!words.some((word) => word.test(source))) continue;
       const module = scenarioModule(file);
       if (module) modules.add(module);
-      else smoke = true;
+      else if (SMOKE.test(file)) smoke = true;
     }
   }
   const files = [...text.matchAll(/\b(?:this|self)\.(\w+)\(|Self::(\w+)/g)].flatMap((match) => context.methods.get(match[1] ?? match[2]) ?? []);
@@ -162,8 +169,17 @@ export function actionsNeeds({ diff, before, after }, covers, context = readCont
       if (statement.kind === "other") return { full: true, why: `line ${side}${number} is outside the bindings, command_context and the handlers` };
       const text = statement.kind === "handler" ? callers(statement.fn) : statement.text;
       const found = picks(text, context, covers, scenarioModule);
-      if (statement.kind === "context") for (const module of ["palette", "shell_lifecycle"]) if (covers.has(module)) found.modules.add(module);
-      const addedWhole = side === "+" && statement.kind === "binding" && !before.includes(statement.text.trim());
+      // Steps that call the handler themselves (run_trellis from a step).
+      if (statement.kind === "handler") for (const { file, text: source } of context.scenario) if (new RegExp(`\\.${statement.fn}\\(`).test(source) && scenarioModule(file)) found.modules.add(scenarioModule(file));
+      // command_context: the palette and the menus, the shell files that build
+      // commands or sheets from it, and the steps that read it themselves.
+      if (statement.kind === "context") {
+        for (const module of ["palette", "shell_lifecycle"]) if (covers.has(module)) found.modules.add(module);
+        for (const file of context.contextReaders) for (const [module, prefixes] of covers) if (prefixes.some((prefix) => file.startsWith(prefix))) found.modules.add(module);
+        for (const { file, text: source } of context.scenario) if (/\bcommand_context\(|commands::commands\(/.test(source) && scenarioModule(file)) found.modules.add(scenarioModule(file));
+      }
+      const addedSet = new Set(added);
+      const addedWhole = side === "+" && statement.kind === "binding" && Array.from({ length: statement.lines[1] - statement.lines[0] + 1 }, (_, at) => statement.lines[0] + at).every((line) => addedSet.has(line));
       if (!found.modules.size && !found.smoke && !addedWhole) return { full: true, why: `line ${side}${number} maps to no scenario step` };
       for (const module of found.modules) modules.add(module);
       why.push(`${side}${number} ${found.actions.join(", ") || statement.kind}: ${[...found.modules].join(", ") || "smoke"}`);
