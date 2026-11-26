@@ -81,7 +81,7 @@ impl Run {
             steps.check(STEP, false, json!({ "fixture": false }));
             return Ok(());
         };
-        // The note's words are main.tex's, so main.tex must be the live PDF.
+        // The note's words are typeset in main.tex's PDF, so it must be live.
         // An earlier module's document left open can take it: a build that
         // runs while that editor is the active one typesets it, the file
         // open winning as Overleaf's rule has it (`open_document`), and on
