@@ -39,8 +39,8 @@ msgid "Lattice compiles Typst with a component it downloads once. Until then, Ty
 msgstr "Lattice 通过一个只需下载一次的组件编译 Typst。在此之前，Typst 文件只有语法高亮。可在“设置 › 编辑编译”中移除它。"
 
 #: lattice-gpui/src/typst.rs
-msgid "Lattice publishes Typst support for Macs with Apple silicon."
-msgstr "Lattice 为搭载 Apple 芯片的 Mac 提供 Typst 支持。"
+msgid "Lattice publishes Typst support for the Mac only."
+msgstr "Lattice 只为 Mac 提供 Typst 支持。"
 
 #: lattice-gpui/src/shell/typst_sync.rs
 msgid "No Typst source was found for this place in the PDF."

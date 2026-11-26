@@ -188,7 +188,7 @@ pub fn require(typing: bool, then: impl FnOnce(&mut App) + 'static, cx: &mut App
     let Some(source) = support.source.clone() else {
         notices::error(
             t!("Typst support isn’t available on this computer"),
-            t!("Lattice publishes Typst support for Macs with Apple silicon."),
+            t!("Lattice publishes Typst support for the Mac only."),
             cx,
         );
         return;
