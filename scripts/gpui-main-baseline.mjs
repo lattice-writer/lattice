@@ -135,7 +135,7 @@ export function mergeChunks(results) {
       if (!seen || (seen.passed === true && step.passed !== true)) steps.set(step.step, step);
     }
   });
-  const merged = { passed: errors.length === 0 && results.every((result) => result?.passed === true), steps: [...steps.values()] };
+  const merged = { scenario: "e2e", passed: errors.length === 0 && results.every((result) => result?.passed === true), modules: null, steps: [...steps.values()] };
   if (errors.length) merged.error = errors.join("; ");
   return merged;
 }
@@ -146,10 +146,33 @@ export function mergeQuits(quits) {
   return quits.length && quits.every((quit) => quit === "saved") ? "saved" : "unknown";
 }
 
+/**
+ * What one chunk's run left: its result when the run wrote one now, else an
+ * error naming why. Files from an earlier run of the same sha are removed
+ * before each chunk, and a chunk that gave up on the lock is an error
+ * whatever is on disk, so neither is ever read as tonight's pass.
+ */
+export function chunkResult(chunkRun, text) {
+  if (chunkRun.code === 75) return { error: "the in-app lock was not free in time" };
+  if (text === null) return chunkRun.code === 0 ? null : { error: `the chunk exited with ${chunkRun.code ?? chunkRun.status} and wrote no result` };
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { error: "the chunk's result is not JSON" };
+  }
+}
+
+// How long all the chunks may take, lock waits included, within the
+// workflow step's 400 minutes after the gate and the build, before the rerun.
+const CHUNKS_BUDGET_MS = 270 * 60_000;
+// A chunk's own run, at most; a lock wait leaves this much of the budget.
+const CHUNK_RUN_MS = 25 * 60_000;
+
 /** The whole scenario in chunks, each under the in-app lock (`--chunks`); resolves like `run`, having written `resultFile`. */
 async function runChunks(count, { sha, resultFile, logs }) {
   const chunks = chunkModules([...readModules(repo).keys()], count);
   const started = Date.now();
+  const deadline = started + CHUNKS_BUDGET_MS;
   const results = [];
   const quits = [];
   const outputs = [];
@@ -160,21 +183,24 @@ async function runChunks(count, { sha, resultFile, logs }) {
     const chunkFile = path.join(logs, `e2e-chunk-${index + 1}.json`);
     const quitFile = `${chunkFile}.quit`;
     const label = `gpui-main-baseline ${sha.slice(0, 9)} e2e ${index + 1}/${chunks.length}`;
+    rmSync(chunkFile, { force: true });
+    rmSync(quitFile, { force: true });
+    const waitS = Math.floor((deadline - Date.now() - CHUNK_RUN_MS) / 1000);
+    if (waitS < 0) {
+      ok = false;
+      results.push({ error: `the nightly ran out of time before chunk ${index + 1}` });
+      quits.push("unknown");
+      continue;
+    }
     console.log(`gpui-main-baseline: e2e chunk ${index + 1}/${chunks.length}: ${chunk.join(", ")}`);
-    const chunkRun = await run(path.join(repo, "scripts", "inapp-lock"), ["--thread", label, "--wait", "5400", "--", path.join(repo, "gpui", "script", "e2e"), "--only", chunk.join(","), chunkFile], {
+    const chunkRun = await run(path.join(repo, "scripts", "inapp-lock"), ["--thread", label, "--wait", String(waitS), "--", path.join(repo, "gpui", "script", "e2e"), "--only", chunk.join(","), chunkFile], {
       log: path.join(logs, `e2e-${index + 1}.log`),
-      timeoutMs: 150 * 60_000,
+      timeoutMs: waitS * 1000 + CHUNK_RUN_MS,
       env: { ...process.env, LATTICE_E2E_QUIT_RESULT: quitFile },
     });
     outputs.push(chunkRun.output);
     ok &&= chunkRun.status === "ok";
-    let result = null;
-    try {
-      result = JSON.parse(readFileSync(chunkFile, "utf8"));
-    } catch {
-      if (chunkRun.code === 75) result = { error: "the in-app lock was not free within 90 min" };
-    }
-    results.push(result);
+    results.push(chunkResult(chunkRun, existsSync(chunkFile) ? readFileSync(chunkFile, "utf8") : null));
     quits.push(existsSync(quitFile) ? readFileSync(quitFile, "utf8").trim() : "unknown");
   }
   writeJson(resultFile, mergeChunks(results));

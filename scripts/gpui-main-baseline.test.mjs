@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { baselineDir, chunkModules, mergeChunks, mergeQuits, parseE2e, parseGate } from "./gpui-main-baseline.mjs";
+import { baselineDir, chunkModules, chunkResult, mergeChunks, mergeQuits, parseE2e, parseGate } from "./gpui-main-baseline.mjs";
 
 // The main-baseline cache is macOS-only tooling, and its paths are POSIX ones.
 describe.skipIf(process.platform === "win32")("gpui-main-baseline", () => {
@@ -74,6 +74,16 @@ describe("gpui-main-baseline: the e2e in chunks", () => {
   it("fails closed on a chunk with no result or an error, such as one that never got the lock", () => {
     const merged = mergeChunks([{ passed: true, steps: [] }, null, { error: "the in-app lock was not free within 90 min" }]);
     expect(merged).toMatchObject({ passed: false, error: "chunk 2 wrote no result; chunk 3: the in-app lock was not free within 90 min" });
+  });
+
+  it("reads a chunk's result only when that run wrote it, and never past a lock give-up", () => {
+    const pass = JSON.stringify({ passed: true, steps: [] });
+    expect(chunkResult({ status: "ok", code: 0 }, pass)).toEqual({ passed: true, steps: [] });
+    expect(chunkResult({ status: "failed", code: 75 }, pass)).toEqual({ error: "the in-app lock was not free in time" });
+    expect(chunkResult({ status: "failed", code: 101 }, null).error).toMatch(/exited with 101 and wrote no result/);
+    expect(chunkResult({ status: "timed out", code: null }, null).error).toMatch(/exited with timed out/);
+    expect(chunkResult({ status: "ok", code: 0 }, null)).toBeNull();
+    expect(chunkResult({ status: "failed", code: 1 }, "{").error).toMatch(/not JSON/);
   });
 
   it("adds up the save-on-quit checks: saved only if every chunk saved", () => {

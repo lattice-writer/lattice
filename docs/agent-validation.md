@@ -252,8 +252,11 @@ Mac mini through runner-up's `lattice-mac` pool
 ([`release-process.md`](release-process.md)). It runs the e2e as six chunks
 of modules (`gpui-main-baseline.mjs --chunks`, each with the smoke flow), each
 under the in-app lock and letting it go in between, so a queued gate or lab
-run waits for one chunk (a few minutes), not the whole scenario; each chunk
-waits up to 90 minutes for the lock. `scripts/gpui-nightly.mjs
+run waits for one chunk (a few minutes), not the whole scenario. The chunks
+share 270 minutes, lock waits included, and each waits for the lock only as
+long as that leaves 25 minutes for its run; a chunk that gave up on the lock,
+ran out of that time or wrote no result fails the night (a chunk's files from
+an earlier run of the same commit are removed first). `scripts/gpui-nightly.mjs
 run` records main with `scripts/gpui-main-baseline.mjs` (the gate, the
 release build and the whole e2e, which also leaves the Mac's main baseline
 for that commit), judges the e2e as gpui.yml judges main (the known failures
