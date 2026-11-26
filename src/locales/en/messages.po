@@ -939,6 +939,10 @@ msgstr "{names} +{more}"
 msgid "{names} and {count} more"
 msgstr "{names} and {count} more"
 
+#: src/app/overleaf-path-summary.ts
+msgid "{names} and {count} more files"
+msgstr "{names} and {count} more files"
+
 #: src/app/use-overleaf-remote-deletes.ts
 msgid "{names} changed on Overleaf after you were asked, so it was not removed there. The next sync brings the newer version back here."
 msgstr "{names} changed on Overleaf after you were asked, so it was not removed there. The next sync brings the newer version back here."
@@ -17902,6 +17906,10 @@ msgstr "There is not enough disk space to install the package. Free up some spac
 #: src/platform/host-errors-overleaf.ts
 msgid "These files are too large for Overleaf: {files}."
 msgstr "These files are too large for Overleaf: {files}."
+
+#: src/app/use-overleaf-remote-deletes.ts
+msgid "These files were deleted from the local project, but are still on Overleaf. Even if you remove them now, Overleaf's history will keep them."
+msgstr "These files were deleted from the local project, but are still on Overleaf. Even if you remove them now, Overleaf's history will keep them."
 
 #: src/build/build-log-messages.ts
 msgid "These table errors come from loading arydshln after colortbl, which LaTeX 2026-11 broke: the tables are fine. Load arydshln before colortbl, or remove {command} if no table draws dashed rules."

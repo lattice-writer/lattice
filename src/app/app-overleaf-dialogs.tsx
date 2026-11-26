@@ -8,6 +8,7 @@ import { lazy, memo, useEffect, type RefObject } from "react";
 import { useLingui } from "@lingui/react/macro";
 import { forgetAgentUndoConflict, isAgentUndoConflict, subscribeAgentUndoConflicts } from "./agent-undo-conflicts";
 import { showWarning } from "./notify";
+import { summarizeOverleafPaths } from "./overleaf-path-summary";
 import { LazyMount } from "../components/lazy-mount";
 import type { CompileProject, ProjectSnapshot, RefreshProject } from "../app-types";
 import type { useOverleafWorkspace } from "./use-overleaf-workspace";
@@ -56,7 +57,7 @@ export const AppOverleafDialogs = memo(function AppOverleafDialogs({
   // An Agent Undo that kept newer edits where they overlap the agent's change
   // leaves markers for just those spots; sync holds the file back until then.
   useEffect(() => subscribeAgentUndoConflicts((paths) => {
-    const files = paths.join(", ");
+    const files = summarizeOverleafPaths(paths);
     showWarning(t`Undo kept newer edits in ${files} where they overlap the agent's change. Choose what to keep in each marked spot; nothing uploads to Overleaf until then.`, t`Agent`);
     if (paths[0]) setConflictPath(paths[0]);
   }), [setConflictPath, t]);
