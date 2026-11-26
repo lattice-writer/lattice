@@ -44,13 +44,13 @@ use crate::completion::{
 const POOL_RETRY: Duration = Duration::from_millis(20);
 
 /// How long TexLab's nothing for a word holds for that word typed further.
-const UNANSWERED_HOLDS: Duration = Duration::from_secs(1);
+pub const UNANSWERED_HOLDS: Duration = Duration::from_secs(1);
 
 static WORD: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\\?[A-Za-z@*]*$").expect("the word pattern compiles"));
 
 /// Where the word before the caret starts in `before`, when there is one.
-fn word_start(before: &str) -> Option<usize> {
+pub fn word_start(before: &str) -> Option<usize> {
     WORD.find(before)
         .filter(|word| !word.is_empty())
         .map(|word| word.start())

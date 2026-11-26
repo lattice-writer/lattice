@@ -16,14 +16,27 @@
 //! bridge hands the page an `Error`, not that bare string, so here the last
 //! text the page sent for each path is kept by revision and goes with a
 //! request that names that revision: TexLab is never asked without it.
+//!
+//! The page asks for completions on every letter of a word, with the whole
+//! file, which TexLab parses again each time. As in the source editor
+//! (`lattice_editor::latex::texlab_completions`), a word TexLab had nothing
+//! for is not asked about again for a second while it only grows and the
+//! rest of the file stays as it was: the page gets that nothing at once.
 
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+    time::Instant,
+};
 
 use gpui::{Context, Entity};
 use lattice_core::{latex::SourceLine, texlab::DocumentAt};
-use lattice_editor::texlab::TexlabService;
+use lattice_editor::{
+    latex::texlab_completions::{UNANSWERED_HOLDS, word_start},
+    texlab::TexlabService,
+};
 use serde::Deserialize;
-use serde_json::Value;
+use serde_json::{Value, json};
 
 use super::StructuredDocument;
 
@@ -32,6 +45,7 @@ use super::StructuredDocument;
 pub(super) struct LatexServices {
     pub texlab: Entity<TexlabService>,
     texts: SentTexts,
+    unanswered: Arc<Mutex<Option<Unanswered>>>,
 }
 
 impl LatexServices {
@@ -39,6 +53,7 @@ impl LatexServices {
         Self {
             texlab,
             texts: SentTexts::default(),
+            unanswered: Arc::default(),
         }
     }
 }
@@ -66,6 +81,52 @@ impl SentTexts {
             (None, None) => None,
         }
     }
+}
+
+/// The last word TexLab completed with nothing: the file and its text as
+/// they were asked about, and the word, which starts at byte `from`.
+struct Unanswered {
+    path: String,
+    text: String,
+    from: usize,
+    word: String,
+    at: Instant,
+}
+
+impl Unanswered {
+    /// Whether `word`, starting at `from` in `text`, is this word typed
+    /// further with nothing else in the file changed, which TexLab would
+    /// have nothing for either.
+    fn covers(&self, path: &str, text: &str, from: usize, word: &str) -> bool {
+        self.at.elapsed() < UNANSWERED_HOLDS
+            && self.path == path
+            && self.from == from
+            && word.starts_with(&self.word)
+            && text.len() - word.len() == self.text.len() - self.word.len()
+            && text[..from] == self.text[..from]
+            && text[from + word.len()..] == self.text[from + self.word.len()..]
+    }
+}
+
+/// The word before the 1-based `line` and UTF-16 `character` the page
+/// asks at, and the byte where it starts in `text`, when there is one.
+fn word_at(text: &str, line: u32, character: u32) -> Option<(usize, &str)> {
+    let line_start: usize = text
+        .split_inclusive('\n')
+        .take(line.saturating_sub(1) as usize)
+        .map(str::len)
+        .sum();
+    let mut units = character.saturating_sub(1) as usize;
+    let mut caret = line_start;
+    for character in text[line_start..].chars() {
+        if units == 0 || character == '\n' {
+            break;
+        }
+        units = units.saturating_sub(character.len_utf16());
+        caret += character.len_utf8();
+    }
+    let from = line_start + word_start(&text[line_start..caret])?;
+    Some((from, &text[from..caret]))
 }
 
 /// A TexLab request as `texlab-language.ts` sends it.
@@ -135,6 +196,21 @@ impl StructuredDocument {
             return self.respond(id, Err("TexLab is unavailable.".into()), cx);
         };
         let text = services.texts.text_for(&request);
+        let word = (command == "texlab_completion")
+            .then(|| text.as_deref())
+            .flatten()
+            .and_then(|text| word_at(text, request.line, request.character))
+            .map(|(from, word)| (from, word.to_string()));
+        let unanswered = services.unanswered.clone();
+        if let (Some(text), Some((from, word))) = (&text, &word)
+            && unanswered.lock().is_ok_and(|unanswered| {
+                unanswered
+                    .as_ref()
+                    .is_some_and(|known| known.covers(&request.path, text, *from, word))
+            })
+        {
+            return self.respond(id, Ok(json!([])), cx);
+        }
         let (root, pool) = services.texlab.read(cx).pool();
         let command = command.to_string();
         self.answer_off_thread(id, cx, move || {
@@ -149,7 +225,23 @@ impl StructuredDocument {
                 character: request.character,
             };
             match command.as_str() {
-                "texlab_completion" => json(pool.completion(&root, &at)?),
+                "texlab_completion" => {
+                    let items = pool.completion(&root, &at)?;
+                    drop(pool);
+                    if let Ok(mut unanswered) = unanswered.lock() {
+                        *unanswered = match (items.is_empty(), text, word) {
+                            (true, Some(text), Some((from, word))) => Some(Unanswered {
+                                path: request.path,
+                                text,
+                                from,
+                                word,
+                                at: Instant::now(),
+                            }),
+                            _ => None,
+                        };
+                    }
+                    json(items)
+                }
                 "texlab_hover" => json(pool.hover(&root, &at)?),
                 _ => json(pool.definition(&root, &at)?),
             }
@@ -191,5 +283,35 @@ mod tests {
         );
         assert_eq!(texts.text_for(&request("main.tex", None, Some(2))), None);
         assert_eq!(texts.text_for(&request("other.tex", None, Some(1))), None);
+    }
+
+    /// The page's position is a 1-based line and UTF-16 column; the word is
+    /// a command or letters before it.
+    #[test]
+    fn the_word_before_the_pages_position() {
+        let text = "\\section{Intro}\nSome prose héllo wor\nnext";
+        assert_eq!(word_at(text, 2, 21), Some((34, "wor")));
+        assert_eq!(word_at(text, 1, 9), Some((0, "\\section")));
+        assert_eq!(word_at(text, 2, 5), Some((16, "Some")));
+        assert_eq!(word_at(text, 2, 6), None);
+    }
+
+    /// A word TexLab had nothing for keeps that nothing while only letters
+    /// are added to it, not once anything else in the file changes.
+    #[test]
+    fn only_letters_added_to_the_word_keep_texlabs_nothing() {
+        let known = Unanswered {
+            path: "main.tex".into(),
+            text: "a wor b".into(),
+            from: 2,
+            word: "wor".into(),
+            at: Instant::now(),
+        };
+        assert!(known.covers("main.tex", "a word b", 2, "word"));
+        assert!(!known.covers("other.tex", "a word b", 2, "word"));
+        assert!(!known.covers("main.tex", "x word b", 2, "word"));
+        assert!(!known.covers("main.tex", "a word c", 2, "word"));
+        assert!(!known.covers("main.tex", "a wo b", 2, "wo"));
+        assert!(!known.covers("main.tex", "a  word b", 3, "word"));
     }
 }
