@@ -105,13 +105,15 @@ fn send_with_retries(mut request: RequestBuilder) -> reqwest::Result<Response> {
     // retried: `try_clone` answers `None` for it.
     let safe = (request.try_clone().and_then(|copy| copy.build().ok()))
         .is_some_and(|built| built.method().is_safe());
+    let asked =
+        (request.try_clone().and_then(|copy| copy.build().ok())).map(|built| built.url().clone());
     let mut retries_done = 0;
     loop {
         let again = request.try_clone();
         wide_event::add("http_requests", 1);
         let outcome = request.send();
         if let Ok(response) = &outcome {
-            super::clock::observe(response);
+            super::clock::observe(response, asked.as_ref());
         }
         let attempt = match &outcome {
             Ok(response) => Attempt::Answered(
@@ -332,7 +334,7 @@ fn fetch_history_version(
         .timeout(Duration::from_secs(30))
         .send()
         .ok()?;
-    super::clock::observe(&response);
+    super::clock::observe(&response, reqwest::Url::parse(host).ok().as_ref());
     if !response.status().is_success() {
         return None;
     }

@@ -11,12 +11,17 @@ use reqwest::blocking::Client;
 use std::collections::BTreeMap;
 
 /// Where the agreed copy from the last sync stands in Overleaf's history: the
-/// version it was downloaded at, or failing that the time of the sync.
+/// version it was downloaded at, or failing that the time of the sync on
+/// Overleaf's clock (`last_sync`, this Mac's, for state from before that was
+/// kept).
 pub(super) fn agreed_copy(state: &SyncState) -> Option<HistoryFrom> {
     let version = state.agreed_version.or(state.remote_version);
     version.map(HistoryFrom::Version).or_else(|| {
-        let at = chrono::DateTime::parse_from_rfc3339(state.last_sync.as_deref()?).ok()?;
-        Some(HistoryFrom::Time(at.timestamp_millis()))
+        let at = state.agreed_at.or_else(|| {
+            let at = chrono::DateTime::parse_from_rfc3339(state.last_sync.as_deref()?).ok()?;
+            Some(at.timestamp_millis())
+        })?;
+        Some(HistoryFrom::Time(at))
     })
 }
 

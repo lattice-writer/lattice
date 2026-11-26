@@ -62,6 +62,14 @@ fn a_clock_behind_overleafs_never_lets_lattices_own_upload_confirm_a_hollow_copy
     };
     let overleaf_now = chrono::Utc::now().timestamp_millis() + AHEAD;
     assert!((stamped - overleaf_now).abs() < 60_000, "stamped {stamped}, Overleaf {overleaf_now}");
+    let agreed_at = state.agreed_at.unwrap();
+    assert!(
+        (agreed_at - overleaf_now).abs() < 60_000,
+        "agreed {agreed_at}, Overleaf {overleaf_now}"
+    );
+    // What the apps show as "last synced" stays on this Mac's clock.
+    let shown = chrono::DateTime::parse_from_rfc3339(state.last_sync.as_deref().unwrap()).unwrap();
+    assert!((shown.timestamp_millis() - (overleaf_now - AHEAD)).abs() < 60_000, "{shown}");
     let upload = json!({ "fromV": 40, "toV": 41, "meta": { "end_ts": overleaf_now },
         "pathnames": ["notes.md"] });
 

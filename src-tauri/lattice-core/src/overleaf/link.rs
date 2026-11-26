@@ -52,8 +52,13 @@ pub(super) struct SyncState {
     /// require it; the ordinary project HTTP pages do not expose it.
     #[serde(default)]
     pub root_folder_id: Option<String>,
+    /// When the last sync ended, on this Mac's clock, as the apps show it.
     #[serde(default)]
     pub last_sync: Option<String>,
+    /// The same moment on Overleaf's clock (Unix ms, `clock::now_ms`), where
+    /// the agreed copy stands in history when no version says so.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agreed_at: Option<i64>,
     /// Newest history version seen on Overleaf at the last sync. Comparing a
     /// cheap probe against this is what lets live mode poll every few seconds
     /// without downloading the project each time.
@@ -544,6 +549,7 @@ pub fn clone_project(
     }
     let state = SyncState {
         last_sync: Some(now_iso()),
+        agreed_at: Some(super::clock::now_ms(&session.host)),
         remote_version: remote_version.filter(|_| collisions.is_empty()),
         files,
         ..SyncState::linked(session.host, project_id, project_name, access_level)
@@ -645,6 +651,7 @@ pub fn publish_project(
     let remote_version = fetch_remote_version(&client, &session.host, &session.cookie, &project_id);
     let state = SyncState {
         last_sync: Some(now_iso()),
+        agreed_at: Some(super::clock::now_ms(&session.host)),
         remote_version,
         files: files.iter().map(|(path, bytes)| (path.clone(), sha256_hex(bytes))).collect(),
         ..SyncState::linked(session.host.clone(), &project_id, &project_name, Some("owner"))

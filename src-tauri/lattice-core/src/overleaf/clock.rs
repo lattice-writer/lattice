@@ -20,8 +20,10 @@ fn origin(url: &reqwest::Url) -> String {
     url.origin().ascii_serialization()
 }
 
-/// Note how far the clock of the host that sent `response` is from ours.
-pub(super) fn observe(response: &Response) {
+/// Note how far the clock of the host that sent `response` is from ours,
+/// under the origin `asked` too when a redirect answered from another one,
+/// since a project keeps the host it was asked at.
+pub(super) fn observe(response: &Response, asked: Option<&reqwest::Url>) {
     let Some(date) = (response.headers().get(DATE))
         .and_then(|value| value.to_str().ok())
         .and_then(|value| chrono::DateTime::parse_from_rfc2822(value).ok())
@@ -31,6 +33,9 @@ pub(super) fn observe(response: &Response) {
     let offset = date.timestamp_millis() - chrono::Utc::now().timestamp_millis();
     if let Ok(mut offsets) = OFFSETS.lock() {
         offsets.insert(origin(response.url()), offset);
+        if let Some(asked) = asked {
+            offsets.insert(origin(asked), offset);
+        }
     }
 }
 
@@ -40,10 +45,4 @@ pub(super) fn now_ms(host: &str) -> i64 {
         .and_then(|url| OFFSETS.lock().ok()?.get(&origin(&url)).copied())
         .unwrap_or_default();
     chrono::Utc::now().timestamp_millis() + offset
-}
-
-/// [`now_ms`] as RFC 3339 to the second, as `last_sync` keeps it.
-pub(super) fn now_iso(host: &str) -> String {
-    (chrono::DateTime::from_timestamp_millis(now_ms(host)).unwrap_or_else(chrono::Utc::now))
-        .to_rfc3339_opts(chrono::SecondsFormat::Secs, true)
 }

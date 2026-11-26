@@ -14,7 +14,7 @@ use super::api::{csrf_token, http_client, DownloadGate, Remote};
 use super::case_collisions::{self, CaseCollision};
 use super::clock;
 use super::files::*;
-use super::link::{save_state, Refusal, SyncState, Unsettled};
+use super::link::{now_iso, save_state, Refusal, SyncState, Unsettled};
 use super::review::HistoryFrom;
 use crate::wide_event;
 use reqwest::blocking::Client;
@@ -394,7 +394,8 @@ fn sync_files(
     state.own_writes = own_writes;
     state.refused = refused;
     state.unresolved_conflicts = result.unresolved_conflicts.clone();
-    state.last_sync = Some(clock::now_iso(&linked.host));
+    state.last_sync = Some(now_iso());
+    state.agreed_at = Some(clock::now_ms(&linked.host));
     // `remote_version_before` is the only history position known to precede
     // the downloaded snapshot. Never replace it with a newer value fetched at
     // the end: that newer value may include a collaborator's edit which is not
