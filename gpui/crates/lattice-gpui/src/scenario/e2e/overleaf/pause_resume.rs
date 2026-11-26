@@ -289,7 +289,9 @@ impl Run {
         self.snapshot(cx, "overleaf-resume-from-settings").await;
         let settings_closed = cx.update(|cx| !self.shell.read(cx).settings_open());
         let apply = drawn("overleaf-review/apply");
-        if let Some(at) = apply.filter(|_| review.is_some()) {
+        // Not while Settings is up: the press would land on whichever of its
+        // controls is drawn there (Unlink, Sign out, the pause toggle).
+        if let Some(at) = apply.filter(|_| review.is_some() && settings_closed) {
             self.click_at(cx, at)?;
         }
         let sent_once = |text: &str| text.matches(KEPT).count() == 1;
@@ -298,18 +300,46 @@ impl Run {
                 mock.file("main.tex").is_some_and(|text| sent_once(&text))
             })
             .await;
-        // Left as the steps after this one expect it, had the click missed.
+        // Left as the steps after this one expect it, had either click
+        // missed: Settings closed, sync resumed through the window's own
+        // path, and what was kept here sent up once before live mode comes
+        // back, so it is no stray upload in the next step's count.
+        let mut recovered = clicked_apply;
         if !clicked_apply {
             self.with_window(cx, |shell, _, cx| {
                 shell.update(cx, |shell, cx| shell.close_settings(cx))
             })?;
+            let still_paused = cx.update(|cx| self.shell.read(cx).overleaf.read(cx).paused());
+            if still_paused {
+                self.with_window(cx, |_, window, cx| {
+                    window.dispatch_action(Box::new(ResumeOverleafSync), cx)
+                })?;
+            }
+            let review = self
+                .wait_for(cx, Duration::from_secs(30), |shell, cx| {
+                    shell
+                        .read(cx)
+                        .overleaf_review()
+                        .is_some_and(|review| review.read(cx).scenario_summary().is_some())
+                })
+                .await
+                .then(|| cx.update(|cx| self.shell.read(cx).overleaf_review()))
+                .flatten();
             if let Some(review) = &review {
                 cx.update(|cx| review.update(cx, |review, cx| review.scenario_apply(cx)));
             }
-            self.wait_for(cx, Duration::from_secs(30), |_, _| {
-                mock.file("main.tex").is_some_and(|text| sent_once(&text))
-            })
-            .await;
+            recovered = self
+                .wait_for(cx, Duration::from_secs(40), |shell, cx| {
+                    let bridge = shell.read(cx).overleaf.read(cx);
+                    !bridge.paused()
+                        && !bridge.syncing()
+                        && sync::link(&root)
+                            .ok()
+                            .flatten()
+                            .is_some_and(|link| !link.paused)
+                        && mock.file("main.tex").is_some_and(|text| sent_once(&text))
+                })
+                .await;
         }
         cx.update(|cx| settings::update(cx, |s| s.overleaf_sync_mode = OverleafSyncMode::Live));
         steps.check(
@@ -326,6 +356,7 @@ impl Run {
                 "resume_at": format!("{resume:?}"), "review": review.is_some(),
                 "settings_closed": settings_closed,
                 "apply_at": format!("{apply:?}"), "clicked_apply": clicked_apply,
+                "recovered": recovered,
                 "overleaf": mock.file("main.tex"),
             }),
         );
