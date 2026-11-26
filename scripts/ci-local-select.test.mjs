@@ -54,13 +54,25 @@ describe("ci-local-select: the e2e a change needs", () => {
     expect(e2eNeeds(["gpui/crates/lattice-gpui/src/editor_panel.rs"]).full).toBe(false);
   });
 
-  it("keeps the root view, the native input and lattice-i18n's code whole, and runs the smoke flow for the string catalogs", () => {
-    for (const file of ["gpui/crates/lattice-gpui/src/shell.rs", "gpui/crates/lattice-gpui/src/native.rs", "gpui/crates/lattice-i18n/src/lib.rs", "gpui/crates/lattice-i18n/build.rs"]) {
+  it("keeps the root view, the native input and pasteboard and lattice-i18n's code whole, and runs the smoke flow for the string catalogs", () => {
+    const shell = ["actions", "views", "parts", "workspaces", "entries", "ground", "editor_events"].map((name) => `gpui/crates/lattice-gpui/src/shell/${name}.rs`);
+    for (const file of ["gpui/crates/lattice-gpui/src/shell.rs", ...shell, "gpui/crates/lattice-gpui/src/native.rs", "gpui/crates/lattice-gpui/src/native/pasteboard.rs", "gpui/crates/lattice-gpui/src/native/input_source.rs", "gpui/crates/lattice-i18n/src/lib.rs", "gpui/crates/lattice-i18n/build.rs"]) {
       expect(e2eNeeds([file], covers), file).toMatchObject({ full: true });
     }
+    expect(e2eNeeds(["gpui/crates/lattice-gpui/src/shell/documents.rs"], covers).full).toBe(false);
     // unlocalized.txt is the coverage test's list of strings left in English.
-    for (const file of ["gpui/crates/lattice-i18n/locales/zh-CN/app.po", "gpui/crates/lattice-i18n/locales/unlocalized.txt", "src/locales/zh-CN/messages.po", "src/locales/en/messages.json", "gpui/crates/lattice-gpui/src/native_windows.rs"]) {
+    for (const file of ["src/locales/zh-CN/messages.po", "src/locales/en/messages.json", "gpui/crates/lattice-gpui/src/native_windows.rs"]) {
       expect(e2eNeeds([file], covers), file).toMatchObject({ full: false, modules: [] });
+    }
+    // settings and find_in_file read the zh-CN catalog.
+    for (const file of ["gpui/crates/lattice-i18n/locales/zh-CN/app.po", "gpui/crates/lattice-i18n/locales/unlocalized.txt"]) {
+      expect(e2eNeeds([file], covers).modules.toSorted(), file).toEqual(["find_in_file", "settings"]);
+    }
+  });
+
+  it("runs the documents and find_in_file modules for project find and replace", () => {
+    for (const file of ["gpui/crates/lattice-gpui/src/search/find.rs", "gpui/crates/lattice-gpui/src/search/replace.rs"]) {
+      expect(e2eNeeds([file], covers), file).toMatchObject({ full: false, modules: ["documents", "find_in_file"] });
     }
   });
 

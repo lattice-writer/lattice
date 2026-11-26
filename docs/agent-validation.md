@@ -169,16 +169,21 @@ module's `covers` names it: the scenario harness, `gpui/patches/`, the
 manifests, each crate's `main.rs`/`lib.rs` and the app's `app.rs`,
 the vendored crates under `gpui/compat/` (gpui-fast, which draws every
 window, gpui-pre and libsqlite3-sys), lattice-ui, lattice-i18n's code,
-lattice-core, and lattice-gpui's root view and native input (`shell.rs`,
-`native.rs`). Any other file picks the modules whose `covers` name it, else
+lattice-core, and lattice-gpui's root view and native input (`shell.rs` and
+the root-view files split out of it under `shell/`, `native.rs` and
+`native/`, the private pasteboard among them). Any other file picks the modules whose `covers` name it, else
 the table's row for it, else the modules that exercise its directory
 (`dirModules`: those covering something under `x/` for `x.rs`, else under
 the nearest directory above it, short of the crate's `src/`, else the module
 named for the file or a directory of it), and only a file none of that
 reaches (a top-level file of lattice-gpui's `src/`, the terminal) runs the
-whole scenario. The string catalogs (lattice-i18n's `locales/`,
-`src/locales/`) run the smoke flow: their build and unit tests check them,
-and the strings as shown are left to the nightly full gate. Only the whole scenario records this Mac's main baseline for the
+whole scenario. A module covering a sibling file is weak evidence for a hub
+file, so hubs get a FULL row or an explicit one (project find and replace
+run `documents` and `find_in_file`). The string catalogs (lattice-i18n's
+`locales/`, `src/locales/`) run the smoke flow: their build and unit tests
+check them, and the strings as shown are left to the nightly full gate,
+except that lattice-i18n's also run `settings` and `find_in_file`, which
+read zh-CN strings. Only the whole scenario records this Mac's main baseline for the
 merge base first, in a scratch worktree, when the machine has none (one more
 build and e2e, about 20 minutes, per merge base); a module run uses the
 baseline when it is already there and otherwise judges against the known

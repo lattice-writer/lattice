@@ -98,18 +98,26 @@ export const E2E_TABLE = [
   [/^gpui\/crates\/lattice-gpui\/src\/app\.rs$/, FULL],
   // lattice-i18n's code; its catalogs are text, below.
   [/^gpui\/crates\/(lattice-ui\/|lattice-i18n\/(?!locales\/))/, FULL],
-  // The window's root view and the native input every module's clicks and
-  // keys go through.
-  [/^gpui\/crates\/lattice-gpui\/src\/(shell|native)\.rs$/, FULL],
+  // The window's root view (shell.rs and the files it is split into: every
+  // command's handler, every panel's drawing, the part registry) and the
+  // native input and private pasteboard every module's clicks, keys and
+  // pastes go through. A module covering some other file of shell/ is no
+  // evidence these are exercised (dirModules).
+  [/^gpui\/crates\/lattice-gpui\/src\/(shell\.rs|shell\/(actions|views|parts|workspaces|entries|ground|editor_events)\.rs|native\.rs)$|^gpui\/crates\/lattice-gpui\/src\/native\//, FULL],
   [/^src-tauri\/lattice-(core|theme)\//, FULL],
   [/^design-system\//, FULL],
   [/^\.github\/workflows\/gpui\.yml$/, FULL],
   // The string catalogs (lattice-i18n's .po files and the Tauri modules'
   // src/locales/, which the islands and lattice-i18n compile in): the build
   // and the unit tests check them (lattice-i18n's coverage test), the smoke
-  // flow runs, and the strings as shown are left to the nightly full gate.
-  [/^gpui\/crates\/lattice-i18n\/locales\//, []],
+  // flow runs, and the strings as shown are left to the nightly full gate,
+  // except the zh-CN strings settings and find_in_file read in Chinese. No
+  // island module reads src/locales/ in Chinese.
+  [/^gpui\/crates\/lattice-i18n\/locales\//, ["settings", "find_in_file"]],
   [/^src\/locales\//, []],
+  // Project find and replace, which the documents module drives
+  // (shell/documents.rs) and find_in_file shares.
+  [/^gpui\/crates\/lattice-gpui\/src\/search\/(find|replace)\.rs$/, ["documents", "find_in_file"]],
   // Compiled only for Linux and Windows: the macOS scenario cannot reach them
   // (scripts/windows-e2e-tier.mjs decides the Windows job's).
   [/^gpui\/crates\/lattice-gpui\/src\/native_(linux|windows)\.rs$/, []],
