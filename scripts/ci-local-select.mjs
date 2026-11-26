@@ -149,6 +149,9 @@ export const E2E_TABLE = [
   // Crates one part of the scenario exercises.
   [/^gpui\/crates\/lattice-board(-core)?\//, ["drawing_drop", "structured"]],
   [/^gpui\/crates\/lattice-webview\//, ISLAND_MODULES],
+  // The script that builds the island pages into the bundle: the islands
+  // module loads them, and the smoke flow opens the app they ship in.
+  [/^gpui\/script\/build-islands$/, ["islands"]],
   // The Tauri app's modules the webview islands are built from
   // (gpui/islands/vite.config.ts; GPUI_INPUTS in ci-tier.mjs lists them).
   [/^src\/agent\//, AGENT_MODULES],

@@ -26,6 +26,10 @@ describe("ci-local-select: the e2e a change needs", () => {
     expect(e2eNeeds(["gpui/README.md", "gpui/crates/lattice-editor/tests/motion.rs", "gpui/crates/lattice-gpui/src/pdf/tests.rs"], new Map())).toMatchObject({ full: false, modules: [] });
   });
 
+  it("runs the islands module for the script that builds the island pages", () => {
+    expect(e2eNeeds(["gpui/script/build-islands"], new Map())).toMatchObject({ full: false, modules: ["islands"] });
+  });
+
   it("runs the whole scenario for its harness, shared code and anything the table does not map", () => {
     for (const file of ["gpui/crates/lattice-gpui/src/scenario/e2e/registry.rs", "gpui/patches/gpui-fast/crates/gpui/src/window.rs", "gpui/Cargo.lock", "src-tauri/lattice-core/src/lib.rs", "gpui/crates/lattice-gpui/src/shell.rs"]) {
       expect(e2eNeeds([file], covers), file).toMatchObject({ full: true, fullBecause: [file] });
