@@ -20,8 +20,8 @@
         "zh": "在你常看的地方暂停和恢复 Overleaf 同步"
       },
       "body": {
-        "en": "While a project's sync is paused, the status bar reads Saved, sync paused, and its menu offers Resume syncing; on a syncing project it offers Pause syncing. The project menu and the command palette (⌘K) have Pause Overleaf sync and Resume Overleaf sync. Resuming syncs at once, and edits made on both sides while paused are merged, so nothing is overwritten.",
-        "zh": "项目的同步暂停时，状态栏显示「已保存，同步已暂停」，它的菜单里有「继续同步」；正在同步的项目则提供「暂停同步」。项目菜单和命令面板（⌘K）里有「暂停 Overleaf 同步」和「恢复 Overleaf 同步」。恢复后会立即同步，暂停期间两边做的修改会合并，不会有内容被覆盖。"
+        "en": "In the native Lattice, while a project's sync is paused, the status bar reads Saved, sync paused, and its menu offers Resume syncing; on a syncing project it offers Pause syncing. The project menu and the command palette (⌘K) have Pause Overleaf sync and Resume Overleaf sync. Resuming syncs at once (in Manual mode it opens Review changes), and edits made on both sides while paused are merged, so nothing is overwritten.",
+        "zh": "在原生 Lattice 中，项目的同步暂停时，状态栏显示「已保存，同步已暂停」，它的菜单里有「继续同步」；正在同步的项目则提供「暂停同步」。项目菜单和命令面板（⌘K）里有「暂停 Overleaf 同步」和「恢复 Overleaf 同步」。恢复后会立即同步（手动模式下会打开「查看改动」），暂停期间两边做的修改会合并，不会有内容被覆盖。"
       }
     },
     {
@@ -31,8 +31,8 @@
         "zh": "在源码编辑器里直接评论到 Overleaf"
       },
       "body": {
-        "en": "In a project linked to Overleaf, Comment on Overleaf in the selection toolbar starts a comment on the passage that your co-authors see on Overleaf; Annotate still saves a note of your own. A saved note gets Share to Overleaf, which posts it as a comment on its passage, and a note's text can now be selected and copied (#1290).",
-        "zh": "在关联了 Overleaf 的项目里，选区工具栏中的「评论到 Overleaf」会在这段文字上发起一条合作者在 Overleaf 上能看到的评论；「批注」仍然只保存你自己的笔记。已保存的笔记多了「分享到 Overleaf」，可以把它作为评论发到对应的段落上；笔记的文字现在也可以选中和复制（#1290）。"
+        "en": "In the native Lattice, in a project linked to Overleaf, Comment on Overleaf in the selection toolbar starts a comment on the passage that your co-authors see on Overleaf; Annotate still saves a note of your own. A saved note gets Share to Overleaf, which posts it as a comment on its passage, and a note's text can now be selected and copied (#1290).",
+        "zh": "在原生 Lattice 中，在关联了 Overleaf 的项目里，选区工具栏中的「评论到 Overleaf」会在这段文字上发起一条合作者在 Overleaf 上能看到的评论；「批注」仍然只保存你自己的笔记。已保存的笔记多了「分享到 Overleaf」，可以把它作为评论发到对应的段落上；笔记的文字现在也可以选中和复制（#1290）。"
       }
     },
     {
@@ -42,8 +42,8 @@
         "zh": "让 AI 助手在稿件所在的整个文件夹里工作"
       },
       "body": {
-        "en": "When you open a folder that holds one Lattice project, such as ProjectA with ProjectA/Manuscript inside, Lattice asks whether to open Manuscript with the whole folder available to the Agent, or to make the folder a project of its own. The first keeps the manuscript's one history and its builds where they are, and lets the Agent read the analysis scripts beside it. Settings › Agent shows the choice under Agent's folder and can undo it, and the project menu shows where History, Builds and the Agent work (#1293).",
-        "zh": "打开一个只包含一个 Lattice 项目的文件夹时，例如里面有 ProjectA/Manuscript 的 ProjectA，Lattice 会问你：是打开 Manuscript 并让 AI 助手可以使用整个文件夹，还是「将此文件夹设为独立项目」。选前者时，稿件仍保持唯一的一份历史，编译结果也留在原处，AI 助手则可以读取旁边的分析脚本。设置 › AI 助手 中的「AI 助手的文件夹」会显示这个选择，也可以撤销；项目菜单会显示历史、编译和 AI 助手各在哪里工作（#1293）。"
+        "en": "In the native Lattice, when you open a folder that holds one Lattice project, such as ProjectA with ProjectA/Manuscript inside, Lattice asks whether to open Manuscript with the whole folder available to the Agent, or to make the folder a project of its own. The first keeps the manuscript's one history and its builds where they are, and lets the Agent read the analysis scripts beside it. Settings › Agent › Display shows the choice under Agent’s folder and can undo it, and the project menu shows where History, Builds and the Agent work (#1293).",
+        "zh": "在原生 Lattice 中，打开一个只包含一个 Lattice 项目的文件夹时，例如里面有 ProjectA/Manuscript 的 ProjectA，Lattice 会问你：是打开 Manuscript 并让 AI 助手可以使用整个文件夹，还是「将此文件夹设为独立项目」。选前者时，稿件仍保持唯一的一份历史，构建结果也留在原处，AI 助手则可以读取旁边的分析脚本。设置 › AI 助手 › 显示 中的「AI 助手的文件夹」会显示这个选择，也可以撤销；项目菜单会显示历史记录、构建和 AI 助手各在哪里（#1293）。"
       }
     },
     {
@@ -53,8 +53,8 @@
         "zh": "彩色方框和彩色文字与打印效果一致"
       },
       "body": {
-        "en": "In the native Lattice's visual view, a \\colorbox is drawn as one box that never breaks across lines, as in the PDF, instead of a highlight that wraps from line to line (#1327). The visual Markdown editor shows inline text colours written as <span style=\"color: …\">, so red and blue revisions stay visible, and saves them exactly as written (#831).",
-        "zh": "在原生 Lattice 的可视视图中，\\colorbox 会像 PDF 里一样画成一个不会跨行断开的方框，而不是逐行换行的高亮（#1327）。可视 Markdown 编辑器会显示用 <span style=\"color: …\"> 写的行内文字颜色，红色、蓝色的修订一目了然，并按原样保存（#831）。"
+        "en": "In the native Lattice's visual view, a \\colorbox is drawn as one box that never breaks across lines, as in the PDF, instead of a highlight that wraps from line to line (#1327). Its visual Markdown editor shows inline text colours written as <span style=\"color: …\">, so red and blue revisions stay visible, and saves them exactly as written (#831). In the source editor and a .tex file's visual view, text in \\textcolor or after \\color is drawn in its colour, made readable on light and dark themes (#1328).",
+        "zh": "在原生 Lattice 的可视视图中，\\colorbox 会像 PDF 里一样画成一个不会跨行断开的方框，而不是逐行换行的高亮（#1327）。它的可视 Markdown 编辑器会显示用 <span style=\"color: …\"> 写的行内文字颜色，红色、蓝色的修订一目了然，并按原样保存（#831）。在源码编辑器和 .tex 文件的可视视图中，\\textcolor 里的文字以及 \\color 之后的文字会以对应颜色显示，并在浅色和深色主题下都保持清晰可读（#1328）。"
       }
     },
     {
@@ -64,8 +64,8 @@
         "zh": "原生版本的使用指南，中英双语"
       },
       "body": {
-        "en": "The guide was checked against the native Lattice, grouped by task, given new screenshots and searchable in both languages. Help › User Guide opens it, and opens the copy that comes with Lattice when the website can't be reached.",
-        "zh": "使用指南已对照原生 Lattice 逐页核对，按任务分组，换上新截图，并支持中英文搜索。「帮助 › 使用指南」会打开它；网站无法访问时，会打开 Lattice 自带的那份。"
+        "en": "The guide was checked against the native Lattice, grouped by task, given new screenshots and searchable in both languages. Help › User Guide opens it, and in the native Lattice opens the copy that comes with Lattice when the website can't be reached.",
+        "zh": "使用指南已对照原生 Lattice 逐页核对，按任务分组，换上新截图，并支持中英文搜索。「帮助 › 使用指南」会打开它；在原生 Lattice 中，网站无法访问时会打开 Lattice 自带的那份。"
       }
     }
   ],
@@ -75,8 +75,8 @@
       "zh": "当电脑时钟比 Overleaf 慢 10 分钟以上时，Overleaf 同步不再可能用 Overleaf 上的空副本替换你的文件。Lattice 现在会从每次答复中读取 Overleaf 的时间，并按它给自己的上传记时。原生版本和经典版本都包含这个修复。"
     },
     {
-      "en": "In the native Lattice, the PDF stays sharp while you type at high zoom: past about 175%, the live preview is drawn at full size instead of being stretched over the page.",
-      "zh": "在原生 Lattice 中，高倍缩放时一边输入 PDF 也保持清晰：超过约 175% 后，实时预览会按实际尺寸绘制，不再被拉伸到页面上。"
+      "en": "In the native Lattice, the PDF stays sharp while you type at high zoom: past about 175% on a Retina screen, the live preview is drawn at full size instead of being stretched over the page.",
+      "zh": "在原生 Lattice 中，高倍缩放时一边输入 PDF 也保持清晰：在 Retina 屏幕上超过约 175% 后，实时预览会按实际尺寸绘制，不再被拉伸到页面上。"
     },
     {
       "en": "In the native Lattice's terminal, Tab and Shift+Tab go to the shell, so Tab completes a command instead of moving out of the terminal (#1272).",
