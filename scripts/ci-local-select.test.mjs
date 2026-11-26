@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { FULL, TEXT_ONLY, coveredJobs, docsGate, e2eNeeds, findGate, formatTrailer, fullCover, macosNeeds, mainMergeRegate, parseTrailer, resolveCover } from "./ci-local-select.mjs";
+import { FULL, TEXT_ONLY, coveredJobs, dirModules, docsGate, e2eNeeds, findGate, formatTrailer, fullCover, macosNeeds, mainMergeRegate, parseTrailer, resolveCover } from "./ci-local-select.mjs";
 import { ciTier } from "./ci-tier.mjs";
 
 const covers = new Map([
@@ -29,6 +29,38 @@ describe("ci-local-select: the e2e a change needs", () => {
   it("runs the whole scenario for its harness, shared code and anything the table does not map", () => {
     for (const file of ["gpui/crates/lattice-gpui/src/scenario/e2e/registry.rs", "gpui/patches/gpui-fast/crates/gpui/src/window.rs", "gpui/Cargo.lock", "src-tauri/lattice-core/src/lib.rs", "gpui/crates/lattice-gpui/src/shell.rs"]) {
       expect(e2eNeeds([file], covers), file).toMatchObject({ full: true, fullBecause: [file] });
+    }
+  });
+
+  it("maps a file no covers names to the modules that exercise its directory, not the whole scenario", () => {
+    const dirCovers = new Map([
+      ["margin", ["gpui/crates/lattice-gpui/src/editor_panel/margin.rs"]],
+      ["outline", ["gpui/crates/lattice-gpui/src/editor_panel/outline"]],
+      ["card_previews", ["gpui/crates/lattice-gpui/src/card_previews.rs"]],
+      ["pdf", ["gpui/crates/lattice-gpui/src/pdf"]],
+    ]);
+    // Its own module directory (editor_panel/ for editor_panel.rs), else its directory, walking up short of src/.
+    expect(dirModules("gpui/crates/lattice-gpui/src/editor_panel.rs", dirCovers)).toEqual(["margin", "outline"]);
+    expect(dirModules("gpui/crates/lattice-gpui/src/editor_panel/views.rs", dirCovers)).toEqual(["margin", "outline"]);
+    expect(dirModules("gpui/crates/lattice-gpui/src/editor_panel/margin_review/cards.rs", dirCovers)).toEqual(["margin", "outline"]);
+    // A module named for its directory.
+    expect(dirModules("gpui/crates/lattice-gpui/src/card_previews/math_page.rs", dirCovers)).toEqual(["card_previews"]);
+    // Nothing near it: the whole scenario. Never src/ itself, which every module is under.
+    expect(dirModules("gpui/crates/lattice-gpui/src/terminal/panel.rs", dirCovers)).toEqual([]);
+    expect(dirModules("gpui/crates/lattice-gpui/src/flavor.rs", dirCovers)).toEqual([]);
+    expect(e2eNeeds(["gpui/crates/lattice-gpui/src/terminal/panel.rs"], dirCovers)).toMatchObject({ full: true });
+    expect(e2eNeeds(["gpui/crates/lattice-gpui/src/editor_panel.rs"], dirCovers)).toMatchObject({ full: false, modules: ["margin", "outline"] });
+    // The real table: editor_panel.rs (LATA-96) picks modules, not the whole scenario.
+    expect(e2eNeeds(["gpui/crates/lattice-gpui/src/editor_panel.rs"]).full).toBe(false);
+  });
+
+  it("keeps the root view, the native input and lattice-i18n's code whole, and runs the smoke flow for the string catalogs", () => {
+    for (const file of ["gpui/crates/lattice-gpui/src/shell.rs", "gpui/crates/lattice-gpui/src/native.rs", "gpui/crates/lattice-i18n/src/lib.rs", "gpui/crates/lattice-i18n/build.rs"]) {
+      expect(e2eNeeds([file], covers), file).toMatchObject({ full: true });
+    }
+    // unlocalized.txt is the coverage test's list of strings left in English.
+    for (const file of ["gpui/crates/lattice-i18n/locales/zh-CN/app.po", "gpui/crates/lattice-i18n/locales/unlocalized.txt", "src/locales/zh-CN/messages.po", "src/locales/en/messages.json", "gpui/crates/lattice-gpui/src/native_windows.rs"]) {
+      expect(e2eNeeds([file], covers), file).toMatchObject({ full: false, modules: [] });
     }
   });
 

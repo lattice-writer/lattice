@@ -27,9 +27,14 @@
  *   3. else the modules whose `covers` list names it
  *      (scripts/gpui-e2e-modules.mjs reads them from the scenario);
  *   4. else what the first matching E2E_TABLE row says;
- *   5. else the whole scenario. A shared file nothing maps (shell.rs)
- *      can break any module, and the trailer tells GitHub its macOS job
- *      need not run, so it runs everything.
+ *   5. else the modules that exercise its directory (dirModules): those whose
+ *      covers name something under the file's own module directory (x/ for
+ *      x.rs), else under its directory, walking up to the crate's src/ but
+ *      not to src/ itself, since every module is under that;
+ *   6. else the whole scenario. A file no module comes near (a top-level
+ *      file of lattice-gpui's src/, the terminal) can break any module, and
+ *      the trailer tells GitHub its macOS job need not run, so it runs
+ *      everything.
  *
  * A commit that changes only text on top of a gated commit (TEXT_ONLY: the
  * documentation, the release notes, the user guide and the i18n catalogs)
@@ -91,10 +96,23 @@ export const E2E_TABLE = [
   [/^gpui\/(Cargo\.(toml|lock)|rust-toolchain\.toml|\.cargo\/)/, FULL],
   [/^gpui\/crates\/[^/]+\/(Cargo\.toml|build\.rs|src\/(main|lib)\.rs)$/, FULL],
   [/^gpui\/crates\/lattice-gpui\/src\/app\.rs$/, FULL],
-  [/^gpui\/crates\/(lattice-ui|lattice-i18n)\//, FULL],
+  // lattice-i18n's code; its catalogs are text, below.
+  [/^gpui\/crates\/(lattice-ui\/|lattice-i18n\/(?!locales\/))/, FULL],
+  // The window's root view and the native input every module's clicks and
+  // keys go through.
+  [/^gpui\/crates\/lattice-gpui\/src\/(shell|native)\.rs$/, FULL],
   [/^src-tauri\/lattice-(core|theme)\//, FULL],
   [/^design-system\//, FULL],
   [/^\.github\/workflows\/gpui\.yml$/, FULL],
+  // The string catalogs (lattice-i18n's .po files and the Tauri modules'
+  // src/locales/, which the islands and lattice-i18n compile in): the build
+  // and the unit tests check them (lattice-i18n's coverage test), the smoke
+  // flow runs, and the strings as shown are left to the nightly full gate.
+  [/^gpui\/crates\/lattice-i18n\/locales\//, []],
+  [/^src\/locales\//, []],
+  // Compiled only for Linux and Windows: the macOS scenario cannot reach them
+  // (scripts/windows-e2e-tier.mjs decides the Windows job's).
+  [/^gpui\/crates\/lattice-gpui\/src\/native_(linux|windows)\.rs$/, []],
   // Crates one part of the scenario exercises.
   [/^gpui\/crates\/lattice-board(-core)?\//, ["drawing_drop", "structured"]],
   [/^gpui\/crates\/lattice-webview\//, ISLAND_MODULES],
@@ -103,6 +121,28 @@ export const E2E_TABLE = [
   [/^src\/agent\//, AGENT_MODULES],
   [/^src\//, ISLAND_MODULES],
 ];
+
+/**
+ * The modules that exercise the directory of a file no `covers` names:
+ * those covering something under its own module directory (`x/` for
+ * `x.rs`), else under the nearest directory above it that any module covers
+ * something in, stopping short of the crate's `src/`, else the module named
+ * for the file or one of its directories. [] when none does.
+ */
+export function dirModules(file, covers = MODULE_COVERS) {
+  const src = /^gpui\/crates\/[^/]+\/src\//.exec(file)?.[0];
+  if (!src) return [];
+  const prefixes = [file.replace(/\.rs$/, "/")];
+  for (let dir = file.slice(0, file.lastIndexOf("/") + 1); dir.length > src.length; dir = dir.slice(0, dir.slice(0, -1).lastIndexOf("/") + 1)) prefixes.push(dir);
+  for (const prefix of prefixes) {
+    const found = [...covers].filter(([, list]) => list.some((cover) => cover.startsWith(prefix))).map(([module]) => module);
+    if (found.length) return found;
+  }
+  // A module named for the file or a directory it is in (card_previews/math_page.rs).
+  const names = file.slice(src.length).replace(/\.rs$/, "").split("/").reverse();
+  const named = names.find((name) => covers.has(name));
+  return named ? [named] : [];
+}
 
 /**
  * The e2e these GPUI inputs need: `full`, or the modules beyond the smoke
@@ -127,11 +167,12 @@ export function e2eNeeds(gpuiFiles, covers = MODULE_COVERS) {
     }
     if (!picked.size) {
       const row = E2E_TABLE.find(([pattern]) => pattern.test(file));
-      if (!row || row[1] === FULL) {
+      const near = row ? [] : dirModules(file, covers);
+      if (row?.[1] === FULL || (!row && !near.length)) {
         fullBecause.push(file);
         continue;
       }
-      for (const module of row[1]) picked.add(module);
+      for (const module of row ? row[1] : near) picked.add(module);
     }
     for (const module of picked) (why[module] ??= []).push(file);
   }
