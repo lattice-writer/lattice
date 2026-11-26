@@ -25,7 +25,10 @@
 
 use std::{
     collections::HashMap,
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicU64, Ordering},
+    },
     time::Instant,
 };
 
@@ -46,6 +49,9 @@ pub(super) struct LatexServices {
     pub texlab: Entity<TexlabService>,
     texts: SentTexts,
     unanswered: Arc<Mutex<Option<Unanswered>>>,
+    /// The last completion asked; only its answer is remembered, as asks
+    /// wait for the pool in no particular order.
+    latest: Arc<AtomicU64>,
 }
 
 impl LatexServices {
@@ -54,6 +60,7 @@ impl LatexServices {
             texlab,
             texts: SentTexts::default(),
             unanswered: Arc::default(),
+            latest: Arc::default(),
         }
     }
 }
@@ -196,9 +203,9 @@ impl StructuredDocument {
             return self.respond(id, Err("TexLab is unavailable.".into()), cx);
         };
         let text = services.texts.text_for(&request);
-        let word = (command == "texlab_completion")
-            .then(|| text.as_deref())
-            .flatten()
+        let word = text
+            .as_deref()
+            .filter(|_| command == "texlab_completion")
             .and_then(|text| word_at(text, request.line, request.character))
             .map(|(from, word)| (from, word.to_string()));
         let unanswered = services.unanswered.clone();
@@ -211,6 +218,8 @@ impl StructuredDocument {
         {
             return self.respond(id, Ok(json!([])), cx);
         }
+        let latest = services.latest.clone();
+        let ask = latest.fetch_add(1, Ordering::SeqCst) + 1;
         let (root, pool) = services.texlab.read(cx).pool();
         let command = command.to_string();
         self.answer_off_thread(id, cx, move || {
@@ -228,7 +237,9 @@ impl StructuredDocument {
                 "texlab_completion" => {
                     let items = pool.completion(&root, &at)?;
                     drop(pool);
-                    if let Ok(mut unanswered) = unanswered.lock() {
+                    if let Ok(mut unanswered) = unanswered.lock()
+                        && latest.load(Ordering::SeqCst) == ask
+                    {
                         *unanswered = match (items.is_empty(), text, word) {
                             (true, Some(text), Some((from, word))) => Some(Unanswered {
                                 path: request.path,
@@ -294,6 +305,10 @@ mod tests {
         assert_eq!(word_at(text, 1, 9), Some((0, "\\section")));
         assert_eq!(word_at(text, 2, 5), Some((16, "Some")));
         assert_eq!(word_at(text, 2, 6), None);
+        assert_eq!(word_at(text, 2, 1), None);
+        assert_eq!(word_at(text, 9, 1), None);
+        // An emoji is two UTF-16 units and four bytes.
+        assert_eq!(word_at("\u{1F600} ab", 1, 6), Some((5, "ab")));
     }
 
     /// A word TexLab had nothing for keeps that nothing while only letters
@@ -313,5 +328,6 @@ mod tests {
         assert!(!known.covers("main.tex", "a word c", 2, "word"));
         assert!(!known.covers("main.tex", "a wo b", 2, "wo"));
         assert!(!known.covers("main.tex", "a  word b", 3, "word"));
+        assert!(!known.covers("main.tex", "a word bb", 2, "word"));
     }
 }
