@@ -10,7 +10,7 @@ Open **Settings › Appearance**. Under **Theme** you can pick a built-in theme,
 
 ![Browse themes, listing the Harbor theme with an Install button](images/en-browse-themes.webp)
 
-The editor's syntax colors are set separately under **Code theme** on the same page.
+The editor's syntax colors are set separately under **Code theme** on the same page. The default is **VS Code** (its Light+ and Dark+ colors); **GitHub**, **Weft & Warp** (Lattice's own), **One**, **Solarized**, **Catppuccin**, **Tokyo Night**, **Dracula**, **Nord** and **Monokai** are the others. A code theme you chose stays, and a copy of Lattice that already ran the native version keeps GitHub, the default before 0.20.0, until you choose another. A theme with a light and a dark variant follows the app's appearance unless you fix one. Code blocks in the visual editor use the same code theme as source files. An installed theme that sets its own syntax colors wins over the code theme.
 
 ## Plugins
 

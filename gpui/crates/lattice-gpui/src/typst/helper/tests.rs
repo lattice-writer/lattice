@@ -14,7 +14,9 @@ fn script(dir: &Path, name: &str, body: &str) -> PathBuf {
 }
 
 fn compile(binary: &Path, root: &Path) -> BuildResult {
-    build(binary, root, "main.typ", &HashMap::new(), false)
+    build(binary, root, "main.typ", &HashMap::new(), false).unwrap_or_else(|failure| {
+        Reply::failed(failure.message).into_build(root, "main.typ", false)
+    })
 }
 
 /// A helper that never says hello, or that takes a compile and never
@@ -91,4 +93,61 @@ fn a_hung_helper_is_killed_and_stop_never_waits() {
     );
     assert!(!result.success);
     assert!(result.log.contains("did not start"), "{}", result.log);
+
+    // A helper of the protocol before the jumps is outdated, for compiles
+    // and jumps alike: the caller downloads this version's helper again.
+    let old = script(
+        dir.path(),
+        "old",
+        &format!(
+            "echo '{}'\nexec sleep 600",
+            serde_json::to_string(&Hello {
+                protocol: 1,
+                version: "0.19.3".into()
+            })
+            .unwrap()
+        ),
+    );
+    let failure = build(&old, dir.path(), "main.typ", &HashMap::new(), false).unwrap_err();
+    assert!(failure.outdated, "{failure:?}");
+    assert!(
+        failure.message.contains("out of date"),
+        "{}",
+        failure.message
+    );
+    let failure = jump_from_click(
+        &old,
+        ClickJump {
+            root: dir.path().to_path_buf(),
+            document: "main.typ".into(),
+            page: 1,
+            ..ClickJump::default()
+        },
+    )
+    .unwrap_err();
+    assert!(failure.outdated, "{failure:?}");
+
+    // An answer the app cannot read is a failed jump with its reason, after
+    // one fresh start, never a hang or a jump to nowhere.
+    let garbled = script(
+        dir.path(),
+        "garbled",
+        &format!("{hello}\nread line\necho 'not a jump'\nexec sleep 600"),
+    );
+    let failure = jump_from_cursor(
+        &garbled,
+        CursorJump {
+            root: dir.path().to_path_buf(),
+            document: "main.typ".into(),
+            path: "main.typ".into(),
+            line: 1,
+            column: 1,
+            ..CursorJump::default()
+        },
+    )
+    .unwrap_err();
+    assert!(
+        !failure.outdated && !failure.message.is_empty(),
+        "{failure:?}"
+    );
 }

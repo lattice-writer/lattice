@@ -22,7 +22,7 @@ import type { Theme } from "./app-settings";
 import { compositeHex, fitContrast } from "./theme-customization";
 
 export const CODE_THEMES = [
-  "github", "lattice", "one", "solarized", "catppuccin", "tokyo-night", "dracula", "nord", "monokai",
+  "vscode", "github", "lattice", "one", "solarized", "catppuccin", "tokyo-night", "dracula", "nord", "monokai",
 ] as const;
 export type CodeTheme = typeof CODE_THEMES[number];
 
@@ -59,26 +59,54 @@ type Palette = {
 type ThemeSource = { name: string; light?: Palette; dark?: Palette };
 
 /* eslint-disable lingui/no-unlocalized-strings -- theme names are proper names; colors are data */
-const THEMES: Record<Exclude<CodeTheme, "lattice">, ThemeSource> = {
-  // Primer's GitHub Light Default and GitHub Dark Default.
+export const THEMES: Record<Exclude<CodeTheme, "lattice">, ThemeSource> = {
+  // VS Code's Default Light+ and Default Dark+, the default code theme. The
+  // tokens are each role's colour in @shikijs/themes' `light-plus` and
+  // `dark-plus` (MIT, Microsoft), resolved through syntax-scopes.ts, which
+  // code-themes.test.ts checks. Those exports carry no gutter, caret or
+  // selection colours, so these are VS Code's own editor defaults.
+  vscode: {
+    name: "VS Code",
+    light: {
+      ground: "#ffffff", ink: "#000000", lineNumber: "#237893", caret: "#000000", selection: "#add6ff",
+      tokens: {
+        keyword: "#0000ff", operator: "#000000", function: "#795e26", type: "#267f99", variable: "#001080",
+        "variable-special": "#0000ff", property: "#001080", attribute: "#e50000", string: "#a31515",
+        comment: "#008000", "comment-doc": "#008000", number: "#098658", constant: "#0000ff", bracket: "#000000",
+        citation: "#000000", reference: "#000000",
+      },
+    },
+    dark: {
+      ground: "#1e1e1e", ink: "#d4d4d4", lineNumber: "#858585", caret: "#aeafad", selection: "#264f78",
+      tokens: {
+        keyword: "#569cd6", operator: "#d4d4d4", function: "#dcdcaa", type: "#4ec9b0", variable: "#9cdcfe",
+        "variable-special": "#569cd6", property: "#9cdcfe", attribute: "#9cdcfe", string: "#ce9178",
+        comment: "#6a9955", "comment-doc": "#6a9955", number: "#b5cea8", constant: "#569cd6", bracket: "#d4d4d4",
+        citation: "#d4d4d4", reference: "#d4d4d4",
+      },
+    },
+  },
+  // Primer's GitHub Light Default and GitHub Dark Default: the tokens are each
+  // role's colour in @shikijs/themes' `github-light-default` and
+  // `github-dark-default` (MIT, GitHub), resolved like VS Code's above.
   github: {
     name: "GitHub",
     light: {
       ground: "#ffffff", ink: "#1f2328", lineNumber: "#8c959f", caret: "#0969da", selection: "#0969da33",
       tokens: {
-        keyword: "#cf222e", operator: "#cf222e", function: "#8250df", type: "#116329", variable: "#0550ae",
-        "variable-special": "#0550ae", property: "#0550ae", attribute: "#0550ae", string: "#0a3069",
-        comment: "#59636e", "comment-doc": "#0a3069", number: "#0550ae", constant: "#0550ae", bracket: "#1f2328",
-        citation: "#0a3069", reference: "#953800",
+        keyword: "#cf222e", operator: "#cf222e", function: "#8250df", type: "#953800", variable: "#953800",
+        "variable-special": "#0550ae", property: "#1f2328", attribute: "#0550ae", string: "#0a3069",
+        comment: "#6e7781", "comment-doc": "#6e7781", number: "#0550ae", constant: "#0550ae", bracket: "#1f2328",
+        citation: "#0550ae", reference: "#0550ae",
       },
     },
     dark: {
       ground: "#0d1117", ink: "#e6edf3", lineNumber: "#6e7681", caret: "#2f81f7", selection: "#388bfd33",
       tokens: {
-        keyword: "#ff7b72", operator: "#ff7b72", function: "#d2a8ff", type: "#7ee787", variable: "#79c0ff",
-        "variable-special": "#79c0ff", property: "#79c0ff", attribute: "#79c0ff", string: "#a5d6ff",
-        comment: "#8b949e", "comment-doc": "#a5d6ff", number: "#79c0ff", constant: "#79c0ff", bracket: "#e6edf3",
-        citation: "#a5d6ff", reference: "#ffa657",
+        keyword: "#ff7b72", operator: "#ff7b72", function: "#d2a8ff", type: "#ffa657", variable: "#ffa657",
+        "variable-special": "#79c0ff", property: "#e6edf3", attribute: "#79c0ff", string: "#a5d6ff",
+        comment: "#8b949e", "comment-doc": "#8b949e", number: "#79c0ff", constant: "#79c0ff", bracket: "#e6edf3",
+        citation: "#79c0ff", reference: "#79c0ff",
       },
     },
   },

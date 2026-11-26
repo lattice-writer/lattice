@@ -28,9 +28,10 @@
 
 use std::path::{Path, PathBuf};
 
-use gpui::{App, AppContext as _, Context, Pixels, Point, Window};
+use gpui::{App, AppContext as _, Context, Pixels, Point, WeakEntity, Window};
 use lattice_core::project as core_project;
 use lattice_i18n::t;
+use trellis::TrellisWorkspace;
 use trellis::runtime::engine::ViewPlacement;
 
 use super::{
@@ -422,21 +423,15 @@ impl Shell {
             opened,
             shown,
         });
-        // The tab is laid out on the next frame; the pointer is already
-        // away, so it lifts out at once there.
-        let workspace = self.workspace.downgrade();
-        let this = cx.entity().downgrade();
-        window.on_next_frame(move |window, cx| {
-            let carried = workspace
-                .update(cx, |workspace, cx| {
-                    workspace.carry_view(&view, window.mouse_position(), cx)
-                })
-                .unwrap_or(false);
-            if !carried {
-                this.update(cx, |this, cx| this.carry_ended(&view, false, window, cx))
-                    .ok();
-            }
-        });
+        // The pointer is already away, so the tab lifts out as soon as a
+        // frame has laid it out.
+        carry_once_laid_out(
+            view,
+            CARRY_FRAMES,
+            self.workspace.downgrade(),
+            cx.entity().downgrade(),
+            window,
+        );
         true
     }
 
@@ -477,6 +472,65 @@ impl Shell {
         }
         self.sync_views(window, cx);
     }
+}
+
+/// How many frames a carried tree row waits for its new tab to be laid out
+/// before the carry gives up and lets go of it.
+const CARRY_FRAMES: u8 = 4;
+
+/// Hand the carried tree row's tab to Trellis once a drawn frame has laid
+/// it out. A next-frame callback runs before that frame draws
+/// (`Window::on_next_frame`), so a tab opened in the same update has no
+/// bounds in it unless another frame happened to draw in between: one did
+/// on the crew's Macs, but on GitHub's macOS and Windows runners none did,
+/// `carry_view` found no tab to lift, and the drag closed the tab it had
+/// just opened. A frame that only runs callbacks draws nothing, so each
+/// retry dirties the window too.
+fn carry_once_laid_out(
+    view: String,
+    frames_left: u8,
+    workspace: WeakEntity<TrellisWorkspace>,
+    this: WeakEntity<Shell>,
+    window: &mut Window,
+) {
+    window.refresh();
+    window.on_next_frame(move |window, cx| {
+        let still_carried = this
+            .read_with(cx, |this, _| {
+                this.parts
+                    .get::<Drops>()
+                    .carried
+                    .as_ref()
+                    .is_some_and(|carried| carried.view == view)
+            })
+            .unwrap_or(false);
+        if !still_carried {
+            return;
+        }
+        let laid_out = workspace
+            .read_with(cx, |workspace, _| {
+                workspace.engine().view_state(&view).is_some_and(|state| {
+                    workspace
+                        .tab_bounds(&state.panel_id)
+                        .iter()
+                        .any(|(id, _)| *id == view)
+                })
+            })
+            .unwrap_or(false);
+        if !laid_out && frames_left > 0 {
+            carry_once_laid_out(view, frames_left - 1, workspace, this, window);
+            return;
+        }
+        let carried = workspace
+            .update(cx, |workspace, cx| {
+                workspace.carry_view(&view, window.mouse_position(), cx)
+            })
+            .unwrap_or(false);
+        if !carried {
+            this.update(cx, |this, cx| this.carry_ended(&view, false, window, cx))
+                .ok();
+        }
+    });
 }
 
 /// This file's registration as a window part (`parts.rs`).

@@ -33,7 +33,7 @@ mod window;
 
 pub(crate) use clicked_word::word_at as clicked_word_at;
 pub(crate) use dark::{enabled as dark_pages, filter as dark_filter};
-pub(crate) use engine::{DocId, PdfEngine, RenderRequest};
+pub(crate) use engine::{DocId, PdfEngine, PixelRect, RenderRequest};
 pub use find::FindOptions;
 pub use layout::FitMode;
 pub(crate) use named_links::citation_keys;

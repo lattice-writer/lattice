@@ -1,0 +1,54 @@
+{
+  "version": "0.19.4",
+  "date": "2026-11-24",
+  "highlights": [
+    {
+      "icon": "feather",
+      "title": {
+        "en": "Jump between Typst source and PDF",
+        "zh": "Typst 源码与 PDF 之间跳转"
+      },
+      "body": {
+        "en": "In the native Lattice, double-click a place in a Typst document's PDF to put the cursor on that line of its source, even in a file you #include, or press ⌘⇧J (Jump to PDF) to mark the cursor's line in the PDF. Edits you haven't saved count too. Lattice downloads the matching Typst support once more after this update.",
+        "zh": "在原生 Lattice 中，双击 Typst 文档 PDF 中的某处，光标就会跳到源码中对应的那一行，#include 进来的文件也可以；按 ⌘⇧J（跳到 PDF）则在 PDF 中标出光标所在的行。尚未保存的修改也算在内。更新后 Lattice 会重新下载一次对应版本的 Typst 支持。"
+      }
+    },
+    {
+      "icon": "bot",
+      "title": {
+        "en": "Word wrap in the Agent's diffs",
+        "zh": "AI 助手的差异视图自动换行"
+      },
+      "body": {
+        "en": "Long lines in the Agent's diffs now wrap, in both versions of Lattice. The wrap button in the diff's toolbar, Word wrap in its … menu, or ⌥Z turns wrapping off and on again, and Lattice remembers your choice.",
+        "zh": "两个版本的 Lattice 中，AI 助手差异视图里过长的行现在会自动换行。差异工具栏上的换行按钮、… 菜单中的「自动换行」或 ⌥Z 可以关闭或重新打开换行，Lattice 会记住你的选择。"
+      }
+    }
+  ],
+  "fixes": [
+    {
+      "en": "Holding a shortcut such as ⌘K or ⌘W runs its command once, in both versions of Lattice: the command palette no longer flickers open and shut, and a held ⌘W no longer closes one tab after another (#1233).",
+      "zh": "在两个版本的 Lattice 中，按住 ⌘K 或 ⌘W 这类快捷键只会执行一次命令：命令面板不会再反复打开和关闭，按住 ⌘W 也不会再一个接一个地关闭标签页（#1233）。"
+    },
+    {
+      "en": "In the Agent, + › Files and folders attaches the file you pick again (#1253).",
+      "zh": "在 AI 助手中，+ › 文件和文件夹 又能附上你选中的文件了（#1253）。"
+    },
+    {
+      "en": "In the native Lattice, New folder in the Project panel makes a folder instead of a file, and empty folders show as folders.",
+      "zh": "在原生 Lattice 中，项目面板里的「新建文件夹」会新建文件夹而不是文件，空文件夹也显示为文件夹。"
+    },
+    {
+      "en": "In the native Lattice, New file or New folder inside a closed folder opens the folder, scrolls to the new entry and puts the cursor in its name.",
+      "zh": "在原生 Lattice 中，在折叠的文件夹里新建文件或文件夹时，会展开该文件夹、滚动到新条目，并把光标放在名称里。"
+    },
+    {
+      "en": "In the native Lattice, the build button shows how long you waited for the build, so Typst builds no longer read 0.0 s.",
+      "zh": "在原生 Lattice 中，编译按钮显示的是你实际等待编译的时间，Typst 编译不再显示 0.0 秒。"
+    },
+    {
+      "en": "In the native Lattice, closing a pane's last tab closes the pane instead of leaving an empty one behind.",
+      "zh": "在原生 Lattice 中，关闭窗格的最后一个标签页时窗格会一起关闭，不再留下一个空窗格。"
+    }
+  ]
+}

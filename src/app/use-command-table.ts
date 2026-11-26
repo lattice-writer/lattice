@@ -207,10 +207,10 @@ export function useCommandTable({
     { id: "quick-open", when: inProject, label: t`Quick open file`, group: "navigate", key: "p", run: () => setSearchDialog("quick-open") },
     { id: "goto-line", when: textEditor, label: t`Go to line`, group: "navigate", ...GOTO_LINE_KEY, run: () => setSearchDialog("goto-line") },
     { id: "goto-symbol", when: textEditor, label: t`Go to symbol`, group: "navigate", key: "o", shift: true, run: () => setSearchDialog("goto-symbol") },
-    { id: "back", when: inProject, label: t({ message: "Back", context: "Document history" }), group: "navigate", key: "[", palette: false, run: () => void documents.go(-1) },
-    { id: "forward", when: inProject, label: t({ message: "Forward", context: "Document history" }), group: "navigate", key: "]", palette: false, run: () => void documents.go(1) },
-    { id: "next-problem", label: t`Next build problem`, group: "navigate", key: "f8", mod: false, palette: false, run: () => cycleDiagnostic(1) },
-    { id: "previous-problem", label: t`Previous build problem`, group: "navigate", key: "f8", shift: true, mod: false, palette: false, run: () => cycleDiagnostic(-1) },
+    { id: "back", when: inProject, label: t({ message: "Back", context: "Document history" }), group: "navigate", key: "[", repeat: true, palette: false, run: () => void documents.go(-1) },
+    { id: "forward", when: inProject, label: t({ message: "Forward", context: "Document history" }), group: "navigate", key: "]", repeat: true, palette: false, run: () => void documents.go(1) },
+    { id: "next-problem", label: t`Next build problem`, group: "navigate", key: "f8", mod: false, repeat: true, palette: false, run: () => cycleDiagnostic(1) },
+    { id: "previous-problem", label: t`Previous build problem`, group: "navigate", key: "f8", shift: true, mod: false, repeat: true, palette: false, run: () => cycleDiagnostic(-1) },
     { id: "reopen-tab", when: inProject, label: t`Reopen the closed tab`, group: "navigate", key: "t", shift: true, palette: false, run: documents.reopenClosed },
     // ⌘W closes a document tab, as in an editor or a browser, and the window
     // once none is open; ⇧⌘W (File ▸ Close Window) closes the window outright.
@@ -344,9 +344,9 @@ export function useCommandTable({
       run: () => setThemePreference(preference),
     })),
     // The interface size, as every Mac app binds it; ⌘= is ⌘+ without Shift.
-    { id: "interface-bigger", label: t`Larger interface`, group: "appearance", key: "+", shift: true, run: () => interfaceZoom.zoom("in") },
-    { id: "interface-bigger-unshifted", key: "=", palette: false, run: () => interfaceZoom.zoom("in") },
-    { id: "interface-smaller", label: t`Smaller interface`, group: "appearance", key: "-", run: () => interfaceZoom.zoom("out") },
+    { id: "interface-bigger", label: t`Larger interface`, group: "appearance", key: "+", shift: true, repeat: true, run: () => interfaceZoom.zoom("in") },
+    { id: "interface-bigger-unshifted", key: "=", repeat: true, palette: false, run: () => interfaceZoom.zoom("in") },
+    { id: "interface-smaller", label: t`Smaller interface`, group: "appearance", key: "-", repeat: true, run: () => interfaceZoom.zoom("out") },
     { id: "interface-actual-size", label: t`Reset interface size`, group: "appearance", key: "0", run: () => interfaceZoom.zoom("reset") },
     { id: "settings", label: t`Open settings`, group: "project", key: ",", run: () => openSettings() },
   ];

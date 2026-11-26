@@ -1723,6 +1723,45 @@ mod tests {
     }
 
     #[crate::test]
+    fn test_held_key_runs_an_action_once_unless_it_repeats(cx: &mut TestAppContext) {
+        let (test, cx) = cx.add_window_view(|_, cx| PendingTextInputTestView::new(cx));
+        test.update_in(cx, |test, window, cx| {
+            window.focus(&test.focus_handle, cx);
+            window.activate_window();
+        });
+        cx.update(|_, cx| cx.bind_keys([KeyBinding::new("ctrl-k", TestAction, Some("Terminal"))]));
+        fn press(cx: &mut VisualTestContext, is_held: bool) -> bool {
+            cx.update(|window, cx| {
+                window
+                    .dispatch_event(
+                        PlatformInput::KeyDown(KeyDownEvent {
+                            keystroke: Keystroke::parse("ctrl-k").expect("valid keystroke"),
+                            is_held,
+                            prefer_character_input: false,
+                        }),
+                        cx,
+                    )
+                    .propagate
+            })
+        }
+
+        for is_held in [false, true, true] {
+            assert!(!press(cx, is_held));
+        }
+        test.read_with(cx, |test, _| assert_eq!(test.action_count.get(), 3));
+
+        test.update(cx, |test, _| test.action_count.set(0));
+        cx.update(|_, cx| cx.set_held_key_repeats(|action| !action.as_any().is::<TestAction>()));
+        for is_held in [false, true, true] {
+            assert!(!press(cx, is_held));
+        }
+        test.read_with(cx, |test, _| {
+            assert_eq!(test.action_count.get(), 1);
+            assert_eq!(test.text.borrow().as_str(), "");
+        });
+    }
+
+    #[crate::test]
     fn test_consumed_modifier_preserves_pending_input(cx: &mut TestAppContext) {
         let (test, cx) = cx.add_window_view(|_, cx| PendingTextInputTestView::new(cx));
         test.update_in(cx, |test, window, cx| {

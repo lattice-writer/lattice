@@ -693,3 +693,44 @@ fn a_named_document_searches_its_own_pdf() {
         assert!(synced_pdf(&root, Some(refused), unbuilt).is_err(), "{refused}");
     }
 }
+
+#[test]
+#[ignore = "requires a local latexmk, pdfLaTeX, minted and Pygments installation"]
+fn a_click_on_minted_code_lands_on_its_line_in_the_source() {
+    let parent = TempDir::new("synctex-minted");
+    let root = project::create(&parent, "Minted").unwrap();
+    let mut manifest = project::read_manifest(&root).unwrap();
+    manifest.trusted = true;
+    project::write_manifest(&root, &manifest).unwrap();
+    fs::write(
+        root.join(".latexmkrc"),
+        "$pdf_mode = 1;\n$pdflatex = 'pdflatex -shell-escape %O %S';\n",
+    )
+    .unwrap();
+    fs::write(
+        root.join("main.tex"),
+        "\\documentclass{article}\n\\usepackage{minted}\n\\begin{document}\n\
+         Before $f(x)$ and\n\\[ \\mathrm{return}\\ x + 1 \\]\n\n\
+         \\begin{minted}{python}\ndef f(x):\n    return x + 1\n\\end{minted}\n\n\
+         Between.\n\n\
+         \\begin{minted}{python}\ndef f(x):\n    return x + 1\n\\end{minted}\n\\end{document}\n",
+    )
+    .unwrap();
+    let result = super::super::build(
+        &root,
+        true,
+        false,
+        &Default::default(),
+        None,
+        &super::super::BuildSteps::silent(),
+        super::super::AuxFiles::Beside,
+    )
+    .unwrap();
+    assert!(result.success, "{}", result.log);
+    // `return x + 1` in each block, 180pt and 236pt down page 1. Both blocks
+    // share one cache file, and the equation holds the same letters.
+    for (y, line) in [(180.0, 9), (236.0, 16)] {
+        let back = inverse_search(&root, 1, 150.0, y).unwrap();
+        assert_eq!((back.path.as_str(), back.line), ("main.tex", line));
+    }
+}

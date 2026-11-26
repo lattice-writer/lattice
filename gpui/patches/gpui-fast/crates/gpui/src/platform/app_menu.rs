@@ -352,7 +352,20 @@ pub(crate) fn init_app_menus(platform: &dyn Platform, cx: &App) {
         let cx = cx.to_async();
         move |action| {
             if let Some(app) = cx.app.upgrade() {
-                app.borrow_mut().update(|cx| cx.dispatch_action(action));
+                app.borrow_mut().update(|cx| {
+                    // A held key's repeat reaches a menu item's key
+                    // equivalent too: it runs only actions that repeat, as
+                    // the window's own key dispatch does.
+                    if cx.platform.menu_action_from_key_repeat()
+                        && cx
+                            .held_key_repeats
+                            .clone()
+                            .is_some_and(|repeats| !repeats(action))
+                    {
+                        return;
+                    }
+                    cx.dispatch_action(action)
+                });
             }
         }
     }));

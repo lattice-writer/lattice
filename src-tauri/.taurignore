@@ -1,0 +1,12 @@
+# What `tauri dev`'s file watcher skips. It reads ignore files from src-tauri/,
+# not the repository's root .gitignore, so the runtimes ignored there are
+# listed again here.
+#
+# The Synara and presentation runtimes are bundled resources that
+# `pnpm prepare:runtime:dev` writes as tauri dev's beforeDevCommand, while
+# the watcher is already running. Each file it wrote restarted
+# `cargo run` (27 times on one cold Windows run, from
+# presentation-runtime/node_modules alone). The app reads them at
+# launch, so a restart mid-write gains nothing.
+/synara-runtime/
+/presentation-runtime/

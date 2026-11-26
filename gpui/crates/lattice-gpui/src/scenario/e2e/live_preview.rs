@@ -68,6 +68,17 @@ fn layer_state(view: &Entity<PdfView>, cx: &App) -> (Vec<usize>, u64, f32, f32) 
     (pages, layer.draws, share(covered), ink_share)
 }
 
+/// The width the live layer's full-size part was drawn for, and its whole
+/// image's, on the first page holding both.
+fn live_detail_sizes(view: &Entity<PdfView>, cx: &App) -> Option<(u32, u32)> {
+    let layer = view.read(cx).live_layer()?;
+    layer.drawn_pages().into_iter().find_map(|page| {
+        let (_, width_px, _) = layer.detail(page)?;
+        let base = layer.image(page)?.size(0).width.0 as u32;
+        Some((width_px, base))
+    })
+}
+
 fn state_name(preview: &LivePreview) -> String {
     match preview.state() {
         State::Off => "off".into(),
@@ -325,6 +336,36 @@ impl Run {
                 "ink_of_covered": ink,
                 "paragraph_updates": cx.update(|cx| preview.read(cx).received("ParagraphUpdate")),
             }),
+        );
+
+        // Zoomed past the page cap (`MAX_PAGE_PIXELS`), the layer is drawn
+        // again at full size over the part of the page on screen, as the
+        // PDF under it is: it showed stretched from the capped size, its
+        // figures and text blurred while the PDF's were sharp.
+        let (scale, fit) = cx.update(|cx| (view.read(cx).scale(), view.read(cx).fit()));
+        self.with_window(cx, {
+            let view = view.clone();
+            move |_, _, cx| view.update(cx, |view, cx| view.zoom_to(5., None, None, cx))
+        })?;
+        let full_size = self
+            .wait_for(cx, Duration::from_secs(10), |_, cx| {
+                live_detail_sizes(&view, cx).is_some_and(|(detail, base)| detail > base)
+            })
+            .await;
+        let sizes = cx.update(|cx| live_detail_sizes(&view, cx));
+        self.with_window(cx, {
+            let view = view.clone();
+            move |_, _, cx| {
+                view.update(cx, |view, cx| match fit {
+                    Some(mode) => view.apply_fit(mode, cx),
+                    None => view.zoom_to(scale, None, None, cx),
+                })
+            }
+        })?;
+        steps.check(
+            "zoomed past the page cap, the typed page's layer is drawn at full size over the part on screen",
+            full_size,
+            json!({ "detail_and_base_width_px": sizes }),
         );
 
         // The save's build waits for the pause in typing, then runs quietly.

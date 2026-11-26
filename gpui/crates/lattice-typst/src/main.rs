@@ -1,6 +1,7 @@
 //! The Typst helper the native app downloads on first use and keeps
-//! running: it says hello, then compiles each request it reads on stdin and
-//! writes the reply on stdout, one JSON object per line
+//! running: it says hello, then answers each request it reads on stdin (a
+//! compile, or a jump between source and PDF) on stdout, one JSON object per
+//! line
 //! (`lattice_core::typst_wire`). Nothing else goes to stdout. It stops when
 //! the app closes its stdin, which the app does by quitting.
 
@@ -22,17 +23,29 @@ fn main() {
         if line.trim().is_empty() {
             continue;
         }
-        let reply = match serde_json::from_str::<Request>(&line) {
-            Ok(request) => Reply::from_build(&lattice_typst::build(
-                &request.root,
-                &request.document,
-                &request.overlay,
-            )),
-            Err(error) => Reply::failed(format!(
-                "The Typst helper could not read the request: {error}"
-            )),
+        let sent = match serde_json::from_str::<Request>(&line) {
+            Ok(Request::Compile(request)) => send(
+                &mut stdout,
+                &Reply::from_build(&lattice_typst::build(
+                    &request.root,
+                    &request.document,
+                    &request.overlay,
+                )),
+            ),
+            Ok(Request::JumpFromClick(request)) => {
+                send(&mut stdout, &lattice_typst::jump_from_click(&request))
+            }
+            Ok(Request::JumpFromCursor(request)) => {
+                send(&mut stdout, &lattice_typst::jump_from_cursor(&request))
+            }
+            Err(error) => send(
+                &mut stdout,
+                &Reply::failed(format!(
+                    "The Typst helper could not read the request: {error}"
+                )),
+            ),
         };
-        if send(&mut stdout, &reply).is_err() {
+        if sent.is_err() {
             break;
         }
     }

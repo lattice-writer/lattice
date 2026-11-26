@@ -17,10 +17,12 @@ Open the **Agent** panel (`⌘⌥3`, or the robot icon on the left). Then use on
 ![The Agent panel: New thread, with Polish, Revise, Proofread and Check references, and the message box](images/en-agent.webp)
 
 - Type what you want in the message box and press Return. Mention a file to point it there.
+- To attach files to a message, choose **+ › Files and folders**, or in the native Lattice drop them from the Finder on the Agent panel. Any kind of file works, such as a Word document or a spreadsheet; the Agent gets the file, and it isn't added to your project.
 - **Polish**, **Revise**, **Proofread** and **Check references** start common tasks. To work on one passage, select it in the editor first.
 - In the editor, select text to **Proofread** (`⌘⌥P`), **Polish** or **Rewrite…** it in place, with a reason for each edit.
 - **Annotate** a passage (select it, choose **Annotate**, write what should change), then **Save and revise now**: the Agent proposes an edit for each annotation and you accept or reject it in place. **Revise from annotations** in the command palette does every open annotation in rounds.
 - A failed build's **Ask the agent** sends that problem straight here.
+- Long lines in the Agent's diffs wrap. The wrap button in a diff's toolbar, or `⌥Z`, turns wrapping off and on again, and Lattice remembers the choice.
 
 Threads are kept per project; the clock next to the thread name lists earlier ones. **Settings › Agent › Archived threads** lists archived threads, such as ones archived after a while unused, and can restore one to the history or delete it for good.
 

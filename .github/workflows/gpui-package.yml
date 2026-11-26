@@ -1,15 +1,17 @@
 name: GPUI package
 
-# Builds, signs and notarizes the GPUI app for Apple silicon macOS and keeps
-# the result as this run's artifact: the .dmg, the .zip, and the updater's
+# Builds, signs and notarizes the GPUI app for macOS, Apple silicon
+# (aarch64, on the Mac mini) or Intel (x86_64, on GitHub's Intel runner), and
+# keeps the result as this run's artifact: the .dmg, the .zip, and the updater's
 # .app.tar.gz with its .sig and the flavor's manifest for it
 # (scripts/gpui-bundle.mjs, gpui/docs/updater.md). The flavor is Lattice Beta
 # (Lattice-Beta_* files, latest.json) or Lattice, the native app under the
 # Tauri app's identity (Lattice-native_* files, latest-native.json;
 # scripts/gpui-bundle.mjs FLAVORS). It runs on demand (Actions > GPUI package
-# > Run workflow) or from release.yml, which publishes the native app beside
-# the Tauri app; this workflow itself publishes nothing: no release, no tag,
-# no upload. It reads the release secrets the way release.yml does.
+# > Run workflow) or from release.yml (aarch64) and macos-intel.yml (x86_64),
+# which publish the native app beside the Tauri app; this workflow itself
+# publishes nothing: no release, no tag, no upload. It reads the release
+# secrets the way release.yml does.
 on:
   workflow_dispatch:
     inputs:
@@ -18,14 +20,28 @@ on:
         type: choice
         options: [beta, main]
         default: beta
+      arch:
+        description: "aarch64 (Apple silicon) or x86_64 (Intel)"
+        type: choice
+        options: [aarch64, x86_64]
+        default: aarch64
   workflow_call:
     inputs:
       flavor:
         type: string
         default: main
+      arch:
+        type: string
+        default: aarch64
+      # The commit to build. macos-intel.yml starts from Release's
+      # workflow_run, whose github.sha is main's head, and passes the
+      # release's own commit.
+      ref:
+        type: string
+        default: ""
 
 concurrency:
-  group: gpui-package-${{ github.ref }}-${{ inputs.flavor }}
+  group: gpui-package-${{ inputs.ref || github.ref }}-${{ inputs.flavor }}-${{ inputs.arch }}
   cancel-in-progress: false
 
 permissions:
@@ -35,6 +51,10 @@ env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: "0"
   CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+  ARCH: ${{ inputs.arch }}
+  # The file names' suffix for the arch, as tauri-action ends the Tauri
+  # app's (scripts/gpui-bundle.mjs ARCHES).
+  SUFFIX: ${{ inputs.arch == 'x86_64' && 'x64' || 'aarch64' }}
 
 jobs:
   # Named `macos`, with gpui.yml's environment, so rust-cache's key is the
@@ -42,13 +62,19 @@ jobs:
   # restores that warm release build (about two minutes instead of a cold 30)
   # and never writes a cache.
   macos:
-    # The Mac mini through runner-up, as release.yml's release job; the
-    # LATTICE_MACOS_RUNNER repository variable moves both back to GitHub.
-    runs-on: ${{ vars.LATTICE_MACOS_RUNNER || 'lattice-mac' }}
+    # aarch64: the Mac mini through runner-up, as release.yml's release job;
+    # the LATTICE_MACOS_RUNNER repository variable moves both back to GitHub.
+    # x86_64: GitHub's Intel runner, as macos-intel.yml's build: the host
+    # must be x86_64, since prepare-synara-sidecar.mjs stages the Node of
+    # rustc's host triple and the presentation runtime keeps the host's
+    # native packages, and cargo builds for the host.
+    runs-on: ${{ inputs.arch == 'x86_64' && 'macos-15-intel' || (vars.LATTICE_MACOS_RUNNER || 'lattice-mac') }}
     # The Mac mini builds cold, beside whatever else it is running.
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
 
       - name: Prepare the Mac
         run: scripts/release-macos-job.sh begin
@@ -58,11 +84,14 @@ jobs:
         run: rustup toolchain install
 
       # GitHub's runners only, as in release.yml: a build compiled under
-      # /Users/runner is no use on the Mac mini.
+      # /Users/runner is no use on the Mac mini. aarch64 keeps gpui.yml's key;
+      # x86_64 adds its own (rust-cache's key also hashes rustc's host), and
+      # nothing saves one, so it builds cold.
       - uses: Swatinem/rust-cache@v2
         if: runner.environment == 'github-hosted'
         with:
           workspaces: gpui
+          key: ${{ inputs.arch == 'x86_64' && 'x86_64-apple-darwin' || '' }}
           save-if: false
 
       - name: Set up pnpm
@@ -162,6 +191,7 @@ jobs:
         run: |
           node scripts/gpui-bundle.mjs \
             --flavor "$FLAVOR" \
+            --arch "$ARCH" \
             --binary gpui/target/release/lattice-gpui \
             --typst-helper gpui/target/release/lattice-typst \
             --out "$RUNNER_TEMP/gpui-bundle"
@@ -207,23 +237,31 @@ jobs:
           # The Typst helper the app downloads on first use: signed with the
           # Developer ID and the hardened runtime, and its archive with the
           # updater key.
-          helper_archive="$(find "$RUNNER_TEMP/gpui-bundle" -maxdepth 1 -name 'Lattice-typst_*_aarch64.tar.gz' -print -quit)"
+          helper_archive="$(find "$RUNNER_TEMP/gpui-bundle" -maxdepth 1 -name "Lattice-typst_*_$SUFFIX.tar.gz" -print -quit)"
           test -s "$helper_archive.sig"
           helper_dir="$(mktemp -d "$RUNNER_TEMP/gpui-typst.XXXXXX")"
           tar -xzf "$helper_archive" -C "$helper_dir"
           codesign --verify --strict --verbose=2 "$helper_dir/lattice-typst"
           codesign --display --verbose=2 "$helper_dir/lattice-typst" 2>&1 | grep -q 'flags=.*runtime'
 
+          # The Intel app: every Mach-O file in the bundle, and the helper,
+          # must run natively on x86_64, as macos-intel.yml checks the
+          # Tauri app's.
+          if [[ "$ARCH" == x86_64 ]]; then
+            .github/scripts/check-macos-arch.sh "$app_path" x86_64
+            lipo "$helper_dir/lattice-typst" -verify_arch x86_64
+          fi
+
       - uses: actions/upload-artifact@v7
         with:
-          name: lattice-gpui-macos-aarch64-${{ inputs.flavor }}
+          name: lattice-gpui-macos-${{ inputs.arch }}-${{ inputs.flavor }}
           path: |
             ${{ runner.temp }}/gpui-bundle/*.dmg
             ${{ runner.temp }}/gpui-bundle/*.zip
             ${{ runner.temp }}/gpui-bundle/*.app.tar.gz
             ${{ runner.temp }}/gpui-bundle/*.app.tar.gz.sig
-            ${{ runner.temp }}/gpui-bundle/Lattice-typst_*_aarch64.tar.gz
-            ${{ runner.temp }}/gpui-bundle/Lattice-typst_*_aarch64.tar.gz.sig
+            ${{ runner.temp }}/gpui-bundle/Lattice-typst_*_${{ env.SUFFIX }}.tar.gz
+            ${{ runner.temp }}/gpui-bundle/Lattice-typst_*_${{ env.SUFFIX }}.tar.gz.sig
             ${{ runner.temp }}/gpui-bundle/latest*.json
           if-no-files-found: error
           retention-days: 14

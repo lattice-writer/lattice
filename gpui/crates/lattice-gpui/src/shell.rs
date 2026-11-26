@@ -49,6 +49,7 @@ mod insert_flow;
 mod insert_pickers_flow;
 mod journal_export;
 mod layers;
+mod manuscript_flow;
 pub(crate) mod menus;
 mod open_failure;
 mod opening;
@@ -89,6 +90,7 @@ mod tab_policy;
 mod terminal_flow;
 mod tools_flow;
 pub mod trellis_layout;
+mod typst_sync;
 pub mod views;
 mod welcome_flow;
 pub mod windows;
@@ -592,7 +594,6 @@ impl Shell {
         self.project.as_ref()
     }
 
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
     pub fn pdf(&self) -> &Entity<PdfPanel> {
         &self.pdf
     }
@@ -602,7 +603,6 @@ impl Shell {
         &self.build_panel
     }
 
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
     pub fn file_tree(&self) -> &Entity<FileTreePanel> {
         &self.file_tree
     }
@@ -625,7 +625,6 @@ impl Shell {
     }
 
     /// Whether a build is under way or queued.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
     pub fn building(&self) -> bool {
         self.build_task.is_some()
     }

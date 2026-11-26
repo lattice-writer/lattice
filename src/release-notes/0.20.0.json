@@ -1,0 +1,78 @@
+{
+  "version": "0.20.0",
+  "date": "2026-11-25",
+  "highlights": [
+    {
+      "icon": "gauge",
+      "title": {
+        "en": "Lattice on the Mac is now the native app",
+        "zh": "Mac 上的 Lattice 现在是原生版本"
+      },
+      "body": {
+        "en": "From this update, every Mac runs the native Lattice, drawn by the Mac's graphics hardware instead of a web page, on Apple silicon and on Intel Macs alike. It looks and works the way Lattice does, and it is faster and lighter. Updating installs it in place of the classic version, with nothing to choose. Your recent projects, settings, themes, plugins, project templates, Agent skills, Agent conversations and Overleaf links come with you. If you had switched back to the classic version, what you changed there since comes along too: the projects you opened, the settings you changed there (a setting the native version already held at a value of its own, one it brought over from the classic version included, keeps that value), and the themes, plugins, templates and skills you added. Typst support downloads again the first time you build a Typst document. The native version has no grammar check and no dictionaries for other languages; spell check uses macOS's own checker. Windows and Linux keep the classic version.",
+        "zh": "从这次更新起，所有 Mac 都运行原生 Lattice：由 Mac 的图形硬件直接绘制，而不是网页，Apple 芯片和 Intel 芯片的 Mac 都一样。它的外观和用法与 Lattice 一致，而且更快、更轻。更新会把它装在经典版本的位置上，不需要做任何选择。最近项目、设置、主题、插件、项目模板、Agent 技能、Agent 对话和 Overleaf 关联都会一起带过去。如果你之前切换回了经典版本，之后在那里做的改动也会带过去：打开过的项目、改过的设置（原生版本里已有自己取值的设置保持原样，包括它当初从经典版本带过来的值），以及新增的主题、插件、模板和技能。第一次编译 Typst 文档时会重新下载 Typst 支持。原生版本没有语法检查，也没有其他语言的词典；拼写检查使用 macOS 自带的检查器。Windows 和 Linux 继续使用经典版本。"
+      }
+    },
+    {
+      "title": {
+        "en": "No more switching back",
+        "zh": "不再切换回经典版本"
+      },
+      "body": {
+        "en": "Settings › Editor & builds no longer offers to switch back to the classic version. The classic version's data stays on your Mac, untouched.",
+        "zh": "设置 › 编辑编译 中不再提供切换回经典版本的选项。经典版本的数据仍留在你的 Mac 上，原封不动。"
+      }
+    },
+    {
+      "icon": "sparkles",
+      "title": {
+        "en": "VS Code colours for code, and a code theme you choose",
+        "zh": "代码使用 VS Code 配色，代码主题可选"
+      },
+      "body": {
+        "en": "VS Code's Light+ and Dark+ colours are the new default code theme. A code theme you chose stays as it is, and a copy that already ran the native version keeps GitHub, the earlier default: choose VS Code under Settings › Appearance › Code theme to switch, or GitHub, Weft & Warp, One, Solarized, Catppuccin, Tokyo Night, Dracula, Nord or Monokai. A code block in the visual editor follows the same code theme, so a .py file and a Python block in a note have the same colours. Selecting text in a code block no longer paints the block's padding.",
+        "zh": "VS Code 的 Light+ 和 Dark+ 配色成为新的默认代码主题。你选过的代码主题保持不变，已经用过原生版本的 Lattice 会保留之前的默认主题 GitHub：在 设置 › 外观 › 代码主题 中选择 VS Code 即可切换，也可以选 GitHub、Weft & Warp、One、Solarized、Catppuccin、Tokyo Night、Dracula、Nord 或 Monokai。可视编辑器里的代码块使用同一个代码主题，所以 .py 文件和笔记里的 Python 代码块颜色完全一致。在代码块里选中文字时，不再把代码块的内边距也涂上选区颜色。"
+      }
+    },
+    {
+      "icon": "feather",
+      "title": {
+        "en": "A new manuscript inside an open project",
+        "zh": "在已打开的项目里新建稿件"
+      },
+      "body": {
+        "en": "In the native Lattice, New manuscript from template… adds a paper from a venue template or one of your saved templates to a folder of the project you have open, without making a new project. It is on a folder's right-click menu, the Project panel's + and ⋯ menus, and the command palette. New project now asks for the parent folder and shows the folder it will create (#1259).",
+        "zh": "在原生 Lattice 中，「从模板新建稿件…」可以用会议模板或你保存的模板，在当前打开的项目的某个文件夹里添加一篇论文，而不用新建项目。它在文件夹的右键菜单、项目面板的 + 和 ⋯ 菜单以及命令面板中。「新建项目」现在会先让你选择上级文件夹，并显示将要创建的文件夹（#1259）。"
+      }
+    },
+    {
+      "icon": "bot",
+      "title": {
+        "en": "The Agent takes any file",
+        "zh": "AI 助手接受任意文件"
+      },
+      "body": {
+        "en": "In the native Lattice, drop any file from the Finder on the Agent, such as a Word document or a spreadsheet, and it is attached to your message (#1254).",
+        "zh": "在原生 Lattice 中，从访达把任意文件拖到 AI 助手上，例如 Word 文档或电子表格，它就会作为附件加到你的消息里（#1254）。"
+      }
+    }
+  ],
+  "fixes": [
+    {
+      "en": "In the native Lattice, an installed theme's syntax colours now colour .tex, .py and Typst sources, instead of the code theme's (#1268).",
+      "zh": "在原生 Lattice 中，已安装主题的语法配色现在会用于 .tex、.py 和 Typst 源码，而不是代码主题的配色（#1268）。"
+    },
+    {
+      "en": "In the native Lattice, going back to a project that hasn't changed shows its PDF straight away, without building it again (#1267).",
+      "zh": "在原生 Lattice 中，回到没有改动的项目时会立即显示它的 PDF，不再重新编译（#1267）。"
+    },
+    {
+      "en": "Double-clicking a minted code block in the PDF jumps to that line of your .tex source, instead of opening minted's cache file (#1263, #1266).",
+      "zh": "在 PDF 中双击 minted 代码块，会跳到 .tex 源码中对应的那一行，而不是打开 minted 的缓存文件（#1263、#1266）。"
+    },
+    {
+      "en": "In the native Lattice, a file dragged out of the Project panel into the documents opens there reliably.",
+      "zh": "在原生 Lattice 中，从项目面板拖到文档区域的文件会稳定地在那里打开。"
+    }
+  ]
+}

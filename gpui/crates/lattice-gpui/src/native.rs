@@ -221,7 +221,48 @@ pub fn send_key_equivalent(native: Native, character: char) -> Result<()> {
 fn post_chord(
     native: Native,
     character: char,
+    modifiers: (bool, bool, bool),
+    through_app: bool,
+) -> Result<()> {
+    for kind in [KEY_DOWN, KEY_UP] {
+        post_key(native, character, modifiers, kind, false, through_app)?;
+    }
+    Ok(())
+}
+
+/// `character` going down with ⌘ when `command`, and staying down: the
+/// keyboard's repeat of it when `repeat`. Through the application, as the
+/// keyboard sends it, so the menu bar's key equivalents see it too.
+/// [`send_key_up`] lets go of it.
+pub fn send_key_down(native: Native, character: char, command: bool, repeat: bool) -> Result<()> {
+    post_key(
+        native,
+        character,
+        (command, false, false),
+        KEY_DOWN,
+        repeat,
+        true,
+    )
+}
+
+/// `character`, held by [`send_key_down`], let go.
+pub fn send_key_up(native: Native, character: char, command: bool) -> Result<()> {
+    post_key(
+        native,
+        character,
+        (command, false, false),
+        KEY_UP,
+        false,
+        true,
+    )
+}
+
+fn post_key(
+    native: Native,
+    character: char,
     (command, option, shift): (bool, bool, bool),
+    kind: usize,
+    repeat: bool,
     through_app: bool,
 ) -> Result<()> {
     let text = match character {
@@ -240,25 +281,23 @@ fn post_chord(
         };
     unsafe {
         let number: isize = msg_send![native.window, windowNumber];
-        for kind in [KEY_DOWN, KEY_UP] {
-            let event: Option<Retained<AnyObject>> = msg_send![class!(NSEvent),
-                keyEventWithType: kind,
-                location: NSPoint::new(0.0, 0.0),
-                modifierFlags: modifiers,
-                timestamp: uptime(),
-                windowNumber: number,
-                context: std::ptr::null_mut::<AnyObject>(),
-                characters: &*characters,
-                charactersIgnoringModifiers: &*characters,
-                isARepeat: Bool::NO,
-                keyCode: key_code(shifted.unwrap_or(character))];
-            let event = event.context("NSEvent refused the key event")?;
-            if through_app {
-                let app: *mut AnyObject = msg_send![class!(NSApplication), sharedApplication];
-                let _: () = msg_send![app, sendEvent: &*event];
-            } else {
-                let _: () = msg_send![native.window, sendEvent: &*event];
-            }
+        let event: Option<Retained<AnyObject>> = msg_send![class!(NSEvent),
+            keyEventWithType: kind,
+            location: NSPoint::new(0.0, 0.0),
+            modifierFlags: modifiers,
+            timestamp: uptime(),
+            windowNumber: number,
+            context: std::ptr::null_mut::<AnyObject>(),
+            characters: &*characters,
+            charactersIgnoringModifiers: &*characters,
+            isARepeat: Bool::new(repeat),
+            keyCode: key_code(shifted.unwrap_or(character))];
+        let event = event.context("NSEvent refused the key event")?;
+        if through_app {
+            let app: *mut AnyObject = msg_send![class!(NSApplication), sharedApplication];
+            let _: () = msg_send![app, sendEvent: &*event];
+        } else {
+            let _: () = msg_send![native.window, sendEvent: &*event];
         }
     }
     Ok(())

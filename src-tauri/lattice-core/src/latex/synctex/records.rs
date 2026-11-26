@@ -173,7 +173,13 @@ pub(super) fn corrections(synctex: &str, page: u32) -> Vec<Correction> {
 /// box around it still carries the `\includegraphics` line. So: the tightest
 /// box with a line around the point, the innermost of equal ones; with none
 /// around it, the nearest record with a line.
-pub(super) fn source_at(synctex: &str, page: u32, (x, y): (f64, f64)) -> Option<(String, u32)> {
+///
+/// Only inputs `counts` keeps answer (by the name SyncTeX recorded). Also
+/// answers the input's tag: an input TeX reads again (minted's file for two
+/// blocks of the same code) is declared again, under a new tag.
+pub(super) fn source_at(
+    synctex: &str, page: u32, (x, y): (f64, f64), counts: impl Fn(&str) -> bool,
+) -> Option<(String, u32, u32)> {
     let (page_open, page_close) = (format!("{{{page}"), format!("}}{page}"));
     let mut scale = Scale::default();
     let mut inputs = HashMap::new();
@@ -184,7 +190,7 @@ pub(super) fn source_at(synctex: &str, page: u32, (x, y): (f64, f64)) -> Option<
         if let Some((tag, path)) =
             record.strip_prefix("Input:").and_then(|rest| rest.split_once(':'))
         {
-            if let Ok(tag) = tag.parse::<u32>() {
+            if let Some(tag) = tag.parse::<u32>().ok().filter(|_| counts(path)) {
                 inputs.insert(tag, path);
             }
             continue;
@@ -216,7 +222,7 @@ pub(super) fn source_at(synctex: &str, page: u32, (x, y): (f64, f64)) -> Option<
         }
     }
     let (_, tag, line) = best?;
-    Some((inputs.get(&tag)?.to_string(), line))
+    Some((inputs.get(&tag)?.to_string(), line, tag))
 }
 
 /// The last page holding anything TeX recorded from a line `before` keeps:

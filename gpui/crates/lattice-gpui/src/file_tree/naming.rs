@@ -5,7 +5,7 @@
 
 use std::collections::HashSet;
 
-use gpui::{AppContext as _, Context, Entity, Subscription, Window};
+use gpui::{AppContext as _, Context, Entity, ScrollStrategy, SharedString, Subscription, Window};
 use gpui_kit::component::input::{InputEvent, InputState};
 use lattice_core::models::FileNode;
 
@@ -61,20 +61,37 @@ impl FileTreePanel {
         let taken: HashSet<String> = all_paths(project.read(cx).files());
         let shown = making.extension.filter(|_| making.shown);
         let path = placeholder(directory, shown, &taken);
-        if !directory.is_empty() {
-            // Its folder opens, so the new row shows.
-            let mut open = String::new();
-            for part in directory.split('/') {
-                if !open.is_empty() {
-                    open.push('/');
-                }
-                open.push_str(part);
-                self.expanded.insert(open.clone());
-            }
-        }
         let name = path.rsplit('/').next().unwrap_or(&path).to_string();
-        self.start_naming(path, name, NamingKind::Create { making }, window, cx);
-        self.rebuild(cx);
+        self.start_naming(
+            path.clone(),
+            name,
+            NamingKind::Create { making },
+            window,
+            cx,
+        );
+        // Its folder and every folder above it open at once, so the new
+        // row shows. The folders Kit's tree has open are noted first: noted
+        // after, a folder it still draws closed would be closed again.
+        self.adopt_kit_row(cx);
+        self.remember_expanded(cx);
+        let mut open = String::new();
+        for part in directory.split('/').filter(|part| !part.is_empty()) {
+            if !open.is_empty() {
+                open.push('/');
+            }
+            open.push_str(part);
+            self.expanded.insert(open.clone());
+        }
+        self.lay_out(cx);
+        self.remember_expanded(cx);
+        // Scrolled to, so the field is drawn and takes focus on the next
+        // frame (`start_naming`).
+        let id = SharedString::from(path);
+        self.state.update(cx, |state, _| {
+            if let Some(ix) = state.index_of(&id) {
+                state.scroll_to_item(ix, ScrollStrategy::Nearest);
+            }
+        });
     }
 
     /// Start renaming the entry at `path`.

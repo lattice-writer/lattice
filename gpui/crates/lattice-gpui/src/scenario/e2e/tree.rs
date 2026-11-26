@@ -262,6 +262,100 @@ impl Run {
         for file in files {
             std::fs::remove_file(file).ok();
         }
+
+        self.new_entries_in_closed_folders(cx, steps, root, &tree)
+            .await?;
+        Ok(())
+    }
+
+    /// New folder makes a folder, and New file or New folder in a closed
+    /// folder opens it and every folder above it at once, the new row's
+    /// field taking the keyboard.
+    async fn new_entries_in_closed_folders(
+        &self,
+        cx: &mut AsyncApp,
+        steps: &mut Steps,
+        root: &Path,
+        tree: &Entity<crate::file_tree::FileTreePanel>,
+    ) -> Result<()> {
+        let rows = |cx: &mut AsyncApp| {
+            cx.update(|cx| {
+                let tree = tree.read(cx);
+                (
+                    tree.row_paths(cx),
+                    tree.folder_rows(cx),
+                    tree.selection_state(cx).1,
+                )
+            })
+        };
+
+        // New folder from chapters/'s menu, chapters/ closed.
+        cx.update(|cx| tree.update(cx, |tree, cx| tree.close_folders(cx)));
+        self.with_window(cx, |_, window, cx| {
+            tree.update(cx, |tree, cx| tree.begin_create("chapters", true, window, cx))
+        })?;
+        self.pause(cx, Duration::from_millis(300)).await;
+        let naming = self.naming_state(cx, tree)?;
+        let (shown, folders, open) = rows(cx);
+        steps.check(
+            "New folder in a closed folder opens it at once, its untitled row a folder row whose field has the keyboard",
+            naming
+                .as_ref()
+                .is_some_and(|(path, name, focused)| {
+                    path == "chapters/untitled" && name == "untitled" && *focused
+                })
+                && shown.iter().any(|row| row == "chapters/untitled")
+                && folders.iter().any(|row| row == "chapters/untitled")
+                && open.iter().any(|folder| folder == "chapters"),
+            json!({ "naming": naming, "rows": shown, "folders": folders, "open": open }),
+        );
+        self.with_window(cx, |_, window, cx| {
+            tree.update(cx, |tree, cx| tree.confirm_name("notes", window, cx))
+        })?;
+        let notes = root.join("chapters/notes");
+        let made = self
+            .wait_for(cx, Duration::from_secs(8), |shell, cx| {
+                notes.is_dir()
+                    && shell
+                        .read(cx)
+                        .file_tree()
+                        .read(cx)
+                        .folder_rows(cx)
+                        .iter()
+                        .any(|row| row == "chapters/notes")
+            })
+            .await;
+        steps.check(
+            "New folder named \"notes\" creates the folder chapters/notes, drawn as a folder, and no file",
+            made && !root.join("chapters/notes.tex").exists(),
+            json!({ "folder": notes.is_dir(), "file": root.join("chapters/notes.tex").exists() }),
+        );
+
+        // New file in chapters/notes/, both folders closed.
+        cx.update(|cx| tree.update(cx, |tree, cx| tree.close_folders(cx)));
+        self.with_window(cx, |_, window, cx| {
+            tree.update(cx, |tree, cx| {
+                tree.begin_create("chapters/notes", false, window, cx)
+            })
+        })?;
+        self.pause(cx, Duration::from_millis(300)).await;
+        let naming = self.naming_state(cx, tree)?;
+        let (shown, _, open) = rows(cx);
+        steps.check(
+            "New file in a closed nested folder opens it and its closed parent at once, its field having the keyboard",
+            naming
+                .as_ref()
+                .is_some_and(|(path, _, focused)| path == "chapters/notes/untitled" && *focused)
+                && shown.iter().any(|row| row == "chapters/notes/untitled")
+                && ["chapters", "chapters/notes"]
+                    .iter()
+                    .all(|folder| open.iter().any(|open| open == folder)),
+            json!({ "naming": naming, "rows": shown, "open": open }),
+        );
+        self.with_window(cx, |_, window, cx| {
+            tree.update(cx, |tree, cx| tree.cancel_name(window, cx))
+        })?;
+        std::fs::remove_dir_all(&notes).ok();
         Ok(())
     }
 

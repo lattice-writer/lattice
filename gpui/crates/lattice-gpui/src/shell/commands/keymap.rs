@@ -43,6 +43,7 @@ const LATEX_FORMAT_KEYS: &str = "Editor && !VimControl";
 /// The default keymap, as the Tauri app's command table and Trellis's keymap
 /// bind it, plus the window's own (quit, hide, minimize).
 pub fn bind_keys(cx: &mut App) {
+    cx.set_held_key_repeats(super::held_keys::repeats);
     cx.bind_keys(default_bindings());
     cx.bind_keys(crate::terminal::key_bindings());
 }

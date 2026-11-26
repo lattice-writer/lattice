@@ -102,7 +102,7 @@ applied on `<html>` by `src/settings/use-appearance.ts`:
   colored accent also becomes the focus ring. The editor's current line keeps
   `--editor-active-line-surface`, which is neutral under every accent.
 - **Code theme** (`data-code-theme`, Settings → Appearance → Code theme):
-  the source editors' palette, GitHub by default. `src/settings/code-themes.ts`
+  the source editors' palette, VS Code (Light+ and Dark+) by default. `src/settings/code-themes.ts`
   holds each named theme's upstream colors, ground included, and sets them on
   the root as `--syntax-*` (token roles) and `--code-*` (ground, ink, gutter,
   caret, current line, selection); a token is lifted only as far as 4.5:1 on
@@ -112,9 +112,13 @@ applied on `<html>` by `src/settings/use-appearance.ts`:
   read as one with the panels beside it; Weft & Warp, the default
   declarations in `foundations.css`, always does. Only a one-variant theme
   in the other appearance (a dark editor in a light app) keeps its own
-  ground. A rendered Markdown code
-  block keeps Weft & Warp (`--lattice-syntax-*`): it sits on the page's
-  surface, not the editor's.
+  ground. VS Code's and GitHub's token colours are taken from
+  `@shikijs/themes` through one role→TextMate-scope table
+  (`src/settings/syntax-scopes.ts`), which also maps Shiki's grammar scopes
+  onto the roles for the visual editor's code blocks, so a rendered Markdown
+  code block wears the chosen code theme too; under a one-variant theme in
+  the other appearance it keeps Weft & Warp (`--lattice-syntax-*`), made for
+  the page's surface.
 - **Translucency** (`data-glass`, only while the native window reports
   vibrancy behind it): the window clears its background, the gutters take
   `--surface-shell` and the titlebar the same under its veil, over macOS's

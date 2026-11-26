@@ -1,17 +1,20 @@
 name: macOS Intel
 
-# The Intel-based Mac (x86_64) build of Lattice: built natively on an Intel runner,
-# signed and notarized like the Apple silicon release, launched from its disk
-# image on a second, fresh Intel runner, and then attached to the release the
-# Release workflow has already published, with its updater entries merged into
-# that release's latest.json.
+# The Intel-based Mac (x86_64) build of Lattice: the classic (Tauri) app and
+# the native (GPUI) app, each built natively on an Intel runner and signed and
+# notarized like the Apple silicon release; the classic DMG launched on a
+# second, fresh Intel runner; then both attached to the release the Release
+# workflow has already published, with the native app's updater entries
+# merged into that release's latest-native.json and handed to every classic
+# Intel copy through latest.json (scripts/hand-macs-native.mjs). From v0.20.0
+# every Mac runs the native app; the classic Intel DMG stays downloadable.
 #
 # Intel never holds up the Apple silicon release. release.yml does not know
 # this workflow exists: it builds, notarizes and publishes the Apple silicon
 # release exactly as before, and only once it has succeeded does this
 # workflow start, from its workflow_run event (as linux-appimage.yml does). An
-# Intel failure leaves the published release without its _x64 assets and
-# latest.json without darwin-x86_64, nothing else: Intel copies then keep
+# Intel failure, the native app's included, leaves the published release
+# without its _x64 assets and both feeds without darwin-x86_64, nothing else: Intel copies then keep
 # their version until a release whose Intel build passes, while Apple silicon
 # copies update as before. macos-intel-retry.yml re-runs a release's failed
 # first attempt once.
@@ -24,15 +27,26 @@ name: macOS Intel
 # - smoke: the DMG installed and launched on a fresh Intel runner
 #   (.github/scripts/smoke-macos-dmg.sh): it must show its window and its
 #   frontend must log;
-# - attach: the DMG and the signed updater archive uploaded, then
-#   darwin-x86_64 added to latest.json (scripts/add-updater-platform.mjs
-#   verifies the archive's signature against the app's updater key first).
+# - native: the native app for x86_64 through gpui-package.yml (flavor
+#   main, arch x86_64), on GitHub's Intel runner, checked that every Mach-O
+#   file contains x86_64;
+# - native-smoke: the native DMG installed and launched on a fresh Intel
+#   runner by the same script (its native mode): it must show its window and
+#   stay up. No Intel Mac in the project ever launches the native app, so
+#   this is its only run on Intel before every Intel copy installs it;
+# - attach: the classic DMG and archive, the native app's
+#   Lattice-native_<version>_x64.* and its Typst helper
+#   Lattice-typst_<version>_x64.* uploaded once check-native-feed.mjs has
+#   verified them, then darwin-x86_64 added to latest-native.json
+#   (scripts/add-updater-platform.mjs verifies the archive's signature
+#   against the app's updater key first) and handed to latest.json.
 #
 # A run by hand (Actions > Run workflow, the way to prove a change to this
-# packaging; pull requests no longer run it) runs the same build, signing,
-# notarization and smoke with the open-licensed fonts, no baked-in keys and
-# no updater key (so no updater archive), and publishes nothing. Without the
-# signing secrets it builds ad hoc signed and skips notarization.
+# packaging; pull requests no longer run it) runs the same classic build,
+# signing, notarization and smoke with the open-licensed fonts, no baked-in
+# keys and no updater key (so no updater archive), builds the native app as
+# gpui-package.yml does, and publishes nothing. Without the signing secrets
+# the classic app builds ad hoc signed and skips notarization.
 on:
   workflow_run:
     workflows: [Release]
@@ -226,6 +240,9 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ env.IS_RELEASE == 'true' && secrets.TAURI_SIGNING_PRIVATE_KEY || '' }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ env.IS_RELEASE == 'true' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '' }}
           LATTICE_FIRECRAWL_KEY: ${{ env.IS_RELEASE == 'true' && secrets.LATTICE_FIRECRAWL_KEY || '' }}
+          # A release's classic copy moves itself to the native app on a Mac
+          # (src-tauri/src/native_app.rs), as release.yml's does.
+          LATTICE_MIGRATES_TO_NATIVE: ${{ env.IS_RELEASE == 'true' && '1' || '' }}
         run: |
           set -euo pipefail
           args=(--target "$TARGET" --bundles "app,dmg")
@@ -367,16 +384,60 @@ jobs:
           path: ${{ runner.temp }}/smoke-evidence
           if-no-files-found: ignore
 
-  # Only after every check, and only for a release. The release is already
-  # public (the Release run succeeded), so this adds the Intel assets, the
-  # darwin-x86_64 updater entries and the Intel install notes; the Apple
-  # silicon assets and latest.json entries stay as they are. --clobber makes a
-  # re-run replace the Intel assets instead of failing or adding a second copy,
-  # but only while latest.json lists no other Intel archive: a re-built archive
-  # has a new signature, and replacing the one latest.json vouches for would
-  # break every Intel copy's update.
+  # The native app for Intel, as release.yml's gpui job builds it for Apple
+  # silicon: signed, notarized, its updater archive signed and its
+  # latest-native.json written for darwin-x86_64, kept as the run's artifact
+  # (lattice-gpui-macos-x86_64-main). It builds the release's own commit.
+  native:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    uses: ./.github/workflows/gpui-package.yml
+    with:
+      flavor: main
+      arch: x86_64
+      ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+    secrets: inherit
+
+  # The native DMG on a fresh Intel runner, as smoke does the classic one.
+  native-smoke:
+    needs: native
+    runs-on: macos-15-intel
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          sparse-checkout: .github/scripts
+      - uses: actions/download-artifact@v8
+        with:
+          name: lattice-gpui-macos-x86_64-main
+          path: ${{ runner.temp }}/native
+      # gpui-package.yml signs and notarizes the native app on every run.
+      - name: Install and launch the native DMG
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          dmgs=("$RUNNER_TEMP"/native/Lattice-native_*_x64.dmg)
+          if ((${#dmgs[@]} != 1)); then
+            echo "::error::Expected one Lattice-native x64 DMG, found: ${dmgs[*]}"
+            exit 1
+          fi
+          .github/scripts/smoke-macos-dmg.sh "${dmgs[0]}" "$RUNNER_TEMP/smoke-evidence" true native
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: macos-intel-native-smoke-evidence
+          path: ${{ runner.temp }}/smoke-evidence
+          if-no-files-found: ignore
+
+  # Only after every check, the native build's included, and only for a
+  # release. The release is already public (the Release run succeeded), so
+  # this adds the Intel assets, the darwin-x86_64 updater entries and the
+  # Intel install notes; the Apple silicon assets and entries stay as they
+  # are. --clobber makes a re-run replace the Intel assets instead of failing
+  # or adding a second copy, but only while neither feed lists another Intel
+  # archive: a re-built archive has a new signature, and replacing the one a
+  # feed vouches for would break every Intel copy's update.
   attach:
-    needs: [build, smoke]
+    needs: [build, smoke, native, native-smoke]
     if: github.event_name == 'workflow_run' && github.event.workflow_run.event == 'push' && startsWith(github.event.workflow_run.head_branch, 'v')
     runs-on: ubuntu-latest
     permissions:
@@ -399,6 +460,15 @@ jobs:
         with:
           name: lattice-macos-intel
           path: ${{ runner.temp }}/intel-assets
+      - uses: actions/download-artifact@v8
+        with:
+          name: lattice-gpui-macos-x86_64-main
+          path: ${{ runner.temp }}/native
+      # check-native-feed.mjs fails the job when a native file is missing, the
+      # archive's or the Typst helper's signature does not verify against the
+      # updater key (tauri.conf.json), or the artifact's latest-native.json
+      # does not name this tag's Lattice-native x64 archive with that
+      # signature under darwin-x86_64 and darwin-x86_64-app.
       - name: Attach the Intel assets to the release
         run: |
           set -euo pipefail
@@ -410,32 +480,56 @@ jobs:
             echo "::error::The build made no signed updater archive."
             exit 1
           fi
-          assets="$RUNNER_TEMP/intel-assets"
+          mapfile -t native < <(node scripts/check-native-feed.mjs --arch x86_64 "$TAG" "$RUNNER_TEMP/native")
+          test "${#native[@]}" -eq 4
+          mapfile -t typst < <(node scripts/check-native-feed.mjs --typst --arch x86_64 "$TAG" "$RUNNER_TEMP/native")
+          test "${#typst[@]}" -eq 2
+          native_archive="${native[1]}"
+          echo "NATIVE_ARCHIVE=$native_archive" >> "$GITHUB_ENV"
+          echo "NATIVE_DMG=$(basename "${native[0]}")" >> "$GITHUB_ENV"
+
+          # What goes up is only signed artifacts, none of them a font.
+          checked="$(mktemp -d "$RUNNER_TEMP/lattice-native-assets.XXXXXX")"
+          cp "${native[@]:0:3}" "${typst[@]}" "$checked/"
+          node scripts/check-font-leaks.mjs assets "$checked"
+
           manifest_dir="$(mktemp -d "$RUNNER_TEMP/lattice-updater.XXXXXX")"
-          gh release download "$TAG" --pattern latest.json --dir "$manifest_dir"
-          if ! jq -e --arg sig "$(<"$assets/$ARCHIVE.sig")" \
-            '[.platforms["darwin-x86_64", "darwin-x86_64-app"] | select(. != null) | .signature == $sig] | all' \
-            "$manifest_dir/latest.json"; then
-            echo "::error::latest.json already lists a different Intel archive; replacing it would break Intel updates."
-            exit 1
-          fi
-          gh release upload "$TAG" "$assets/$DMG" "$assets/$ARCHIVE" "$assets/$ARCHIVE.sig" --clobber
-      # The updater entries go in after the assets they point to are uploaded.
-      # A re-run adds the same entries again.
-      - name: Add darwin-x86_64 to the updater manifest
+          gh release download "$TAG" --pattern latest.json --pattern latest-native.json --dir "$manifest_dir"
+          for manifest in latest.json latest-native.json; do
+            if ! jq -e --arg sig "$(<"$native_archive.sig")" \
+              '[.platforms["darwin-x86_64", "darwin-x86_64-app"] | select(. != null) | .signature == $sig] | all' \
+              "$manifest_dir/$manifest"; then
+              echo "::error::$manifest already lists a different Intel archive; replacing it would break Intel updates."
+              exit 1
+            fi
+          done
+          assets="$RUNNER_TEMP/intel-assets"
+          gh release upload "$TAG" "$assets/$DMG" "$assets/$ARCHIVE" "$assets/$ARCHIVE.sig" "${native[@]:0:3}" "${typst[@]}" --clobber
+      # The updater entries go in after the assets they point to are uploaded,
+      # latest-native.json before latest.json, which hands Intel Macs its
+      # entry. latest.json keeps no classic Intel entry: from v0.20.0 every
+      # Mac runs the native app. A re-run adds the same entries again.
+      - name: Add darwin-x86_64 to the updater manifests
         run: |
           set -euo pipefail
+          name="$(basename "$NATIVE_ARCHIVE")"
           manifest_dir="$(mktemp -d "$RUNNER_TEMP/lattice-updater.XXXXXX")"
-          gh release download "$TAG" --pattern latest.json --dir "$manifest_dir"
+          gh release download "$TAG" --pattern latest.json --pattern latest-native.json --dir "$manifest_dir"
           gh api "repos/$GH_REPO/releases/tags/$TAG" > "$manifest_dir/release.json"
           node scripts/add-updater-platform.mjs \
-            "$manifest_dir/latest.json" "$manifest_dir/release.json" \
-            "$RUNNER_TEMP/intel-assets/$ARCHIVE" "$RUNNER_TEMP/intel-assets/$ARCHIVE.sig" \
-            "$ARCHIVE" darwin-x86_64 darwin-x86_64-app
+            "$manifest_dir/latest-native.json" "$manifest_dir/release.json" \
+            "$NATIVE_ARCHIVE" "$NATIVE_ARCHIVE.sig" \
+            "$name" darwin-x86_64 darwin-x86_64-app
+          node scripts/hand-macs-native.mjs \
+            "$manifest_dir/latest.json" "$manifest_dir/latest-native.json" \
+            darwin-x86_64 darwin-x86_64-app
+          gh release upload "$TAG" "$manifest_dir/latest-native.json" --clobber
           gh release upload "$TAG" "$manifest_dir/latest.json" --clobber
-          # What the updater now reads: both Macs listed.
-          gh release download "$TAG" --pattern latest.json --output - |
+          # What the updaters now read: both Macs listed, Intel on the native archive.
+          gh release download "$TAG" --pattern latest-native.json --output - |
             jq -e '.platforms | has("darwin-aarch64") and has("darwin-x86_64") and has("darwin-x86_64-app")'
+          gh release download "$TAG" --pattern latest.json --output - |
+            jq -e --arg name "$name" '.platforms | has("darwin-aarch64") and (.["darwin-x86_64"].url | endswith("/" + $name)) and (.["darwin-x86_64-app"].url | endswith("/" + $name))'
       # Appended once: a re-run finds the heading and leaves the notes alone.
       - name: Add the Intel install notes
         run: |
@@ -447,9 +541,9 @@ jobs:
 
           ## Install (Intel-based Mac)
 
-          On a Mac with an Intel processor, download **$DMG** below instead,
-          open it, and drag Lattice to Applications. It needs macOS 14 or
-          later, is signed and notarized like the Apple silicon download, and
-          updates itself the same way.
+          On a Mac with an Intel processor, download **$NATIVE_DMG** below
+          instead, open it, and drag Lattice to Applications. It needs macOS 14
+          or later, is signed and notarized like the Apple silicon download,
+          and updates itself the same way.
           EOF
           gh release edit "$TAG" --notes-file "$notes"

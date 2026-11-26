@@ -34,7 +34,9 @@ use typst_kit::{
 };
 use typst_layout::PagedDocument;
 
-static FONTS: LazyLock<FontStore> = LazyLock::new(|| {
+use crate::jump::Kept;
+
+pub(crate) static FONTS: LazyLock<FontStore> = LazyLock::new(|| {
     let started = std::time::Instant::now();
     let mut fonts = FontStore::new();
     fonts.extend(typst_kit::fonts::system());
@@ -47,7 +49,8 @@ static FONTS: LazyLock<FontStore> = LazyLock::new(|| {
     fonts
 });
 
-static LIBRARY: LazyLock<LazyHash<Library>> = LazyLock::new(|| LazyHash::new(Library::default()));
+pub(crate) static LIBRARY: LazyLock<LazyHash<Library>> =
+    LazyLock::new(|| LazyHash::new(Library::default()));
 
 /// Scan the fonts ahead of the first build (a project with a Typst root
 /// opened), which would otherwise wait for it.
@@ -59,6 +62,8 @@ pub fn prewarm_fonts() {
 /// What one compile produced.
 pub(crate) struct Compiled {
     pub pdf: Option<Vec<u8>>,
+    /// The document the PDF is of, for [`Session::keep`].
+    pub document: Option<PagedDocument>,
     pub pages: u32,
     pub diagnostics: Vec<Diagnostic>,
 }
@@ -92,6 +97,8 @@ pub(crate) struct Session {
     main: FileId,
     files: FileStore<Loader>,
     time: Time,
+    /// The last document whose PDF was written, for the jumps.
+    kept: Option<Kept>,
 }
 
 impl Session {
@@ -111,6 +118,7 @@ impl Session {
             main,
             files: FileStore::new(loader),
             time: Time::system(),
+            kept: None,
         }
     }
 
@@ -126,21 +134,21 @@ impl Session {
         self.time.reset();
         let Warned { output, warnings } = typst::compile::<PagedDocument>(&*self);
         let mut diagnostics: Vec<Diagnostic> = Vec::new();
-        let (pdf, pages) = match output {
+        let (pdf, document, pages) = match output {
             Ok(document) => {
                 let pages = u32::try_from(document.pages().len()).unwrap_or(u32::MAX);
                 match typst_pdf::pdf(&document, &typst_pdf::PdfOptions::default()) {
-                    Ok(bytes) => (Some(bytes), pages),
+                    Ok(bytes) => (Some(bytes), Some(document), pages),
                     Err(errors) => {
                         diagnostics
                             .extend(errors.iter().map(|e| crate::diagnostics::convert(self, e)));
-                        (None, pages)
+                        (None, None, pages)
                     }
                 }
             }
             Err(errors) => {
                 diagnostics.extend(errors.iter().map(|e| crate::diagnostics::convert(self, e)));
-                (None, 0)
+                (None, None, 0)
             }
         };
         diagnostics.extend(
@@ -150,9 +158,31 @@ impl Session {
         );
         Compiled {
             pdf,
+            document,
             pages,
             diagnostics,
         }
+    }
+
+    /// Keep `document`, whose PDF was just written, with the sources this
+    /// compile read: the next compile re-reads them in place.
+    pub(crate) fn keep(&mut self, document: PagedDocument) {
+        let (_, read) = self.files.dependencies();
+        let read: Vec<FileId> = read.collect();
+        let sources = read
+            .into_iter()
+            .filter_map(|id| Some((id, self.files.source(id).ok()?)))
+            .collect();
+        self.kept = Some(Kept {
+            document,
+            sources,
+            main: self.main,
+        });
+    }
+
+    /// The document the jumps read, if a PDF was written this session.
+    pub(crate) fn kept(&self) -> Option<&Kept> {
+        self.kept.as_ref()
     }
 }
 

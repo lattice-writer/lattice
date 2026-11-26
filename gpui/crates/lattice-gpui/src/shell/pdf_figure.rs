@@ -74,6 +74,15 @@ impl Shell {
             return;
         };
         let generation = self.next_inverse();
+        // A Typst figure is drawn in the document itself: its source line.
+        let typst = match &document {
+            Some(document) => lattice_core::project::is_typst_path(document),
+            None => self.typst_live_document().is_some(),
+        };
+        if typst {
+            self.inverse_sync_as(generation, document, page, x, y, word, window, cx);
+            return;
+        }
         let lookup = cx.background_spawn({
             let root = root.clone();
             let document = document.clone();

@@ -1,5 +1,5 @@
 import { isWindowsHost } from "../platform/host-platform";
-import { type FormEvent, type ReactNode, lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useLingui } from "@lingui/react/macro";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
@@ -15,7 +15,6 @@ import { SwitchField } from "../components/ui/switch-field";
 import { ModalDialog } from "../components/ui/modal-dialog";
 import { useUpdater, type UpdaterApi } from "../telemetry/app-updater";
 import { updatesItself } from "../telemetry/updates-itself";
-import { useNativeAppSupported } from "../app/native-app";
 import {
   type Theme,
   type ThemePreference,
@@ -115,7 +114,6 @@ export type SettingsDialogProps = DoctorSettingsProps & {
 
 /** Where Linux copies, which do not update themselves, get each new release. */
 const LATEST_RELEASE_URL = "https://github.com/lattice-writer/lattice/releases/latest";
-const NativeAppDialog = lazy(() => import("../app/native-app-dialog").then((module) => ({ default: module.NativeAppDialog })));
 
 /** Below this dialog width the sections and the page take turns (dialogs.css holds the same number). */
 const NARROW_SETTINGS_WIDTH = 560;
@@ -169,7 +167,7 @@ export function SettingsDialog(props: SettingsDialogProps) {
   const settingsViewportRef = useRef<HTMLDivElement>(null);
   const [projectWordDraft, setProjectWordDraft] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const searchEntries = useSettingsSearchIndex(Boolean(props.project), props.knownAuthorName, props.livePreview?.available, useNativeAppSupported());
+  const searchEntries = useSettingsSearchIndex(Boolean(props.project), props.knownAuthorName, props.livePreview?.available);
   /** The row a search result asked for, revealed once its page has rendered. */
   // A fresh object per opening, so opening the same row again reveals it again.
   const [reveal, setReveal] = useState<{ entry: SettingsSearchEntry } | null>(() => (props.reveal ? { entry: props.reveal } : null));
@@ -403,8 +401,6 @@ function EditorSettingsPane({ projectWordDraft, setProjectWordDraft, ...props }:
   const updateStatus = useUpdateStatus(updater);
   const projectSpellingWords = props.project?.manifest.spellingWords ?? [];
   const updateBusy = ["checking", "downloading", "installing", "restarting"].includes(updater.phase);
-  const nativeAppSupported = useNativeAppSupported();
-  const [nativeAppOpen, setNativeAppOpen] = useState(false);
   const addProjectSpellingWord = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const word = projectWordDraft.trim();
@@ -563,21 +559,6 @@ function EditorSettingsPane({ projectWordDraft, setProjectWordDraft, ...props }:
                 </ReloadButton>
               )}
             </SettingsRow>
-            {/* Apple silicon only, as the backend says: the native app ships for nothing else. */}
-            {nativeAppSupported && (
-              <SettingsRow
-                data-setting="native-app"
-                label={t`Switch to the new Lattice`}
-                description={t`The native Mac app: faster and lighter, with the same look.`}
-              >
-                <Button size="compact" onClick={() => setNativeAppOpen(true)}>{t`Switch…`}</Button>
-              </SettingsRow>
-            )}
-            {nativeAppOpen && (
-              <Suspense fallback={null}>
-                <NativeAppDialog release={null} onClose={() => setNativeAppOpen(false)} />
-              </Suspense>
-            )}
           </>
         ) : (
           <SettingsRow

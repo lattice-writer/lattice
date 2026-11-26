@@ -36,6 +36,11 @@ pub(super) static ENTRIES: &[Entry] = &[
         text: Text::Message("Choose a simple name without folders or a leading dot.", &[]),
     },
     Entry {
+        file: "project/manuscript.rs",
+        literal: "Choose a folder name whose parts are not empty and do not start with a dot.",
+        text: Text::Message("Choose a folder name whose parts are not empty and do not start with a dot.", &[]),
+    },
+    Entry {
         file: "project/paths.rs",
         literal: "History records cannot edit themselves.",
         text: Text::Message("History records cannot edit themselves.", &[]),
@@ -319,6 +324,31 @@ pub(super) static ENTRIES: &[Entry] = &[
         file: "project/imports.rs",
         literal: "{name} is larger than the 64 MB limit for agent attachments.",
         text: Text::Message("{item} is larger than the 64 MB limit for agent attachments.", &[("item", Arg::Helper(Helper::UnnamedPath, 0))]),
+    },
+    Entry {
+        file: "project/imports.rs",
+        literal: "{name} could not be read as an attachment.",
+        text: Text::Message("{item} could not be read as an attachment.", &[("item", Arg::Helper(Helper::UnnamedPath, 0))]),
+    },
+    Entry {
+        file: "project/imports.rs",
+        literal: "{name} is a folder. Attach the files inside it instead.",
+        text: Text::Message("{item} is a folder. Attach the files inside it instead.", &[("item", Arg::Helper(Helper::UnnamedPath, 0))]),
+    },
+    Entry {
+        file: "project/imports.rs",
+        literal: "{name} is not a regular file, so it cannot be attached.",
+        text: Text::Message("{item} is not a regular file, so it cannot be attached.", &[("item", Arg::Helper(Helper::UnnamedPath, 0))]),
+    },
+    Entry {
+        file: "project/imports.rs",
+        literal: "{name} is empty, so it cannot be attached.",
+        text: Text::Message("{item} is empty, so it cannot be attached.", &[("item", Arg::Helper(Helper::UnnamedPath, 0))]),
+    },
+    Entry {
+        file: "project/imports.rs",
+        literal: "{name} is larger than the 25 MB limit for agent file attachments.",
+        text: Text::Message("{item} is larger than the 25 MB limit for agent file attachments.", &[("item", Arg::Helper(Helper::UnnamedPath, 0))]),
     },
     Entry {
         file: "project/imports.rs",

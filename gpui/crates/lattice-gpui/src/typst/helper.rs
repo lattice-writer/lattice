@@ -9,6 +9,12 @@
 //! cannot hold up every later build. The child is also reachable outside the
 //! request lock (`CHILD`), so `stop` (Remove, Download again) kills it
 //! without waiting for the compile in progress.
+//!
+//! Besides compiles, the helper answers the jumps between a Typst source
+//! and its PDF (`jump_from_click`, `jump_from_cursor`), which Typst has no
+//! SyncTeX map for. A helper of another wire protocol (one installed for
+//! this version before the jumps existed) is reported `outdated`, and the
+//! caller downloads this version's again.
 
 use std::{
     collections::HashMap,
@@ -25,8 +31,11 @@ use std::{
 
 use lattice_core::{
     latex::BuildResult,
-    typst_wire::{Hello, PROTOCOL, Reply, Request},
+    typst_wire::{
+        ClickJump, Compile, CursorJump, Hello, PROTOCOL, PdfJump, Reply, Request, SourceJump,
+    },
 };
+use serde::de::DeserializeOwned;
 
 /// How long the helper may take to say hello: it reads its fonts first.
 #[cfg(not(test))]
@@ -99,16 +108,28 @@ static CHILD: LazyLock<Mutex<Option<Arc<Mutex<Child>>>>> = LazyLock::new(Default
 static STOPS: AtomicU64 = AtomicU64::new(0);
 
 /// A failed exchange, and whether a fresh start may help: a helper that
-/// stopped gets one; one that hung already had its deadline.
-struct Failure {
-    message: String,
+/// stopped gets one; one that hung already had its deadline. An `outdated`
+/// helper speaks another protocol: only downloading it again helps.
+#[derive(Debug)]
+pub struct Failure {
+    pub message: String,
+    pub outdated: bool,
     retry: bool,
 }
 
 fn stopped(message: impl Into<String>) -> Failure {
     Failure {
         message: message.into(),
+        outdated: false,
         retry: true,
+    }
+}
+
+fn final_failure(message: impl Into<String>) -> Failure {
+    Failure {
+        message: message.into(),
+        outdated: false,
+        retry: false,
     }
 }
 
@@ -181,10 +202,7 @@ fn start(binary: &Path, stops: u64) -> Result<Running, Failure> {
     *CHILD.lock().unwrap_or_else(PoisonError::into_inner) = Some(child.clone());
     if STOPS.load(Ordering::SeqCst) != stops {
         kill(&child);
-        return Err(Failure {
-            message: "Typst support was stopped".to_string(),
-            retry: false,
-        });
+        return Err(final_failure("Typst support was stopped"));
     }
     let running = Running {
         binary: binary.to_path_buf(),
@@ -196,31 +214,30 @@ fn start(binary: &Path, stops: u64) -> Result<Running, Failure> {
         read_line(&running.lines, &running.child, HELLO_DEADLINE).map_err(
             |no_line| match no_line {
                 NoLine::Stopped => stopped("Typst support did not start: it stopped"),
-                NoLine::TimedOut => Failure {
-                    message: format!(
-                        "Typst support did not start: no hello after {} s",
-                        HELLO_DEADLINE.as_secs()
-                    ),
-                    retry: false,
-                },
+                NoLine::TimedOut => final_failure(format!(
+                    "Typst support did not start: no hello after {} s",
+                    HELLO_DEADLINE.as_secs()
+                )),
             },
         )?;
     let hello: Hello = serde_json::from_str(&line)
         .map_err(|_| stopped("Typst support did not start: it said nothing Lattice understands"))?;
     if hello.protocol != PROTOCOL {
+        kill(&running.child);
         return Err(Failure {
             message: format!(
-                "Typst support {} does not match Lattice {}; download it again in Settings",
+                "Typst support {} is out of date for Lattice {}",
                 hello.version,
                 lattice_core::VERSION
             ),
+            outdated: true,
             retry: false,
         });
     }
     Ok(running)
 }
 
-fn exchange(running: &mut Running, request: &Request) -> Result<Reply, Failure> {
+fn exchange<T: DeserializeOwned>(running: &mut Running, request: &Request) -> Result<T, Failure> {
     let mut line = serde_json::to_string(request).map_err(|error| stopped(error.to_string()))?;
     line.push('\n');
     running
@@ -232,13 +249,10 @@ fn exchange(running: &mut Running, request: &Request) -> Result<Reply, Failure> 
         read_line(&running.lines, &running.child, REPLY_DEADLINE).map_err(
             |no_line| match no_line {
                 NoLine::Stopped => stopped("Typst support stopped"),
-                NoLine::TimedOut => Failure {
-                    message: format!(
-                        "Typst support stopped responding: no answer after {} s",
-                        REPLY_DEADLINE.as_secs()
-                    ),
-                    retry: false,
-                },
+                NoLine::TimedOut => final_failure(format!(
+                    "Typst support stopped responding: no answer after {} s",
+                    REPLY_DEADLINE.as_secs()
+                )),
             },
         )?;
     serde_json::from_str(&answer).map_err(|error| stopped(error.to_string()))
@@ -272,6 +286,25 @@ pub fn prewarm(binary: &Path) {
     }
 }
 
+/// Send `request` to the helper at `binary` and read its answer.
+fn ask<T: DeserializeOwned>(binary: &Path, request: &Request) -> Result<T, Failure> {
+    let stops = STOPS.load(Ordering::SeqCst);
+    let mut slot = RUNNING.lock().unwrap_or_else(PoisonError::into_inner);
+    let mut answer =
+        running(&mut slot, binary, stops).and_then(|running| exchange(running, request));
+    if answer.as_ref().is_err_and(|failure| failure.retry) && STOPS.load(Ordering::SeqCst) == stops
+    {
+        // A helper that stopped (it crashed, or was removed and put back)
+        // gets one fresh start before the caller hears of it.
+        *slot = None;
+        answer = running(&mut slot, binary, stops).and_then(|running| exchange(running, request));
+    }
+    if answer.is_err() {
+        *slot = None;
+    }
+    answer
+}
+
 /// Compile `document` (relative to `root`) with `overlay`'s unsaved
 /// buffers through the helper at `binary`.
 pub fn build(
@@ -280,28 +313,23 @@ pub fn build(
     document: &str,
     overlay: &HashMap<String, String>,
     one_off: bool,
-) -> BuildResult {
-    let request = Request {
+) -> Result<BuildResult, Failure> {
+    let request = Request::Compile(Compile {
         root: root.to_path_buf(),
         document: document.to_string(),
         overlay: overlay.clone(),
-    };
-    let stops = STOPS.load(Ordering::SeqCst);
-    let mut slot = RUNNING.lock().unwrap_or_else(PoisonError::into_inner);
-    let mut reply =
-        running(&mut slot, binary, stops).and_then(|running| exchange(running, &request));
-    if reply.as_ref().is_err_and(|failure| failure.retry) && STOPS.load(Ordering::SeqCst) == stops {
-        // A helper that stopped (it crashed, or was removed and put back)
-        // gets one fresh start before the build says so.
-        *slot = None;
-        reply = running(&mut slot, binary, stops).and_then(|running| exchange(running, &request));
-    }
-    if reply.is_err() {
-        *slot = None;
-    }
-    reply
-        .unwrap_or_else(|failure| Reply::failed(failure.message))
-        .into_build(root, document, one_off)
+    });
+    ask::<Reply>(binary, &request).map(|reply| reply.into_build(root, document, one_off))
+}
+
+/// From a click in the PDF to its Typst source (`ClickJump`).
+pub fn jump_from_click(binary: &Path, request: ClickJump) -> Result<SourceJump, Failure> {
+    ask(binary, &Request::JumpFromClick(request))
+}
+
+/// From a caret in a Typst source to its places in the PDF (`CursorJump`).
+pub fn jump_from_cursor(binary: &Path, request: CursorJump) -> Result<PdfJump, Failure> {
+    ask(binary, &Request::JumpFromCursor(request))
 }
 
 /// Stop the helper, before its files are removed: killed at once, even

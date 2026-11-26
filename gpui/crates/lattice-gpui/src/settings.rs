@@ -149,12 +149,12 @@ pub fn tauri_folders(scripted: bool) -> Option<(PathBuf, PathBuf)> {
 /// read only on an ordinary run; `LATTICE_GPUI_TAURI_DATA` names a stand-in
 /// holding both, as a scenario's copy. True when this launch carried some.
 ///
-/// Lattice (the native one, `crate::flavor`) can be switched back to the
-/// Tauri app and to itself again. A launch after such a later switch finds
-/// the first launch's marker and carries nothing more, except that the
-/// projects opened in the Tauri app meanwhile join the recent projects
-/// (`migrate::merge_recent_projects`); that is no update to announce, so it
-/// returns false.
+/// Lattice (the native one, `crate::flavor`) also catches up on a launch
+/// after the Tauri app ran again, as it does for a writer who switched back
+/// before 0.20.0 and is moved to Lattice by the update
+/// (`migrate::catch_up`): the recent projects opened there, the settings
+/// changed there, and what else was added there. That is no update to
+/// announce, so it returns false.
 pub fn migrate_from_tauri(scripted: bool) -> bool {
     use lattice_settings::migrate;
     let Some(state) = crate::shell::workspaces::state_dir(scripted) else {
@@ -174,15 +174,18 @@ pub fn migrate_from_tauri(scripted: bool) -> bool {
         overleaf: crate::overleaf::config_dir(),
     };
     if crate::flavor::current().native_lattice {
-        // Before `RecentProjects::init` reads the list (`app.rs`).
-        match migrate::merge_recent_projects(&tauri, &gpui) {
-            Some(Ok(merged)) => log::info!(
-                "merged the Tauri app's recent projects after a switch back: {merged} new or newer"
-            ),
-            Some(Err(error)) => log::warn!(
-                "could not merge the Tauri app's recent projects, will try again next launch: {error:#}"
-            ),
-            None => {}
+        // Before `RecentProjects::init` reads the list and `init` the
+        // settings (`app.rs`).
+        if let Some(report) = migrate::catch_up(&tauri, &gpui) {
+            log::info!(
+                "caught up on the Tauri app's changes since it was last carried: {:?}{}",
+                report.carried,
+                if report.failed.is_empty() {
+                    String::new()
+                } else {
+                    format!("; will try again next launch: {:?}", report.failed)
+                }
+            );
         }
     }
     let Some(report) = migrate::migrate(&tauri, &gpui) else {
@@ -414,6 +417,7 @@ pub fn accent(accent: &lattice_settings::Accent) -> Accent {
 
 pub fn code_theme(theme: StoredCodeTheme) -> CodeTheme {
     match theme {
+        StoredCodeTheme::Vscode => CodeTheme::Vscode,
         StoredCodeTheme::Github => CodeTheme::Github,
         StoredCodeTheme::Lattice => CodeTheme::WeftAndWarp,
         StoredCodeTheme::One => CodeTheme::One,
@@ -476,6 +480,7 @@ fn apply(before: Option<&Settings>, cx: &mut App) {
     LatticeTheme::set_tint(tint(a.tint), cx);
     LatticeTheme::set_accent(accent(&a.accent), cx);
     LatticeTheme::set_code_theme(code_theme(a.code_theme), cx);
+    LatticeTheme::set_code_theme_variant(code_theme_variant(a.code_theme_variant), cx);
     if changed(|was, now| was.appearance.theme == now.appearance.theme) {
         reload_theme(cx);
     }
@@ -486,13 +491,11 @@ fn apply(before: Option<&Settings>, cx: &mut App) {
             was.editor_font_size,
             &was.source_font,
             was.source_line_height,
-            was.code_theme_variant,
         ) == (
             now.editor_keymap,
             now.editor_font_size,
             &now.source_font,
             now.source_line_height,
-            now.code_theme_variant,
         )
     }) {
         crate::app::apply_editor_settings(cx);

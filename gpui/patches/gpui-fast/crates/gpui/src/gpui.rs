@@ -129,7 +129,7 @@ pub use fast::backdrop::{
 };
 pub use fast::composition::{
     ComposedScene, ComposedSceneLayer, CompositionSurfaceId, CompositionSurfaceKind,
-    PlatformCompositionSurface, PlatformCompositionSurfaceContent, PlatformSurfaceAttachment,
+    OverlayBoundsObserver, PlatformCompositionSurface, PlatformCompositionSurfaceContent, PlatformSurfaceAttachment,
     WindowComposition, WindowCompositionSurface,
 };
 pub use fast::glyph_outline::GlyphOutlineCmd;

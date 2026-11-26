@@ -914,6 +914,7 @@ pub struct App {
     pub(crate) event_listeners: SubscriberSet<EntityId, (TypeId, Listener)>,
     pub(crate) keystroke_observers: SingleSubscriberSet<KeystrokeObserver>,
     pub(crate) keystroke_interceptors: SingleSubscriberSet<KeystrokeObserver>,
+    pub(crate) held_key_repeats: Option<Rc<dyn Fn(&dyn Action) -> bool>>,
     pub(crate) keyboard_layout_observers: SingleSubscriberSet<Handler>,
     missing_glyph_callback: Rc<MissingGlyphCallbackSlot>,
     pub(crate) thermal_state_observers: SingleSubscriberSet<Handler>,
@@ -1064,6 +1065,7 @@ impl App {
                 release_listeners: SubscriberSet::new(),
                 keystroke_observers: SingleSubscriberSet::new(),
                 keystroke_interceptors: SingleSubscriberSet::new(),
+                held_key_repeats: None,
                 keyboard_layout_observers: SingleSubscriberSet::new(),
                 missing_glyph_callback: Rc::default(),
                 thermal_state_observers: SingleSubscriberSet::new(),
@@ -2742,6 +2744,14 @@ impl App {
                 f(event, window, cx);
                 true
             }))
+    }
+
+    /// Decide which bound actions run again while their key is held: for a
+    /// key the keyboard repeats, a binding whose action \`repeats\` refuses
+    /// still takes the key, so it is neither typed nor passed on, but runs
+    /// only on the first press. Without it every action repeats.
+    pub fn set_held_key_repeats(&mut self, repeats: impl Fn(&dyn Action) -> bool + 'static) {
+        self.held_key_repeats = Some(Rc::new(repeats));
     }
 
     /// Register key bindings.

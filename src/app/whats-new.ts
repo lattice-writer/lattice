@@ -69,7 +69,7 @@ let thisLaunch: { updatedFrom: string | null } | null = null;
  * `takeUpdatedFrom`, asked once per page: the toast and the native app's offer
  * (native-app.ts) both want to know, and the first ask records the version.
  */
-export function updatedFromThisLaunch(): string | null {
+function updatedFromThisLaunch(): string | null {
   thisLaunch ??= { updatedFrom: takeUpdatedFrom() };
   return thisLaunch.updatedFrom;
 }

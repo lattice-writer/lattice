@@ -26,7 +26,7 @@ use super::{
     paint::{JobSource, PageJob, compose, inexact_reason, only_loading, to_bgra},
     protocol::SP_PER_BP,
 };
-use crate::pdf::{PdfEngine, PdfView, RenderRequest};
+use crate::pdf::{PdfEngine, PdfView, PixelRect, RenderRequest};
 
 /// What a page's image was drawn for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -34,6 +34,9 @@ struct Key {
     stamp: u64,
     width_px: u32,
     dark: bool,
+    /// The part of the page drawn, for a page drawn again at full size over
+    /// its capped image, as the viewer does for the PDF's (`view/pages.rs`).
+    region: Option<PixelRect>,
 }
 
 #[derive(Default)]
@@ -47,6 +50,11 @@ struct Slot {
 pub struct Layer {
     preview: Entity<LivePreview>,
     slots: HashMap<usize, Slot>,
+    /// The part of each capped page on screen at full size, over its slot's
+    /// image: without it a page larger than `MAX_PAGE_PIXELS` (past about
+    /// 175% on a 2x screen) showed the layer, figures and text alike,
+    /// stretched from the capped size while the PDF under it was sharp.
+    details: HashMap<usize, Slot>,
     /// Bumped on every change; a page is drawn again when the change it was
     /// drawn for is older than its own or the last "every page".
     stamp: u64,
@@ -76,6 +84,7 @@ impl Layer {
         Self {
             preview,
             slots: HashMap::new(),
+            details: HashMap::new(),
             stamp: 1,
             all: 1,
             pages: HashMap::new(),
@@ -112,9 +121,36 @@ impl Layer {
         self.slots.get(&page)?.image.clone()
     }
 
-    /// Let go of `page`'s image, from memory and from the GPU atlas.
+    /// `page`'s full-size part over its image, with the width of the page
+    /// it was drawn for and its place there, in device pixels.
+    pub fn detail(&self, page: usize) -> Option<(Arc<RenderImage>, u32, PixelRect)> {
+        let slot = self.details.get(&page)?;
+        let key = slot.drawn?;
+        Some((slot.image.clone()?, key.width_px, key.region?))
+    }
+
+    fn slots_mut(&mut self, detail: bool) -> &mut HashMap<usize, Slot> {
+        if detail {
+            &mut self.details
+        } else {
+            &mut self.slots
+        }
+    }
+
+    /// Let go of `page`'s image and its full-size part, from memory and
+    /// from the GPU atlas.
     pub fn release(&mut self, page: usize, window: &mut Window) {
+        self.release_detail(page, window);
         if let Some(slot) = self.slots.remove(&page)
+            && let Some(image) = slot.image
+        {
+            window.drop_image(image).ok();
+        }
+    }
+
+    /// Let go of `page`'s full-size part only.
+    pub fn release_detail(&mut self, page: usize, window: &mut Window) {
+        if let Some(slot) = self.details.remove(&page)
             && let Some(image) = slot.image
         {
             window.drop_image(image).ok();
@@ -123,7 +159,7 @@ impl Layer {
 
     /// Let go of every page's image, inside a frame's window.
     pub fn release_every(&mut self, window: &mut Window) {
-        for (_, slot) in self.slots.drain() {
+        for (_, slot) in self.slots.drain().chain(self.details.drain()) {
             if let Some(image) = slot.image {
                 window.drop_image(image).ok();
             }
@@ -132,7 +168,7 @@ impl Layer {
 
     /// Let go of every page's image.
     pub fn release_all(&mut self, cx: &mut gpui::App) {
-        for (_, slot) in self.slots.drain() {
+        for (_, slot) in self.slots.drain().chain(self.details.drain()) {
             if let Some(image) = slot.image {
                 cx.drop_image(image, None);
             }
@@ -153,14 +189,17 @@ impl Layer {
 }
 
 impl PdfView {
-    /// Ask for `page`'s live image at `width_px` device pixels across, if
-    /// it is not drawn for the latest change at that size.
+    /// Ask for `page`'s live image at `width_px` device pixels across, or
+    /// for the part `region` of it at that size over a capped image, if it
+    /// is not drawn for the latest change at that size.
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn request_live_page(
         &mut self,
         page: usize,
         width_px: u32,
         (width_pt, height_pt): (f32, f32),
         dark: bool,
+        region: Option<PixelRect>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
@@ -171,8 +210,9 @@ impl PdfView {
             stamp: layer.stamp_of(page),
             width_px,
             dark,
+            region,
         };
-        let slot = layer.slots.entry(page).or_default();
+        let slot = layer.slots_mut(region.is_some()).entry(page).or_default();
         if slot.drawn == Some(key) || slot.pending.as_ref().is_some_and(|(want, _)| *want == key) {
             return;
         }
@@ -187,16 +227,14 @@ impl PdfView {
                 width_px,
                 height_px,
                 width_pt.max(1.),
+                region,
                 cx,
             )
         });
         let Some(plan) = plan else {
             // Nothing to show: the page is the PDF's alone.
-            let slot = self
-                .live_layer_mut()
-                .and_then(|layer| layer.slots.remove(&page));
-            if let Some(image) = slot.and_then(|slot| slot.image) {
-                window.drop_image(image).ok();
+            if let Some(layer) = self.live_layer_mut() {
+                layer.release(page, window);
             }
             return;
         };
@@ -207,10 +245,13 @@ impl PdfView {
                 if let JobSource::Fallback { pixels, .. } = &mut job.source
                     && let Ok(Ok(rendered)) = rendered
                 {
-                    let size = rendered.image.size(0);
-                    let (w, h) = (size.width.0.max(1) as u32, size.height.0.max(1) as u32);
-                    job.k *= f64::from(w) / f64::from(job.width_px);
-                    (job.width_px, job.height_px) = (w, h);
+                    // A part is drawn at exactly its own size.
+                    if region.is_none() {
+                        let size = rendered.image.size(0);
+                        let (w, h) = (size.width.0.max(1) as u32, size.height.0.max(1) as u32);
+                        job.k *= f64::from(w) / f64::from(job.width_px);
+                        (job.width_px, job.height_px) = (w, h);
+                    }
                     *pixels = rendered.image.as_bytes(0).map(<[u8]>::to_vec);
                 }
             }
@@ -228,7 +269,12 @@ impl PdfView {
                 let Some(layer) = this.live_layer_mut() else {
                     return;
                 };
-                let Some(slot) = layer.slots.get_mut(&page) else {
+                let slots = if region.is_some() {
+                    &mut layer.details
+                } else {
+                    &mut layer.slots
+                };
+                let Some(slot) = slots.get_mut(&page) else {
                     return;
                 };
                 if slot.pending.as_ref().map(|(want, _)| *want) != Some(key) {
@@ -257,7 +303,7 @@ impl PdfView {
         });
         if let Some(slot) = self
             .live_layer_mut()
-            .map(|layer| layer.slots.entry(page).or_default())
+            .map(|layer| layer.slots_mut(region.is_some()).entry(page).or_default())
         {
             slot.pending = Some((key, task));
         }
@@ -277,6 +323,7 @@ fn plan(
     width_px: u32,
     height_px: u32,
     width_pt: f32,
+    region: Option<PixelRect>,
     cx: &mut Context<LivePreview>,
 ) -> Option<Plan> {
     let session = preview.session.as_mut()?;
@@ -337,7 +384,7 @@ fn plan(
                         generation: pdf.generation,
                         page: n as usize - 1,
                         width_px,
-                        region: None,
+                        region,
                         dark: false,
                         cancel: Default::default(),
                     },
@@ -348,8 +395,9 @@ fn plan(
     };
     Some(Plan {
         job: PageJob {
-            width_px,
-            height_px,
+            width_px: region.map_or(width_px, |region| region.w),
+            height_px: region.map_or(height_px, |region| region.h),
+            origin: region.map(|region| (region.x, region.y)),
             // Device pixels per sp: the page is `width_px` across its width
             // in PDF points (bp).
             k: f64::from(width_px) / (f64::from(width_pt) * SP_PER_BP),

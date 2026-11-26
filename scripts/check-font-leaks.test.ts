@@ -137,6 +137,8 @@ describe("Typst support downloads", () => {
     write(root, "Lattice-typst_1.2.3_aarch64.tar.gz", "the helper");
     write(root, "Lattice-typst_1.2.3_aarch64.tar.gz.sig", "its signature");
     write(root, "Lattice-typst_1.2.3-rc.1_aarch64.tar.gz", "a rehearsal's helper");
+    write(root, "Lattice-typst_1.2.3_x64.tar.gz", "the Intel helper");
+    write(root, "Lattice-typst_1.2.3_x64.tar.gz.sig", "its signature");
     expect(checkAssets(root)).toEqual([]);
     write(root, "Lattice-typst_1.2.3_aarch64.zip", "another package");
     expect(checkAssets(root)).toEqual(["Lattice-typst_1.2.3_aarch64.zip is not a signed release artifact"]);

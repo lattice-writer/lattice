@@ -276,19 +276,19 @@ A raised, popover, floating or dialog surface stands on `--color-raised` with `b
 | `--color-syntax-operator` | `#7D5100` | `#E8B25C` | Weft & Warp syntax: operator |
 | `--color-syntax-citation` | `#8D472F` | `#DFA27D` | Weft & Warp syntax: citation |
 | `--color-syntax-reference` | `#7A3FA8` | `#D59BF0` | Weft & Warp syntax: reference |
-| `--color-syntax-github-ink` | `#1F2328` | `#E6EDF3` | GitHub code theme (the default): ink: plain code and brackets |
-| `--color-syntax-github-line-number` | `#89929C` | `#6E7681` | GitHub code theme (the default): line numbers in the gutter |
-| `--color-syntax-github-caret` | `#0969DA` | `#2F81F7` | GitHub code theme (the default): the caret |
-| `--color-syntax-github-keyword` | `#CF222E` | `#FF7B72` | GitHub code theme (the default): LaTeX commands, keywords |
-| `--color-syntax-github-operator` | `#CF222E` | `#FF7B72` | GitHub code theme (the default): operators |
-| `--color-syntax-github-function` | `#804DDC` | `#D2A8FF` | GitHub code theme (the default): sectioning, functions |
-| `--color-syntax-github-type` | `#116329` | `#7EE787` | GitHub code theme (the default): environment names, types |
-| `--color-syntax-github-variable` | `#0550AE` | `#79C0FF` | GitHub code theme (the default): math, variables |
-| `--color-syntax-github-string` | `#0A3069` | `#A5D6FF` | GitHub code theme (the default): strings, arguments |
-| `--color-syntax-github-comment` | `#59636E` | `#8B949E` | GitHub code theme (the default): comments |
-| `--color-syntax-github-number` | `#0550AE` | `#79C0FF` | GitHub code theme (the default): numbers, constants |
-| `--color-syntax-github-citation` | `#0A3069` | `#A5D6FF` | GitHub code theme (the default): citation keys |
-| `--color-syntax-github-reference` | `#953800` | `#FFA657` | GitHub code theme (the default): cross-references |
+| `--color-syntax-github-ink` | `#1F2328` | `#E6EDF3` | GitHub code theme: ink: plain code and brackets |
+| `--color-syntax-github-line-number` | `#89929C` | `#6E7681` | GitHub code theme: line numbers in the gutter |
+| `--color-syntax-github-caret` | `#0969DA` | `#2F81F7` | GitHub code theme: the caret |
+| `--color-syntax-github-keyword` | `#CF222E` | `#FF7B72` | GitHub code theme: LaTeX commands, keywords |
+| `--color-syntax-github-operator` | `#CF222E` | `#FF7B72` | GitHub code theme: operators |
+| `--color-syntax-github-function` | `#804DDC` | `#D2A8FF` | GitHub code theme: sectioning, functions |
+| `--color-syntax-github-type` | `#953800` | `#FFA657` | GitHub code theme: environment names, types |
+| `--color-syntax-github-variable` | `#953800` | `#FFA657` | GitHub code theme: math, variables |
+| `--color-syntax-github-string` | `#0A3069` | `#A5D6FF` | GitHub code theme: strings, arguments |
+| `--color-syntax-github-comment` | `#656D77` | `#8B949E` | GitHub code theme: comments |
+| `--color-syntax-github-number` | `#0550AE` | `#79C0FF` | GitHub code theme: numbers, constants |
+| `--color-syntax-github-citation` | `#0550AE` | `#79C0FF` | GitHub code theme: citation keys |
+| `--color-syntax-github-reference` | `#0550AE` | `#79C0FF` | GitHub code theme: cross-references |
 
 ### Font families
 

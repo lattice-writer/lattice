@@ -54,6 +54,10 @@ pub struct TypstSupport {
     /// A download failed this session: typing stops fetching (and saying
     /// so) on every pause, and a build asks again instead of fetching.
     fetch_failed: bool,
+    /// This version's helper was downloaded again this session because the
+    /// installed one was outdated: a download that is outdated too is not
+    /// fetched again on every build.
+    replaced_outdated: bool,
     /// What runs once the helper is installed: the compiles that asked.
     waiting: Vec<Box<dyn FnOnce(&mut App)>>,
     _task: Option<Task<()>>,
@@ -87,6 +91,7 @@ pub fn init(scripted: bool, cx: &mut App) {
         phase: Phase::Idle,
         declined: false,
         fetch_failed: false,
+        replaced_outdated: false,
         waiting: Vec::new(),
         _task: None,
     });
@@ -145,8 +150,10 @@ fn megabytes(bytes: u64) -> u64 {
     bytes.div_ceil(1_000_000)
 }
 
-/// A compile needs Typst support and it is not installed: ask to download
-/// it (or download it, for a writer who said yes before), then run `then`.
+/// A compile needs Typst support and it is not installed, or the installed
+/// helper is outdated (it speaks an older wire protocol: a build of this
+/// version from before the jumps): ask to download it (or download it, for
+/// a writer who said yes before), then run `then`.
 /// A live compile (`typing`) asks once a session; after Not now it does
 /// nothing.
 pub fn require(typing: bool, then: impl FnOnce(&mut App) + 'static, cx: &mut App) {
@@ -162,6 +169,22 @@ pub fn require(typing: bool, then: impl FnOnce(&mut App) + 'static, cx: &mut App
     if typing && (support.declined || support.fetch_failed) {
         return;
     }
+    // A helper named by `LATTICE_TYPST_HELPER` is not replaced by a download;
+    // the build already said it is out of date.
+    if support.dev.is_some() {
+        return;
+    }
+    let outdated = install::installed(&support.folder).is_some();
+    if outdated && support.replaced_outdated {
+        // Downloaded again this session and still outdated: say so, rather
+        // than fetch it on every build or let a jump do nothing.
+        notices::error(
+            t!("Typst support"),
+            t!("The downloaded Typst support doesn’t match this version of Lattice."),
+            cx,
+        );
+        return;
+    }
     let Some(source) = support.source.clone() else {
         notices::error(
             t!("Typst support isn’t available on this computer"),
@@ -171,7 +194,8 @@ pub fn require(typing: bool, then: impl FnOnce(&mut App) + 'static, cx: &mut App
         return;
     };
     support.waiting.push(Box::new(then));
-    if install::installed_before(&support.folder) && !support.fetch_failed {
+    if (outdated || install::installed_before(&support.folder)) && !support.fetch_failed {
+        support.replaced_outdated |= outdated;
         download(cx);
         return;
     }

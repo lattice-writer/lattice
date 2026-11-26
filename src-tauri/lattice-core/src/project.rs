@@ -50,6 +50,7 @@ mod linked_bibliography;
 mod linked_sources_tests;
 mod manifest;
 mod manifest_settings;
+mod manuscript;
 mod moved_file;
 mod paths;
 mod pdf_copy;
@@ -106,8 +107,9 @@ pub use history::{
 };
 pub use history::{HistoryItem, TransactionRecord};
 pub use imports::{
-    import_assets, import_files, import_image_bytes, import_sources, read_agent_composer_files,
-    write_bytes, AgentComposerFile, ImportRequest, NameConflict, ProjectImport,
+    import_assets, import_files, import_image_bytes, import_sources, read_agent_attachments,
+    read_agent_composer_files, write_bytes, AgentAttachments, AgentComposerFile, ImportRequest,
+    NameConflict, ProjectImport,
 };
 pub use linked_bibliography::{
     read_bibliography_source, read_linked_bibliography, save_linked_bibliography,
@@ -123,6 +125,7 @@ pub use manifest_settings::{
     set_deadline, set_grammar_ignores, set_spelling_words, set_submission_items,
     update_manifest_settings, ManifestSettings,
 };
+pub use manuscript::{add_manuscript, AddedManuscript, ManuscriptError, ManuscriptTemplate};
 pub use moved_file::find_moved_file;
 pub use paths::safe_path;
 pub(crate) use paths::{creation_path, stays_inside};

@@ -6,6 +6,10 @@ msgstr "1 小时前"
 msgid "1 minute ago"
 msgstr "1 分钟前"
 
+#: lattice-gpui/src/shell/typst_sync.rs
+msgid "Build the Typst document first, so Lattice can match the PDF to its source."
+msgstr "请先编译 Typst 文档，Lattice 才能将 PDF 与源码对应。"
+
 #: lattice-gpui/src/build/card.rs
 msgid "Building {document}…"
 msgstr "正在编译 {document}…"
@@ -38,13 +42,25 @@ msgstr "Lattice 通过一个只需下载一次的组件编译 Typst。在此之�
 msgid "Lattice publishes Typst support for Macs with Apple silicon."
 msgstr "Lattice 为搭载 Apple 芯片的 Mac 提供 Typst 支持。"
 
+#: lattice-gpui/src/shell/typst_sync.rs
+msgid "No Typst source was found for this place in the PDF."
+msgstr "在 PDF 的这个位置找不到对应的 Typst 源码。"
+
 #: lattice-gpui/src/build/card.rs
 msgid "Not built yet. Press {0} to build"
 msgstr "尚未编译。按 {0} 开始编译"
 
 #: lattice-gpui/src/typst.rs
+msgid "Not now"
+msgstr "以后再说"
+
+#: lattice-gpui/src/typst.rs
 msgid "Remove Typst support?"
 msgstr "移除 Typst 支持？"
+
+#: lattice-gpui/src/typst.rs
+msgid "The downloaded Typst support doesn’t match this version of Lattice."
+msgstr "下载的 Typst 支持与此版本的 Lattice 不匹配。"
 
 #: lattice-gpui/src/typst.rs
 msgid "Typst files keep their highlighting. The next Typst build asks to download it again."

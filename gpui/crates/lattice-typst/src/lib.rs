@@ -18,9 +18,13 @@ use std::{
     time::Instant,
 };
 
-use lattice_core::latex::{BuildResult, BuildStep};
+use lattice_core::{
+    latex::{BuildResult, BuildStep},
+    typst_wire::{ClickJump, CursorJump, Jump, PdfJump, SourceJump},
+};
 
 mod diagnostics;
+mod jump;
 mod world;
 
 pub use world::prewarm_fonts;
@@ -51,20 +55,25 @@ pub fn build(root: &Path, document: &str, overlay: &HashMap<String, String>) -> 
     // Memoized results nobody asked for in the last few compiles go, so a
     // long session of typing does not keep every layout it ever made.
     comemo::evict(10);
-    drop(guard);
 
     let pdf = root.join(document).with_extension("pdf");
     let mut diagnostics = compiled.diagnostics;
     let mut wrote = false;
-    if let Some(bytes) = compiled.pdf {
+    if let (Some(bytes), Some(laid_out)) = (compiled.pdf, compiled.document) {
         match write_atomically(root, &pdf, &bytes) {
-            Ok(()) => wrote = true,
+            Ok(()) => {
+                wrote = true;
+                // The jumps read the document of the PDF on screen, which a
+                // failed compile after this one leaves there.
+                session.keep(laid_out);
+            }
             Err(error) => diagnostics.push(diagnostics::note(
                 "error",
                 format!("Could not write {}: {error}", pdf.display()),
             )),
         }
     }
+    drop(guard);
     let errors = diagnostics.iter().any(|d| d.level == "error");
     let duration = started.elapsed();
     let duration_ms = u64::try_from(duration.as_millis()).unwrap_or(u64::MAX);
@@ -105,6 +114,48 @@ pub fn build(root: &Path, document: &str, overlay: &HashMap<String, String>) -> 
         unchanged: false,
         aux_folder: String::new(),
     }
+}
+
+/// Run `jump` on the document this session last wrote the PDF of, when
+/// that is `root`'s `document`.
+fn with_kept<T>(root: &Path, document: &str, jump: impl FnOnce(&jump::Kept) -> Jump<T>) -> Jump<T> {
+    let guard = SESSION.lock().unwrap_or_else(PoisonError::into_inner);
+    match guard
+        .as_ref()
+        .filter(|session| session.is_for(root, document))
+        .and_then(world::Session::kept)
+    {
+        Some(kept) => jump(kept),
+        None => Jump::NotCompiled,
+    }
+}
+
+/// From a click in the PDF to the source that put it there.
+pub fn jump_from_click(request: &ClickJump) -> SourceJump {
+    with_kept(&request.root, &request.document, |kept| {
+        jump::source_at(
+            kept,
+            &request.root,
+            &request.overlay,
+            request.page,
+            request.x,
+            request.y,
+        )
+    })
+}
+
+/// From a caret in a source to the places in the PDF its text went.
+pub fn jump_from_cursor(request: &CursorJump) -> PdfJump {
+    with_kept(&request.root, &request.document, |kept| {
+        jump::places_of(
+            kept,
+            &request.root,
+            &request.overlay,
+            &request.path,
+            request.line,
+            request.column,
+        )
+    })
 }
 
 /// The PDF pane reads the file while it may be replaced: write it in the

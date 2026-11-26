@@ -232,6 +232,13 @@ mod tests {
             panic!("not a shortcut");
         };
         assert_eq!(key.combo(), "meta+KeyK");
+        assert!(!key.repeat, "a page that does not say sends a press");
+        let Ok(Inbound::Shortcut(held)) = parse(json!({
+            "kind": "shortcut", "code": "KeyK", "key": "k", "meta": true, "repeat": true
+        })) else {
+            panic!("not a shortcut");
+        };
+        assert!(held.repeat);
         assert!(parse(json!({ "kind": "unknown" })).is_err());
     }
 

@@ -507,6 +507,11 @@ pub trait Platform: 'static {
         Task::ready(Vec::new())
     }
     fn on_app_menu_action(&self, callback: Box<dyn FnMut(&dyn Action)>);
+    /// Whether the menu action now being run was chosen by a key the
+    /// keyboard repeats while it is held (a menu item's key equivalent).
+    fn menu_action_from_key_repeat(&self) -> bool {
+        false
+    }
     fn on_will_open_app_menu(&self, callback: Box<dyn FnMut()>);
     fn on_validate_app_menu_command(&self, callback: Box<dyn FnMut(&dyn Action) -> bool>);
 

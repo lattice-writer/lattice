@@ -455,9 +455,9 @@ dependencies = [
 
 [[package]]
 name = "ashpd"
-version = "0.13.5"
+version = "0.13.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b09507a218cf6eb4ab0659883e54880cea3984e3dbaa4989b6cda3f8f8a97a5"
+checksum = "fb8421aaa9644a5faf26735f258b669b15f063313ef8f8e2bdb28912a1a6f111"
 dependencies = [
  "enumflags2",
  "futures-channel",
@@ -5211,6 +5211,7 @@ dependencies = [
  "objc2 0.6.3",
  "objc2-app-kit 0.3.2",
  "objc2-foundation 0.3.2",
+ "windows 0.61.3",
  "x11",
 ]
 
@@ -7200,7 +7201,7 @@ dependencies = [
 
 [[package]]
 name = "lattice-core"
-version = "0.19.2"
+version = "0.20.0"
 dependencies = [
  "anydoc",
  "axum",
@@ -7417,6 +7418,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "typst",
+ "typst-ide",
  "typst-kit",
  "typst-layout",
  "typst-pdf",
@@ -14830,6 +14832,25 @@ dependencies = [
  "typst-timing",
  "typst-utils",
  "unicode-math-class",
+]
+
+[[package]]
+name = "typst-ide"
+version = "0.15.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6ffbba2bc8bb6b08410e4ee6f8ca04f12e79c9f42d37d03b0776870a8920c08b"
+dependencies = [
+ "comemo",
+ "ecow",
+ "indexmap",
+ "rustc-hash 2.1.1",
+ "serde",
+ "typst",
+ "typst-eval",
+ "typst-html",
+ "typst-layout",
+ "typst-utils",
+ "unscanny",
 ]
 
 [[package]]

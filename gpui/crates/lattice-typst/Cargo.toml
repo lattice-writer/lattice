@@ -17,6 +17,8 @@ typst-pdf.workspace = true
 # The paged document a compile makes (`PagedDocument`), which `typst` does
 # not re-export.
 typst-layout.workspace = true
+# Jumps between the source and the PDF, which Typst writes no SyncTeX for.
+typst-ide.workspace = true
 typst-kit.workspace = true
 comemo.workspace = true
 lattice-core.workspace = true

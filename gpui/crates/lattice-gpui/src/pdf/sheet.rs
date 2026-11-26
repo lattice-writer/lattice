@@ -383,6 +383,7 @@ impl PdfView {
         );
         let text = slot.text.clone();
         let live = self.live_layer().and_then(|layer| layer.image(ix));
+        let live_detail = self.live_layer().and_then(|layer| layer.detail(ix));
         let ground: Hsla = if dark {
             rgb(DARK_PAGE).into()
         } else {
@@ -520,6 +521,19 @@ impl PdfView {
                         .absolute()
                         .inset_0()
                         .size_full()
+                        .object_fit(ObjectFit::Fill),
+                )
+            })
+            // Its full-size part over a capped page, as the PDF's.
+            .when_some(live_detail, |page, (image, width_px, region)| {
+                let to_logical = rect.w / width_px as f32;
+                page.child(
+                    img(image)
+                        .absolute()
+                        .left(px(region.x as f32 * to_logical))
+                        .top(px(region.y as f32 * to_logical))
+                        .w(px(region.w as f32 * to_logical))
+                        .h(px(region.h as f32 * to_logical))
                         .object_fit(ObjectFit::Fill),
                 )
             })

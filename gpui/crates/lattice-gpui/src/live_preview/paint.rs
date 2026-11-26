@@ -14,6 +14,10 @@ use tiny_skia::{
     Color, FillRule, FilterQuality, Paint, Pixmap, PixmapPaint, Rect as SkRect, Transform,
 };
 
+pub use super::{
+    exact::{inexact_reason, only_loading},
+    matrix::Mat,
+};
 use super::{
     fonts::{FontStore, ImageStore, LoadedFont, LoadedImage, image_info},
     model::{OverlayRow, PageOverlay, Rect, cached_picture_moves},
@@ -29,42 +33,6 @@ const ROW_SIDE: f64 = 4. * PT;
 /// Paper: rendered pages stay white in both themes (dark pages are the
 /// viewer's filter, applied to the whole layer after).
 const PAPER: Color = Color::WHITE;
-
-/// Affine map [a, b, c, d, e, f]: x' = a·x + c·y + e, y' = b·x + d·y + f.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Mat([f64; 6]);
-
-impl Mat {
-    pub const IDENTITY: Mat = Mat([1., 0., 0., 1., 0., 0.]);
-
-    pub fn scale(k: f64) -> Mat {
-        Mat([k, 0., 0., k, 0., 0.])
-    }
-
-    /// `self` after `other`: `other` applies first.
-    pub fn mul(self, other: Mat) -> Mat {
-        let [a, b, c, d, e, f] = self.0;
-        let [g, h, i, j, k, l] = other.0;
-        Mat([
-            a * g + c * h,
-            b * g + d * h,
-            a * i + c * j,
-            b * i + d * j,
-            a * k + c * l + e,
-            b * k + d * l + f,
-        ])
-    }
-
-    fn skia(self) -> Transform {
-        let [a, b, c, d, e, f] = self.0.map(|v| v as f32);
-        Transform::from_row(a, b, c, d, e, f)
-    }
-
-    fn apply(self, x: f64, y: f64) -> (f64, f64) {
-        let [a, b, c, d, e, f] = self.0;
-        (a * x + c * y + e, b * x + d * y + f)
-    }
-}
 
 /// The colour of the fill (else stroke) operator in a PDF colour string
 /// ("1 0 0 rg 1 0 0 RG").
@@ -102,91 +70,6 @@ fn pdf_color(data: &str) -> Option<Color> {
 
 fn rgb(r: f32, g: f32, b: f32) -> Color {
     Color::from_rgba(r.clamp(0., 1.), g.clamp(0., 1.), b.clamp(0., 1.), 1.).unwrap_or(Color::BLACK)
-}
-
-/// Why a display list cannot be drawn exactly (`None` when it can), over
-/// `lines` (all of its lines when `None`) and the items outside them.
-pub fn inexact_reason(
-    dl: &DisplayList,
-    fonts: &FontStore,
-    images: &ImageStore,
-    lines: Option<&mut dyn Iterator<Item = &Line>>,
-) -> Option<String> {
-    let flags = dl.flag_names();
-    if !flags.is_empty() {
-        return Some(format!(
-            "contains material the live renderer cannot draw ({})",
-            flags.join(", ")
-        ));
-    }
-    let check = |items: &[Item]| -> Option<String> {
-        for item in items {
-            match item {
-                Item::Glyph {
-                    font, char, index, ..
-                } => {
-                    let Some(desc) = dl.fonts.get(&font.to_string()) else {
-                        return Some("fonts are loading".into());
-                    };
-                    let Some(loaded) = fonts.get(desc) else {
-                        return Some("fonts are loading".into());
-                    };
-                    if let LoadedFont::Missing(reason) = loaded.as_ref() {
-                        return Some(reason.clone());
-                    }
-                    if !loaded.drawable(*index, *char) {
-                        return Some(format!(
-                            "a glyph is missing from {}",
-                            desc.psname
-                                .as_deref()
-                                .or(desc.name.as_deref())
-                                .unwrap_or("a font")
-                        ));
-                    }
-                }
-                Item::Image { index, .. } => {
-                    let Some(info) = image_info(dl, *index) else {
-                        return Some("an image has no source file".into());
-                    };
-                    match images.get(&info.file) {
-                        None => {
-                            return Some("images are loading".into());
-                        }
-                        Some(LoadedImage::Missing(reason)) => return Some(reason.clone()),
-                        Some(LoadedImage::Bitmap(_)) => {}
-                    }
-                }
-                Item::Literal | Item::Unknown { .. } => {
-                    return Some(
-                        "contains drawing commands (e.g. TikZ) the live renderer cannot draw"
-                            .into(),
-                    );
-                }
-                _ => {}
-            }
-        }
-        None
-    };
-    if let Some(reason) = check(&dl.other) {
-        return Some(reason);
-    }
-    match lines {
-        Some(lines) => {
-            for line in lines {
-                if let Some(reason) = check(&line.items) {
-                    return Some(reason);
-                }
-            }
-            None
-        }
-        None => dl.lines.iter().find_map(|line| check(&line.items)),
-    }
-}
-
-/// Whether `reason` only waits for a load (fonts or images): the next draw
-/// may be exact.
-pub fn only_loading(reason: &str) -> bool {
-    reason.ends_with("are loading")
 }
 
 /// Draws display-list items onto a pixmap whose base transform maps sp to
@@ -509,6 +392,10 @@ pub enum JobSource {
 pub struct PageJob {
     pub width_px: u32,
     pub height_px: u32,
+    /// Where the pixmap's top-left sits on the page, in device pixels, for
+    /// a part of a page drawn at full size over its capped image; `None`
+    /// for the whole page.
+    pub origin: Option<(u32, u32)>,
     /// Device pixels per sp.
     pub k: f64,
     pub source: JobSource,
@@ -568,7 +455,8 @@ fn row_bands(rows: &[OverlayRow]) -> Vec<[f64; 4]> {
 /// through.
 pub fn compose(job: PageJob) -> Option<Pixmap> {
     let mut pixmap = Pixmap::new(job.width_px.max(1), job.height_px.max(1))?;
-    let base = Mat::scale(job.k);
+    let (ox, oy) = job.origin.unwrap_or_default();
+    let base = Mat([1., 0., 0., 1., -f64::from(ox), -f64::from(oy)]).mul(Mat::scale(job.k));
     let hidden: HashSet<usize> = job
         .overlays
         .iter()
@@ -613,6 +501,17 @@ pub fn compose(job: PageJob) -> Option<Pixmap> {
                         let (x, y, w, h) = device_rect(base, src);
                         if w < 1 || h < 1 {
                             continue;
+                        }
+                        // A part holds only its own pixels of the fallback:
+                        // a picture taken from beyond them would come back
+                        // cut or blank, so the part is not drawn and the
+                        // page's whole image shows instead.
+                        let inside = x >= 0
+                            && y >= 0
+                            && x + w <= pixmap.width() as i32
+                            && y + h <= pixmap.height() as i32;
+                        if job.origin.is_some() && !inside {
+                            return None;
                         }
                         let rect = tiny_skia::IntRect::from_xywh(x, y, w as u32, h as u32);
                         if let Some(snap) = rect.and_then(|rect| pixmap.clone_rect(rect)) {
@@ -702,14 +601,6 @@ mod tests {
     use crate::live_preview::protocol::FontDesc;
 
     #[test]
-    fn matrices_compose_with_the_right_one_first() {
-        let scale = Mat::scale(2.);
-        let shift = Mat([1., 0., 0., 1., 10., 0.]);
-        assert_eq!(scale.mul(shift).apply(1., 1.), (22., 2.));
-        assert_eq!(shift.mul(scale).apply(1., 1.), (12., 2.));
-    }
-
-    #[test]
     fn pdf_colors_take_the_fill_operator() {
         let red = pdf_color("1 0 0 rg 0 0 1 RG").unwrap();
         assert_eq!((red.red(), red.green(), red.blue()), (1., 0., 0.));
@@ -764,6 +655,7 @@ mod tests {
             overlays: Vec::new(),
             fonts: FontStore::default(),
             images: ImageStore::default(),
+            origin: None,
         })
         .unwrap();
         let at = |x: u32, y: u32| pixmap.pixel(x, y).unwrap();
@@ -823,6 +715,7 @@ mod tests {
             overlays: Vec::new(),
             fonts: FontStore::default(),
             images: ImageStore::default(),
+            origin: None,
         };
         assert!(compose(job).is_none());
     }
@@ -855,6 +748,7 @@ mod tests {
             )],
             fonts: FontStore::default(),
             images: ImageStore::default(),
+            origin: None,
         })
         .unwrap();
         let at = |x: u32, y: u32| pixmap.pixel(x, y).unwrap();
@@ -868,6 +762,81 @@ mod tests {
         let bgra = to_bgra(&pixmap, false);
         let ix = (57 * 100 + 20) * 4;
         assert_eq!(&bgra[ix..ix + 4], &[0, 0, 255, 255]);
+    }
+
+    #[test]
+    fn a_part_of_a_page_is_the_same_pixels_as_the_whole_page_there() {
+        let job = |width_px, height_px, origin| PageJob {
+            width_px,
+            height_px,
+            k: 2. / PT,
+            source: JobSource::DisplayList(Arc::new(page_with_rule())),
+            overlays: Vec::new(),
+            fonts: FontStore::default(),
+            images: ImageStore::default(),
+            origin,
+        };
+        let whole = compose(job(200, 200, None)).unwrap();
+        let part = compose(job(60, 30, Some((25, 21)))).unwrap();
+        assert_eq!((part.width(), part.height()), (60, 30));
+        for y in 0..30 {
+            for x in 0..60 {
+                assert_eq!(part.pixel(x, y), whole.pixel(x + 25, y + 21), "at {x}, {y}");
+            }
+        }
+        // The rule (20..80 by 30..40 at 2 px per pt) crosses the part.
+        let rule = part.pixel(30, 15).unwrap();
+        assert_eq!((rule.red(), rule.green(), rule.blue()), (255, 0, 0));
+    }
+
+    #[test]
+    fn a_part_whose_moved_picture_comes_from_beyond_it_is_not_drawn() {
+        let mut line = page_with_rule().dl.lines[0].clone();
+        line.items.push(Item::Unknown {
+            kind: "cached_picture".into(),
+            detail: serde_json::json!(format!(
+                "1 {} {} {} {}",
+                10. * PT,
+                10. * PT,
+                20. * PT,
+                20. * PT
+            )),
+        });
+        let mut page = page_with_rule();
+        page.dl.lines = vec![line.clone()];
+        let overlay = crate::live_preview::model::Overlay {
+            par_id: 1,
+            dl: Arc::new(page.dl.clone()),
+            fragments: Vec::new(),
+            revision: 2,
+        };
+        let page = Arc::new(page);
+        let job = |(w, h), origin| PageJob {
+            width_px: w,
+            height_px: h,
+            origin,
+            k: 1. / PT,
+            source: JobSource::Fallback {
+                page: page.clone(),
+                pixels: Some(vec![255; (w * h * 4) as usize]),
+            },
+            overlays: vec![(
+                PageOverlay {
+                    overlay: overlay.clone(),
+                    rows: vec![OverlayRow {
+                        line: line.clone(),
+                        dx: 0.,
+                        dy: 40. * PT,
+                    }],
+                },
+                HashSet::from([0]),
+            )],
+            fonts: FontStore::default(),
+            images: ImageStore::default(),
+        };
+        assert!(compose(job((100, 100), None)).is_some());
+        assert!(compose(job((40, 40), Some((5, 50)))).is_none());
+        assert!(compose(job((40, 40), Some((0, 0)))).is_some());
     }
 
     #[test]

@@ -7,13 +7,13 @@
 
 Lattice needs macOS 14 or later. Linux (AppImage) and Windows builds are experimental and have no Agent.
 
-## The native Lattice on Apple silicon
+## The native Lattice
 
-On a Mac with Apple silicon, Lattice can switch to its native version, which the Mac draws itself instead of as a web page. It looks and works the same. Lattice offers the switch once after the update that brings it; **Settings › Editor & builds › Switch to the new Lattice** offers it any time after **Not now** or **Don't ask again**.
+On a Mac, Lattice is the native app: the Mac draws it itself instead of as a web page, on Apple silicon and Intel Macs alike. Since version 0.20.0 it replaces the classic version, which Windows and Linux keep. Updating a classic copy installs the native one in its place with nothing to choose, and a classic copy of 0.20.0 or later installs it the moment it starts, with a short notice while it downloads.
 
-- **What comes with you:** on the first switch, your recent projects, settings, themes, plugins, project templates, Agent skills and Overleaf links. Your Agent conversations come along too: each time the native version starts its Agent, it adds the classic version's conversations it doesn't have yet, and says how many in a short notice. Your project folders are untouched either way.
-- **What's different:** the native version checks spelling with macOS's own checker and has no grammar check or dictionaries for other languages.
-- **Switching back:** **Settings › Editor & builds › Switch back to the classic version** in the native version installs the classic one in its place. The classic version opens with its data as it was before the switch; changes made in the native version don't flow back. If you switch again later, the native version keeps its own settings, themes, plugins and Overleaf session, and adds the recent projects you opened and the Agent conversations you started in the classic version.
+- **What comes with you:** your recent projects, settings, themes, plugins, project templates, Agent skills and Overleaf links. Your Agent conversations come along too: each time the native version starts its Agent, it adds the classic version's conversations it doesn't have yet, and says how many in a short notice. Your project folders are untouched either way.
+- **If you had switched back:** versions 0.19.0 to 0.19.4 could switch back to the classic version. If you did, the native version starts with its own settings and adds what you did in the classic version since: the projects you opened, the settings you changed there (a setting the native version already held at a value of its own keeps it, including one it brought over from the classic version the first time), and the themes, plugins, templates and skills you added.
+- **What's different:** the native version checks spelling with macOS's own checker and has no grammar check or dictionaries for other languages. There is no way back to the classic version on a Mac; its data stays on your Mac, untouched.
 
 ## Set up TeX
 
@@ -28,7 +28,7 @@ To check your setup at any time, open **Settings › TeX doctor**. It lists ever
 The project menu (the project name at the top left of the window) and the **File** menu have the same actions:
 
 - **Open another folder** (`⌘O`): any folder with a `.tex` file. Lattice works on it in place.
-- **New project** (`⌘⇧N`): name it, pick a venue template (NeurIPS, ICML, ICLR, ACL, CVPR, AAAI or a thesis class) or one of your own saved templates, then **Choose location**.
+- **New project** (`⌘⇧N`): name it, pick a venue template (NeurIPS, ICML, ICLR, ACL, CVPR, AAAI or a thesis class) or one of your own saved templates, then **Choose location**. In the native Lattice the button is **Choose parent folder…**: the folder you pick holds the project's own folder, and the dialog shows what it will make (for example **Will create ProjectA/Manuscript/**) before you press **Create project**. It warns you when the parent folder already has the project's name, so you don't end up with `Manuscript/Manuscript/`.
 - **Clone repository…**: a Git repository from GitHub or elsewhere.
 - **Open from Overleaf**: see [Overleaf sync](overleaf.md).
 - **Import Overleaf ZIP…**: a project downloaded from Overleaf as a ZIP.
@@ -36,6 +36,12 @@ The project menu (the project name at the top left of the window) and the **File
 ![The New project dialog with a name, a venue template and Choose location](images/en-new-project.webp)
 
 Recent projects are in **File › Open Recent**. A window can hold several projects as tabs in the title bar.
+
+### A repository with several manuscripts
+
+A project is just a folder, so it can be a whole repository: analysis code, data and one or more papers side by side. Opening the repository's root as the project lets the Agent work across all of it, for example checking a number in the Results against the output in `analysis/` and then revising the paper in the same conversation.
+
+In the native Lattice, start each paper with **New manuscript from template…**. It is on a folder's right-click menu, on the Project panel's own right-click menu, in its **+** menu and in the command palette. Pick a template (the same ones New project offers, your saved templates included) and a folder name, and optionally tick **Set as main document** so **Build** compiles it. Lattice writes the template's files into that folder and opens its main file. The project that is open stays open, with its settings, history and Agent conversations; no second project is made. If any of the files is already there, nothing is written and the dialog lists the files in the way.
 
 ## The Get started checklist
 

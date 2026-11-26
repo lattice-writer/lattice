@@ -6,7 +6,7 @@ import { liveShortcuts, pressMatches, type KeyPress } from "../app/use-app-comma
 const LATTICE_HOST_SHORTCUTS_REQUEST = "lattice:request-host-shortcuts";
 /** `{ version: 1, shortcuts: [{ key, mod, ctrl, shift, alt }] }`: the keys a Synara frame leaves to Lattice. */
 const LATTICE_HOST_SHORTCUTS = "lattice:host-shortcuts";
-/** `{ version: 1, key, code, metaKey, ctrlKey, shiftKey, altKey }`: one of those keys, pressed in the frame. */
+/** `{ version: 1, key, code, metaKey, ctrlKey, shiftKey, altKey, repeat? }`: one of those keys, pressed (or held) in the frame. */
 const SYNARA_HOST_SHORTCUT = "synara:host-shortcut";
 
 /** Longer than any KeyboardEvent key or code ("ArrowRight", "NumpadDecimal"). */
@@ -17,7 +17,9 @@ function forwardedPress(data: Record<string, unknown>): KeyPress | null {
   if (data.version !== 1 || typeof key !== "string" || typeof code !== "string") return null;
   if (!key || key.length > MAX_KEY_LENGTH || code.length > MAX_KEY_LENGTH) return null;
   if (typeof metaKey !== "boolean" || typeof ctrlKey !== "boolean" || typeof shiftKey !== "boolean" || typeof altKey !== "boolean") return null;
-  return { key, code, metaKey, ctrlKey, shiftKey, altKey };
+  // A frame that says the key is held is believed; one that does not say
+  // (Synara sends no `repeat` yet) sends first presses, as before.
+  return { key, code, metaKey, ctrlKey, shiftKey, altKey, repeat: data.repeat === true };
 }
 
 /** Every Synara frame in this window: the Agent panel, the Git drawer's views, Settings' pages. */

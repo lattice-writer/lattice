@@ -46,12 +46,13 @@ describe("the macOS Intel workflow", () => {
   it("builds and smokes on Intel runners", () => {
     expect(intel.jobs.build["runs-on"]).toMatch(/intel/);
     expect(intel.jobs.smoke["runs-on"]).toMatch(/intel/);
+    expect(intel.jobs["native-smoke"]["runs-on"]).toMatch(/intel/);
     expect(intel.env?.TARGET).toBe("x86_64-apple-darwin");
   });
 
   it("builds, smokes and attaches, with the release's secrets, for a published tag release", () => {
     const run = runFor(releaseRun({}));
-    expect(run.jobs).toEqual(["build", "smoke", "attach"]);
+    expect(run.jobs).toEqual(["build", "smoke", "native", "native-smoke", "attach"]);
     expect(run.step("build", "Check the release's version").runs).toBe(true);
     expect(run.step("build", "Fetch the licensed interface fonts").runs).toBe(true);
     expect(run.step("build", BUILD).env).toMatchObject({
@@ -75,6 +76,7 @@ describe("the macOS Intel workflow", () => {
     const run = runFor(github);
     expect(run.jobs).not.toContain("attach");
     expect(run.jobs).toContain("smoke");
+    expect(run.jobs).toContain("native-smoke");
     expect(run.step("build", "Fetch the licensed interface fonts").runs).toBe(false);
     expect(run.step("build", BUILD).env).toMatchObject({
       LATTICE_FIRECRAWL_KEY: "",
@@ -86,7 +88,7 @@ describe("the macOS Intel workflow", () => {
     expect(intel.permissions).toEqual({ contents: "read" });
     const writers = Object.entries(intel.jobs).filter(([, job]) => job.permissions?.contents === "write").map(([name]) => name);
     expect(writers).toEqual(["attach"]);
-    expect(intel.jobs.attach.needs).toEqual(["build", "smoke"]);
+    expect(intel.jobs.attach.needs).toEqual(["build", "smoke", "native", "native-smoke"]);
   });
 
   it("never runs tauri-action or builds Lattice Tauri Beta", () => {

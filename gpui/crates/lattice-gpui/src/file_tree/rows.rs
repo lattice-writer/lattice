@@ -19,6 +19,7 @@ pub(super) fn tree_items(nodes: &[FileNode], expanded: &HashSet<String>) -> Vec<
             }
             let (deepest, label) = flattened(node);
             TreeItem::new(deepest.path.clone(), label)
+                .folder(true)
                 .children(tree_items(&deepest.children, expanded))
                 .expanded(expanded.contains(&deepest.path))
         })
@@ -163,6 +164,21 @@ mod tests {
             ids,
             HashSet::from(["main.tex", "style", "style/notes.md"].map(String::from))
         );
+    }
+
+    // An empty folder, a New folder's row among them, is a folder row,
+    // not a file's.
+    #[test]
+    fn an_empty_folder_is_a_folder_row() {
+        let items = tree_items(
+            &[
+                node("figures", "directory", vec![]),
+                node("main.tex", "file", vec![]),
+            ],
+            &HashSet::new(),
+        );
+        assert!(items[0].is_folder());
+        assert!(!items[1].is_folder());
     }
 
     #[test]

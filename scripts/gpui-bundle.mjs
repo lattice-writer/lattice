@@ -37,10 +37,14 @@
  * nothing; gpui/docs/updater.md says how the channel is published.
  *
  * Usage:
- *   node scripts/gpui-bundle.mjs [--flavor beta|main] [--binary PATH]
- *     [--out DIR] [--skip-islands] [--skip-runtimes] [--no-dmg] [--feed URL]
- *     [--typst-helper PATH]
+ *   node scripts/gpui-bundle.mjs [--flavor beta|main] [--arch aarch64|x86_64]
+ *     [--binary PATH] [--out DIR] [--skip-islands] [--skip-runtimes] [--no-dmg]
+ *     [--feed URL] [--typst-helper PATH]
  *     --flavor         beta (default): Lattice Beta; main: Lattice
+ *     --arch           aarch64 (default): Apple silicon; x86_64: Intel (ARCHES
+ *                      below). The binary and the staged runtimes must be
+ *                      built for it: CI builds x86_64 on an Intel runner, so
+ *                      prepare-synara-sidecar.mjs stages the host's Node
  *     --skip-islands   reuse gpui/islands/dist
  *     --skip-runtimes  reuse the staged src-tauri/synara-runtime and
  *                      presentation-runtime as they are
@@ -48,7 +52,7 @@
  *                      (default: the flavor's, FLAVORS below)
  *     --typst-helper PATH  also package the Typst helper (gpui/target/release/
  *                      lattice-typst): signed and notarized as the app is,
- *                      packed as Lattice-typst_<version>_aarch64.tar.gz with
+ *                      packed as Lattice-typst_<version>_<suffix>.tar.gz with
  *                      its minisign .sig beside the app's files
  */
 import { execFileSync } from "node:child_process";
@@ -70,7 +74,7 @@ export const releaseRepository = (env = process.env) => env.GITHUB_REPOSITORY ||
 /**
  * The apps the GPUI binary ships as; it reads which one it is from the
  * bundle's identifier (gpui/crates/lattice-gpui/src/flavor.rs). `artifact`
- * names the files (<artifact>_<version>_aarch64.*), `manifest` the updater
+ * names the files (<artifact>_<version>_<suffix>.*), `manifest` the updater
  * manifest written beside them, and `feed` the folder the archive is
  * downloaded from, which the manifest's URL names.
  */
@@ -89,7 +93,7 @@ export const FLAVORS = {
   // app's privacy grants, Keychain items and Dock place. Every release
   // carries it beside the Tauri app, under names of its own so it never
   // replaces a Tauri asset, with its own manifest (latest-native.json): the
-  // Tauri app offers the switch from it and the native app updates from it
+  // native app updates from it, and from 0.20.0 latest.json hands Macs it too
   // (.github/workflows/release.yml, gpui/docs/updater.md). The bundle in the
   // dmg and the archive is still Lattice.app.
   main: {
@@ -103,14 +107,33 @@ export const FLAVORS = {
 export const EXECUTABLE = "lattice-gpui";
 
 /**
+ * The Macs the GPUI app ships for. `suffix` ends the file names as
+ * tauri-action ends the Tauri app's (Lattice_<version>_aarch64.dmg,
+ * Lattice_<version>_x64.dmg), `platform` is the updater key Tauri and
+ * crates/lattice-gpui/src/updater/manifest.rs read (darwin-<rust arch>), and
+ * `pdfium` the folder gpui/script/fetch-pdfium unpacks PDFium into.
+ */
+export const ARCHES = {
+  aarch64: { suffix: "aarch64", platform: "darwin-aarch64", pdfium: "mac-arm64" },
+  x86_64: { suffix: "x64", platform: "darwin-x86_64", pdfium: "mac-x64" },
+};
+
+/** `name` as an ARCHES key, or a thrown error naming the choices. */
+export function archOf(name) {
+  const arch = ARCHES[name];
+  if (!arch) throw new Error(`--arch is one of ${Object.keys(ARCHES).join(", ")}, not ${name}`);
+  return arch;
+}
+
+/**
  * The Typst helper the native app downloads on first use
  * (gpui/crates/lattice-gpui/src/typst/install.rs names it the same way):
  * the archive holds the one binary at its root, and its .sig is the Tauri
  * updater key's, which the app checks it against.
  */
 export const TYPST_HELPER = "lattice-typst";
-export function typstHelperFiles(version) {
-  const archive = `Lattice-typst_${version}_aarch64.tar.gz`;
+export function typstHelperFiles(version, arch = "aarch64") {
+  const archive = `Lattice-typst_${version}_${archOf(arch).suffix}.tar.gz`;
   return { archive, signature: `${archive}.sig` };
 }
 
@@ -150,13 +173,14 @@ export function infoPlist({ flavor, version, minimumSystemVersion, extra }) {
 /**
  * The flavor's manifest, in the shape tauri-action writes latest.json
  * (crates/lattice-gpui/src/updater/manifest.rs reads it). It lists the
- * archive under both keys tauri-action writes, since the Tauri app's updater
- * looks for darwin-aarch64-app before darwin-aarch64 when it reads the
- * native feed to offer the switch.
+ * archive under both keys tauri-action writes for the arch (darwin-aarch64
+ * and darwin-aarch64-app, or darwin-x86_64 and darwin-x86_64-app), since the
+ * Tauri app's updater looks for the -app key first.
  */
-export function updaterManifest({ version, signature, url, pubDate = new Date().toISOString(), notes = "" }) {
+export function updaterManifest({ version, signature, url, arch = "aarch64", pubDate = new Date().toISOString(), notes = "" }) {
   const entry = { signature, url };
-  return { version, notes, pub_date: pubDate, platforms: { "darwin-aarch64": entry, "darwin-aarch64-app": { ...entry } } };
+  const { platform } = archOf(arch);
+  return { version, notes, pub_date: pubDate, platforms: { [platform]: entry, [`${platform}-app`]: { ...entry } } };
 }
 
 /**
@@ -165,9 +189,9 @@ export function updaterManifest({ version, signature, url, pubDate = new Date().
  * looks the notarization up online), then packed and signed with the updater
  * key. Returns the files made.
  */
-function packageTypstHelper({ binary, out, version, identity, key }) {
+function packageTypstHelper({ binary, out, version, arch, identity, key }) {
   if (!existsSync(binary)) throw new Error(`no Typst helper at ${binary}`);
-  const { archive, signature } = typstHelperFiles(version);
+  const { archive, signature } = typstHelperFiles(version, arch);
   const stage = mkdtempSync(path.join(os.tmpdir(), "gpui-typst-"));
   try {
     const helper = path.join(stage, TYPST_HELPER);
@@ -204,6 +228,7 @@ async function main() {
       binary: { type: "string" },
       out: { type: "string" },
       flavor: { type: "string", default: "beta" },
+      arch: { type: "string", default: "aarch64" },
       feed: { type: "string" },
       "skip-islands": { type: "boolean", default: false },
       "skip-runtimes": { type: "boolean", default: false },
@@ -214,6 +239,7 @@ async function main() {
   if (process.platform !== "darwin") throw new Error("the GPUI app bundle is built on macOS only");
   const flavor = FLAVORS[values.flavor];
   if (!flavor) throw new Error(`--flavor is one of ${Object.keys(FLAVORS).join(", ")}, not ${values.flavor}`);
+  const arch = archOf(values.arch);
 
   const config = JSON.parse(readFileSync(path.join(tauri, "tauri.conf.json"), "utf8"));
   const version = config.version;
@@ -231,14 +257,16 @@ async function main() {
   // 1. The binary.
   let binary = values.binary && path.resolve(values.binary);
   if (!binary) {
+    // gpui-build.mjs builds for the host; another arch's binary comes from --binary.
+    if (ARCHES[{ arm64: "aarch64", x64: "x86_64" }[process.arch]] !== arch) throw new Error(`--arch ${values.arch} on this ${process.arch} Mac needs --binary`);
     run(process.execPath, [path.join(repo, "scripts", "gpui-build.mjs"), "--", "build", "--release", "--locked", "-p", "lattice-gpui"]);
     binary = path.join(repo, "gpui", "target", "release", EXECUTABLE);
   }
   if (!existsSync(binary)) throw new Error(`no binary at ${binary}`);
 
   // 2. What it loads from the bundle.
-  run(path.join(repo, "gpui", "script", "fetch-pdfium"), []);
-  const pdfium = path.join(repo, "gpui", "vendor", "pdfium", "mac-arm64", "lib", "libpdfium.dylib");
+  run(path.join(repo, "gpui", "script", "fetch-pdfium"), [arch.pdfium]);
+  const pdfium = path.join(repo, "gpui", "vendor", "pdfium", arch.pdfium, "lib", "libpdfium.dylib");
   if (!values["skip-islands"]) run(path.join(repo, "gpui", "script", "build-islands"), []);
   if (!values["skip-runtimes"]) {
     run(process.execPath, [path.join(repo, "scripts", "prepare-synara-sidecar.mjs")]);
@@ -295,7 +323,7 @@ async function main() {
   console.log(`gpui-bundle: signed ${signed + 2} Mach-O files and the bundle ${identity === "-" ? "ad hoc" : `as ${identity}`}`);
 
   // 5. Notarize the app before it is packed, so every package holds the stapled app.
-  const base = `${flavor.artifact}_${version}_aarch64`;
+  const base = `${flavor.artifact}_${version}_${arch.suffix}`;
   if (key) {
     const upload = path.join(out, `${base}.notarize.zip`);
     run("ditto", ["-c", "-k", "--keepParent", app, upload]);
@@ -345,14 +373,14 @@ async function main() {
     const signature = readFileSync(`${archive}.sig`, "utf8").trim();
     const manifest = path.join(out, flavor.manifest);
     const url = `${feed.replace(/\/$/, "")}/${path.basename(archive)}`;
-    writeFileSync(manifest, `${JSON.stringify(updaterManifest({ version, signature, url }), null, 2)}\n`);
+    writeFileSync(manifest, `${JSON.stringify(updaterManifest({ version, signature, url, arch: values.arch }), null, 2)}\n`);
     outputs.push(`${archive}.sig`, manifest);
   } else {
     console.log(`gpui-bundle: no TAURI_SIGNING_PRIVATE_KEY: the updater archive is unsigned and no ${flavor.manifest} is written`);
   }
 
   if (values["typst-helper"]) {
-    outputs.push(...packageTypstHelper({ binary: path.resolve(values["typst-helper"]), out, version, identity, key }));
+    outputs.push(...packageTypstHelper({ binary: path.resolve(values["typst-helper"]), out, version, arch: values.arch, identity, key }));
   }
 
   console.log(`gpui-bundle: ${app}`);

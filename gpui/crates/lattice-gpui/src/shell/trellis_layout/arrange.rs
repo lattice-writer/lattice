@@ -8,7 +8,7 @@ use trellis::model::{LayoutDocument, PanelNode, Views};
 use super::presets::Documents;
 use super::{
     DocumentPlaces, Place, ROOT_PDF, document_slot, file_key, file_record, is_document_slot,
-    is_document_view, map_panels, panels_of, tidy,
+    map_panels, panels_of, tidy,
 };
 
 /// Where each document of `doc` sits: its panel, and whether it is in front
@@ -229,6 +229,39 @@ fn fill_slot(
     }
 }
 
+/// The slots of `doc`'s panels that hold nothing but slots while another
+/// panel holds a document: such a panel closes rather than stand empty,
+/// unless it is the only docked panel (floating and hidden panels leave the
+/// workspace blank). None while a preset or focus mode arranged the layout
+/// (`arranged`): its empty slots are its own.
+pub fn stranded_slots(doc: &LayoutDocument, arranged: bool) -> Vec<String> {
+    if arranged {
+        return Vec::new();
+    }
+    let docked = trellis::model::panels_of(doc.root.as_ref());
+    let only_docked = |panel: &PanelNode| docked.len() == 1 && docked[0].id == panel.id;
+    let all = panels_of(doc, true);
+    let only_slots = |panel: &PanelNode| {
+        panel
+            .views
+            .iter()
+            .all(|id| is_document_slot(doc.views.get(id)))
+    };
+    let documents = |panel: &PanelNode| {
+        panel
+            .views
+            .iter()
+            .any(|id| doc.views.get(id).is_some_and(|view| view.kind == "file"))
+    };
+    if !all.iter().any(|panel| documents(panel)) {
+        return Vec::new();
+    }
+    all.into_iter()
+        .filter(|panel| !panel.views.is_empty() && only_slots(panel) && !only_docked(panel))
+        .flat_map(|panel| panel.views.iter().cloned())
+        .collect()
+}
+
 /// The slots of `doc`'s panels that hold a document now: they leave.
 pub fn filled_slots(doc: &LayoutDocument) -> Vec<String> {
     panels_of(doc, true)
@@ -250,22 +283,25 @@ pub fn filled_slots(doc: &LayoutDocument) -> Vec<String> {
 }
 
 /// `current`, just after `view_id` closed out of `previous`, keeping the
-/// document panel it was the last document of as an empty slot, so closing
-/// a document never changes the arrangement. `None` when the panel still
-/// holds a document (or a slot).
+/// panel it was the only view of as an empty slot when it is the only
+/// docked panel, so the workspace has something to show (a floating or
+/// hidden panel does not fill it). `None` otherwise, and the
+/// panel closes with its last view (Leo: closing a tab closes it, with no
+/// "Empty" left behind); the next document opened gets a panel of its own
+/// (`with_document_panel`).
 pub fn keep_document_slot(
     previous: &LayoutDocument,
     current: &LayoutDocument,
     view_id: &str,
 ) -> Option<LayoutDocument> {
-    let panel = panels_of(previous, true)
-        .into_iter()
-        .find(|target| target.views.iter().any(|id| id == view_id))?;
-    if panel
-        .views
+    let all = panels_of(previous, true);
+    let panel = all
         .iter()
-        .any(|id| id != view_id && is_document_view(previous.views.get(id)))
-    {
+        .copied()
+        .find(|target| target.views.iter().any(|id| id == view_id))?;
+    let docked = trellis::model::panels_of(previous.root.as_ref());
+    let only_docked = matches!(docked.as_slice(), [only] if only.id == panel.id);
+    if panel.views.iter().any(|id| id != view_id) || !only_docked {
         return None;
     }
     let (slot, slot_record) = document_slot(&panel.id);

@@ -201,7 +201,6 @@ impl BuildPanel {
     }
 
     /// How many builds have finished, for a scenario.
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
     pub fn builds(&self) -> usize {
         self.builds
     }
@@ -375,8 +374,10 @@ impl BuildPanel {
         }
     }
 
-    /// The project's files, which diagnostics are resolved against.
-    pub fn set_project_files(&mut self, files: Vec<String>) {
+    /// The project's folder and files, which diagnostics are resolved
+    /// against, a build's restated on entry as much as one running.
+    pub fn set_project(&mut self, root: &Path, files: Vec<String>) {
+        self.root = root.to_path_buf();
         self.project_files = files;
     }
 
@@ -392,9 +393,13 @@ impl BuildPanel {
         sources: HashMap<String, String>,
         cx: &mut Context<Self>,
     ) {
+        let started = match &self.status {
+            Status::Running { started, .. } => Some(*started),
+            _ => None,
+        };
         self.builds += 1;
         self.status = Status::Finished;
-        self.outcome = BuildOutcome::of(result, wrote_pdf).map(|outcome| BuildOutcome {
+        self.outcome = BuildOutcome::of(result, wrote_pdf, started).map(|outcome| BuildOutcome {
             quiet: self.quiet && outcome.succeeded,
             ..outcome
         });

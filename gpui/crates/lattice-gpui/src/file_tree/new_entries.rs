@@ -5,7 +5,9 @@
 //! board at the project root and New presentation, a deck, under
 //! `slides/`. They make the panel's + menu, lead its ⋯ menu, and are the
 //! palette's Project commands. New Typst file is the native app's own,
-//! after New Markdown file: the Tauri app has no Typst.
+//! after New Markdown file: the Tauri app has no Typst. So is New
+//! manuscript from template… after New folder, which asks for a template and
+//! a folder beside the selection (`welcome/new_manuscript.rs`, lattice#1259).
 //!
 //! A LaTeX or Markdown file's row is named `untitled.tex` or `untitled.md`,
 //! its stem selected; a spreadsheet's or board's is a bare `untitled`, and
@@ -29,6 +31,7 @@ pub enum NewEntry {
     Markdown,
     Typst,
     Folder,
+    Manuscript,
     Import,
     Spreadsheet,
     Board,
@@ -71,11 +74,12 @@ impl Making {
 impl NewEntry {
     /// In the order the Tauri app lists them; a separator goes before New
     /// spreadsheet.
-    pub const ALL: [NewEntry; 8] = [
+    pub const ALL: [NewEntry; 9] = [
         NewEntry::Latex,
         NewEntry::Markdown,
         NewEntry::Typst,
         NewEntry::Folder,
+        NewEntry::Manuscript,
         NewEntry::Import,
         NewEntry::Spreadsheet,
         NewEntry::Board,
@@ -88,6 +92,7 @@ impl NewEntry {
             NewEntry::Markdown => t!("New Markdown file"),
             NewEntry::Typst => t!("New Typst file"),
             NewEntry::Folder => t!("New folder"),
+            NewEntry::Manuscript => t!("New manuscript from template…"),
             NewEntry::Import => t!("Import files…"),
             NewEntry::Spreadsheet => t!("New spreadsheet"),
             NewEntry::Board => t!("New board"),
@@ -102,6 +107,7 @@ impl NewEntry {
             NewEntry::Markdown => Icon::FILE_TEXT,
             NewEntry::Typst => Icon::FILE_CODE_CORNER,
             NewEntry::Folder => Icon::FOLDER_PLUS,
+            NewEntry::Manuscript => Icon::NOTEBOOK_PEN,
             NewEntry::Import => Icon::FOLDER_INPUT,
             NewEntry::Spreadsheet => Icon::TABLE_2,
             NewEntry::Board => Icon::SHAPES,
@@ -130,7 +136,7 @@ impl NewEntry {
                 deck: true,
                 ..Making::FOLDER
             },
-            NewEntry::Import => return None,
+            NewEntry::Import | NewEntry::Manuscript => return None,
         })
     }
 }
@@ -145,9 +151,10 @@ impl FileTreePanel {
             NewEntry::Presentation => "slides".to_string(),
             _ => self.selection_folder(cx),
         };
-        match entry.making() {
-            Some(making) => self.begin_making(&directory, making, window, cx),
-            None => cx.emit(FileTreeEvent::Import { target: directory }),
+        match (entry, entry.making()) {
+            (_, Some(making)) => self.begin_making(&directory, making, window, cx),
+            (NewEntry::Manuscript, None) => cx.emit(FileTreeEvent::NewManuscript { directory }),
+            (_, None) => cx.emit(FileTreeEvent::Import { target: directory }),
         }
     }
 
@@ -166,7 +173,7 @@ impl FileTreePanel {
         }
     }
 
-    /// The eight entries, a separator before New spreadsheet: the strip's +
+    /// The nine entries, a separator before New spreadsheet: the strip's +
     /// menu and the head of its ⋯ menu.
     pub(super) fn new_entries_menu(view: &WeakEntity<Self>, mut menu: Menu) -> Menu {
         for entry in NewEntry::ALL {
@@ -238,6 +245,7 @@ mod tests {
             "map.excalidraw"
         );
         assert!(NewEntry::Import.making().is_none());
+        assert!(NewEntry::Manuscript.making().is_none());
         assert!(NewEntry::Presentation.making().unwrap().deck);
     }
 }

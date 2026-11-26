@@ -348,6 +348,11 @@ impl ReviewSheet {
     fn close(cx: &mut Context<Self>) {
         cx.emit(ReviewSheetEvent::Close);
     }
+
+    /// Close the sheet as Cancel does, for a scenario that leaves it up.
+    pub fn close_for_scenario(&mut self, cx: &mut Context<Self>) {
+        Self::close(cx);
+    }
 }
 
 /// A date and time as `Intl.DateTimeFormat` with `dateStyle: "medium",

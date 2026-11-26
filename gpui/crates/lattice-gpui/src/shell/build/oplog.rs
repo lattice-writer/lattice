@@ -46,6 +46,20 @@ pub(super) fn outcome(
     match outcome {
         _ if !current => trace.finish("cancelled", superseded(), cx),
         None => {}
+        // The project's last build taken on entry: tagged, with no compiler
+        // time, so the log never counts it as a build that ran.
+        Some(Ok(Finished {
+            result,
+            current: true,
+            ..
+        })) => {
+            trace.enrich([
+                ("entry_current", serde_json::json!(true)),
+                ("diagnostics", serde_json::json!(result.diagnostics.len())),
+                ("has_pdf", serde_json::json!(result.has_pdf)),
+            ]);
+            trace.finish("success", None, cx);
+        }
         Some(Ok(Finished { result, .. })) => {
             trace.enrich([
                 (
