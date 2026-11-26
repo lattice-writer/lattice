@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { execFileSync, spawn, spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -63,12 +63,21 @@ describe.skipIf(process.platform === "win32")("inapp-lock", () => {
     const log = path.join(dir, "log");
     const note = (name, seconds) => `echo start ${name} >> "$1"; sleep ${seconds}; echo end ${name} >> "$1"`;
     const start = (args) => new Promise((resolve) => spawn(script, args, { env }).on("exit", resolve));
-    const e2e = start(["--thread", "E", "--kind", "e2e", "--", "sh", "-c", note("e2e", 0.3), "sh", log]);
-    execFileSync("sleep", ["0.1"]);
-    const builds = start(["build", "--", "sh", "-c", note("build", 1.5), "sh", log]);
-    execFileSync("sleep", ["0.1"]);
+    // Each next taker starts once the one before it has begun, so a loaded
+    // machine's slow process start cannot reorder them.
+    const begun = async (name) => {
+      const deadline = Date.now() + 20_000;
+      while (!(existsSync(log) && readFileSync(log, "utf8").includes(`start ${name}`))) {
+        if (Date.now() > deadline) throw new Error(`${name} never started`);
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+    };
+    const e2e = start(["--thread", "E", "--kind", "e2e", "--", "sh", "-c", note("e2e", 2), "sh", log]);
+    await begun("e2e");
+    const builds = start(["build", "--", "sh", "-c", note("build", 3), "sh", log]);
+    await begun("build");
     const quiet = start(["--thread", "Q", "--", "sh", "-c", note("quiet", 1), "sh", log]);
-    execFileSync("sleep", ["2"]);
+    await begun("quiet");
     const late = start(["build", "--", "sh", "-c", note("late", 0.1), "sh", log]);
     expect(await Promise.all([e2e, builds, quiet, late])).toEqual([0, 0, 0, 0]);
     const lines = readFileSync(log, "utf8").trim().split("\n");
