@@ -264,6 +264,9 @@ impl OverleafBridge {
             let (probe, expired) = probe.await;
             this.update(cx, |this, cx| {
                 this.whole_files.probe_task = None;
+                if matches!(&probe, Ok(probe) if probe.version_known) {
+                    this.version_read = Some(Instant::now());
+                }
                 let unchanged = this.is_current(&root)
                     && !this.syncing
                     && matches!(&probe, Ok(probe) if probe.version_known && !probe.changed && !probe.local_changed);
@@ -356,6 +359,9 @@ impl OverleafBridge {
                 .await;
             this.update(cx, |this, cx| {
                 this.push_waiting = false;
+                if matches!(&probe, Ok(probe) if probe.version_known) {
+                    this.version_read = Some(Instant::now());
+                }
                 if expired {
                     super::super::session_changed(cx);
                 }
@@ -475,13 +481,33 @@ impl OverleafBridge {
                 }
                 // Asked while that probe ran: it already answered.
                 while woken.try_recv().is_ok() {}
-                let mut timer = cx.background_executor().timer(wait).fuse();
-                futures::select_biased! {
-                    _ = timer => {}
-                    asked = woken.next() => {
-                        if asked.is_none() {
-                            return;
+                let slept = Instant::now();
+                let mut rest = wait;
+                loop {
+                    let mut timer = cx.background_executor().timer(rest).fuse();
+                    futures::select_biased! {
+                        _ = timer => {}
+                        asked = woken.next() => {
+                            if asked.is_none() {
+                                return;
+                            }
+                            break;
                         }
+                    }
+                    // A push's probe or a sync read Overleaf's version while
+                    // this waited: that answered what this probe would ask,
+                    // so the wait runs again from it. Without this the poll
+                    // asked again seconds after a push's probe had (LEO-14).
+                    // Reads before the wait began are this probe's own or
+                    // older, so a backoff after a failed probe is kept.
+                    let since = this
+                        .update(cx, |this, _| this.version_read.filter(|read| *read > slept))
+                        .ok()
+                        .flatten()
+                        .map(|read| read.elapsed());
+                    match since {
+                        Some(since) if since < wait => rest = wait - since,
+                        _ => break,
                     }
                 }
             }

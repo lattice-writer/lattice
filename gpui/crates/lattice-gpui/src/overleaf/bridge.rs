@@ -193,6 +193,9 @@ pub struct OverleafBridge {
     /// Syncs Overleaf refused in a row while the session stayed valid.
     refusals: u32,
     last_auto_sync: Option<Instant>,
+    /// When a probe or a sync last read Overleaf's version: the live poll's
+    /// wait counts from it, since that answer was the poll's question too.
+    version_read: Option<Instant>,
     /// An automatic sync was answered 429: none starts before this.
     rate_limited_until: Option<Instant>,
     /// Automatic syncs Overleaf answered 429 in a row.
@@ -269,6 +272,7 @@ impl OverleafBridge {
             transport_retry: false,
             refusals: 0,
             last_auto_sync: None,
+            version_read: None,
             rate_limited_until: None,
             rate_limits: 0,
             declined_deletes: HashSet::new(),
@@ -754,6 +758,7 @@ impl OverleafBridge {
                 this.whole_files.synced(result.is_ok());
                 match result {
                     Ok(result) => {
+                        this.version_read = Some(Instant::now());
                         let brought = [result.pulled.clone(), result.merged.clone()].concat();
                         crate::history::review_mode::store::after_sync(
                             &root, reviewed, &brought, cx,
