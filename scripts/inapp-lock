@@ -14,10 +14,12 @@ the new one too, or says loudly that it could not.
 Waiters take the lock in the order they came: each puts a ticket in
 <lock>.queue, named by its arrival and flocked while it waits, and only the
 first live ticket tries the lock (a waiter that died leaves its ticket
-unlocked, and the next one removes it). Before, every waiter polled the lock
+unlocked, and the next one removes it; one that stopped polling, its ticket
+untouched for STALLED seconds, is passed over). Before, every waiter polled the lock
 each second and whoever polled first after a release took it, so one gate
 waited over 30 minutes while ten later holders went first (LATA-105).
-Takers that do not go through this script (lockf -k) still take the lock
+Takers that do not go through this script (lockf -k), and copies of it from
+before the queue (a branch's own, a merge base's), still take the lock
 whenever it is free.
 
 The holder writes who it is into the file (pid, thread, command, since), so a
@@ -73,6 +75,9 @@ import time
 LOCK = os.environ.get("INAPP_LOCK_FILE", "/tmp/lattice-inapp-test.lock")
 BUILDS = LOCK + ".builds"
 QUEUE = LOCK + ".queue"
+# A waiter touches its ticket each time it polls; a live one untouched this
+# long (a stopped process) is passed over, so it cannot hold up the line.
+STALLED = 30
 TIMED_OUT = 75
 KINDS = ("quiet", "e2e")
 
@@ -145,7 +150,9 @@ def take_ticket():
     draft = os.path.join(QUEUE, f".draft-{os.getpid()}-{time.time_ns()}")
     fd = os.open(draft, os.O_RDWR | os.O_CREAT, 0o666)
     fcntl.flock(fd, fcntl.LOCK_EX)
-    name = os.path.join(QUEUE, f"{time.time_ns():020d}-{os.getpid()}")
+    # The system's monotonic clock, which a wall-clock step cannot move back.
+    # Not time.monotonic_ns(): Python 3.9's counts from the process's start.
+    name = os.path.join(QUEUE, f"{time.clock_gettime_ns(time.CLOCK_MONOTONIC):020d}-{os.getpid()}")
     os.rename(draft, name)
     return name, fd
 
@@ -160,10 +167,11 @@ def drop_ticket(ticket):
 
 
 def waiters():
-    """The live tickets in the order they came, removing those whose waiter is
-    gone (nothing holds their flock)."""
+    """The live, polling tickets in the order they came. Those whose waiter is
+    gone (nothing holds their flock) are removed, a draft one died before
+    renaming included; a live one untouched for STALLED seconds is left out."""
     try:
-        names = sorted(name for name in os.listdir(QUEUE) if not name.startswith("."))
+        names = sorted(os.listdir(QUEUE))
     except FileNotFoundError:
         return []
     live = []
@@ -176,7 +184,8 @@ def waiters():
         try:
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
-            live.append(path)
+            if not name.startswith(".") and time.time() - os.fstat(fd).st_mtime < STALLED:
+                live.append(path)
         else:
             try:
                 os.unlink(path)
@@ -197,6 +206,7 @@ def acquire(thread, command, wait, notes, kind="quiet"):
     ticket = take_ticket()
     try:
         while True:
+            os.utime(ticket[0])
             line = waiters()
             ahead = line.index(ticket[0]) if ticket[0] in line else 0
             fd = lock_at_path() if ahead == 0 else None

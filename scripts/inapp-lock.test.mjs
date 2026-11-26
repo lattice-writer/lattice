@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { execFileSync, spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -57,6 +57,26 @@ describe.skipIf(process.platform === "win32")("inapp-lock", () => {
     expect(await Promise.all(waiting.map(({ done }) => done))).toEqual([0, null, 0, 0]);
     expect(readFileSync(log, "utf8").trim().split("\n")).toEqual(["B", "D", "E"]);
     expect(queued()).toBe(0);
+  });
+
+  it("passes over a waiter that stopped polling", async () => {
+    const log = path.join(dir, "log");
+    expect(lock("--thread", "A", "hold", "30").status).toBe(0);
+    const queue = `${env.INAPP_LOCK_FILE}.queue`;
+    const stopped = spawn(script, ["--thread", "S", "--wait", "60", "--", "sh", "-c", 'echo S >> "$1"', "sh", log], { env });
+    const deadline = Date.now() + 10_000;
+    while (!(existsSync(queue) && readdirSync(queue).some((name) => !name.startsWith(".")))) {
+      if (Date.now() > deadline) throw new Error("S never queued");
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    stopped.kill("SIGSTOP");
+    const ticket = path.join(queue, readdirSync(queue).find((name) => !name.startsWith(".")));
+    utimesSync(ticket, new Date(Date.now() - 60_000), new Date(Date.now() - 60_000));
+    expect(lock("--thread", "A", "release").status).toBe(0);
+    expect(lock("--thread", "B", "--wait", "5", "--", "sh", "-c", 'echo B >> "$1"', "sh", log).status).toBe(0);
+    stopped.kill("SIGCONT");
+    expect(await new Promise((resolve) => stopped.on("exit", resolve))).toBe(0);
+    expect(readFileSync(log, "utf8").trim().split("\n")).toEqual(["B", "S"]);
   });
 
   it("keeps a hold after the process group that started it is killed", () => {
