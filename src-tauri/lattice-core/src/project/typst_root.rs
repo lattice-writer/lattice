@@ -51,16 +51,20 @@ pub(super) fn resolve_typst_root(root: &Path, relative: String) -> Option<Compil
 /// shallowest, then the first by name, so a build always picks the same one.
 fn including_typst_root(root: &Path, part: &str) -> Option<String> {
     let mut includes: Vec<(String, Vec<String>)> = Vec::new();
-    for entry in WalkDir::new(root).max_depth(4).into_iter().filter_map(Result::ok) {
+    // Every Typst build beside a LaTeX default walks this, live builds
+    // included: hidden folders (`.git`, `.research/build`) and
+    // `node_modules` hold no part of the document and are not entered.
+    let walk = WalkDir::new(root).max_depth(4).into_iter().filter_entry(|entry| {
+        let name = entry.file_name().to_string_lossy();
+        entry.depth() == 0 || !(name.starts_with('.') || name == "node_modules")
+    });
+    for entry in walk.filter_map(Result::ok) {
         let path = entry.path();
         if !path.is_file() || !path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("typ")) {
             continue;
         }
         let Ok(relative) = path.strip_prefix(root) else { continue };
         let relative = relative.to_string_lossy().replace('\\', "/");
-        if relative.split('/').any(|segment| segment.starts_with('.')) {
-            continue;
-        }
         let content = fs::read_to_string(path).unwrap_or_default();
         let included = typst_includes(&relative, &content);
         includes.push((relative, included));
@@ -97,16 +101,12 @@ fn including_typst_root(root: &Path, part: &str) -> Option<String> {
 /// The files a Typst source names in `include "…"` (markup's `#include` or
 /// code's bare `include`), relative to the project: a path resolves from the
 /// including file's folder, and one starting with `/` from the project root,
-/// as Typst resolves them. Line comments are skipped.
+/// as Typst resolves them. An include inside a comment names nothing.
 fn typst_includes(file: &str, content: &str) -> Vec<String> {
     let folder = file.rsplit_once('/').map_or("", |(folder, _)| folder);
     let mut found = Vec::new();
-    for line in content.lines() {
-        let code = line.trim_start();
-        if code.starts_with("//") {
-            continue;
-        }
-        let mut rest = code;
+    for line in strip_typst_comments(content).lines() {
+        let mut rest = line;
         while let Some(at) = rest.find("include") {
             let before = rest[..at].chars().next_back();
             let after = rest[at + "include".len()..].trim_start();
@@ -128,6 +128,67 @@ fn typst_includes(file: &str, content: &str) -> Vec<String> {
         }
     }
     found
+}
+
+/// `content` with its `// …` line comments and `/* … */` block comments
+/// (which nest in Typst, and may span lines) blanked out, newlines kept. A
+/// `//` inside a quoted string is text; a quote left open ends with its line,
+/// as a stray quote in markup is not a string.
+fn strip_typst_comments(content: &str) -> String {
+    let mut out = String::with_capacity(content.len());
+    let mut chars = content.chars().peekable();
+    let (mut quoted, mut depth) = (false, 0usize);
+    while let Some(c) = chars.next() {
+        if c == '\n' {
+            quoted = false;
+            out.push(c);
+            continue;
+        }
+        if depth > 0 {
+            match (c, chars.peek()) {
+                ('*', Some('/')) => {
+                    chars.next();
+                    depth -= 1;
+                }
+                ('/', Some('*')) => {
+                    chars.next();
+                    depth += 1;
+                }
+                _ => {}
+            }
+            continue;
+        }
+        if quoted {
+            if c == '\\' {
+                out.push(c);
+                if let Some(&next) = chars.peek().filter(|next| **next != '\n') {
+                    chars.next();
+                    out.push(next);
+                }
+                continue;
+            }
+            quoted = c != '"';
+            out.push(c);
+            continue;
+        }
+        match (c, chars.peek()) {
+            ('/', Some('/')) => {
+                while chars.peek().is_some_and(|next| *next != '\n') {
+                    chars.next();
+                }
+            }
+            ('/', Some('*')) => {
+                chars.next();
+                depth = 1;
+                out.push(' ');
+            }
+            _ => {
+                quoted = c == '"';
+                out.push(c);
+            }
+        }
+    }
+    out
 }
 
 /// A folder with no LaTeX document may be a Typst one: its `main.typ`, or
@@ -243,5 +304,18 @@ mod tests {
             ),
             vec!["top.typ".to_string(), "ch/y.typ".to_string()]
         );
+        // Trailing and block comments, nested and over lines, name nothing;
+        // a `//` in a string is text.
+        let commented = concat!(
+            "#include \"a.typ\" // #include \"b.typ\"\n",
+            "/* #include \"c.typ\"\n#include \"d.typ\" /* nested */ #include \"e.typ\" */\n",
+            "#include \"f.typ\" /* #include \"g.typ\" */ #include \"h.typ\"\n",
+            "#link(\"https://example.org\") #include \"i.typ\"\n",
+        );
+        assert_eq!(typst_includes("x.typ", commented), ["a.typ", "f.typ", "h.typ", "i.typ"]);
+        // A part only a hidden folder or node_modules includes stands alone.
+        fixture.write(".cache/copy.typ", "#include \"../parts/b.typ\"\n");
+        fixture.write("node_modules/pkg/lib.typ", "#include \"../../parts/b.typ\"\n");
+        assert_eq!(target("parts/b.typ"), Some(("parts/b.typ".into(), false)));
     }
 }
