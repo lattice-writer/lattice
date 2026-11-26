@@ -63,6 +63,7 @@ pub mod templates;
 #[cfg(test)]
 pub(crate) mod test_support;
 mod tree;
+mod typst_root;
 
 pub use agent_folder::{
     agent_folder, may_widen_to, projects_inside, set_agent_folder,
@@ -122,9 +123,9 @@ pub use linked_bibliography::{
 };
 pub(crate) use manifest::ensure_ignore_line;
 pub use manifest::{
-    choose_root_document, classify_open_error, folder_root, has_latexmkrc, is_typst_path,
-    latexmk_engine_arg, main_document_chosen, open, read_manifest, resolve_compile_root,
-    set_compile_root, tex_program_engine, CompileRoot,
+    choose_root_document, classify_open_error, folder_root, has_latexmkrc, latexmk_engine_arg,
+    main_document_chosen, open, read_manifest, resolve_compile_root, set_compile_root,
+    tex_program_engine, CompileRoot,
 };
 pub use manifest_settings::{
     set_deadline, set_grammar_ignores, set_spelling_words, set_submission_items,
@@ -156,6 +157,7 @@ pub use symbols::{
 pub use symbols::{RenameSymbolResult, UnusedSymbols};
 pub use tree::{project_tree_path_visible, scan_tree, tree_files, TreeView};
 pub use tree::{read_file, stat_file, ProjectFileStat};
+pub use typst_root::is_typst_path;
 // Fixtures for other modules' tests.
 #[cfg(test)]
 pub use {
