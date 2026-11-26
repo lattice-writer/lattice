@@ -9,7 +9,7 @@
     "Also steps that failed in branch runs 44225936391 and 44226228810, whose GPUI sources equal main's: a hosted-runner flake looks like this.",
     "An entry with \"tier\": \"flaky\" passes on main more often than not and fails the hosted runners now and then for a reason outside the change: the verdict reruns it with its module, a failure on both tries is a warning on a branch and fails the job on main (--strict-flaky). Add one only with the runs that show it failing and passing on the same code; take it off once its cause is fixed. Each flaky-tier entry's followup is its own issue for the real fix.",
     "Linux (gpui.yml linux, Xvfb, XTEST input, GL on llvmpipe): main has not run the Linux e2e yet, so the Linux entries come from branch runs whose GPUI sources are main's plus only the Linux input layer: 45483277041 (the first whole Linux run), 45505858441 and 45531114205 on main 938cf2726, and 45603069391 and 45631595139 on main 979526541. Check them against main's own Linux runs once it has some.",
-    "2026-11-26: 46 macOS entries came off (33 whole, 13 kept for their other platforms): each passed both in the nightly on the Mac mini (run 45749677371, main at 1c1de3af) and on the hosted macOS runner (PR 1298 at 796ec7652, GPUI sources as main's). The quarantine flaky steps stay listed whatever one pass shows."
+    "2026-11-26: 37 macOS entries came off (26 whole, 11 kept for their other platforms): each had failed in every main run, then passed both in the nightly on the Mac mini (run 45749677371, main at 1c1de3af) and on the hosted macOS runner (PR 1298 at 796ec7652, GPUI sources as main's). Intermittent ones and the quarantine flaky steps stay listed until more runs pass."
   ],
   "steps": [
     {
@@ -146,9 +146,10 @@
     {
       "step": "a batch move that fails part-way still moves the open tab of what went first",
       "platforms": [
+        "macos",
         "windows"
       ],
-      "reason": "Windows: failed in 1 of 2 main runs (44213516921), so intermittent; observed {\"moved\":true,\"front\":\"dest/mv-a.tex\",\"notice\":\"Build succeeded in 2.9 s: #4e53eb\"}",
+      "reason": "macOS: failed in 1 of 3 main runs (44173099111), so intermittent; observed {\"moved\":true,\"front\":\"dest/mv-a.tex\",\"notice\":\"the app became active outside a foreground section, after step \\\"switching projects keeps each project's open folders: B'…: the app became active outside a foreground secti… | Windows: failed in 1 of 2 main runs (44213516921), so intermittent; observed {\"moved\":true,\"front\":\"dest/mv-a.tex\",\"notice\":\"Build succeeded in 2.9 s: #4e53eb\"}",
       "followup": "LEO-14"
     },
     {
@@ -303,6 +304,14 @@
         "macos"
       ],
       "reason": "macOS: failed twice (its module's rerun too) in 2 of 5 main runs (44759657308, 44781141164), failed once and passed on the rerun in 44733890089, passed in 44734249294 and 44767427945, so intermittent; passes on the Mac mini. The native keys never reach the cell, as a native click into a page on the hosted runner; observed {\"typed\":false,\"parses\":true}",
+      "followup": "LEO-14"
+    },
+    {
+      "step": "the sheet hidden past the delay hibernates, and is drawn again with its edit when shown",
+      "platforms": [
+        "macos"
+      ],
+      "reason": "macOS: failed twice (its module's rerun too) in 2 of 5 main runs (44759657308, 44781141164), failed once and passed on the rerun in 44733890089, passed in 44734249294 and 44767427945, so intermittent; passes on the Mac mini. It fails with the step above: with nothing typed there is no edit to keep; observed {\"hibernated\":true,\"woke\":true,\"builds\":2,\"buffer_kept\":false}",
       "followup": "LEO-14"
     },
     {
@@ -590,6 +599,22 @@
       "followup": "LEO-14"
     },
     {
+      "step": "the strip leaves out the title and authors while the full text's masthead is on screen",
+      "platforms": [
+        "macos"
+      ],
+      "reason": "macOS: failed in 1 of 3 main runs (44173099111), so intermittent; observed {}",
+      "followup": "LEO-14"
+    },
+    {
+      "step": "back from Blog on the full text's top, the strip still leaves out the title and authors",
+      "platforms": [
+        "macos"
+      ],
+      "reason": "macOS: failed in 1 of 3 main runs (44173099111), so intermittent; observed {\"drawn\":true}",
+      "followup": "LEO-14"
+    },
+    {
       "step": "the PDF's selection pill offers the action to click",
       "platforms": [
         "macos"
@@ -716,6 +741,14 @@
       "followup": "LEO-14"
     },
     {
+      "step": "a native pointer resting on a lint underline opens the lint card over it",
+      "platforms": [
+        "macos"
+      ],
+      "reason": "macOS: failed in 1 of 3 main runs (44173099111), so intermittent; observed {\"card\":null}",
+      "followup": "LEO-14"
+    },
+    {
       "step": "the ring is drawn over the manuscript, and a press anywhere takes it down",
       "platforms": [
         "windows"
@@ -750,10 +783,11 @@
     {
       "step": "the editor's overlay scrollbar shows while the text scrolls, a 4px thumb 5px off the edge, and hides within 0.8 s once it rests",
       "platforms": [
+        "macos",
         "windows",
         "linux"
       ],
-      "reason": "Windows: failed in every main run (44162980527, 44213516921); observed {\"at_rest\":false,\"bar\":{\"shown\":true,\"thumb\":{\"x\":450,\"y\":265.361572265625,\"width\":4,\"height\":38.92496109008789},\"track_width\":10,\"gap_to_edge\":5,\"hidden_after_ms\":1303}} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"at_rest\":false,\"bar\":{\"shown\":true,\"thumb\":{\"x\":577,\"y\":319.2269287109375,\"width\":4,\"height\":66.51053619384766},\"track_width\":10,\"gap_to_edge\":5,\"hidden_after_ms\":1948}}",
+      "reason": "macOS: failed in 2 of 3 main runs (44154544765, 44162980527), so intermittent; observed {\"at_rest\":false,\"bar\":{\"shown\":true,\"thumb\":{\"x\":450,\"y\":251.59600830078125,\"width\":4,\"height\":33.05373001098633},\"track_width\":10,\"gap_to_edge\":5,\"hidden_after_ms\":1343}} | Windows: failed in every main run (44162980527, 44213516921); observed {\"at_rest\":false,\"bar\":{\"shown\":true,\"thumb\":{\"x\":450,\"y\":265.361572265625,\"width\":4,\"height\":38.92496109008789},\"track_width\":10,\"gap_to_edge\":5,\"hidden_after_ms\":1303}} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"at_rest\":false,\"bar\":{\"shown\":true,\"thumb\":{\"x\":577,\"y\":319.2269287109375,\"width\":4,\"height\":66.51053619384766},\"track_width\":10,\"gap_to_edge\":5,\"hidden_after_ms\":1948}}",
       "followup": "LEO-14"
     },
     {
@@ -763,6 +797,22 @@
         "windows"
       ],
       "reason": "macOS: failed in 2 of 3 main runs (44154544765, 44162980527), so intermittent; observed [{\"expected\":[3,16],\"word\":\"introduces\",\"caret\":[3,16]},{\"expected\":[4,3],\"word\":\"second\",\"caret\":[4,3]},{\"expected\":[5,16],\"word\":\"last\",\"caret\":[1,1]}] | Windows: failed in every main run (44162980527, 44213516921); observed [{\"expected\":[3,16],\"word\":\"introduces\",\"caret\":[1,1]},{\"expected\":[4,3],\"word\":\"second\",\"caret\":[1,1]},{\"expected\":[5,16],\"word\":\"last\",\"caret\":[1,1]}]",
+      "followup": "LEO-14"
+    },
+    {
+      "step": "typing \\begin{itemize} in a LaTeX file writes its \\end{itemize} with the caret on its first \\item, Enter on an item starts the next, and Enter on the empty one leaves the list",
+      "platforms": [
+        "macos"
+      ],
+      "reason": "macOS: failed in 1 of 3 main runs (44154544765), so intermittent; observed {\"closed\":\"\\\\begin{itemize}\\n\\\\item |\\n\\\\end{itemize}\",\"next\":\"\\\\begin{itemize}\\n\\\\item one\\n\\\\item |\\n\\\\end{itemize}\",\"left\":\"\\\\begin{itemize}\\n\\\\item one\\n\\\\end{itemize}\\n|\"}",
+      "followup": "LEO-14"
+    },
+    {
+      "step": "in a LaTeX file $ writes a pair with the caret between, and \\left( grows its \\right) after the caret",
+      "platforms": [
+        "macos"
+      ],
+      "reason": "macOS: failed in 1 of 3 main runs (44154544765), so intermittent; observed {\"paired\":\"\\\\begin{itemize}\\n\\\\item one\\n\\\\end{itemize}\\n$|$\",\"sized\":\"\\\\begin{itemize}\\n\\\\item one\\n\\\\end{itemize}\\n$\\\\left(|\\\\right)$\"}",
       "followup": "LEO-14"
     },
     {
@@ -1192,6 +1242,14 @@
       ],
       "reason": "Windows: failed once in run 44460622331 attempt 2 of #1148, which does not touch it, and passed in every main run since #1103, so intermittent; observed {}",
       "followup": "LEO-15"
+    },
+    {
+      "step": "a native click on the zoom controls over the page reaches GPUI, and the page zooms",
+      "platforms": [
+        "macos"
+      ],
+      "reason": "macOS: failed in 4 of 5 main baselines on the Mac mini's local gate (main 2e39149ce, 5c9197738, a216812a5, b3dd2c790; passed at 54bb273ac), and in both full ci:local runs of #1163 while it passed in all three islands-only runs, so intermittent in a full run; observed {\"scale\":1.0,\"page_presses\":0,\"bounds\":\"Some(Bounds { origin: Point { x: 288px, y: 86px }, size: Size { 648px × 802px } })\"}",
+      "followup": "LEO-14"
     },
     {
       "step": "the PDF's Copy source link copies the PDF at the passage's page, its words as the title",
