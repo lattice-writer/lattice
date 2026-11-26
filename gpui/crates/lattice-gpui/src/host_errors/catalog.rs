@@ -1657,6 +1657,11 @@ pub(super) static ENTRIES: &[Entry] = &[
     },
     Entry {
         file: "overleaf_rt/client.rs",
+        literal: "The computer slept, so the connection is joined again.",
+        text: Text::Message("The computer slept, so the connection is joined again.", &[]),
+    },
+    Entry {
+        file: "overleaf_rt/client.rs",
         literal: "The Overleaf realtime server returned an error: {}",
         text: Text::Message("The Overleaf realtime server returned an error: {error}", &[("error", Arg::Param(0))]),
     },

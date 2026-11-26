@@ -16890,6 +16890,10 @@ msgstr "The commented file is no longer open live with Overleaf. Try again."
 msgid "The compiled output is not a valid PDF."
 msgstr "The compiled output is not a valid PDF."
 
+#: src/platform/host-errors-overleaf.ts
+msgid "The computer slept, so the connection is joined again."
+msgstr "The computer slept, so the connection is joined again."
+
 #. placeholder {0}: result.disagreements.map(fieldText).join(", ")
 #: src/papers/bibliography-audit.tsx
 msgid "The conference's own citation export and Crossref disagree on: {0}. The conference export is kept."

@@ -38,6 +38,20 @@ impl Run {
         steps: &mut Steps,
         mock: &MockOverleaf,
     ) -> Result<()> {
+        let checked = self.sleep_checks(cx, steps, mock).await;
+        // The checks after these share the stand-in: however these went,
+        // it names a minute again and lets the channel back.
+        mock.heartbeat_timeout(60);
+        mock.enable_realtime();
+        checked
+    }
+
+    async fn sleep_checks(
+        &self,
+        cx: &mut AsyncApp,
+        steps: &mut Steps,
+        mock: &MockOverleaf,
+    ) -> Result<()> {
         let main = self.root(cx).await?.join("main.tex");
         let unconfirmed = Cell::new(false);
         // Live in main.tex with everything answered, and Overleaf's copy the

@@ -16890,6 +16890,10 @@ msgstr "此文件已不在实时协作中，请重试"
 msgid "The compiled output is not a valid PDF."
 msgstr "编译结果不是有效的 PDF"
 
+#: src/platform/host-errors-overleaf.ts
+msgid "The computer slept, so the connection is joined again."
+msgstr "电脑刚从睡眠中唤醒，正在重新连接"
+
 #. placeholder {0}: result.disagreements.map(fieldText).join(", ")
 #: src/papers/bibliography-audit.tsx
 msgid "The conference's own citation export and Crossref disagree on: {0}. The conference export is kept."
