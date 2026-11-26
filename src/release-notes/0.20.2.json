@@ -1,0 +1,61 @@
+{
+  "version": "0.20.2",
+  "date": "2026-11-27",
+  "highlights": [
+    {
+      "icon": "git",
+      "title": {
+        "en": "Overleaf's \"too many requests\" waits as long as Overleaf asks, and says so",
+        "zh": "Overleaf「请求过多」时按它要求的时间等待，并显示还要等多久"
+      },
+      "body": {
+        "en": "In the native Lattice, when Overleaf answers live sync with \"too many requests\", the cool-down now lasts as long as Overleaf asks when it says how long, between 30 seconds and 5 minutes, instead of Lattice's own guess of 30 seconds, doubling each time. While it waits, pointing at the title bar's Overleaf button shows Overleaf asked to wait, retrying in N s, and the waiting sync goes out the moment the cool-down ends instead of on the next check up to 45 seconds later. In both apps, error messages for such an answer say how long to wait, in English and Chinese. Live sync also no longer asks Overleaf for its latest version a few seconds after it has just read it.",
+        "zh": "在原生 Lattice 中，Overleaf 对实时同步回复「请求过多」并给出等待时间时，冷却时间现在按它要求的时长来等，在 30 秒到 5 分钟之间，而不是 Lattice 自己从 30 秒起逐次翻倍的估计。等待期间，把指针移到标题栏的 Overleaf 按钮上会显示「Overleaf 要求稍候，N 秒后重试」；冷却一结束，等着的同步就会立即发出，而不是等到最多 45 秒后的下一次检查。在两个版本中，这类回复的错误信息都会写明需要等多久，中英文都有。实时同步也不再在刚读到 Overleaf 最新版本几秒后又去问一次。"
+      }
+    },
+    {
+      "icon": "message",
+      "title": {
+        "en": "Export review PDF says which document a note belongs to",
+        "zh": "导出评阅 PDF 会说明批注属于哪个文档"
+      },
+      "body": {
+        "en": "In the native Lattice, when Export review PDF… opens on a PDF that doesn't contain some notes' document, a banner names that document, such as \"1 note is in main.tex, which this PDF does not show.\", instead of marking each note Not on this PDF with no reason. On the live PDF the banner has Build main.tex, which builds that document and places the notes again once its PDF is on screen.",
+        "zh": "在原生 Lattice 中，「导出评阅 PDF…」打开的 PDF 不包含某些批注所在的文档时，会有一条提示写出那个文档，例如「1 条批注在 main.tex 中，此 PDF 不包含它。」，而不是只把每条批注标成「不在此 PDF 中」却不说原因。在实时 PDF 上，这条提示带有「编译 main.tex」按钮，它会编译那个文档，并在它的 PDF 显示出来后重新放置这些批注。"
+      }
+    },
+    {
+      "icon": "shapes",
+      "title": {
+        "en": "Saving an included Typst file builds the whole document",
+        "zh": "保存被引入的 Typst 文件时会编译整个文档"
+      },
+      "body": {
+        "en": "In the native Lattice, in a project with no Typst main document, ⌘S or an autosave on a part that another .typ file includes now builds the document that includes it, through any number of levels. Before, the part was compiled alone and its PDF replaced the document's, and with no main document at all the part became the project's main document.",
+        "zh": "在原生 Lattice 中，在没有设定 Typst 主文档的项目里，对一个被其他 .typ 文件引入的部分按 ⌘S 或自动保存时，现在会编译引入它的那个文档，引入有多少层都可以。以前这个部分会被单独编译，它的 PDF 会替换文档的 PDF；项目完全没有主文档时，这个部分还会变成项目的主文档。"
+      }
+    }
+  ],
+  "fixes": [
+    {
+      "en": "In the native Lattice, a \\colorbox with one of xcolor's base colour names, such as \\colorbox{yellow}{…}, is now filled like an [HTML] colour in both the visual and source views, and its text stays readable on the fill (#1327).",
+      "zh": "在原生 Lattice 中，使用 xcolor 基本颜色名的 \\colorbox，例如 \\colorbox{yellow}{…}，现在在可视视图和源码视图中都会像 [HTML] 颜色一样被填充，框里的文字在底色上也保持清晰可读（#1327）。"
+    },
+    {
+      "en": "Typing in a .tex file's visual view in the native Lattice takes less CPU: it no longer asks TexLab again for a word that had no completions a moment before. On a 240 KB paper, CPU while typing fell from about 20% to 15%.",
+      "zh": "在原生 Lattice 中，在 .tex 文件的可视视图里输入更省 CPU：刚才没有补全结果的词，不会再去问 TexLab 一遍。在一篇 240 KB 的论文上，输入时的 CPU 占用从约 20% 降到 15%。"
+    },
+    {
+      "en": "The Agent panel's provider banner shows plain text instead of raw colour codes when Lattice was started from a shell that forces colour, and a warning saved by an earlier run no longer appears at startup as if it were current.",
+      "zh": "从强制彩色输出的 shell 启动 Lattice 时，AI 助手面板中的模型状态提示显示为纯文本，不再夹着原始的颜色代码；上次运行保存下来的警告，也不会在启动时被当成当前状态显示出来。"
+    },
+    {
+      "en": "In a Chinese interface, Lattice gives the reasons a live Overleaf connection timed out in Chinese.",
+      "zh": "在中文界面下，Lattice 会用中文说明 Overleaf 实时连接超时的原因。"
+    },
+    {
+      "en": "A folder too shallow to give to the Agent is now refused with \"The Agent can only be given a folder at least three levels deep.\", in English and Chinese, instead of a message about the home folder.",
+      "zh": "把太浅的文件夹交给 AI 助手时，现在会提示「只能把至少三层深的文件夹交给 AI 助手。」（中英文都有），而不是一条关于主文件夹的提示。"
+    }
+  ]
+}

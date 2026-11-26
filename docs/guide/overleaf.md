@@ -30,6 +30,8 @@ Set in **Settings › Overleaf**:
 
 The status bar says whether a file has reached Overleaf: **Saved and synced**, or **Saved, syncing…** while it is on its way. Click it to **Pause syncing**, or, while it reads **Saved, sync paused**, to **Resume syncing**. The project menu and the command palette (`⌘K`) have **Pause Overleaf sync** and **Resume Overleaf sync** too. A pause holds for that project until you resume, across restarts. Resuming syncs at once (in **Manual** mode it opens **Review changes**), and what changed on both sides while paused is merged as below.
 
+When Overleaf answers "too many requests" and says how long to wait, live sync waits that long, between 30 seconds and 5 minutes. Meanwhile, pointing at the title bar's Overleaf button shows **Overleaf asked to wait, retrying in N s**, and the waiting sync goes out as soon as the wait ends.
+
 When the same file changed on both sides between syncs, Lattice merges the two against the last synced version: prose (.tex, Markdown, text) sentence by sentence, other text files line by line. Edits to different sentences, even in the same paragraph, both survive. Only a spot you both rewrote is marked, in the file itself, with your text and Overleaf's tinted side by side and **Keep mine**, **Keep theirs** and **Keep both** on it; the sync opens the first marked file there. The text from before the merge is kept under `.research/overleaf-conflicts/`, which never syncs.
 
 When a figure or another binary file changed on both sides, the newer copy stays and the other is set aside. A notice says whose copy stayed, with **Use mine** or **Use Overleaf's** to swap.
