@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { failuresOf, issueBody, listedFailures, nightlyFor, planIssue } from "./gpui-nightly.mjs";
+import { failuresOf, idleFailures, issueBody, listedFailures, nightlyFor, planIssue } from "./gpui-nightly.mjs";
 
 const green = { gate: { status: "ok", failing: [] }, build: { status: "ok" }, e2e: { status: "ok", result: "e2e@x.json" } };
 const clean = { error: null, fresh: [], quarantined: [], flaky: [], fixed: [] };
@@ -44,6 +44,21 @@ describe("gpui-nightly: what failed", () => {
 
   it("does not count flaky steps that passed on the rerun, or known failures", () => {
     expect(failuresOf(green, { ...clean, flaky: ["tree: rename"], fixed: ["settings: theme"] }, "saved")).toEqual([]);
+  });
+});
+
+describe("gpui-nightly: the idle guard", () => {
+  it("is nothing when every check passed, and names each check that failed", () => {
+    const checks = [{ name: "idle with the editor focused, only the caret draws", passed: true }, { name: "idle in the background, the window draws nothing", passed: false }];
+    expect(idleFailures({ passed: true, checks: [checks[0]] }, 0)).toEqual([]);
+    expect(idleFailures({ passed: false, checks }, 1)).toEqual(["idle guard: idle in the background, the window draws nothing"]);
+  });
+
+  it("fails closed: no result, a scenario that did not finish, or no checks", () => {
+    expect(idleFailures(null, 1)).toEqual(["idle guard: no result (exit 1)"]);
+    expect(idleFailures({ error: "the editor has not been laid out" }, 1)).toEqual(["idle guard did not finish: the editor has not been laid out"]);
+    expect(idleFailures({ passed: true, checks: [] }, 0)).toEqual(["idle guard: ran no checks"]);
+    expect(idleFailures({ passed: true, checks: [{ name: "x", passed: true }] }, 3)).toEqual(["idle guard: exited 3"]);
   });
 });
 
@@ -90,6 +105,10 @@ describe("gpui-nightly: the workflow", () => {
     expect(workflow).toMatch(/scripts\/inapp-lock --thread .* -- node scripts\/gpui-nightly\.mjs run/);
     expect(workflow).toMatch(/if: \$\{\{ !cancelled\(\) \}\}\n(.*\n){0,3}\s+run: node scripts\/gpui-nightly\.mjs report/);
     expect(workflow).toMatch(/issues: write/);
+    // The idle growth waits half an hour after the lock is given back, before the report.
+    expect(workflow).toMatch(/if: \$\{\{ !cancelled\(\) \}\}\n\s+timeout-minutes: 40\n\s+run: node scripts\/gpui-nightly\.mjs growth\n/);
+    expect(workflow.indexOf("gpui-nightly.mjs growth")).toBeLessThan(workflow.indexOf("gpui-nightly.mjs report"));
+    expect(workflow).not.toMatch(/inapp-lock.*gpui-nightly\.mjs growth/);
     // The build tree check runs before the lock, with a short timeout of its own.
     expect(workflow.indexOf("Reach the shared build tree")).toBeLessThan(workflow.indexOf("scripts/inapp-lock"));
     expect(workflow).toMatch(/- name: Reach the shared build tree\n\s+timeout-minutes: 2\n/);

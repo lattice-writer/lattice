@@ -33,7 +33,7 @@ jobs:
   e2e:
     if: github.repository == 'lattice-writer/lattice' || github.repository == 'leo1oel/lattice'
     runs-on: ${{ vars.LATTICE_MACOS_RUNNER || 'lattice-mac' }}
-    timeout-minutes: 420
+    timeout-minutes: 460
     steps:
       - uses: actions/checkout@v7
         with:
@@ -58,6 +58,17 @@ jobs:
       - name: Gate, release build and the whole e2e on main
         timeout-minutes: 400
         run: scripts/inapp-lock --thread "nightly-e2e $(git rev-parse --short HEAD)" --wait 5400 -- node scripts/gpui-nightly.mjs run
+      # The idle guard's 30-minute memory growth (gpui/script/idle-guard
+      # --growth), after the lock is given back. The one windowed run on the
+      # Mac mini outside the in-app lock, by exception (approved 2026-11-26):
+      # the app never activates, never takes the key window
+      # (GPUI_LAB_ASSUME_KEY) and sends no input, so it cannot disturb the
+      # runs that hold the lock, and holding it for half an hour would keep
+      # them out.
+      - name: Idle memory growth, outside the lock
+        if: ${{ !cancelled() }}
+        timeout-minutes: 40
+        run: node scripts/gpui-nightly.mjs growth
       - name: Open, update or close the nightly issue
         if: ${{ !cancelled() }}
         env:

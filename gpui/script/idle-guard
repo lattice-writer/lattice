@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# The idle guard (crates/lattice-gpui/src/scenario/idle.rs, lattice#1025):
+# the `idle` scenario against the release build, on a scratch copy of
+# fixtures/e2e and with a scratch HOME, as script/e2e runs the e2e.
+#
+# Usage: script/idle-guard [--growth SECS] [result.json]
+#   Without --growth (about a minute): with the editor focused only the
+#   caret draws, at most 2.5 frames a second, and in the background the
+#   window draws no frame. The focused part takes the GPUI e2e input lock;
+#   run it under scripts/inapp-lock, as any windowed run.
+#   --growth SECS: the footprint after SECS idle has not grown past the
+#   scenario's limit. The window acts key (GPUI_LAB_ASSUME_KEY), so its caret
+#   keeps drawing, while the app stays in the background and sends no input.
+#
+# No GPUI_LAB_IGNORE_OCCLUSION, unlike script/e2e: it paces every window by
+# the display link, which is the redraw this guards against. A window that is
+# covered or on a sleeping display draws nothing at all, so the focused counts
+# fail there rather than pass without measuring (the Mac mini keeps its
+# display awake).
+#
+# --growth holds no lock: its app never activates (a scenario run does not),
+# never takes the key window (GPUI_LAB_ASSUME_KEY) and sends no input, so
+# other runs' windows and input locks are untouched through the wait.
+set -euo pipefail
+
+growth=()
+if [ "${1:-}" = "--growth" ]; then
+  growth=(GPUI_LAB_ASSUME_KEY=1 "LATTICE_IDLE_GROWTH_SECS=${2:?--growth needs seconds}")
+  shift 2
+fi
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+app="$root/target/release/lattice-gpui"
+[ -x "$app" ] || { echo "idle-guard: $app is missing; build the release binary first (node scripts/gpui-build.mjs)" >&2; exit 1; }
+
+scratch="$(mktemp -d -t lattice-gpui-idle)"
+trap 'rm -rf "$scratch"' EXIT
+out="${1:-$scratch/idle.json}"
+mkdir -p "$scratch/home"
+cp -R "$root/fixtures/e2e" "$scratch/project"
+env ${growth[@]+"${growth[@]}"} LATTICE_GPUI_E2E_LOCK_LABEL="${LATTICE_GPUI_E2E_LOCK_LABEL:-$(cd "$root/.." && pwd)}" \
+  PATH="$PATH:/Library/TeX/texbin" HOME="$scratch/home" "$app" "$scratch/project" --scenario idle --out "$out"
+cat "$out"
+jq -e '.passed == true' "$out" >/dev/null || { echo "idle-guard: failed" >&2; exit 1; }
+echo "idle-guard: passed"
