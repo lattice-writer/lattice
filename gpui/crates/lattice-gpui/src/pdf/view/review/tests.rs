@@ -58,8 +58,6 @@ fn built_fixture_with(layout: AuxFiles, open: Option<(&str, &str)>) -> Option<te
     Some(scratch)
 }
 
-// A note on words of an \input file has no PDF anchor: SyncTeX finds its
-// line on the PDF and the words are looked for there.
 /// The note on the introduction's words, and `pdf` of `root` read as the
 /// sheet reads the live PDF.
 fn note_and_source(root: &Path, pdf: &str) -> (EditorComment, ReviewSource) {
@@ -112,16 +110,34 @@ fn names_the_root_of_a_note_another_roots_pdf_leaves_unplaced() {
         return;
     };
     let (note, source) = note_and_source(scratch.path(), "other.pdf");
-    let placed = source.place(std::slice::from_ref(&note));
-    assert_eq!(placed, vec![ReviewPlacement::Unplaced]);
+    // Notes on a .tex no root reads, and on one deleted since: no root is
+    // named for them, the default least of all.
+    let stray = |path: &str, keep: bool| {
+        let text = "Stray words of a chapter nothing inputs.\n";
+        if keep {
+            std::fs::write(scratch.path().join(path), text).unwrap();
+        }
+        let author = model::Author {
+            id: "me".into(),
+            name: "Ada".into(),
+        };
+        let mut note = model::new_note(path, text, 0, 11, "Why?", None, &author).unwrap();
+        note.number = 2;
+        note
+    };
+    let notes = [note, stray("orphan.tex", true), stray("gone.tex", false)];
+    let placed = source.place(&notes);
+    assert_eq!(placed, vec![ReviewPlacement::Unplaced; 3]);
     assert!(source.shows("other.tex") && source.is_live());
     assert_eq!(
-        source.elsewhere(&[note], &placed),
+        source.elsewhere(&notes, &placed),
         vec![("main.tex".to_string(), 1)]
     );
     source.engine.close(source.doc);
 }
 
+// A note on words of an \input file has no PDF anchor: SyncTeX finds its
+// line on the PDF and the words are looked for there.
 #[test]
 fn places_a_note_on_words_of_an_input_file_as_a_highlight() {
     for layout in [AuxFiles::Beside, AuxFiles::Hidden] {

@@ -434,6 +434,9 @@ impl Shell {
             oplog::outcome(&mut trace, current, outcome.as_ref(), cx);
         }
         self.agent_build_finished(current, outcome.as_ref(), cx);
+        if current {
+            self.review_build_finished(outcome.as_ref(), cx);
+        }
         match outcome {
             // A build of the project open before shows nothing in this one.
             _ if !current => self.build_panel.update(cx, |panel, cx| panel.cleared(cx)),
@@ -686,7 +689,7 @@ pub(super) struct Finished {
     rewritten: bool,
     /// The SHA-256 of the PDF the build left, as the viewer keeps the one it
     /// shows.
-    pdf_digest: Option<String>,
+    pub(super) pdf_digest: Option<String>,
     /// The project's last build, current on entering it: the PDF is the one
     /// the viewer opened then.
     current: bool,

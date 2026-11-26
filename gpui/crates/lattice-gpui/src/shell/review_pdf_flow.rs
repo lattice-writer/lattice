@@ -79,6 +79,32 @@ impl Shell {
         cx.notify();
     }
 
+    /// A build finished: the sheet waiting on a root's build hears whether
+    /// this was it, and the digest of the PDF it wrote.
+    pub(super) fn review_build_finished(
+        &mut self,
+        outcome: Option<&Result<super::build::Finished, String>>,
+        cx: &mut Context<Self>,
+    ) {
+        let Some((sheet, _)) = &self.parts.get::<ReviewFlow>().sheet else {
+            return;
+        };
+        let sheet = sheet.clone();
+        let Some(wanted) = sheet.read(cx).building().map(str::to_string) else {
+            return;
+        };
+        let finished = outcome.and_then(|outcome| outcome.as_ref().ok());
+        let other = finished.is_some_and(|finished| finished.result.root_document != wanted);
+        // Another root's build ran first; the one asked for is queued.
+        if other && self.queued_build.is_some() {
+            return;
+        }
+        let digest = finished
+            .filter(|finished| finished.result.success && !other)
+            .and_then(|finished| finished.pdf_digest.clone());
+        sheet.update(cx, |sheet, cx| sheet.build_finished(digest, cx));
+    }
+
     /// The sheet, for the window to draw over everything.
     pub(super) fn review_sheet(&self) -> Option<AnyElement> {
         let (sheet, _) = self.parts.get::<ReviewFlow>().sheet.as_ref()?;

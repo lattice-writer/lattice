@@ -22,6 +22,10 @@ msgstr "无法在新窗口中打开 PDF"
 msgid "Could not save the PDF"
 msgstr "PDF 没保存成功"
 
+#: lattice-gpui/src/pdf/review_sheet.rs
+msgid "Couldn’t build {document}"
+msgstr "无法编译 {document}"
+
 #: lattice-gpui/src/pdf/toolbar.rs
 msgid "PDF saved"
 msgstr "PDF 已保存"

@@ -14,7 +14,7 @@ use chrono::{DateTime, Local};
 use gpui::{
     AnyElement, AppContext as _, Context, Entity, EventEmitter, FontWeight,
     InteractiveElement as _, IntoElement, ParentElement as _, Render, SharedString,
-    StatefulInteractiveElement as _, Styled as _, Subscription, Task, Window, div,
+    StatefulInteractiveElement as _, Styled as _, Subscription, Task, WeakEntity, Window, div,
     prelude::FluentBuilder as _, px,
 };
 use lattice_core::{
@@ -58,8 +58,11 @@ pub struct ReviewSheet {
     /// Root documents other than this PDF's that typeset unplaced notes,
     /// each with how many.
     elsewhere: Vec<(String, usize)>,
-    /// The root asked to be built, until its PDF is the one on screen.
+    /// The root asked to be built, until its PDF is the one on screen, and
+    /// once its build has finished, the digest of the PDF it left.
     building: Option<String>,
+    built: Option<String>,
+    view: WeakEntity<PdfView>,
     selected: HashSet<String>,
     with_replies: bool,
     busy: bool,
@@ -84,23 +87,7 @@ impl ReviewSheet {
             .filter(|note| note.number > 0)
             .collect();
         notes.sort_by_key(|note| note.number);
-        // Once the root asked for is built and shown, its notes are placed
-        // on it.
-        let observing = cx.observe(view, |this: &mut Self, view, cx| {
-            let Some(wanted) = this.building.clone() else {
-                return;
-            };
-            let Some(source) = view
-                .read(cx)
-                .review_source()
-                .filter(|source| source.shows(&wanted))
-            else {
-                return;
-            };
-            this.building = None;
-            this.source = Some(source);
-            this.place(cx);
-        });
+        let observing = cx.observe(view, |this: &mut Self, _, cx| this.take_built(cx));
         let mut sheet = Self {
             source: view.read(cx).review_source(),
             notes,
@@ -108,6 +95,8 @@ impl ReviewSheet {
             placements: None,
             elsewhere: Vec::new(),
             building: None,
+            built: None,
+            view: view.downgrade(),
             selected: HashSet::new(),
             with_replies: true,
             busy: false,
@@ -160,8 +149,54 @@ impl ReviewSheet {
     /// PDF is shown.
     fn build(&mut self, document: String, cx: &mut Context<Self>) {
         self.building = Some(document.clone());
+        self.built = None;
+        self.error = None;
         cx.emit(ReviewSheetEvent::Build(document));
         cx.notify();
+    }
+
+    /// The root the sheet waits on a build of.
+    pub fn building(&self) -> Option<&str> {
+        self.building.as_deref()
+    }
+
+    /// The window's build for [`Self::building`] finished: `Some` with the
+    /// digest of the PDF it wrote when it compiled that root, `None` when it
+    /// failed or never ran.
+    pub fn build_finished(&mut self, built: Option<String>, cx: &mut Context<Self>) {
+        let Some(document) = self.building.clone() else {
+            return;
+        };
+        match built {
+            Some(digest) => {
+                self.built = Some(digest);
+                self.take_built(cx);
+            }
+            None => {
+                self.building = None;
+                self.error = Some(t!("Couldn’t build {document}", document = document).into());
+            }
+        }
+        cx.notify();
+    }
+
+    /// Once the PDF the asked-for build wrote is the one on screen, place
+    /// the notes on it; an older PDF of that root shown first is passed by.
+    fn take_built(&mut self, cx: &mut Context<Self>) {
+        let (Some(wanted), Some(digest)) = (&self.building, &self.built) else {
+            return;
+        };
+        let Some(source) = self.view.upgrade().and_then(|view| {
+            view.read(cx)
+                .review_source()
+                .filter(|source| source.shows(wanted) && source.digest == *digest)
+        }) else {
+            return;
+        };
+        self.building = None;
+        self.built = None;
+        self.source = Some(source);
+        self.place(cx);
     }
 
     /// The other roots unplaced notes belong to, each with how many, once

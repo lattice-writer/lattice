@@ -90,13 +90,22 @@ pub fn choose_document(root: &Path, open_document: Option<&str>) -> Result<(Stri
     let document = compiled_document(root, &manifest)?;
     Ok((document, compile_root::is_one_off_root(root)))
 }
-/// The document a build with `open_document` in the editor would compile,
-/// without recording anything as [`choose_document`] does: the file's own
-/// root when it is one, the root that reads it when the default does not,
-/// else the default.
-pub fn build_document(root: &Path, open_document: Option<&str>) -> Result<String, String> {
-    compile_root::build_target(root, &project::read_manifest(root)?, open_document)
+/// The root document that typesets `file` (project-relative): the one a
+/// build with it open compiles, as [`choose_document`] would pick it without
+/// recording anything, when `file` is that root or a file it reads. `None`
+/// for a file that is gone, or that no root reads (the default is not
+/// credited with a stray chapter, a Markdown note or a `.bib`).
+pub fn typesetting_root(root: &Path, file: &str) -> Option<String> {
+    let file = file.trim().replace('\\', "/");
+    if !root.join(&file).is_file() {
+        return None;
+    }
+    let manifest = project::read_manifest(root).ok()?;
+    let target = compile_root::build_target(root, &manifest, Some(&file)).ok()?;
+    (target == file || changes::input_loop::flattened(root, &target).contains(&file))
+        .then_some(target)
 }
+
 pub(crate) use build_log::{is_pass_noise_warning, unwrap_log_lines};
 pub use build_steps::{BuildStep, BuildSteps};
 pub use changes::{

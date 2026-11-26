@@ -233,6 +233,9 @@ impl Run {
     ) -> Result<()> {
         const STEP: &str = "PDF: on another document's PDF, Export review PDF names the document a note is in, and its Build places the note there";
         let other = root.join("review-other.tex");
+        // The build adds the document to the manifest's roots; put it back.
+        let manifest = root.join(".research/project.json");
+        let manifest_before = std::fs::read(&manifest)?;
         std::fs::write(
             &other,
             "\\documentclass{article}\n\\begin{document}\nAnother document.\n\\end{document}\n",
@@ -327,7 +330,15 @@ impl Run {
                 workspace.close(&[crate::shell::views::root_pdf_id("review-other.tex")], cx)
             });
         });
-        std::fs::remove_file(&other).ok();
+        for extension in ["tex", "pdf", "aux", "log", "synctex.gz", "fls", "fdb_latexmk"] {
+            std::fs::remove_file(other.with_extension(extension)).ok();
+        }
+        std::fs::write(&manifest, &manifest_before)?;
+        cx.update(|cx| {
+            if let Some(project) = self.shell.read(cx).project().cloned() {
+                project.update(cx, |project, cx| project.reload_manifest(cx));
+            }
+        });
         self.pause(cx, Duration::from_millis(300)).await;
         Ok(())
     }

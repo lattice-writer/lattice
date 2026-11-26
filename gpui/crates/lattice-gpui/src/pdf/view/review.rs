@@ -76,8 +76,9 @@ impl ReviewSource {
     }
 
     /// The root documents other than this PDF's that typeset the notes
-    /// `placements` leave unplaced, each with how many, in the notes'
-    /// order: built, their notes would have a place.
+    /// `placements` leave unplaced (lattice-core's `typesetting_root`), each
+    /// with how many, in the notes' order: built, their notes would have a
+    /// place. A note on a file no root reads names none.
     pub fn elsewhere(
         &self,
         notes: &[EditorComment],
@@ -90,8 +91,7 @@ impl ReviewSource {
             .zip(placements)
             .filter(|(_, placement)| placement.page().is_none())
         {
-            let Ok(owner) = lattice_core::latex::build_document(&self.root, Some(&note.path))
-            else {
+            let Some(owner) = lattice_core::latex::typesetting_root(&self.root, &note.path) else {
                 continue;
             };
             if shown.as_ref() == Some(&owner) {
