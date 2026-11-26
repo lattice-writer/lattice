@@ -12268,6 +12268,14 @@ msgstr "Overleaf: pulled {pulled}, pushed {pushed}."
 msgid "Overleaf: waiting on conflict resolution in {files}."
 msgstr "Overleaf: waiting on conflict resolution in {files}."
 
+#: src/platform/host-errors-overleaf.ts
+msgid "Overleaf's answer to {event} timed out after {seconds}s."
+msgstr "Overleaf's answer to {event} timed out after {seconds}s."
+
+#: src/platform/host-errors-overleaf.ts
+msgid "Overleaf's answer to {event} timed out after {seconds}s. Overleaf has sent nothing since, so the connection is presumed lost."
+msgstr "Overleaf's answer to {event} timed out after {seconds}s. Overleaf has sent nothing since, so the connection is presumed lost."
+
 #: src/canvas/pdf-annotation-composer.tsx
 msgid "Overleaf's copy of {name} reads differently here, so it is open beside the PDF now. Check the passage there, then save again."
 msgstr "Overleaf's copy of {name} reads differently here, so it is open beside the PDF now. Check the passage there, then save again."
@@ -12291,6 +12299,14 @@ msgstr "Overleaf's project has an unexpected rootFolder."
 #: src/platform/host-errors-overleaf.ts
 msgid "Overleaf's project join returned no root folder id."
 msgstr "Overleaf's project join returned no root folder id."
+
+#: src/platform/host-errors-overleaf.ts
+msgid "Overleaf's project join timed out after {seconds}s."
+msgstr "Overleaf's project join timed out after {seconds}s."
+
+#: src/platform/host-errors-overleaf.ts
+msgid "Overleaf's realtime connect handshake timed out after {seconds}s."
+msgstr "Overleaf's realtime connect handshake timed out after {seconds}s."
 
 #: src/platform/host-errors-overleaf.ts
 msgid "Overleaf's root folder has no id."

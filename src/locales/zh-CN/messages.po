@@ -12268,6 +12268,14 @@ msgstr "Overleaf：下载 {pulled} 个，上传 {pushed} 个"
 msgid "Overleaf: waiting on conflict resolution in {files}."
 msgstr "Overleaf：等你处理 {files} 的冲突"
 
+#: src/platform/host-errors-overleaf.ts
+msgid "Overleaf's answer to {event} timed out after {seconds}s."
+msgstr "Overleaf 在 {seconds} 秒内没有响应 {event} 请求"
+
+#: src/platform/host-errors-overleaf.ts
+msgid "Overleaf's answer to {event} timed out after {seconds}s. Overleaf has sent nothing since, so the connection is presumed lost."
+msgstr "Overleaf 在 {seconds} 秒内没有响应 {event} 请求，此后也没再发来任何数据，连接可能已断开"
+
 #: src/canvas/pdf-annotation-composer.tsx
 msgid "Overleaf's copy of {name} reads differently here, so it is open beside the PDF now. Check the passage there, then save again."
 msgstr "Overleaf 上的 {name} 这里和本地不一样，已在 PDF 旁打开它。确认这段文字后再保存一次。"
@@ -12291,6 +12299,14 @@ msgstr "Overleaf 项目的根文件夹格式异常"
 #: src/platform/host-errors-overleaf.ts
 msgid "Overleaf's project join returned no root folder id."
 msgstr "加入 Overleaf 项目时没有返回根文件夹 ID"
+
+#: src/platform/host-errors-overleaf.ts
+msgid "Overleaf's project join timed out after {seconds}s."
+msgstr "加入 Overleaf 项目超时（{seconds} 秒）"
+
+#: src/platform/host-errors-overleaf.ts
+msgid "Overleaf's realtime connect handshake timed out after {seconds}s."
+msgstr "Overleaf 实时连接握手超时（{seconds} 秒）"
 
 #: src/platform/host-errors-overleaf.ts
 msgid "Overleaf's root folder has no id."

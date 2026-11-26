@@ -1671,6 +1671,26 @@ pub(super) static ENTRIES: &[Entry] = &[
         text: Text::Message("Overleaf has sent nothing for {seconds}s, so the connection is presumed lost.", &[("seconds", Arg::Param(0))]),
     },
     Entry {
+        file: "overleaf_rt/client/ack.rs",
+        literal: "Overleaf's answer to {name} timed out after {}s.",
+        text: Text::Message("Overleaf's answer to {event} timed out after {seconds}s.", &[("event", Arg::Param(0)), ("seconds", Arg::Param(1))]),
+    },
+    Entry {
+        file: "overleaf_rt/client/ack.rs",
+        literal: "Overleaf's answer to {name} timed out after {}s. Overleaf has sent nothing since, so the connection is presumed lost.",
+        text: Text::Message("Overleaf's answer to {event} timed out after {seconds}s. Overleaf has sent nothing since, so the connection is presumed lost.", &[("event", Arg::Param(0)), ("seconds", Arg::Param(1))]),
+    },
+    Entry {
+        file: "overleaf_rt/client.rs",
+        literal: "Overleaf's realtime connect handshake timed out after {}s.",
+        text: Text::Message("Overleaf's realtime connect handshake timed out after {seconds}s.", &[("seconds", Arg::Param(0))]),
+    },
+    Entry {
+        file: "overleaf_rt/client.rs",
+        literal: "Overleaf's project join timed out after {}s.",
+        text: Text::Message("Overleaf's project join timed out after {seconds}s.", &[("seconds", Arg::Param(0))]),
+    },
+    Entry {
         file: "overleaf_rt/client.rs",
         literal: "The computer slept, so the connection is joined again.",
         text: Text::Message("The computer slept, so the connection is joined again.", &[]),

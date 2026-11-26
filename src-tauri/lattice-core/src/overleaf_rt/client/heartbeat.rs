@@ -73,10 +73,6 @@ pub(super) fn watch_heartbeat(shared: Arc<Shared>, timeout: Duration) {
     });
 }
 
-/// Why a connection ended on an answer that never came.
-pub(super) const SILENT_SINCE: &str =
-    "Overleaf has sent nothing since, so the connection is presumed lost.";
-
 /// Nothing at all has arrived since `since`, on [`awake_or_asleep`]'s clock.
 ///
 /// An answer that times out on a socket that has stayed silent since the

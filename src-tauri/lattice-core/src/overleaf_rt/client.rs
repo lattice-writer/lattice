@@ -8,7 +8,7 @@ use super::tree::{parse_project, NodeKind, ProjectTree, Tree};
 use super::{NOT_CONNECTED, USER_AGENT};
 use crate::runtime as rt;
 use crate::util::url_encode;
-use ack::{await_slot, emit_with_ack, open_slot};
+use ack::{await_slot, emit_with_ack, open_slot, ACK_TIMEOUT};
 use futures_util::sink::{Sink, SinkExt};
 use futures_util::stream::{Stream, StreamExt};
 pub(super) use heartbeat::awake_or_asleep;
@@ -442,9 +442,21 @@ impl RealtimeClient {
         // them. A server that joins us from the handshake query pushes
         // `joinProjectResponse` immediately after accepting the connection,
         // and an answer that arrives before anyone is waiting is simply lost.
-        let connect_slot =
-            open_slot(&shared, CONNECT_SLOT, "Overleaf's realtime connect handshake", false);
-        let join_slot = open_slot(&shared, JOIN_SLOT, "Overleaf's project join", false);
+        let connect_slot = open_slot(
+            &shared,
+            CONNECT_SLOT,
+            format!(
+                "Overleaf's realtime connect handshake timed out after {}s.",
+                ACK_TIMEOUT.as_secs()
+            ),
+            None,
+        );
+        let join_slot = open_slot(
+            &shared,
+            JOIN_SLOT,
+            format!("Overleaf's project join timed out after {}s.", ACK_TIMEOUT.as_secs()),
+            None,
+        );
         rt::spawn(read_loop(source, shared.clone()));
         // Zero is the handshake saying it sends no heartbeats at all.
         if heartbeat > 0 {

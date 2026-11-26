@@ -101,6 +101,9 @@ fn should_retry(reason: &str) -> bool {
 /// What the toolbar says while the channel waits to join again.
 fn reconnecting_detail(reason: &str, delay: Duration) -> String {
     let seconds = delay.as_secs_f64().ceil() as u64;
+    // lattice-core's English reason, in the interface language. It stays
+    // English up to here: `should_retry` and the refusal count read it.
+    let reason = crate::host_errors::text(reason);
     if delay.is_zero() {
         t!(
             "Overleaf live editing disconnected ({reason}). Reconnecting now…",
@@ -235,7 +238,7 @@ pub(super) fn hold(
                 let detail = if refused_too_often {
                     t!("Overleaf keeps refusing live editing for this project, though you are still signed in. Check that the project still opens on Overleaf.").to_string()
                 } else {
-                    reason
+                    crate::host_errors::text(&reason)
                 };
                 bridge
                     .update(cx, |bridge, cx| {

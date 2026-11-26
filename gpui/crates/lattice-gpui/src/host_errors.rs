@@ -421,6 +421,50 @@ mod tests {
         );
     }
 
+    // The live channel's reasons for an answer that never came (lattice-core's
+    // `open_slot`), as the toolbar shows them. The Socket.IO event is
+    // Overleaf's own identifier, so it keeps its name inside the Chinese.
+    #[test]
+    fn an_ack_timeout_reads_in_chinese() {
+        let filled = |id: &str, args: &[(&str, &dyn std::fmt::Display)]| {
+            lattice_i18n::fill_named(lattice_i18n::chinese(None, id).unwrap(), args)
+        };
+        for (english, expected) in [
+            (
+                "Overleaf's answer to applyOtUpdate timed out after 10s.",
+                filled(
+                    "Overleaf's answer to {event} timed out after {seconds}s.",
+                    &[("event", &"applyOtUpdate"), ("seconds", &"10")],
+                ),
+            ),
+            (
+                "Overleaf's answer to joinDoc timed out after 10s. Overleaf has sent nothing since, so the connection is presumed lost.",
+                filled(
+                    "Overleaf's answer to {event} timed out after {seconds}s. Overleaf has sent nothing since, so the connection is presumed lost.",
+                    &[("event", &"joinDoc"), ("seconds", &"10")],
+                ),
+            ),
+            (
+                "Overleaf's realtime connect handshake timed out after 10s.",
+                filled(
+                    "Overleaf's realtime connect handshake timed out after {seconds}s.",
+                    &[("seconds", &"10")],
+                ),
+            ),
+            (
+                "Overleaf's project join timed out after 10s.",
+                filled(
+                    "Overleaf's project join timed out after {seconds}s.",
+                    &[("seconds", &"10")],
+                ),
+            ),
+        ] {
+            let shown = zh(english);
+            assert_eq!(shown, expected, "{english}");
+            assert!(!shown.contains("timed out"), "{shown}");
+        }
+    }
+
     // Every message the catalog names has its Chinese in messages.po, as the
     // Tauri catalog test asks of the same entries.
     #[test]
