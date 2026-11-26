@@ -160,7 +160,9 @@ describe("ci-tier", () => {
   it("runs only one platform's Rust and GPUI jobs, in full, for a platform dispatch", () => {
     const outputs = (platform) => {
       const file = path.join(mkdtempSync(path.join(tmpdir(), "ci-tier-")), "out");
-      const env = { PATH: process.env.PATH, HOME: process.env.HOME, GITHUB_EVENT_NAME: "workflow_dispatch", GITHUB_REF: "refs/heads/capy/topic", GITHUB_OUTPUT: file, INPUT_PLATFORM: platform };
+      // INPUT_BASE: an all-platform dispatch diffs against origin/main's merge
+      // base otherwise, and CI's test job checks out one commit with no origin/main.
+      const env = { PATH: process.env.PATH, HOME: process.env.HOME, GITHUB_EVENT_NAME: "workflow_dispatch", GITHUB_REF: "refs/heads/capy/topic", GITHUB_OUTPUT: file, INPUT_PLATFORM: platform, INPUT_BASE: "HEAD" };
       execFileSync(process.execPath, [path.join(repo, "scripts/ci-tier.mjs"), "--github"], { cwd: repo, env, stdio: "ignore" });
       return Object.fromEntries(readFileSync(file, "utf8").trim().split("\n").map((line) => line.split(/=(.*)/s).slice(0, 2)));
     };

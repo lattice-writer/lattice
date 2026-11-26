@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -60,9 +60,19 @@ describe.skipIf(process.platform === "win32")("ci:local", () => {
     const dir = mkdtempSync(path.join(tmpdir(), "ci-local-baseline-"));
     const saved = process.env.LATTICE_GPUI_BUILD_DIR;
     process.env.LATTICE_GPUI_BUILD_DIR = dir;
+    // CI's test job checks out one commit, with no HEAD~1, so the merge base
+    // is a commit made on HEAD here, kept in an object store of the test's own
+    // (git's alternates), and HEAD is its ancestor.
+    const objects = path.join(dir, "objects");
+    mkdirSync(objects);
+    const store = path.resolve(repo, spawnSync("git", ["rev-parse", "--git-common-dir"], { cwd: repo, encoding: "utf8" }).stdout.trim(), "objects");
+    const commit = spawnSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", "commit-tree", "HEAD^{tree}", "-p", "HEAD", "-m", "merge base"], { cwd: repo, encoding: "utf8", env: { ...process.env, GIT_OBJECT_DIRECTORY: objects, GIT_ALTERNATE_OBJECT_DIRECTORIES: store } });
+    const savedAlternates = process.env.GIT_ALTERNATE_OBJECT_DIRECTORIES;
+    process.env.GIT_ALTERNATE_OBJECT_DIRECTORIES = objects;
     try {
-      const head = spawnSync("git", ["rev-parse", "HEAD"], { cwd: repo, encoding: "utf8" }).stdout.trim();
-      const parent = spawnSync("git", ["rev-parse", "HEAD~1"], { cwd: repo, encoding: "utf8" }).stdout.trim();
+      const head = commit.stdout.trim();
+      const parent = spawnSync("git", ["rev-parse", "HEAD"], { cwd: repo, encoding: "utf8" }).stdout.trim();
+      expect(head).toMatch(/^[0-9a-f]{40}$/);
       const files = ["gpui/crates/lattice-gpui/src/main.rs"];
       const order = () => localStages(ciTier(files), files, head, { full: true, modules: [] }).filter((stage) => ["gpui-main", "gpui-e2e"].includes(stage.name));
       expect(order().map((stage) => [stage.name, stage.rescues])).toEqual([["gpui-main", undefined], ["gpui-e2e", undefined]]);
@@ -88,6 +98,8 @@ describe.skipIf(process.platform === "win32")("ci:local", () => {
     } finally {
       if (saved === undefined) delete process.env.LATTICE_GPUI_BUILD_DIR;
       else process.env.LATTICE_GPUI_BUILD_DIR = saved;
+      if (savedAlternates === undefined) delete process.env.GIT_ALTERNATE_OBJECT_DIRECTORIES;
+      else process.env.GIT_ALTERNATE_OBJECT_DIRECTORIES = savedAlternates;
       rmSync(dir, { recursive: true, force: true });
     }
   });
