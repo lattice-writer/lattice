@@ -282,8 +282,9 @@ Mac mini through runner-up's `lattice-mac` pool
 of modules (`gpui-main-baseline.mjs --chunks`, each with the smoke flow), each
 under the in-app lock and letting it go in between, so a queued gate or lab
 run waits for one chunk (a few minutes), not the whole scenario. The chunks
-share 220 minutes, lock waits included (the step's 400 less the gate, the
-build and the rerun's 30-minute lock wait), and each waits for the lock only as
+share 220 minutes, lock waits included (the step's 465 less the gate, the
+build, the rerun's 30-minute lock wait and run, and the idle guard's lock wait
+and runs, about an hour), and each waits for the lock only as
 long as that leaves 25 minutes for its run; a chunk that gave up on the lock,
 ran out of that time or wrote no result fails the night (a chunk's files from
 an earlier run of the same commit are removed first). `scripts/gpui-nightly.mjs
