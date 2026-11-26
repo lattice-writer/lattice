@@ -6,6 +6,7 @@
 use super::account::{ensure_user_id, load_session, normalize_host, SessionFile};
 use super::files::{retain_syncable, BuildPdf};
 use super::link::{load_state, SyncState, PAUSED};
+use super::retry_after::retry_after;
 use crate::overleaf_rt::{SESSION_EXPIRED, USER_AGENT};
 use crate::util::err;
 use crate::wide_event;
@@ -140,11 +141,21 @@ pub(super) fn send(request: RequestBuilder) -> Result<Response, String> {
 }
 
 /// `what` completes "Overleaf returned 500 …", e.g. "for the project chat".
+///
+/// A 429 that says when to come back carries it as "; retry after N s", the
+/// one wording the GPUI app's live mode reads its cool-down from, since the
+/// error text is all that reaches it.
 pub(super) fn expect_success(response: Response, what: &str) -> Result<Response, String> {
-    if !response.status().is_success() {
-        return Err(format!("Overleaf returned {} {what}.", response.status()));
+    let status = response.status();
+    if status.is_success() {
+        return Ok(response);
     }
-    Ok(response)
+    if status == StatusCode::TOO_MANY_REQUESTS {
+        if let Some(seconds) = retry_after(&response) {
+            return Err(format!("Overleaf returned {} {what}; retry after {seconds} s.", status));
+        }
+    }
+    Err(format!("Overleaf returned {} {what}.", status))
 }
 
 // ---- The dashboard ----------------------------------------------------------

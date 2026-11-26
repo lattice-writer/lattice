@@ -4,6 +4,8 @@
 //! (`overleaf-sync-outcome.ts`), and how a failure reads
 //! (`overleaf-sync-failures.ts`, `overleaf-realtime-model.ts`).
 
+use std::time::Duration;
+
 use lattice_core::overleaf::{ConflictSide, NameProblem, OverleafConflict, OverleafSyncResult};
 use lattice_i18n::t;
 
@@ -270,6 +272,15 @@ pub fn is_rate_limited(error: &str) -> bool {
         || error.to_lowercase().contains("too many requests")
 }
 
+/// How long a 429 asked to be left alone, when it said: lattice-core words a
+/// rate-limited answer's `Retry-After` as "; retry after N s" (`expect_success`
+/// and an upload's error, in seconds whichever form Overleaf sent it in).
+pub fn retry_after(error: &str) -> Option<Duration> {
+    let (_, rest) = error.rsplit_once("; retry after ")?;
+    let (seconds, _) = rest.split_once(" s")?;
+    seconds.parse().ok().map(Duration::from_secs)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -339,6 +350,25 @@ mod tests {
             "Failed to upload \"a.txt\" to Overleaf: Overleaf returned HTTP 429 during upload"
         ));
         assert!(!is_rate_limited("Could not upload figures/fig-429.png"));
+        assert_eq!(
+            retry_after(
+                "Failed to upload \"a.txt\" to Overleaf: Overleaf returned HTTP 429 during upload; retry after 45 s"
+            ),
+            Some(Duration::from_secs(45))
+        );
+        assert_eq!(
+            retry_after(
+                "Overleaf returned 429 Too Many Requests for the project download; retry after 120 s."
+            ),
+            Some(Duration::from_secs(120))
+        );
+        for told_nothing in [
+            "Overleaf returned 429 Too Many Requests for the project download.",
+            "Overleaf returned HTTP 429 during upload; retry after soon s",
+            "Overleaf returned HTTP 429 during upload; retry after 45",
+        ] {
+            assert_eq!(retry_after(told_nothing), None, "{told_nothing}");
+        }
         assert!(!is_signed_out("Could not reach Overleaf"));
     }
 

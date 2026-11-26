@@ -2,6 +2,7 @@
 //! `overleaf` for the endpoint and why the root folder id is required).
 
 use super::api::{folders_above, send_as, Remote, JSON};
+use super::retry_after::retry_after;
 use crate::util::err;
 use crate::wide_event;
 use reqwest::blocking::Client;
@@ -100,6 +101,8 @@ impl Uploader<'_> {
             .multipart(form);
         let response = send_as(request, err).map_err(UploadFailure::Unsent)?;
         let status = response.status();
+        let retry_after =
+            (status == StatusCode::TOO_MANY_REQUESTS).then(|| retry_after(&response)).flatten();
         let body = serde_json::from_str::<Value>(&response.text().unwrap_or_default()).ok();
         let accepted = body.as_ref().and_then(|v| v.get("success")?.as_bool()).unwrap_or(false);
         if status.is_success() && accepted {
@@ -112,7 +115,7 @@ impl Uploader<'_> {
             .as_ref()
             .and_then(|v| v.get("error")?.as_str())
             .and_then(|code| UPLOAD_ERROR_CODES.iter().copied().find(|known| *known == code));
-        Err(UploadFailure::Refused { status, code })
+        Err(UploadFailure::Refused { status, code, retry_after })
     }
 }
 
@@ -124,6 +127,8 @@ enum UploadFailure {
     Refused {
         status: StatusCode,
         code: Option<&'static str>,
+        /// A 429's `Retry-After`, in seconds (see [`retry_after`]).
+        retry_after: Option<u64>,
     },
 }
 
@@ -134,15 +139,24 @@ impl UploadFailure {
     fn into_error(self, rel: &str) -> String {
         let cause = match self {
             UploadFailure::Unsent(error) => error,
-            UploadFailure::Refused { status, code } => {
+            UploadFailure::Refused { status, code, retry_after } => {
                 wide_event::record("upload_status", status.as_u16());
                 if let Some(code) = code {
                     wide_event::record("upload_error", code);
                 }
-                let error = if status.is_success() {
-                    "Overleaf rejected the upload".to_string()
-                } else {
-                    format!("Overleaf returned HTTP {} during upload", status.as_u16())
+                // A multipart upload is never resent on its own (see
+                // `send_with_retries`), so a 429's Retry-After goes into the
+                // error, in the wording `expect_success` gives it, for live
+                // mode's cool-down to read.
+                let error = match (status.is_success(), retry_after) {
+                    (true, _) => "Overleaf rejected the upload".to_string(),
+                    (false, Some(seconds)) => format!(
+                        "Overleaf returned HTTP {} during upload; retry after {seconds} s",
+                        status.as_u16()
+                    ),
+                    (false, None) => {
+                        format!("Overleaf returned HTTP {} during upload", status.as_u16())
+                    }
                 };
                 match code {
                     Some(code) => format!("{error} ({code})"),
@@ -246,5 +260,31 @@ mod tests {
             assert_eq!(event["upload_status"], a.0, "{event}");
             assert_eq!(event.get("upload_error").and_then(Value::as_str), code, "{event}");
         }
+    }
+
+    #[test]
+    fn a_rate_limited_upload_says_when_to_retry() {
+        let server = tiny_http::Server::http("127.0.0.1:0").unwrap();
+        let host = format!("http://{}", server.server_addr());
+        let answering = std::thread::spawn(move || {
+            let request = server.recv_timeout(Duration::from_secs(10)).unwrap().unwrap();
+            let response = tiny_http::Response::from_string("Too Many Requests")
+                .with_status_code(429)
+                .with_header("Retry-After: 45".parse::<tiny_http::Header>().unwrap());
+            request.respond(response).unwrap();
+        });
+        let (config, root) = (signed_in(&host), TempDir::new("rate-limited-upload"));
+        seed_linked_project(&root, &host, &[], &[]);
+        let remote = Remote::open(&config, &root).unwrap();
+        let client = http_client(10).unwrap();
+        let files = BTreeMap::from([("a.tex".to_string(), b"one".to_vec())]);
+        let error = (remote.uploader(&client, "fixture-csrf"))
+            .and_then(|uploader| uploader.upload_all(&files, &BTreeSet::new()))
+            .unwrap_err();
+        answering.join().unwrap();
+        assert_eq!(
+            error,
+            "Failed to upload \"a.tex\" to Overleaf: Overleaf returned HTTP 429 during upload; retry after 45 s"
+        );
     }
 }

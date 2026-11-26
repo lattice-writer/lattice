@@ -275,12 +275,11 @@
     {
       "step": "PDF: Export review PDF places a note on its words as a highlight, ticked, and the copy carries it as a Highlight with its id and number, with the cover note on page 1, leaving the compiled PDF as it was",
       "platforms": [
-        "macos",
         "windows",
         "linux"
       ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"placed\":true,\"kinds\":[[\"1a1b17ca-8014-440c-adc1-6ed1591e5801\",\"unplaced\"]],\"ticked\":[],\"closed\":false,\"failure\":null,\"annotations\":[],\"untouched\":true} | Windows: failed in every main run (44162980527, 44213516921); observed {\"placed\":true,\"kinds\":[[\"697aa6f7-7c54-4eb3-9080-374fb1c7a628\",\"unplaced\"]],\"ticked\":[],\"closed\":false,\"failure\":null,\"annotations\":[],\"untouched\":true} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"placed\":true,\"kinds\":[[\"2ff01ae2-dd75-4248-aa38-aac4db8620ef\",\"unplaced\"]],\"ticked\":[],\"closed\":false,\"failure\":null,\"annotations\":[],\"untouched\":true}",
-      "followup": "LEO-14"
+      "reason": "Windows: failed in every main run (44162980527, 44213516921); observed {\"placed\":true,\"kinds\":[[\"697aa6f7-7c54-4eb3-9080-374fb1c7a628\",\"unplaced\"]],\"ticked\":[],\"closed\":false,\"failure\":null,\"annotations\":[],\"untouched\":true} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"placed\":true,\"kinds\":[[\"2ff01ae2-dd75-4248-aa38-aac4db8620ef\",\"unplaced\"]],\"ticked\":[],\"closed\":false,\"failure\":null,\"annotations\":[],\"untouched\":true}",
+      "followup": "LEO-15"
     },
     {
       "step": "in Split, a click moves the keyboard between the source and the page's child frame, one of them focused at a time",

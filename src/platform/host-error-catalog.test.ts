@@ -71,6 +71,7 @@ function formatted(literal: string, values: string[]): string {
 const SAMPLE_ARGUMENTS: Record<string, string[]> = {
   "The project changed before {action}.": ["the action could start"],
   "Overleaf returned {} {what}.": ["«0»", "for the request"],
+  "Overleaf returned {} {what}; retry after {seconds} s.": ["«0»", "for the request", "«2»"],
   "Open Slide refresh failed{subject} ({status}): {}": ["", "«1»", "«2»"],
   // A name repeated in the Rust text arrives once per mention, always the same value.
   "Overleaf no longer has {deleted} but has {kept}, a name this disk may take for the same file, so deleting {deleted} here could delete {kept}. Move {deleted} out of the project, then sync again. No files were changed.":

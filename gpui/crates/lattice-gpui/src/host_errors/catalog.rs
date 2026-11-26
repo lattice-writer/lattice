@@ -1546,6 +1546,11 @@ pub(super) static ENTRIES: &[Entry] = &[
         text: Text::Message("Overleaf returned HTTP {status} during upload", &[("status", Arg::Param(0))]),
     },
     Entry {
+        file: "overleaf/upload.rs",
+        literal: "Overleaf returned HTTP {} during upload; retry after {seconds} s",
+        text: Text::Message("Overleaf returned HTTP {status} during upload; retry after {seconds} s", &[("status", Arg::Param(0)), ("seconds", Arg::Param(1))]),
+    },
+    Entry {
         file: "overleaf/doc_push.rs",
         literal: "Failed to send \"{path}\" to Overleaf: {error}",
         text: Text::Message("Failed to send \"{path}\" to Overleaf: {error}", &[("path", Arg::Param(0)), ("error", Arg::Param(1))]),
@@ -1794,6 +1799,11 @@ pub(super) static ENTRIES: &[Entry] = &[
         file: "overleaf/api.rs",
         literal: "Overleaf returned {} {what}.",
         text: Text::Message("Overleaf returned {status} for the request.", &[("status", Arg::Param(0))]),
+    },
+    Entry {
+        file: "overleaf/api.rs",
+        literal: "Overleaf returned {} {what}; retry after {seconds} s.",
+        text: Text::Message("Overleaf returned {status} for the request; retry after {seconds} s.", &[("status", Arg::Param(0)), ("seconds", Arg::Param(2))]),
     },
     Entry {
         file: "overleaf/link.rs",

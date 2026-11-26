@@ -12204,12 +12204,20 @@ msgid "Overleaf reserves the name {file} at the top of a project, so it stays on
 msgstr "{file} 是 Overleaf 在项目顶层保留的名称，只留在本机。重命名后即可同步。"
 
 #: src/platform/host-errors-overleaf.ts
+msgid "Overleaf returned {status} for the request; retry after {seconds} s."
+msgstr "Overleaf 返回了 {status}，请在 {seconds} 秒后重试"
+
+#: src/platform/host-errors-overleaf.ts
 msgid "Overleaf returned {status} for the request."
 msgstr "Overleaf 返回了 {status}"
 
 #: src/platform/host-errors-overleaf.ts
 msgid "Overleaf returned HTTP {status} during upload"
 msgstr "上传时 Overleaf 返回了 HTTP {status}"
+
+#: src/platform/host-errors-overleaf.ts
+msgid "Overleaf returned HTTP {status} during upload; retry after {seconds} s"
+msgstr "上传时 Overleaf 返回了 HTTP {status}，请在 {seconds} 秒后重试"
 
 #: src/platform/host-errors-overleaf.ts
 msgid "Overleaf sent an unreadable zip archive: {error}"

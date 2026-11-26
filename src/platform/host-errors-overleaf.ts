@@ -50,6 +50,7 @@ export const OVERLEAF_HOST_ERRORS: readonly HostErrorEntry[] = [
   ["overleaf/upload.rs", "Failed to upload \"{rel}\" to Overleaf: {cause}", ([path, cause]) => t`Failed to upload "${path}" to Overleaf: ${cause}`],
   ["overleaf/upload.rs", "Overleaf rejected the upload", () => t`Overleaf rejected the upload`],
   ["overleaf/upload.rs", "Overleaf returned HTTP {} during upload", ([status]) => t`Overleaf returned HTTP ${status} during upload`],
+  ["overleaf/upload.rs", "Overleaf returned HTTP {} during upload; retry after {seconds} s", ([status, seconds]) => t`Overleaf returned HTTP ${status} during upload; retry after ${seconds} s`],
   ["overleaf/doc_push.rs", "Failed to send \"{path}\" to Overleaf: {error}", ([path, error]) => t`Failed to send "${path}" to Overleaf: ${error}`],
   ["overleaf/files.rs", "Could not record the sync base for {rel}: {e}", ([path, error]) => t`Could not record the sync base for ${path}: ${error}`],
   ["overleaf/sync/relocations.rs", "Waiting for Overleaf to confirm this account can edit the project before syncing moved files. Local moves have been kept.", () => t`Waiting for Overleaf to confirm this account can edit the project before syncing moved files. Local moves have been kept.`],
@@ -110,6 +111,7 @@ export const OVERLEAF_HOST_ERRORS: readonly HostErrorEntry[] = [
   // What was being asked for is Rust's English ("for the project chat"), so
   // the translation names only the status.
   ["overleaf/api.rs", "Overleaf returned {} {what}.", ([status]) => t`Overleaf returned ${status} for the request.`],
+  ["overleaf/api.rs", "Overleaf returned {} {what}; retry after {seconds} s.", ([status, , seconds]) => t`Overleaf returned ${status} for the request; retry after ${seconds} s.`],
   ["overleaf/link.rs", "Overleaf's project join returned no root folder id.", () => t`Overleaf's project join returned no root folder id.`],
   ["overleaf/files.rs", "Invalid authoritative inventory path: {path}", ([path]) => t`Invalid authoritative inventory path: ${path}`],
   ["overleaf_rt/codec.rs", "Overleaf does not offer the websocket transport (offers {transports:?})", ([transports]) => t`Overleaf does not offer the websocket transport (offers ${transports})`],
