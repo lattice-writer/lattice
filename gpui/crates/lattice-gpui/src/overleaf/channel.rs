@@ -128,7 +128,9 @@ fn backoff(attempt: u32) -> Duration {
 /// again on the same second, every time, which is what an overloaded
 /// server rate-limits.
 fn jittered(delay: Duration, roll: u64) -> Duration {
-    delay.mul_f64(0.8 + 0.4 * (roll as f64 / u64::MAX as f64))
+    delay
+        .mul_f64(0.8 + 0.4 * (roll as f64 / u64::MAX as f64))
+        .min(RECONNECT_MAX)
 }
 
 /// A fresh random u64 (std's per-instance hasher keys), for the spread.
@@ -357,6 +359,7 @@ mod tests {
         let delay = Duration::from_secs(10);
         assert_eq!(jittered(delay, 0), Duration::from_secs(8));
         assert_eq!(jittered(delay, u64::MAX), Duration::from_secs(12));
+        assert_eq!(jittered(RECONNECT_MAX, u64::MAX), RECONNECT_MAX);
         let spread: std::collections::BTreeSet<_> =
             (0..8).map(|_| jittered(delay, roll())).collect();
         assert!(spread.len() > 1, "the spread should differ between tries");

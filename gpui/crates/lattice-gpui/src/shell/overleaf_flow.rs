@@ -177,9 +177,11 @@ impl Shell {
             // Resumed from Settings in manual mode: Review changes comes to
             // the front rather than opening behind Settings.
             OverleafBridgeEvent::Resumed => {
-                if self.overleaf.read(cx).mode() == OverleafSyncMode::Manual
-                    && self.settings.is_some()
-                {
+                let bridge = self.overleaf.read(cx);
+                let opens_review = bridge.mode() == OverleafSyncMode::Manual
+                    && bridge.link().is_some()
+                    && !bridge.syncing();
+                if opens_review && self.settings.is_some() {
                     self.close_settings(cx);
                 }
                 self.sync_overleaf(window, cx)

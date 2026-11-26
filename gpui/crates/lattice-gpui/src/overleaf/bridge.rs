@@ -194,6 +194,8 @@ pub struct OverleafBridge {
     last_auto_sync: Option<Instant>,
     /// An automatic sync was answered 429: none starts before this.
     rate_limited_until: Option<Instant>,
+    /// Automatic syncs Overleaf answered 429 in a row.
+    rate_limits: u32,
     /// Files the writer chose to keep on Overleaf when asked, for the
     /// session: the safe side of forgetting is a file left on Overleaf.
     declined_deletes: HashSet<(PathBuf, String)>,
@@ -267,6 +269,7 @@ impl OverleafBridge {
             refusals: 0,
             last_auto_sync: None,
             rate_limited_until: None,
+            rate_limits: 0,
             declined_deletes: HashSet::new(),
             sync_task: None,
             sync_trace: None,
@@ -410,6 +413,8 @@ impl OverleafBridge {
         self.local_pending = false;
         self.transport_retry = false;
         self.refusals = 0;
+        self.rate_limited_until = None;
+        self.rate_limits = 0;
         self.entities.clear();
         self.entity_list = None;
         self.review_reset();
@@ -719,6 +724,17 @@ impl OverleafBridge {
             return;
         };
         if self.syncing {
+            return;
+        }
+        // Every automatic start (a dropped channel, a rejoin, a flush), not
+        // only the poll's, waits out a 429's cool-down: the edit stays owed
+        // and the poll sends it once the cool-down is over.
+        if options.automatic
+            && self
+                .rate_limited_until
+                .is_some_and(|until| until > Instant::now())
+        {
+            self.transport_retry = true;
             return;
         }
         if options.automatic {

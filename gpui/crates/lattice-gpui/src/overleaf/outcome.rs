@@ -260,9 +260,14 @@ pub fn is_project_refusal(error: &str) -> bool {
 /// How many refusals in a row are retried before one is reported.
 pub const REFUSAL_RETRIES: u32 = 3;
 
-/// Whether Overleaf asked us to slow down.
+/// Whether Overleaf asked us to slow down, in lattice-core's wordings for
+/// the status ("Overleaf returned 429 Too Many Requests …", "… returned
+/// HTTP 429 during upload"), so a path or a byte count that happens to hold
+/// 429 is not mistaken for one.
 pub fn is_rate_limited(error: &str) -> bool {
-    error.contains("429") || error.to_lowercase().contains("too many requests")
+    error.contains("returned 429")
+        || error.contains("HTTP 429")
+        || error.to_lowercase().contains("too many requests")
 }
 
 #[cfg(test)]
@@ -327,6 +332,13 @@ mod tests {
             "Overleaf turned this request away, though the session is still valid."
         ));
         assert!(is_rate_limited("HTTP 429 Too Many Requests"));
+        assert!(is_rate_limited(
+            "Overleaf returned 429 Too Many Requests uploading main.tex."
+        ));
+        assert!(is_rate_limited(
+            "Failed to upload \"a.txt\" to Overleaf: Overleaf returned HTTP 429 during upload"
+        ));
+        assert!(!is_rate_limited("Could not upload figures/fig-429.png"));
         assert!(!is_signed_out("Could not reach Overleaf"));
     }
 

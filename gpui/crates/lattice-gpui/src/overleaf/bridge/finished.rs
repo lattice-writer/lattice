@@ -9,8 +9,21 @@ use serde_json::json;
 use super::*;
 use crate::app_log::trace::Trace;
 
-/// How long live mode holds its syncs after Overleaf answers one with 429.
+/// How long live mode holds its syncs after Overleaf answers one with 429,
+/// doubling with each 429 in a row up to [`RATE_LIMIT_COOLDOWN_MAX`].
 const RATE_LIMIT_COOLDOWN: Duration = Duration::from_secs(30);
+const RATE_LIMIT_COOLDOWN_MAX: Duration = Duration::from_secs(300);
+/// 429s in a row held quietly (30 s + 60 s + 120 s + 240 s, about 7.5 min)
+/// before one is reported, so the writer learns their edits aren't
+/// reaching Overleaf; the cool-down still holds after that.
+const RATE_LIMIT_RETRIES: u32 = 4;
+
+/// The cool-down after the `rate_limits`th 429 in a row (from 1).
+fn rate_limit_cooldown(rate_limits: u32) -> Duration {
+    RATE_LIMIT_COOLDOWN
+        .saturating_mul(1 << rate_limits.saturating_sub(1).min(16))
+        .min(RATE_LIMIT_COOLDOWN_MAX)
+}
 
 impl OverleafBridge {
     /// A failed sync is owed again, quietly, for a scenario's checks.
@@ -85,6 +98,7 @@ impl OverleafBridge {
     ) {
         self.transport_retry = false;
         self.rate_limited_until = None;
+        self.rate_limits = 0;
         self.refusals = 0;
         self.remote_changes = false;
         // Edited here while the sync ran: left as they were, so they still
@@ -225,10 +239,11 @@ impl OverleafBridge {
         // the cool-down is over, with nothing in the way meanwhile.
         let rate_limited = options.automatic && outcome::is_rate_limited(&error);
         if rate_limited {
-            self.rate_limited_until = Some(Instant::now() + RATE_LIMIT_COOLDOWN);
+            self.rate_limits += 1;
+            self.rate_limited_until = Some(Instant::now() + rate_limit_cooldown(self.rate_limits));
         }
         let retryable = outcome::is_transient_transport_failure(&error)
-            || rate_limited
+            || (rate_limited && self.rate_limits < RATE_LIMIT_RETRIES)
             || (refused && self.refusals < outcome::REFUSAL_RETRIES);
         let this = cx.entity().downgrade();
         let sync_again = || {
@@ -278,5 +293,19 @@ impl OverleafBridge {
             .detail(error)
         };
         notices::show(notice.key(SYNC_KEY), cx);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_rate_limit_in_a_row_cools_down_twice_as_long_up_to_five_minutes() {
+        assert_eq!(rate_limit_cooldown(1), Duration::from_secs(30));
+        assert_eq!(rate_limit_cooldown(2), Duration::from_secs(60));
+        assert_eq!(rate_limit_cooldown(4), Duration::from_secs(240));
+        assert_eq!(rate_limit_cooldown(5), RATE_LIMIT_COOLDOWN_MAX);
+        assert_eq!(rate_limit_cooldown(u32::MAX), RATE_LIMIT_COOLDOWN_MAX);
     }
 }
