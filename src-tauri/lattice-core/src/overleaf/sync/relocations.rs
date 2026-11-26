@@ -161,7 +161,7 @@ pub fn sync_relocations(
                     .map(|next| (path.clone(), next, hash.clone()))
             })
             .collect();
-        let moved_at = HistoryFrom::Time(chrono::Utc::now().timestamp_millis());
+        let moved_at = HistoryFrom::Time(crate::overleaf::clock::now_ms(&state.host));
         for (old, new, hash) in &remapped {
             if let Some(base) = read_base_copy(root, old) {
                 write_base_copy(root, new, base.as_bytes())?;

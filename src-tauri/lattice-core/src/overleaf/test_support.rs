@@ -102,6 +102,9 @@ pub(super) struct Mock {
     pub upload_failure: Option<(u16, &'static str)>,
     /// Move and rename requests fail.
     pub fail_relocation: bool,
+    /// How far ahead of this machine's clock Overleaf's runs, in ms: every
+    /// answer's `Date` header says so, as history's `end_ts` would.
+    pub clock_ahead_ms: i64,
     /// Runs as each request arrives, before it is answered, with its method
     /// and URL: the moment to change something while a sync waits on Overleaf.
     pub on_request: Option<OnRequest>,
@@ -392,6 +395,11 @@ impl Mock {
             if let Some(content_type) = content_type {
                 let header = format!("Content-Type: {content_type}").parse::<tiny_http::Header>();
                 response = response.with_header(header.unwrap());
+            }
+            if self.clock_ahead_ms != 0 {
+                let at = chrono::Utc::now() + chrono::Duration::milliseconds(self.clock_ahead_ms);
+                let date = at.format("Date: %a, %d %b %Y %H:%M:%S GMT").to_string();
+                response = response.with_header(date.parse::<tiny_http::Header>().unwrap());
             }
             let _ = request.respond(response);
         });

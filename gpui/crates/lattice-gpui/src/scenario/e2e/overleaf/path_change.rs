@@ -2,11 +2,12 @@
 //! reachable throughout (`overleaf/network.rs`'s `path_changes`, Wi-Fi to
 //! Ethernet or a VPN). A change that leaves the socket working costs
 //! nothing: its probe is answered, heartbeats muted so that the answer is
-//! all it hears, and the channel stays live without joining again. One that leaves it on a path that is gone, its socket
-//! open and silent (`MockOverleaf::go_silent`), has the burst of
-//! reachability callbacks join again once, after the burst settles and the
-//! probe goes unanswered, long before the heartbeat watchdog would; what
-//! was typed onto the dead socket lands once.
+//! all it hears, and the channel stays live without joining again. One
+//! that leaves it on a path that is gone, its socket open and silent
+//! (`MockOverleaf::go_silent`), has the burst of reachability callbacks
+//! join again once, after the burst settles and the probe goes unanswered,
+//! long before the heartbeat watchdog would; what was typed onto the dead
+//! socket lands once.
 
 use std::time::{Duration, Instant};
 

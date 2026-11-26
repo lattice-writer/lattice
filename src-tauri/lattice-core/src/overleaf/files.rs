@@ -449,7 +449,7 @@ pub fn checkpoint_realtime_text(root: &Path, rel: &str, text: &str) -> Result<()
     write_local_file(root, &format!("{BASE_DIR}/{rel}"), text.as_bytes())?;
     write_local_file(root, &format!("{BASE_DIR}/.gitignore"), b"*\n")?;
     state.files.insert(rel.to_string(), sha256_hex(text.as_bytes()));
-    let now = chrono::Utc::now().timestamp_millis();
+    let now = super::clock::now_ms(&state.host);
     state.own_writes.insert(rel.to_string(), HistoryFrom::Time(now));
     let body = serde_json::to_string_pretty(&state).map_err(err)? + "\n";
     write_local_file(root, &format!("{STATE_DIR}/{STATE_FILE}"), body.as_bytes())

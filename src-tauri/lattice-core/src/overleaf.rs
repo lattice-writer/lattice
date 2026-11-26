@@ -44,6 +44,7 @@ mod api;
 #[cfg(test)]
 mod bench;
 mod case_collisions;
+mod clock;
 mod destination;
 mod doc_comment;
 mod doc_push;

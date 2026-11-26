@@ -41,6 +41,48 @@ fn overleaf_history_never_counts_lattices_own_upload_as_confirmation() {
     assert_eq!(read_local(&root, "notes.md").as_deref(), Some(b"".as_slice()));
 }
 
+/// The same, with no project version to stamp the upload by and Overleaf's
+/// clock 20 minutes ahead of this Mac's, past the history's slack: the upload
+/// is placed in Overleaf's time, so it still reads as Lattice's own and
+/// cannot vouch for a hollow copy, while a co-author's later edit still does.
+#[test]
+fn a_clock_behind_overleafs_never_lets_lattices_own_upload_confirm_a_hollow_copy() {
+    const AHEAD: i64 = 20 * 60_000;
+    let notes = "Notes kept only in this project.\n".repeat(60);
+    let edited = format!("{notes}One more line written here.\n");
+    let base: Files = &[("notes.md", notes.as_bytes())];
+    let pushing = Mock { clock_ahead_ms: AHEAD, ..Mock::project(base) }.serve();
+    let (config, root) = linked(&pushing, &[("notes.md", edited.as_bytes())], base);
+    let result = sync(&config, &root, NO_LIVE, None).unwrap();
+    assert_eq!(result.pushed, ["notes.md"]);
+    let state = load_state(&root).unwrap();
+    assert!(state.remote_version.is_none() && state.agreed_version.is_none());
+    let Some(&HistoryFrom::Time(stamped)) = state.own_writes.get("notes.md") else {
+        panic!("the upload should be stamped by time: {:?}", state.own_writes);
+    };
+    let overleaf_now = chrono::Utc::now().timestamp_millis() + AHEAD;
+    assert!((stamped - overleaf_now).abs() < 60_000, "stamped {stamped}, Overleaf {overleaf_now}");
+    let upload = json!({ "fromV": 40, "toV": 41, "meta": { "end_ts": overleaf_now },
+        "pathnames": ["notes.md"] });
+
+    let resync = |history: Vec<Value>| {
+        let mock = Mock { clock_ahead_ms: AHEAD, history, ..Mock::project(&[("notes.md", b"")]) };
+        let server = mock.serve();
+        let config = signed_in(&server.base);
+        edit_state(&root, |state| state.host = server.base.clone());
+        sync(&config, &root, NO_LIVE, None).unwrap()
+    };
+    let result = resync(vec![upload.clone()]);
+    assert_eq!(result.refused_incoming, ["notes.md"]);
+    assert_eq!(read_local(&root, "notes.md").as_deref(), Some(edited.as_bytes()));
+
+    let emptied = json!({ "fromV": 41, "toV": 42, "meta": { "end_ts": overleaf_now + 15 * 60_000 },
+        "pathnames": ["notes.md"] });
+    let result = resync(vec![emptied, upload]);
+    assert_eq!(result.pulled, ["notes.md"]);
+    assert_eq!(read_local(&root, "notes.md").as_deref(), Some(b"".as_slice()));
+}
+
 /// Edits sent from Lattice over the realtime channel are already in the copy
 /// it checkpoints when it leaves the document, so they cannot vouch for a
 /// hollow download of that document either; a collaborator's later edit can.
