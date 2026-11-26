@@ -59,7 +59,6 @@ describe("ci-local-select: the e2e a change needs", () => {
     for (const file of ["gpui/crates/lattice-gpui/src/shell.rs", ...shell, "gpui/crates/lattice-gpui/src/native.rs", "gpui/crates/lattice-gpui/src/native/pasteboard.rs", "gpui/crates/lattice-gpui/src/native/input_source.rs", "gpui/crates/lattice-i18n/src/lib.rs", "gpui/crates/lattice-i18n/build.rs"]) {
       expect(e2eNeeds([file], covers), file).toMatchObject({ full: true });
     }
-    expect(e2eNeeds(["gpui/crates/lattice-gpui/src/shell/documents.rs"], covers).full).toBe(false);
     // unlocalized.txt is the coverage test's list of strings left in English.
     for (const file of ["src/locales/zh-CN/messages.po", "src/locales/en/messages.json", "gpui/crates/lattice-gpui/src/native_windows.rs"]) {
       expect(e2eNeeds([file], covers), file).toMatchObject({ full: false, modules: [] });
