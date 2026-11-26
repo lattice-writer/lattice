@@ -94,14 +94,20 @@ purpose; such a release keeps showing the last What's new that had one, and its
 tag still needs the lead file before `release.yml` will publish it.
 
 The release notes say what changed; the [user guide](guide/README.md) says how
-to use it, so it is updated with them. Before the release commit, update the
-guide for every user-visible change in the release: a new feature or workflow,
+to use it. The guide publishes from main, so update it in the pull request
+that makes a user-visible change, and before the release commit check that
+every change in the release has reached it: a new feature or workflow,
 a renamed menu, button or setting, a changed shortcut or default. Change the
 English page and its Chinese page under `docs/guide/zh-CN/` together, and
-retake a screenshot when the window it shows has changed (the guide's README
-says how). `scripts/user-guide.test.ts` fails when a page has no translation
+retake a screenshot when the window it shows has changed. Screenshots are the
+native app's window at its default 1440 × 900 in light mode, with the Guided
+tutorial open, taken under the in-app lock with a scratch `HOME`
+(`LATTICE_APPEARANCE=light`), captured with `screencapture -x -o -l <window id>`
+and saved as WebP (`cwebp -q 82`) under `images/` as `en-NAME.webp` and
+`zh-NAME.webp`; switch Settings › Appearance › Interface language for the
+Chinese set. `scripts/user-guide.test.ts` fails when a page has no translation
 or a link or image is missing, and `user-guide.yml` (below) publishes the
-guide from the release's commit.
+guide as soon as the change reaches main.
 
 ## What `release.yml` does
 
@@ -387,9 +393,11 @@ The build is checked before anything is published (no Timeless font, by name or 
 
 ### `user-guide.yml`
 
-Once the Release workflow succeeds, `user-guide.yml` renders the user guide (`docs/guide/`, `node scripts/user-guide.mjs --out DIR`) from the release's commit and publishes it to the `gh-pages` branch under `guide/`, so <https://lattice-writer.github.io/lattice/guide/>, which Help ▸ User Guide opens in both apps, describes the version people download.
+A push to main that changes `docs/guide/`, `scripts/user-guide.mjs`, `scripts/lib/util.mjs` or the workflow itself makes `user-guide.yml` render the user guide (`node scripts/user-guide.mjs --out DIR`: the pages, a sidebar grouped by the README's `##` headings, and a search index per language) and publish it to the `gh-pages` branch under `guide/`, so <https://lattice-writer.github.io/lattice/guide/>, which Help ▸ User Guide opens in both apps, follows main within minutes.
 It writes nothing outside `guide/`, and shares `web-demo.yml`'s publish group so the two never push to `gh-pages` at once.
-Run it by hand (`gh workflow run user-guide.yml --ref main`) to publish a guide fix without waiting for a release.
+GitHub keeps only one pending job in that group, so a guide publish that queues while another job holds it can replace a waiting web-demo publish: after a release, check that the demo shows the new version, and run `web-demo.yml` again if it doesn't.
+The trigger paths leave out the renderer's `marked` dependency; after a bump that changes its output, run the workflow by hand.
+Run it by hand (`gh workflow run user-guide.yml --ref <ref>`) to publish another ref, for example to put back the guide of a release.
 
 ### `release-cache.yml`
 

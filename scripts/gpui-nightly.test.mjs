@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { GROWTH_PENDING, failuresOf, idleFailures, issueBody, listedFailures, nightlyFor, planIssue } from "./gpui-nightly.mjs";
+import { failuresOf, idleFailures, issueBody, listedFailures, nightlyFor, planIssue } from "./gpui-nightly.mjs";
 
 const green = { gate: { status: "ok", failing: [] }, build: { status: "ok" }, e2e: { status: "ok", result: "e2e@x.json" } };
 const clean = { error: null, fresh: [], quarantined: [], flaky: [], fixed: [] };
@@ -61,12 +61,6 @@ describe("gpui-nightly: the idle guard", () => {
     expect(idleFailures({ passed: true, checks: [{ name: "x", passed: true }] }, 3)).toEqual(["idle guard: exited 3"]);
   });
 
-  it("fails a night whose growth check never finished, without failing a green run before it", () => {
-    const pending = { sha, run: "41", failures: [], flaky: [], growth: "pending" };
-    expect(pending.failures).toEqual([]);
-    expect(nightlyFor(pending, { sha, subject: "x", run: "41" }).failures).toEqual([GROWTH_PENDING]);
-    expect(nightlyFor({ ...pending, growth: "done" }, { sha, subject: "x", run: "41" }).failures).toEqual([]);
-  });
 });
 
 describe("gpui-nightly: the issue", () => {
@@ -104,20 +98,18 @@ describe("gpui-nightly: the issue", () => {
 describe("gpui-nightly: the workflow", () => {
   const workflow = readFileSync(new URL("../.github/workflows/nightly-e2e.yml", import.meta.url), "utf8");
 
-  it("runs on main every night on the Mac mini, under the in-app lock, and reports even when the run failed", () => {
+  it("runs on main every night on the Mac mini, a chunk at a time under the in-app lock, and reports even when the run failed", () => {
     expect(workflow).toMatch(/schedule:\n\s+#.*\n\s+- cron: "\d+ \d+ \* \* \*"/);
     expect(workflow).toMatch(/runs-on: \$\{\{ vars\.LATTICE_MACOS_RUNNER \|\| 'lattice-mac' \}\}\n/);
     expect(workflow).toMatch(/fetch-depth: 0\n/);
     expect(workflow).toMatch(/ref: main\n/);
-    expect(workflow).toMatch(/scripts\/inapp-lock --thread .* -- node scripts\/gpui-nightly\.mjs run/);
+    // It takes the in-app lock per chunk (gpui-main-baseline.mjs --chunks), never for the whole run.
+    expect(workflow).toMatch(/\n\s+run: node scripts\/gpui-nightly\.mjs run\n/);
+    expect(workflow).not.toMatch(/run: .*inapp-lock/);
+    expect(readFileSync(new URL("./gpui-nightly.mjs", import.meta.url), "utf8")).toMatch(/"--chunks", String\(CHUNKS\)/);
     expect(workflow).toMatch(/if: \$\{\{ !cancelled\(\) \}\}\n(.*\n){0,3}\s+run: node scripts\/gpui-nightly\.mjs report/);
     expect(workflow).toMatch(/issues: write/);
-    // The idle growth waits half an hour after the lock is given back, before the report.
-    expect(workflow).toMatch(/if: \$\{\{ !cancelled\(\) \}\}\n\s+timeout-minutes: 40\n\s+run: node scripts\/gpui-nightly\.mjs growth\n/);
-    expect(workflow.indexOf("gpui-nightly.mjs growth")).toBeLessThan(workflow.indexOf("gpui-nightly.mjs report"));
-    expect(workflow).not.toMatch(/inapp-lock.*gpui-nightly\.mjs growth/);
     // The build tree check runs before the lock, with a short timeout of its own.
-    expect(workflow.indexOf("Reach the shared build tree")).toBeLessThan(workflow.indexOf("scripts/inapp-lock"));
     expect(workflow).toMatch(/- name: Reach the shared build tree\n\s+timeout-minutes: 2\n/);
   });
 });

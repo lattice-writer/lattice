@@ -65,6 +65,8 @@ pub(super) struct AnnotationLayer {
     /// Each pin's row and the notes it stands for, by number.
     pins: Vec<(u32, Vec<String>)>,
     provider: bool,
+    /// The note card's parts as last drawn, for scripted checks.
+    card_parts: Rc<std::cell::RefCell<Vec<card::PaintedNote>>>,
     draft: Option<Draft>,
     /// How many notes have been opened, which numbers each draft.
     drafts: u64,
@@ -217,6 +219,7 @@ impl EditorPanel {
             let provider = NoteCards {
                 placed: self.annotations.placed.clone(),
                 panel: cx.weak_entity(),
+                painted: self.annotations.card_parts.clone(),
             };
             self.lattice.update(cx, |lattice, _| {
                 lattice.add_hover_provider(Rc::new(provider))
@@ -266,6 +269,41 @@ impl EditorPanel {
             .iter()
             .map(|(range, comment)| (comment.id.clone(), comment.number, range.clone()))
             .collect()
+    }
+
+    /// Words selected in a note's card are what ⌘C copies, though the
+    /// editor under the card keeps the keyboard.
+    pub(super) fn note_card_copy(element: gpui::Div, cx: &mut Context<Self>) -> gpui::Div {
+        use gpui::InteractiveElement as _;
+        element.capture_action(cx.listener(|_, _: &editor::actions::Copy, window, cx| {
+            let selected = gpui_kit::base::TextSelection::selected_text(window, cx);
+            let selected = selected.trim();
+            if !selected.is_empty() {
+                cx.write_to_clipboard(gpui::ClipboardItem::new_string(selected.to_string()));
+                cx.stop_propagation();
+            }
+        }))
+    }
+
+    /// The note card's parts as last drawn, for scripted checks: each note's
+    /// id, its text and its Share to Overleaf.
+    pub fn annotation_card_parts(&self) -> Vec<card::PaintedNote> {
+        self.annotations.card_parts.borrow().clone()
+    }
+
+    /// The note `id`'s passage as an Overleaf comment quotes it: its start
+    /// in UTF-16 units and its text (`overleaf_selection`); none when it no
+    /// longer anchors here.
+    pub fn annotation_overleaf_range(&self, id: &str, cx: &App) -> Option<(i64, String)> {
+        let root = self.project_root(cx);
+        let comment = store::try_store(cx)?.read(cx).get(&root, id)?.clone();
+        let text = self.buffer.read(cx).text();
+        let range = model::anchor_of(&text, &comment)?;
+        let quote = text.get(range.clone())?.to_string();
+        if quote.trim().is_empty() {
+            return None;
+        }
+        Some((text[..range.start].encode_utf16().count() as i64, quote))
     }
 
     /// The selection, as bytes of the buffer; none when nothing is selected.
@@ -586,6 +624,7 @@ impl EditorPanel {
 struct NoteCards {
     placed: Placed,
     panel: gpui::WeakEntity<EditorPanel>,
+    painted: Rc<std::cell::RefCell<Vec<card::PaintedNote>>>,
 }
 
 impl HoverProvider for NoteCards {
@@ -612,15 +651,24 @@ impl HoverProvider for NoteCards {
         let range = from.max(line_start)..to.min(line_end).max(from.max(line_start) + 1);
         let comments: Vec<EditorComment> = hits.into_iter().map(|(_, comment)| comment).collect();
         let panel = self.panel.clone();
+        let painted = self.painted.clone();
         Some(HoverTarget {
             range,
             id: "annotation",
             card: Rc::new(move |context, _, cx| {
+                // A note on a file of a linked project can go to Overleaf.
+                let parts = card::CardParts {
+                    share: panel
+                        .upgrade()
+                        .is_some_and(|panel| panel.read(cx).overleaf_save().is_some()),
+                    painted: painted.clone(),
+                };
                 let panel = panel.clone();
                 let on: card::CardAction = Rc::new(move |event, _, cx| {
                     let request = match event {
                         CardEvent::Resolve(id) => AnnotationRequest::Resolve(id),
                         CardEvent::Reply(id) => AnnotationRequest::Reply(id),
+                        CardEvent::Share(id) => AnnotationRequest::ShareToOverleaf(id),
                     };
                     panel
                         .update(cx, |panel, cx| {
@@ -631,7 +679,7 @@ impl HoverProvider for NoteCards {
                         })
                         .ok();
                 });
-                card::comment_card(&comments, on, context.max_width, cx)
+                card::comment_card(&comments, on, context.max_width, &parts, cx)
             }),
         })
     }

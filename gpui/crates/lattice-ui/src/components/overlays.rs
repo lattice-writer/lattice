@@ -21,8 +21,9 @@ use std::time::Duration;
 
 use gpui::{
     AnimationExt as _, AnyElement, AnyView, App, AppContext as _, ElementId, Hsla,
-    InteractiveElement as _, IntoElement, ParentElement as _, Render, RenderOnce, SharedString,
-    Styled as _, Window, div, point, prelude::FluentBuilder as _, px, scaled,
+    InteractiveElement as _, IntoElement, ParentElement as _, Render, RenderOnce, ScrollHandle,
+    SharedString, StatefulInteractiveElement as _, Styled as _, Window, div, point,
+    prelude::FluentBuilder as _, px, scaled,
 };
 
 use crate::{
@@ -254,6 +255,8 @@ impl Render for LatticeTooltip {
 pub struct DialogCard {
     title: SharedString,
     body: Option<SharedString>,
+    body_scroll: Option<ScrollHandle>,
+    body_parity: Option<SharedString>,
     mark: Option<(Icon, Hsla, Hsla)>,
     fields: Vec<AnyElement>,
     actions: Vec<AnyElement>,
@@ -264,6 +267,8 @@ impl DialogCard {
         Self {
             title: title.into(),
             body: None,
+            body_scroll: None,
+            body_parity: None,
             mark: None,
             fields: Vec::new(),
             actions: Vec::new(),
@@ -272,6 +277,16 @@ impl DialogCard {
 
     pub fn body(mut self, body: impl Into<SharedString>) -> Self {
         self.body = Some(body.into());
+        self
+    }
+
+    pub fn track_body_scroll(mut self, scroll: &ScrollHandle) -> Self {
+        self.body_scroll = Some(scroll.clone());
+        self
+    }
+
+    pub fn body_parity(mut self, name: impl Into<SharedString>) -> Self {
+        self.body_parity = Some(name.into());
         self
     }
 
@@ -293,15 +308,23 @@ impl DialogCard {
     }
 }
 
+const DIALOG_VIEWPORT_INSET: f32 = 40.;
+const DIALOG_MIN_HEIGHT: f32 = 200.;
+
 impl RenderOnce for DialogCard {
-    fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let palette = cx.palette().clone();
+        let viewport_height = window.viewport_size().height;
+        let max_card_height =
+            (viewport_height - px(DIALOG_VIEWPORT_INSET)).max(px(DIALOG_MIN_HEIGHT));
         let id = ElementId::NamedChild(
             std::sync::Arc::new(ElementId::Name("dialog-card".into())),
             self.title.clone(),
         );
+        let body_id = ElementId::NamedChild(std::sync::Arc::new(id.clone()), "body".into());
         let card = div()
             .w(CONTAINER_DIALOG)
+            .max_h(max_card_height)
             .flex()
             .flex_col()
             .pt(px(20.))
@@ -313,6 +336,7 @@ impl RenderOnce for DialogCard {
             .when_some(self.mark, |this, (icon, ink, wash)| {
                 this.child(
                     div()
+                        .flex_none()
                         .size(px(36.))
                         .mb(px(16.))
                         .flex()
@@ -325,20 +349,29 @@ impl RenderOnce for DialogCard {
             })
             .child(
                 div()
+                    .flex_none()
                     .text_role(TextRole::Title, cx)
                     .text_color(palette.text)
                     .child(self.title),
             )
             .children(self.body.map(|body| {
                 div()
+                    .id(body_id)
+                    .relative()
+                    .flex_shrink(1.)
+                    .min_h_0()
+                    .overflow_y_scroll()
+                    .when_some(self.body_scroll, |this, scroll| this.track_scroll(&scroll))
                     .pt(px(4.))
                     .text_role(TextRole::Body, cx)
                     .text_color(palette.text_secondary)
+                    .children(self.body_parity.and_then(crate::parity::probe))
                     .child(body)
             }))
             .when(!self.fields.is_empty(), |this| {
                 this.child(
                     div()
+                        .flex_none()
                         .flex()
                         .flex_col()
                         .gap(px(12.))
@@ -348,6 +381,7 @@ impl RenderOnce for DialogCard {
             })
             .child(
                 div()
+                    .flex_none()
                     .flex()
                     .justify_end()
                     .gap(px(8.))

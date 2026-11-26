@@ -625,6 +625,7 @@ function Markdown() {
           // paper's own text does not take.
           projectRoot={paper ? undefined : opened.projectRoot}
           optimizeForReading={Boolean(paper)}
+          textColors
           onEligibilityChange={masthead ? setEligibility : undefined}
           onChangeMarkdown={onChangeMarkdown}
           onFlushPendingChange={onFlushPendingChange}

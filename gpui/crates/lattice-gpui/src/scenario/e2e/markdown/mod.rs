@@ -22,7 +22,9 @@
 //! - a word typed into the visual editor just before its tab closes is in
 //!   the file once the tab has gone;
 //! - hidden past the (shortened) hibernation delay the page is torn down,
-//!   and drawn again with the document when shown.
+//!   and drawn again with the document when shown;
+//! - author text colours are drawn and kept through an edit
+//!   (`markdown/colors.rs`).
 
 #![cfg(target_os = "macos")]
 
@@ -34,6 +36,8 @@ use language::{LanguageAwareStyling, Point};
 use lattice_webview::{Island, IslandState};
 use serde_json::{Value, json};
 use theme::ActiveTheme as _;
+
+mod colors;
 
 use super::{Run, Steps};
 use crate::{
@@ -141,6 +145,7 @@ impl Run {
             .await?;
         self.markdown_split_scroll(cx, steps, root).await?;
         self.markdown_page_index(cx, steps, root).await?;
+        self.markdown_colors(cx, steps, root).await?;
         Ok(())
     }
 

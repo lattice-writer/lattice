@@ -164,14 +164,15 @@ impl OverleafBridge {
     }
 
     /// Start a thread on UTF-16 `from..to` of the live document `path`,
-    /// saying `content`; `done` runs once Overleaf has its message.
+    /// saying `content`; `done` runs once Overleaf has its message, told
+    /// whether the thread was anchored on the passage too.
     pub fn add_comment(
         &mut self,
         path: &str,
         from: i64,
         quote: String,
         content: String,
-        done: impl FnOnce(&mut gpui::App) + 'static,
+        done: impl FnOnce(bool, &mut gpui::App) + 'static,
         cx: &mut Context<Self>,
     ) {
         let doc_id = match self.doc_of_path(path) {
@@ -193,10 +194,14 @@ impl OverleafBridge {
                 lattice_core::overleaf::reply_to_thread(config, root, &thread, &content)
             },
             move |this, cx| {
-                if let Err(error) = this.anchor_comment(&doc_id, &thread_id, from, &quote, cx) {
-                    this.review.error = Some(error.into());
-                }
-                done(cx);
+                let anchored = match this.anchor_comment(&doc_id, &thread_id, from, &quote, cx) {
+                    Ok(()) => true,
+                    Err(error) => {
+                        this.review.error = Some(error.into());
+                        false
+                    }
+                };
+                done(anchored, cx);
             },
             cx,
         );

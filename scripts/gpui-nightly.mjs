@@ -14,14 +14,15 @@
  *           judges main (scripts/gpui-e2e-known-failures.json, the flaky tier
  *           counted, one rerun of a new failure's module on a fresh fixture),
  *           and writes nightly@<sha>.json beside the baseline, with this
- *           run's id, or a record of why it stopped. The rerun takes the
- *           scratch HOME and lab switches gpui/script/e2e gives the
- *           scenario. The scenario and the rerun open windows: run it under
- *           scripts/inapp-lock.
- *           It also runs the idle guard's frame counts (gpui/script/idle-guard,
- *           about a minute) and counts what fails there.
- *   growth  the idle guard's memory growth over 30 minutes, added to that
- *           record; run after `run`, outside the in-app lock (runGrowth).
+ *           run's id, or a record of why it stopped. The scenario runs in
+ *           chunks of modules (gpui-main-baseline.mjs --chunks), each under
+ *           scripts/inapp-lock, letting the lock go in between so a queued
+ *           gate or lab run gets in; the rerun takes the lock too (`rerun`),
+ *           with the scratch HOME and lab switches gpui/script/e2e gives the
+ *           scenario. Then the idle guard (gpui/script/idle-guard, lattice#1025):
+ *           its frame counts under the lock, and 30 minutes of idle memory
+ *           growth outside it (runIdleGuard). Run it outside the lock.
+ *   rerun   (internal) MODULES OUT: the rerun of those modules, under the lock.
  *   report  reads that record and keeps one GitHub issue, labelled
  *           `nightly-e2e`, in step (planIssue): it opens one for the first
  *           failures, rewrites its body every night they persist and comments
@@ -47,6 +48,9 @@ const git = (...args) => execFileSync("git", args, { cwd: repo, encoding: "utf8"
 export const LABEL = "nightly-e2e";
 // The system disk floor release builds keep on the Mac mini (CREW.md).
 const MIN_FREE_GB = Number(process.env.LATTICE_NIGHTLY_MIN_FREE_GB ?? 20);
+// The whole scenario takes 16-26 min on the Mac mini; six chunks hold the
+// in-app lock about 3-5 min each.
+const CHUNKS = 6;
 
 /** What failed tonight, one line each: gate stages, the build, and the e2e steps the verdict counts. */
 export function failuresOf(record, verdict, quit = null) {
@@ -126,31 +130,44 @@ const recordFile = (sha) => path.join(baselineDir(), `nightly@${sha}.json`);
 // Which run wrote a record: report takes only its own run's, so a night that
 // wrote none never reports an older night's record for the same commit.
 const runId = () => process.env.GITHUB_RUN_ID ?? "local";
-const app = path.join(repo, "gpui", "target", "release", "lattice-gpui");
-// The idle guard's memory wait (`growth`, after the in-app lock is given back).
-const GROWTH_SECONDS = 1800;
-// What `report` counts for a record whose growth check `growth` never
-// finished (it timed out or died): `run` marks it pending, `growth` clears it.
-export const GROWTH_PENDING = "idle guard: the 30-minute memory growth check did not finish";
 
-/** gpui/script/idle-guard with `args`, on the release build the run left. */
-function runIdleGuard(args) {
+/**
+ * The idle guard on the release build the run left: its frame counts under
+ * the in-app lock (about a minute, 12 s of it in front), then 30 minutes of
+ * idle memory growth outside it. The growth run is a passive window, the
+ * CREW.md lock exception approved on 2026-11-26: it never activates, never
+ * takes the key window (GPUI_LAB_ASSUME_KEY) and sends no input, so it cannot
+ * disturb the runs that hold the lock, and holding it for half an hour would
+ * keep them out.
+ */
+function runIdleGuard(sha) {
   const dir = mkdtempSync(path.join(tmpdir(), "gpui-nightly-idle-"));
-  const out = path.join(dir, "idle.json");
-  const guard = spawnSync(path.join(repo, "gpui", "script", "idle-guard"), [...args, out], { cwd: repo, stdio: "inherit" });
-  let result = null;
+  const guard = path.join(repo, "gpui", "script", "idle-guard");
+  const run = (out, command) => {
+    const status = spawnSync(command[0], command.slice(1), { cwd: repo, stdio: "inherit" });
+    let result = null;
+    try {
+      result = JSON.parse(readFileSync(out, "utf8"));
+    } catch {
+      // idleFailures reports the missing result.
+    }
+    return idleFailures(result, status.status ?? status.signal);
+  };
   try {
-    result = JSON.parse(readFileSync(out, "utf8"));
-  } catch {
-    // idleFailures reports the missing result.
+    const frames = path.join(dir, "frames.json");
+    const growth = path.join(dir, "growth.json");
+    return [
+      ...run(frames, [path.join(repo, "scripts", "inapp-lock"), "--thread", `nightly-e2e ${sha.slice(0, 9)} idle`, "--wait", "1800", "--", guard, frames]),
+      ...run(growth, [guard, "--growth", "1800", growth]),
+    ];
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
-  rmSync(dir, { recursive: true, force: true });
-  return idleFailures(result, guard.status ?? guard.signal);
 }
 
 /** The nightly record `report` reads for this run, or a failure that says why there is none. */
 export function nightlyFor(saved, { sha, subject, run }) {
-  if (saved?.sha === sha && saved.run === run) return saved.growth === "pending" ? { ...saved, failures: [...saved.failures, GROWTH_PENDING] } : saved;
+  if (saved?.sha === sha && saved.run === run) return saved;
   return { sha, subject, run, failures: [saved ? "the nightly run wrote no record of its own (the one on disk is another run's)" : "the nightly run wrote no record (see the run's log: the in-app lock, the disk floor or a crash)"], flaky: [] };
 }
 
@@ -175,7 +192,7 @@ function runNightly() {
   const quitFile = path.join(dir, `quit@${sha}.txt`);
   rmSync(resultFile, { force: true });
   rmSync(quitFile, { force: true });
-  const baseline = spawnSync("node", [path.join(repo, "scripts", "gpui-main-baseline.mjs")], { cwd: repo, stdio: "inherit", env: { ...process.env, LATTICE_E2E_QUIT_RESULT: quitFile } });
+  const baseline = spawnSync("node", [path.join(repo, "scripts", "gpui-main-baseline.mjs"), "--chunks", String(CHUNKS)], { cwd: repo, stdio: "inherit", env: { ...process.env, LATTICE_E2E_QUIT_RESULT: quitFile } });
   const baselineFile = path.join(dir, `known-failures@${sha}.json`);
   const record = existsSync(baselineFile) ? JSON.parse(readFileSync(baselineFile, "utf8")) : null;
   // gpui-main-baseline.mjs exits 0 whether or not main is green; anything
@@ -193,47 +210,19 @@ function runNightly() {
     verdict = judge(result, knownFailures(), "macos", { strict: true });
     const retry = [...verdict.fresh, ...verdict.quarantined];
     if (retry.length && !verdict.error) {
-      const home = mkdtempSync(path.join(tmpdir(), "gpui-nightly-home-"));
-      const env = { ...process.env, HOME: home, GPUI_LAB_IGNORE_OCCLUSION: "1", GPUI_LAB_ASSUME_KEY: "1", PATH: `${process.env.PATH}:/Library/TeX/texbin` };
-      try {
-        verdict = settle(verdict, rerun(app, path.join(repo, "gpui", "fixtures", "e2e"), rerunModules(result, retry), env));
-      } finally {
-        rmSync(home, { recursive: true, force: true });
-      }
+      const out = path.join(dir, `nightly-rerun@${sha}.json`);
+      rmSync(out, { force: true });
+      spawnSync(path.join(repo, "scripts", "inapp-lock"), ["--thread", `nightly-e2e ${sha.slice(0, 9)} rerun`, "--wait", "1800", "--kind", "e2e", "--", "node", fileURLToPath(import.meta.url), "rerun", rerunModules(result, retry).join(","), out], { cwd: repo, stdio: "inherit" });
+      verdict = settle(verdict, existsSync(out) ? JSON.parse(readFileSync(out, "utf8")) : null);
     }
   }
-  // The idle guard's frame counts, about a minute, while this run still
-  // holds the in-app lock; its memory growth runs after (`growth`).
-  const built = record.build?.status === "ok";
-  const idle = built ? runIdleGuard([]) : [];
-  const nightly = { sha, subject, run: runId(), finished: new Date().toISOString(), baseline: record ? path.basename(baselineFile) : null, failures: [...failuresOf(record, verdict, existsSync(quitFile) ? readFileSync(quitFile, "utf8").trim() : null), ...idle], flaky: verdict?.flaky ?? [], fixed: verdict?.fixed ?? [], ...(built ? { growth: "pending" } : {}) };
-  writeNightly(nightly, `Nightly full gate at ${sha.slice(0, 9)}`);
-}
-
-function writeNightly(nightly, title) {
-  writeFileSync(recordFile(nightly.sha), `${JSON.stringify(nightly, null, 2)}\n`);
-  const lines = [`${title}: ${nightly.failures.length ? `${nightly.failures.length} failure(s)` : "green"}`, ...nightly.failures.map((failure) => `- ${failure}`), ...nightly.flaky.map((step) => `- flaky: ${step}`), ...nightly.fixed.map((step) => `- known failure that passed: ${step}`)];
+  const idle = record.build?.status === "ok" ? runIdleGuard(sha) : [];
+  const nightly = { sha, subject, run: runId(), finished: new Date().toISOString(), baseline: record ? path.basename(baselineFile) : null, failures: [...failuresOf(record, verdict, existsSync(quitFile) ? readFileSync(quitFile, "utf8").trim() : null), ...idle], flaky: verdict?.flaky ?? [], fixed: verdict?.fixed ?? [] };
+  writeFileSync(recordFile(sha), `${JSON.stringify(nightly, null, 2)}\n`);
+  const lines = [`Nightly full gate at ${sha.slice(0, 9)}: ${nightly.failures.length ? `${nightly.failures.length} failure(s)` : "green"}`, ...nightly.failures.map((failure) => `- ${failure}`), ...nightly.flaky.map((step) => `- flaky: ${step}`), ...nightly.fixed.map((step) => `- known failure that passed: ${step}`)];
   console.log(lines.join("\n"));
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `## ${lines[0]}\n\n${lines.slice(1).join("\n")}\n`);
   process.exitCode = nightly.failures.length ? 1 : 0;
-}
-
-/**
- * The idle guard's memory growth over GROWTH_SECONDS, added to this run's
- * record. It runs after `run` has given the in-app lock back: the app
- * stays in the background and sends no input for the whole wait, so it
- * needs no lock, and holding one for half an hour would keep the crew's
- * gates out. A night with no record of its own already fails in `report`.
- */
-function runGrowth() {
-  const sha = git("rev-parse", "HEAD");
-  const file = recordFile(sha);
-  const saved = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : null;
-  if (saved?.run !== runId()) return console.log("gpui-nightly: no record of this run to add the idle growth to");
-  // Not pending: `run` built nothing to measure, and its record says why.
-  if (saved.growth !== "pending") return console.log("gpui-nightly: this run left no idle growth check to run");
-  const failures = runIdleGuard(["--growth", String(GROWTH_SECONDS)]);
-  writeNightly({ ...saved, growth: "done", failures: [...saved.failures, ...failures] }, `Nightly full gate and idle growth at ${sha.slice(0, 9)}`);
 }
 
 function report({ dryRun }) {
@@ -257,13 +246,25 @@ function report({ dryRun }) {
   }
 }
 
+/** The rerun of `modules`, run under the in-app lock by `run`: writes its result to `out`. */
+function rerunModulesInScratch(modules, out) {
+  const home = mkdtempSync(path.join(tmpdir(), "gpui-nightly-home-"));
+  const env = { ...process.env, HOME: home, GPUI_LAB_IGNORE_OCCLUSION: "1", GPUI_LAB_ASSUME_KEY: "1", PATH: `${process.env.PATH}:/Library/TeX/texbin` };
+  try {
+    const result = rerun(path.join(repo, "gpui", "target", "release", "lattice-gpui"), path.join(repo, "gpui", "fixtures", "e2e"), modules.split(","), env);
+    if (result) writeFileSync(out, JSON.stringify(result));
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+}
+
 if (isMain(import.meta.url)) {
   const [command, ...rest] = process.argv.slice(2);
   try {
     if (command === "run") runNightly();
-    else if (command === "growth") runGrowth();
+    else if (command === "rerun") rerunModulesInScratch(rest[0], rest[1]);
     else if (command === "report") report({ dryRun: rest.includes("--dry-run") });
-    else throw new Error("usage: gpui-nightly.mjs run | growth | report [--dry-run]");
+    else throw new Error("usage: gpui-nightly.mjs run | report [--dry-run] | rerun MODULES OUT");
   } catch (error) {
     console.error(`gpui-nightly: ${error.message}`);
     process.exit(1);

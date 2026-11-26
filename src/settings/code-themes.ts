@@ -19,7 +19,7 @@
  */
 
 import type { Theme } from "./app-settings";
-import { compositeHex, fitContrast } from "./theme-customization";
+import { compositeHex, contrastRatio, fitContrast } from "./theme-customization";
 
 export const CODE_THEMES = [
   "vscode", "github", "lattice", "one", "solarized", "catppuccin", "tokyo-night", "dracula", "nord", "monokai",
@@ -255,6 +255,18 @@ const EDITOR_GROUNDS: Record<Theme, readonly string[]> = {
   dark: ["#1f1f22", "#1d1b18", "#191c1a", "#181c1f", "#1c1a1f"],
 };
 const EDITOR_GROUND = "var(--editor-bg)";
+
+/**
+ * Author-coloured text (a Markdown `<span style="color: …">`) at `alpha` on
+ * the editor ground of a `kind` window: null when it already reads at 4.5:1
+ * on every tint's ground, otherwise the nearest opaque colour with its hue
+ * that does, as a code theme's tokens are fitted.
+ */
+export function fitEditorText(hex: string, alpha: number, kind: Theme): string | null {
+  const grounds = EDITOR_GROUNDS[kind];
+  if (grounds.every((ground) => contrastRatio(compositeHex(hex, alpha, ground), ground) >= 4.5)) return null;
+  return fitContrast(compositeHex(hex, alpha, grounds[0]!), grounds, 4.5, kind);
+}
 
 /** The current line's wash: the ink at the strength Lattice's own editor uses. */
 const LINE_ALPHA = 0.05;

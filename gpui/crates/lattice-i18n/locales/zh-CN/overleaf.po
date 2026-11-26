@@ -62,6 +62,10 @@ msgstr "由 {name} 标记为已解决"
 msgid "Restore the whole project to this version on Overleaf?"
 msgstr "要在 Overleaf 上将整个项目恢复到此版本吗？"
 
+#: lattice-gpui/src/annotations/card.rs
+msgid "Share to Overleaf"
+msgstr "分享到 Overleaf"
+
 #: lattice-gpui/src/overleaf/bridge/documents/reviewing.rs
 msgid "The file is no longer open live with Overleaf. Try again."
 msgstr "此文件已不再与 Overleaf 实时同步。请重试。"

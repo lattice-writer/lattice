@@ -3,9 +3,9 @@
 ## Install Lattice
 
 1. Download the `.dmg` from the [latest release](https://github.com/lattice-writer/lattice/releases/latest) and drag Lattice into Applications. On an Intel Mac, take the file ending in `_x64.dmg`. With Homebrew: `brew install --cask lattice`.
-2. Open Lattice. It updates itself: when a new version is ready, **Lattice › Restart to Update…** installs it. You can change this in **Settings › Editor & builds › App updates**.
+2. Open Lattice. It updates itself: when a new version is ready, **Lattice › Restart to Update…** installs it. **Settings › Editor & builds › App updates** shows the version you run and has **Check for updates**.
 
-Lattice needs macOS 14 or later. Linux (AppImage) and Windows builds are experimental and have no Agent.
+Lattice needs macOS 14 or later. Windows and Linux builds are experimental, run the classic app and have no Agent; this guide describes the Mac app.
 
 ## The native Lattice
 
@@ -17,34 +17,36 @@ On a Mac, Lattice is the native app: the Mac draws it itself instead of as a web
 
 ## Set up TeX
 
-Lattice builds PDFs with your own TeX installation (MacTeX or TeX Live). If you have none, Lattice offers to install **BasicTeX** for you: it is the first step of the Get started checklist, and a build that finds no TeX offers it too. A missing LaTeX package found during a build can also be installed from the build problem itself.
+Lattice builds PDFs with your own TeX installation (MacTeX or TeX Live). If you have none, Lattice offers to install **BasicTeX** for you: it is the first step of the Get started checklist, and a build that finds no TeX offers it too. A missing LaTeX package found during a build can also be installed from the build problem itself. Typst documents need no TeX at all; see [Typst documents](typst.md).
 
-To check your setup at any time, open **Settings › TeX doctor**. It lists every tool a build uses and what the open project needs (its root document, bibliography, venue packages and fonts). **Ready to compile** means you are set. If something is red, **Install required tools** installs it; adding papers and looking up citations need a small Python tool (`uv`), which the same button installs.
+To check your setup at any time, open **Settings › TeX doctor**. It lists every tool a build uses and what the open project needs (its root document, bibliography, venue packages and fonts). **Ready to compile** means you are set. If something is red, **Install required tools** installs it. Adding papers and looking up citations need a small Python tool (`uv`), which the same button installs; the Get started panel's **Install paper tools** does the same (about 45 MB).
 
 ![The TeX doctor with every tool found: Ready to compile](images/en-tex-doctor.webp)
 
 ## Open or create a project
 
-The project menu (the project name at the top left of the window) and the **File** menu have the same actions:
+The project menu (the project name at the top left of the window) and the **File** menu hold the ways to open and start projects:
 
-- **Open another folder** (`⌘O`): any folder with a `.tex` file. Lattice works on it in place.
-- **New project** (`⌘⇧N`): name it, pick a venue template (NeurIPS, ICML, ICLR, ACL, CVPR, AAAI or a thesis class) or one of your own saved templates, then **Choose location**. In the native Lattice the button is **Choose parent folder…**: the folder you pick holds the project's own folder, and the dialog shows what it will make (for example **Will create ProjectA/Manuscript/**) before you press **Create project**. It warns you when the parent folder already has the project's name, so you don't end up with `Manuscript/Manuscript/`.
+- **Open another folder** (`⌘O`, **File › Open…**): any folder with a `.tex` or `.typ` file. Lattice works on it in place. In the project menu, **Open a folder in this window** opens it as a tab of the window you're in.
+- **New project** (`⌘⇧N`): the **Create a research project** dialog. Give it a **Project name**, pick a **Venue template** (blank article, Chinese article with ctexart, NeurIPS, ICML, ICLR, ACL, CVPR and the CVPR rebuttal, AAAI, IEEE conference and journal, ACM, Tsinghua and USTC theses, or **Blank Typst document**) or one of **My templates**, then **Choose parent folder…**. The folder you pick holds the project's own folder, and the dialog shows what it will make (for example **Will create ProjectA/Manuscript/**) before you press **Create project**. It warns you when the parent folder already has the project's name, so you don't end up with `Manuscript/Manuscript/`.
 - **Clone repository…**: a Git repository from GitHub or elsewhere.
 - **Open from Overleaf**: see [Overleaf sync](overleaf.md).
-- **Import Overleaf ZIP…**: a project downloaded from Overleaf as a ZIP.
+- **File › Import Overleaf ZIP…**: a project downloaded from Overleaf as a ZIP.
 
-![The New project dialog with a name, a venue template and Choose location](images/en-new-project.webp)
+![The Create a research project dialog with a name, a venue template and Choose parent folder](images/en-new-project.webp)
 
-Recent projects are in **File › Open Recent**. A window can hold several projects as tabs in the title bar.
+Recent projects are at the top of the project menu and in **File › Open Recent**. A window can hold several projects as tabs in the title bar.
 
 ### A repository with several manuscripts
 
 A project is just a folder, so it can be a whole repository: analysis code, data and one or more papers side by side. Opening the repository's root as the project lets the Agent work across all of it, for example checking a number in the Results against the output in `analysis/` and then revising the paper in the same conversation.
 
-In the native Lattice, start each paper with **New manuscript from template…**. It is on a folder's right-click menu, on the Project panel's own right-click menu, in its **+** menu and in the command palette. Pick a template (the same ones New project offers, your saved templates included) and a folder name, and optionally tick **Set as main document** so **Build** compiles it. Lattice writes the template's files into that folder and opens its main file. The project that is open stays open, with its settings, history and Agent conversations; no second project is made. If any of the files is already there, nothing is written and the dialog lists the files in the way.
+Start each paper with **New manuscript from template…**. It is on a folder's right-click menu, on the Project panel's own right-click menu, in its **+** menu and in the command palette (`⌘K`). Pick a **Template** (the same ones New project offers, your saved templates included) and a **Folder** (`Manuscript` to start with), and optionally tick **Set as main document** so **Build** compiles it. **Create manuscript** writes the template's files into that folder and opens its main file. The project that is open stays open, with its settings, history and Agent conversations; no second project is made. If any of the files is already there, nothing is written and the dialog lists the files in the way.
+
+![New manuscript from template: a template, the folder it writes to, and Set as main document](images/en-new-manuscript.webp)
 
 ## The Get started checklist
 
-**Guided tutorial** in the project menu opens a sample paper beside **Get started**, a six-step checklist: install LaTeX, change the title and build, jump between PDF and source, cite a paper, ask the Agent to revise a paragraph, and start your own paper. Each step has **Show me**, and steps you do on your own tick themselves. You can reopen the checklist from **Panels › Get started**.
+**Guided tutorial** in the project menu opens a sample paper beside **Get started**, a six-step checklist: install LaTeX, change the title and build, jump between PDF and source, cite a paper, ask the Agent to revise a paragraph, and start your own paper. Each step has **Show me**, and steps you do on your own tick themselves. To reopen the checklist later, run **Show Get started panel** from the command palette (`⌘K`).
 
 ![The tutorial paper with the Get started checklist on the left and the PDF on the right](images/en-get-started.webp)

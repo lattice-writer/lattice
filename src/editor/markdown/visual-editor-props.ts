@@ -22,6 +22,12 @@ export type VisualMarkdownEditorProps = {
   onChangeMarkdown: (next: string, expected: string) => boolean;
   onFlushPendingChange?: (flush: (() => boolean) | null) => void;
   optimizeForReading?: boolean;
+  /**
+   * Show `<span style="color: …">` runs in their colour and keep them through
+   * edits (inline-color.ts). The native app's editor sets it; the classic
+   * app leaves them as raw HTML, since new features go to the native app.
+   */
+  textColors?: boolean;
   /** Lets a parent place the eligibility notice outside the article body. */
   onEligibilityChange?: (reason: string | null) => void;
   synchronizeSourceScroll?: boolean;

@@ -7,8 +7,8 @@ use std::rc::Rc;
 
 use gpui::{
     App, AppContext as _, Context, Entity, FocusHandle, Global, InteractiveElement as _,
-    IntoElement, KeyDownEvent, ParentElement as _, Render, SharedString, Styled as _, Window, div,
-    px,
+    IntoElement, KeyDownEvent, ParentElement as _, Render, ScrollHandle, SharedString, Styled as _,
+    Window, div, point, px,
 };
 use lattice_i18n::{t, tc};
 use lattice_ui::{
@@ -119,6 +119,8 @@ pub struct ConfirmHost {
     /// Cancel does, as the Tauri app's dialog starts on Cancel
     /// (`confirm-action-dialog.tsx`).
     focus: FocusHandle,
+    /// Scroll state for a long confirmation body, reset for each question.
+    body_scroll: ScrollHandle,
 }
 
 struct ConfirmCenter(Entity<ConfirmHost>);
@@ -134,6 +136,7 @@ pub fn install(cx: &mut App) -> Entity<ConfirmHost> {
         pending: None,
         serial: 0,
         focus: cx.focus_handle(),
+        body_scroll: ScrollHandle::new(),
     });
     cx.set_global(ConfirmCenter(host.clone()));
     host
@@ -150,6 +153,7 @@ pub fn ask(question: Confirm, cx: &mut App) {
     let host = install(cx);
     let replaced = host.update(cx, |host, cx| {
         host.serial += 1;
+        host.body_scroll.set_offset(point(px(0.), px(0.)));
         cx.notify();
         host.pending.replace(question)
     });
@@ -210,6 +214,18 @@ impl ConfirmHost {
     pub fn dismiss(&mut self, cx: &mut Context<Self>) {
         self.close(cx);
     }
+
+    /// Vertical scroll offset of the open dialog's body, for a scenario.
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+    pub fn body_scroll_offset(&self) -> f32 {
+        f32::from(self.body_scroll.offset().y)
+    }
+
+    /// Maximum vertical scroll extent of the open dialog's body, for a scenario.
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+    pub fn body_max_scroll(&self) -> f32 {
+        f32::from(self.body_scroll.max_offset().y)
+    }
 }
 
 impl Render for ConfirmHost {
@@ -241,7 +257,9 @@ impl Render for ConfirmHost {
         } else {
             confirm.primary()
         };
-        let mut card = DialogCard::new(question.title.clone());
+        let mut card = DialogCard::new(question.title.clone())
+            .track_body_scroll(&self.body_scroll)
+            .body_parity("confirm/body");
         if question.destructive {
             card = card.mark(Icon("icons/trash.svg"), palette.danger, palette.danger_soft);
         }

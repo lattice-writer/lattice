@@ -11,7 +11,11 @@
  *   gpui     gpui.yml's `macos` job: the release build, the unit tests and
  *            the e2e scenario, which a trailer records as `e2e=full` or as
  *            `e2e=smoke+<module>+…` (the smoke flow and those modules)
- *   webkit   ci.yml's perf-bench-webkit shards
+ *   webkit   ci.yml's perf-bench-webkit shards, which measure the classic
+ *            app in WKWebView. Classic macOS is frozen (no Mac user runs it
+ *            since 0.20.0), so a change needs them only when it touches the
+ *            benchmark itself (touchesWebkitBench); main and tags
+ *            still run them on GitHub
  *
  * The e2e a change needs is the smoke flow (open, build, SyncTeX both ways,
  * edits and ⌘S, autosave, a second window, the quit that saves; every
@@ -27,9 +31,14 @@
  *   3. else the modules whose `covers` list names it
  *      (scripts/gpui-e2e-modules.mjs reads them from the scenario);
  *   4. else what the first matching E2E_TABLE row says;
- *   5. else the whole scenario. A shared file nothing maps (shell.rs)
- *      can break any module, and the trailer tells GitHub its macOS job
- *      need not run, so it runs everything.
+ *   5. else the modules that exercise its directory (dirModules): those whose
+ *      covers name something under the file's own module directory (x/ for
+ *      x.rs), else under its directory, walking up to the crate's src/ but
+ *      not to src/ itself, since every module is under that;
+ *   6. else the whole scenario. A file no module comes near (a top-level
+ *      file of lattice-gpui's src/, the terminal) can break any module, and
+ *      the trailer tells GitHub its macOS job need not run, so it runs
+ *      everything.
  *
  * A commit that changes only text on top of a gated commit (TEXT_ONLY: the
  * documentation, the release notes, the user guide and the i18n catalogs)
@@ -42,7 +51,7 @@
  * gate that is itself a docs-only pass, and it does not hold: the full gate.
  *
  * Release paths (RELEASE_PATHS) always take the full gate, so only a trailer
- * that records it (`rust gpui e2e=full webkit`, written by `pnpm ci:local`
+ * that records it (`rust gpui e2e=full`, written by `pnpm ci:local`
  * for such a diff) stands for their macOS jobs; a tree-only trailer from
  * before the stages were recorded does not. A tag still runs every job on
  * GitHub, trailer or not (scripts/ci-tier.mjs), which is where a release is
@@ -50,8 +59,23 @@
  */
 import { execFileSync } from "node:child_process";
 import { readModules } from "./gpui-e2e-modules.mjs";
+import { harnessInputs } from "./perf-bench/harness-inputs.mjs";
 
 export const FULL = "full";
+
+// The WebKit benchmark's own code (ci-tier's PERF_BENCH_INPUTS): a change to
+// it, or to a file the bench imports (harnessInputs), runs the benchmark. A
+// dependency bump (package.json, the lockfile, the pnpm setup) does not: it
+// is measured on main.
+const WEBKIT_BENCH_TOOLING = /^(scripts\/perf-bench(\.mjs|\/)|tools\/(mock-backend|perf-bench)\/|\.github\/actions\/bench-page\/)/;
+const NOT_BENCH_TOOLING = /^(src\/|package\.json$|pnpm-lock\.yaml$|\.github\/actions\/setup-pnpm\/)/;
+
+/** Whether these files change the WebKit benchmark itself. */
+export function touchesWebkitBench(files) {
+  if (files.some((file) => WEBKIT_BENCH_TOOLING.test(file))) return true;
+  const inputs = new Set(harnessInputs().filter((file) => !NOT_BENCH_TOOLING.test(file)));
+  return files.some((file) => inputs.has(file));
+}
 
 // What ships or signs a release: the release workflows, the bundle
 // configuration, entitlements, Info.plist and icons, the updater in both
@@ -72,6 +96,15 @@ const AGENT_MODULES = [...new Set([...ISLAND_MODULES, ...[...MODULE_COVERS.keys(
  * `covers`; the others apply to files no `covers` names. The first
  * matching row wins; a file no row and no `covers` matches needs FULL.
  */
+/**
+ * Files the macOS scenario cannot show apart from the smoke flow, though
+ * another platform's may: code compiled only for Linux or Windows, and the
+ * Tauri modules' catalogs, which no island module reads in Chinese. Kept out
+ * of E2E_TABLE, whose empty rows the Windows and Linux tiers read as files no
+ * e2e step reads anywhere (windows-e2e-tier.mjs NO_STEP).
+ */
+const MACOS_SMOKE = [/^gpui\/crates\/lattice-gpui\/src\/native_(linux|windows)\.rs$/, /^src\/locales\//];
+
 export const E2E_TABLE = [
   // The scenario's own harness, runner and fixture: every module runs on them.
   [/^gpui\/crates\/lattice-gpui\/src\/scenario(\.rs$|\/)/, FULL],
@@ -91,18 +124,64 @@ export const E2E_TABLE = [
   [/^gpui\/(Cargo\.(toml|lock)|rust-toolchain\.toml|\.cargo\/)/, FULL],
   [/^gpui\/crates\/[^/]+\/(Cargo\.toml|build\.rs|src\/(main|lib)\.rs)$/, FULL],
   [/^gpui\/crates\/lattice-gpui\/src\/app\.rs$/, FULL],
-  [/^gpui\/crates\/(lattice-ui|lattice-i18n)\//, FULL],
+  // lattice-i18n's code; its catalogs are text, below.
+  [/^gpui\/crates\/(lattice-ui\/|lattice-i18n\/(?!locales\/))/, FULL],
+  // The window's root view (shell.rs and the files it is split into: every
+  // command's handler, every panel's drawing, the part registry) and the
+  // native input and private pasteboard every module's clicks, keys and
+  // pastes go through. A module covering some other file of shell/ is no
+  // evidence these are exercised (dirModules).
+  [/^gpui\/crates\/lattice-gpui\/src\/(shell\.rs|shell\/(actions|views|parts|workspaces|entries|ground|editor_events)\.rs|native\.rs)$|^gpui\/crates\/lattice-gpui\/src\/native\//, FULL],
   [/^src-tauri\/lattice-(core|theme)\//, FULL],
   [/^design-system\//, FULL],
   [/^\.github\/workflows\/gpui\.yml$/, FULL],
+  // lattice-i18n's string catalogs: the build and the unit tests check them
+  // (lattice-i18n's coverage test), settings and find_in_file read zh-CN
+  // strings, and the rest of the strings as shown are left to the nightly
+  // full gate.
+  [/^gpui\/crates\/lattice-i18n\/locales\//, ["settings", "find_in_file"]],
+  // Project find and replace, which the documents module drives
+  // (shell/documents.rs) and find_in_file shares.
+  [/^gpui\/crates\/lattice-gpui\/src\/search\/(find|replace)\.rs$/, ["documents", "find_in_file"]],
+  // The shared search field: the shortcut sheet, project find and replace,
+  // and the pickers type into it.
+  [/^gpui\/crates\/lattice-gpui\/src\/search\/field\.rs$/, ["documents", "find_in_file", "focus_trap", "insert_pickers", "shortcut_sheet"]],
   // Crates one part of the scenario exercises.
   [/^gpui\/crates\/lattice-board(-core)?\//, ["drawing_drop", "structured"]],
   [/^gpui\/crates\/lattice-webview\//, ISLAND_MODULES],
+  // The script that builds the island pages: it runs gpui/islands/vite.config.ts
+  // and nothing else, so it takes the modules that config's covers pick.
+  [/^gpui\/script\/build-islands$/, ["islands", "markdown", "structured"]],
   // The Tauri app's modules the webview islands are built from
   // (gpui/islands/vite.config.ts; GPUI_INPUTS in ci-tier.mjs lists them).
   [/^src\/agent\//, AGENT_MODULES],
   [/^src\//, ISLAND_MODULES],
 ];
+
+/**
+ * The modules that exercise the directory of a file no `covers` names
+ * (never for lattice-gpui's shell/):
+ * those covering something under its own module directory (`x/` for
+ * `x.rs`), else under the nearest directory above it that any module covers
+ * something in, stopping short of the crate's `src/`, else the module named
+ * for the file or one of its directories. [] when none does.
+ */
+export function dirModules(file, covers = MODULE_COVERS) {
+  const src = /^gpui\/crates\/[^/]+\/src\//.exec(file)?.[0];
+  // shell/ holds the root view's feature flows: a module covering one of
+  // them says nothing about another, so one no covers names runs it all.
+  if (!src || file.startsWith("gpui/crates/lattice-gpui/src/shell/")) return [];
+  const prefixes = [file.replace(/\.rs$/, "/")];
+  for (let dir = file.slice(0, file.lastIndexOf("/") + 1); dir.length > src.length; dir = dir.slice(0, dir.slice(0, -1).lastIndexOf("/") + 1)) prefixes.push(dir);
+  for (const prefix of prefixes) {
+    const found = [...covers].filter(([, list]) => list.some((cover) => cover.startsWith(prefix))).map(([module]) => module);
+    if (found.length) return found;
+  }
+  // A module named for the file or a directory it is in (card_previews/math_page.rs).
+  const names = file.slice(src.length).replace(/\.rs$/, "").split("/").reverse();
+  const named = names.find((name) => covers.has(name));
+  return named ? [named] : [];
+}
 
 /**
  * The e2e these GPUI inputs need: `full`, or the modules beyond the smoke
@@ -126,12 +205,13 @@ export function e2eNeeds(gpuiFiles, covers = MODULE_COVERS) {
       }
     }
     if (!picked.size) {
-      const row = E2E_TABLE.find(([pattern]) => pattern.test(file));
-      if (!row || row[1] === FULL) {
+      const row = MACOS_SMOKE.some((pattern) => pattern.test(file)) ? [null, []] : E2E_TABLE.find(([pattern]) => pattern.test(file));
+      const near = row ? [] : dirModules(file, covers);
+      if (row?.[1] === FULL || (!row && !near.length)) {
         fullBecause.push(file);
         continue;
       }
-      for (const module of row[1]) picked.add(module);
+      for (const module of row ? row[1] : near) picked.add(module);
     }
     for (const module of picked) (why[module] ??= []).push(file);
   }
@@ -144,7 +224,7 @@ export function macosNeeds(tier, files) {
     rust: tier.jobs.rust,
     gpui: tier.jobs.gpui,
     e2e: !tier.jobs.gpui ? null : tier.full ? { full: true, modules: [], why: {}, fullBecause: ["full run"] } : e2eNeeds(tier.gpuiFiles),
-    webkit: tier.jobs["perf-bench"],
+    webkit: tier.jobs["perf-bench"] && touchesWebkitBench(files),
     release: files.filter((file) => RELEASE_PATHS.test(file)),
   };
 }
@@ -184,9 +264,13 @@ export function parseTrailer(message) {
   return cover;
 }
 
-/** Whether a trailer records every stage of the full gate, as a release path needs. */
+/**
+ * Whether a trailer records every stage of the full gate, as a release path
+ * needs. The WebKit benchmark is not one (macosNeeds); one the change needs
+ * is checked as its own group.
+ */
 export function fullCover(cover) {
-  return Boolean(cover && !cover.legacy && cover.rust && cover.gpui && cover.e2e === FULL && cover.webkit);
+  return Boolean(cover && !cover.legacy && cover.rust && cover.gpui && cover.e2e === FULL);
 }
 
 /** Whether a recorded e2e stands for the one a change needs. */
@@ -206,7 +290,7 @@ export function coveredJobs(cover, needs) {
     let reason = null;
     if (!needs[group]) reason = null;
     else if (!cover) reason = "no CI-local trailer names this tree";
-    else if (needs.release.length && !fullCover(cover)) reason = `release paths changed (${needs.release.slice(0, 3).join(", ")}) and the trailer does not record the full gate (rust gpui e2e=full webkit)`;
+    else if (needs.release.length && !fullCover(cover)) reason = `release paths changed (${needs.release.slice(0, 3).join(", ")}) and the trailer does not record the full gate (rust gpui e2e=full)`;
     else if (!cover[group]) reason = `the trailer records no ${group} stage`;
     else if (group === "gpui" && !e2eCovered(cover.e2e, needs.e2e)) {
       reason = needs.e2e.full ? `the change needs the whole e2e (${needs.e2e.fullBecause.slice(0, 3).join(", ")})` : `the trailer's e2e lacks ${needs.e2e.modules.filter((module) => !cover.e2e?.includes(module)).join(", ")}`;

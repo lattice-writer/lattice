@@ -8,7 +8,9 @@ name: Nightly e2e
 #
 # On the Mac mini through runner-up's lattice-mac pool, as the release jobs
 # (docs/release-process.md), under the in-app lock every windowed run there
-# takes, so no crew gate or hand test drives the screen under it. The
+# takes, so no crew gate or hand test drives the screen under it. It takes
+# that lock per chunk of e2e modules and lets it go in between, so a queued
+# gate or lab run waits minutes, not the whole scenario. The
 # repository variable LATTICE_MACOS_RUNNER moves it with the release jobs.
 # Holding runner-up's one place, a release tag pushed meanwhile waits for it.
 #
@@ -33,7 +35,7 @@ jobs:
   e2e:
     if: github.repository == 'lattice-writer/lattice' || github.repository == 'leo1oel/lattice'
     runs-on: ${{ vars.LATTICE_MACOS_RUNNER || 'lattice-mac' }}
-    timeout-minutes: 460
+    timeout-minutes: 420
     steps:
       - uses: actions/checkout@v7
         with:
@@ -52,23 +54,13 @@ jobs:
         run: |
           dir="${LATTICE_GPUI_BUILD_DIR:-$HOME/Library/Caches/lattice-gpui-build}"
           mkdir -p "$dir/main-baseline" && ls "$dir/main-baseline" >/dev/null
-      # Waits up to 90 minutes for a crew gate or measurement to free the
-      # lock; giving up (exit 75) leaves no record, which the report counts.
-      # Its own timeout leaves the job time for the report.
+      # Each chunk of modules, and the rerun, waits up to 90 minutes for the
+      # in-app lock (scripts/gpui-main-baseline.mjs --chunks); one that gives
+      # up is an error in the record, which the report counts. Its own
+      # timeout leaves the job time for the report.
       - name: Gate, release build and the whole e2e on main
         timeout-minutes: 400
-        run: scripts/inapp-lock --thread "nightly-e2e $(git rev-parse --short HEAD)" --wait 5400 -- node scripts/gpui-nightly.mjs run
-      # The idle guard's 30-minute memory growth (gpui/script/idle-guard
-      # --growth), after the lock is given back. The one windowed run on the
-      # Mac mini outside the in-app lock, by exception (approved 2026-11-26):
-      # the app never activates, never takes the key window
-      # (GPUI_LAB_ASSUME_KEY) and sends no input, so it cannot disturb the
-      # runs that hold the lock, and holding it for half an hour would keep
-      # them out.
-      - name: Idle memory growth, outside the lock
-        if: ${{ !cancelled() }}
-        timeout-minutes: 40
-        run: node scripts/gpui-nightly.mjs growth
+        run: node scripts/gpui-nightly.mjs run
       - name: Open, update or close the nightly issue
         if: ${{ !cancelled() }}
         env:
