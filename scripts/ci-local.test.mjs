@@ -30,6 +30,10 @@ describe.skipIf(process.platform === "win32")("ci:local", () => {
     expect(holderRunsE2e({ kind: "e2e", pid: process.pid, command: "gpui/script/e2e --only smoke out.json" }, live)).toBe(true);
     expect(holderRunsE2e({ kind: "quiet", pid: process.pid, command: "script/e2e --only smoke out.json" }, live)).toBe(false);
     expect(holderRunsE2e({ pid: process.pid, command: "node scripts/gpui-e2e-light.mjs && measure/series.sh" }, live)).toBe(false);
+    expect(holderRunsE2e({ pid: process.pid, command: "script/e2e" }, live)).toBe(true);
+    expect(holderRunsE2e({ pid: process.pid, command: "gpui/script/e2e --only smoke out.json" }, live)).toBe(true);
+    expect(holderRunsE2e({ pid: process.pid, command: "script/e2e-light" }, live)).toBe(false);
+    expect(holderRunsE2e({ pid: process.pid }, live)).toBe(false);
     expect(holderRunsE2e({ kind: "e2e", pid: process.pid }, () => [])).toBe(false);
     const gone = spawnSync("sh", ["-c", "echo $$"], { encoding: "utf8" }).stdout.trim();
     expect(holderRunsE2e({ kind: "e2e", pid: Number(gone) }, () => [Number(gone)])).toBe(false);

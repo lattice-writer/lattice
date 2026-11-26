@@ -21,6 +21,7 @@
 #![cfg(target_os = "macos")]
 
 mod chat;
+mod editor_comments;
 mod live;
 mod local_copy;
 mod margin;
@@ -544,6 +545,7 @@ pub(super) const MODULE: super::registry::Module = super::registry::Module {
     covers: &[
         "gpui/crates/lattice-gpui/src/overleaf",
         "gpui/crates/lattice-gpui/src/shell/overleaf_flow.rs",
+        "gpui/crates/lattice-gpui/src/shell/overleaf_collab.rs",
     ],
     run: |run, cx, steps, fixture| Box::pin(run.overleaf(cx, steps, &fixture.root)),
 };

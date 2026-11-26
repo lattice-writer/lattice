@@ -92,7 +92,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as sleep } from "node:timers/promises";
 import { FULL, RELEASE_PATHS, coveredJobs, docsGate, findGate, formatTrailer, macosNeeds, mainMergeRegate } from "./ci-local-select.mjs";
-import { JOBS, ciTier } from "./ci-tier.mjs";
+import { JOBS, ciTier, selectorListsEdited } from "./ci-tier.mjs";
 import { changedFiles, gateStages, runStages } from "./gate-changed.mjs";
 import { readBaseline } from "./gpui-e2e-light.mjs";
 import { baselineDir } from "./gpui-main-baseline.mjs";
@@ -140,7 +140,10 @@ const LOCAL = {
 /**
  * Whether the in-app lock's holder (its record, as scripts/inapp-lock writes
  * it) runs a GPUI e2e scenario: it said so (--kind e2e) and is the live
- * process that holds the file. Such a run drives only its own windows, so a
+ * process that holds the file. A record with no kind at all comes from a
+ * branch's scripts/inapp-lock from before --kind (lattice#1300); it counts as
+ * an e2e when its command is gpui/script/e2e, so gates stop waiting behind
+ * those branches' e2e runs. Such a run drives only its own windows, so a
  * build beside it costs it some speed and nothing else, and a waiting gate
  * builds meanwhile and queues for the lock only for its e2e. Any other holder
  * (a perf measurement, a hand test, the WebKit benchmark, plain lockf) keeps
@@ -148,7 +151,8 @@ const LOCAL = {
  * before it could clear it, or one that cannot be read.
  */
 export function holderRunsE2e(record, holders = lockHolders) {
-  if (record?.kind !== "e2e" || !Number.isInteger(record.pid)) return false;
+  const e2e = record?.kind === "e2e" || (record?.kind === undefined && /^(\S*\/)?script\/e2e(\s|$)/.test(record?.command ?? ""));
+  if (!e2e || !Number.isInteger(record.pid)) return false;
   try {
     process.kill(record.pid, 0);
   } catch (error) {
@@ -274,7 +278,7 @@ export function localStages(tier, files, mergeBase, e2eNeed = macosNeeds(tier, f
  * first-parent line when everything since it is text and its trailer covers
  * the rest of the branch, or null with the reason printed.
  */
-export function docsOnlyPass(files, cwd = repo) {
+export function docsOnlyPass(files, cwd = repo, mergeBase = null) {
   const gate = findGate({ cwd });
   if (!gate) return null;
   const check = docsGate(gate, { cwd, worktree: true });
@@ -284,7 +288,7 @@ export function docsOnlyPass(files, cwd = repo) {
   }
   if (!check.files.length) return null;
   const rest = files.filter((file) => !check.files.includes(file));
-  const gap = Object.values(coveredJobs(check.cover, macosNeeds(ciTier(rest), rest))).find((group) => !group.covered);
+  const gap = Object.values(coveredJobs(check.cover, macosNeeds(ciTier(rest, { selector: !selectorListsEdited(mergeBase, rest) }), rest))).find((group) => !group.covered);
   if (gap) {
     console.log(`ci:local: no docs-only pass: the gate at ${gate.slice(0, 9)} does not cover the rest of the branch (${gap.reason})`);
     return null;
@@ -316,13 +320,13 @@ async function main() {
   }
   const started = Date.now();
   const { mergeBase, files } = changedFiles(options.base);
-  const docs = options.full ? null : docsOnlyPass(files);
+  const docs = options.full ? null : docsOnlyPass(files, repo, mergeBase);
   if (docs) {
     await docsOnlyMain({ docs, mergeBase, files, options, started });
     return;
   }
   const release = files.filter((file) => RELEASE_PATHS.test(file));
-  const tier = ciTier(files, { full: options.full || release.length > 0 });
+  const tier = ciTier(files, { full: options.full || release.length > 0, selector: !selectorListsEdited(mergeBase, files) });
   const needs = macosNeeds(tier, files);
   console.log(`ci:local: ${files.length} changed file(s) against ${options.base} (${mergeBase.slice(0, 9)})`);
   if (release.length) console.log(`ci:local: release paths changed (${release.slice(0, 3).join(", ")}): the full gate runs, and only its full trailer lets GitHub skip the macOS jobs`);
@@ -374,7 +378,10 @@ async function main() {
     return;
   }
   console.log(`ci:local: every stage passed in ${minutes} min`);
-  if (!tier.jobs.rust && !tier.jobs.gpui && !needs.webkit) return;
+  if (!tier.jobs.rust && !tier.jobs.gpui && !needs.webkit) {
+    console.log("ci:local: no macOS job to cover; push without a CI-local trailer");
+    return;
+  }
   if (stages.some((stage) => stage.skip === "opens windows; --headless")) {
     console.log("ci:local: --headless skipped the stages that open windows; run it whole on a Mac that may open windows for the CI-local trailer");
     return;

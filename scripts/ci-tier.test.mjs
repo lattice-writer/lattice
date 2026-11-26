@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { GPUI_INPUTS, JOBS, ciTier, localMacosPass, trailerHonoured, wantsFull } from "./ci-tier.mjs";
+import { CI_CONTROL, CI_CONTROL_TESTS, GPUI_INPUTS, JOBS, ciTier, localMacosPass, trailerHonoured, wantsFull } from "./ci-tier.mjs";
 
 const repo = path.resolve(import.meta.dirname, "..");
 
@@ -81,10 +81,39 @@ describe("ci-tier", () => {
   it("runs a workflow's every job when it changes, and everything for the shared pieces", () => {
     expect(running([".github/workflows/gpui.yml"]).on).toEqual(["gpui"]);
     expect(running([".github/workflows/ci.yml"]).on).toEqual(JOBS.filter((job) => job !== "gpui"));
-    expect(running(["scripts/ci-tier.mjs"]).on).toEqual(JOBS);
     expect(running([".github/actions/setup-pnpm/action.yml"]).on).toEqual(JOBS);
-    for (const file of ["scripts/ci-local.mjs", "scripts/ci-local-select.mjs", "scripts/gpui-e2e-modules.mjs"]) expect(running([file]).on, file).toEqual(JOBS);
+    // The selector alone runs its own tests; with any other file, everything.
+    for (const file of ["scripts/ci-tier.mjs", "scripts/ci-local.mjs", "scripts/ci-local-select.mjs", "scripts/gpui-e2e-modules.mjs", "scripts/windows-e2e-tier.mjs", "scripts/linux-gpui-e2e-tier.mjs"]) {
+      const tier = ciTier([file, "scripts/ci-tier.test.mjs", "docs/agent-validation.md"], { scan });
+      expect(JOBS.filter((job) => tier.jobs[job]), file).toEqual(["vitest", "lint-build"]);
+      expect(tier.vitestFiles, file).toContain("scripts/windows-e2e-tier.test.mjs");
+    }
+    const reads = ciTier(["scripts/ci-tier.mjs", "docs/spec.md"], { scan: { ...scan, testReads: [{ read: "docs/spec.md", test: "src/spec.test.ts" }] } });
+    expect(reads.vitestFiles).toContain("src/spec.test.ts");
+    for (const other of ["gpui/crates/lattice-gpui/src/shell.rs", "src/App.tsx", "scripts/inapp-lock", "src-tauri/src/lib.rs"]) {
+      expect(running(["scripts/ci-local-select.mjs", other]).on, other).toEqual(JOBS);
+    }
     expect(ciTier(["README.md"], { full: true, scan }).jobs).toEqual(Object.fromEntries(JOBS.map((job) => [job, true])));
+  });
+
+  it("lists every test that imports a CI-selection script as its own", () => {
+    const scripts = path.resolve(import.meta.dirname);
+    const imports = (file, seen = new Set()) => {
+      if (seen.has(file) || !existsSync(file)) return seen;
+      seen.add(file);
+      for (const [, spec] of readFileSync(file, "utf8").matchAll(/(?:from|import\(?)\s*["'](\.{1,2}\/[^"']+)["']/g)) imports(path.resolve(path.dirname(file), spec), seen);
+      return seen;
+    };
+    const control = [...CI_CONTROL].map((file) => path.resolve(scripts, "..", file));
+    const reaching = readdirSync(scripts)
+      .filter((name) => /\.test\.(mjs|ts)$/.test(name))
+      .filter((name) => [...imports(path.join(scripts, name))].some((file) => control.includes(file)))
+      .map((name) => "scripts/" + name);
+    expect(reaching.sort()).toEqual([...CI_CONTROL_TESTS].sort());
+    // selectorListsEdited reads the lists line by line.
+    const source = readFileSync(path.join(scripts, "ci-tier.mjs"), "utf8");
+    for (const name of ["CI_CONTROL_TESTS", "CI_CONTROL", "DOCS"]) expect(source, name).toMatch(new RegExp(`^(export )?const ${name} = .*;$`, "m"));
+    expect(JOBS.filter((job) => ciTier(["scripts/ci-tier.mjs"], { scan, selector: false }).jobs[job])).toEqual(JOBS);
   });
 
   it("reads the CI: full trailer and the ci:full label", () => {

@@ -28,10 +28,15 @@
  *
  * Documentation alone (docs/, top-level and .github/ Markdown, gpui/docs/,
  * LICENSE) turns on nothing. A change to ci.yml turns on all of ci.yml's
- * jobs, one to gpui.yml all of gpui.yml's, and one to this file, to what
- * picks the local stages and the trailer's cover (ci-local.mjs,
- * ci-local-select.mjs, gpui-e2e-modules.mjs) or to .github/actions/
- * everything.
+ * jobs, one to gpui.yml all of gpui.yml's, and one to .github/actions/
+ * everything. A change to what picks the jobs, the local stages and the
+ * trailer's cover (CI_CONTROL: this file, ci-local.mjs, ci-local-select.mjs,
+ * gpui-e2e-modules.mjs and the Windows and Linux e2e tiers) runs their unit
+ * tests and the lint and build job when nothing else but their tests and
+ * documentation changed (selectorOnly): what can go wrong there is a wrong
+ * pick, which those tests check, while the apps' own jobs would only run
+ * main's code again. With any other file it runs everything, so a selector
+ * change is never judged by its own picks.
  *
  * `--github` is the workflows' `changes` step. ci.yml and gpui.yml run only
  * for a release tag and by dispatch: pull requests and pushes to branches or
@@ -67,7 +72,7 @@
  *   node scripts/ci-tier.mjs --github                 write $GITHUB_OUTPUT
  */
 import { execFileSync } from "node:child_process";
-import { appendFileSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { coveredJobs, macosNeeds, parseTrailer, resolveCover } from "./ci-local-select.mjs";
@@ -82,9 +87,13 @@ const git = (...args) => execFileSync("git", args, { cwd: repo, encoding: "utf8"
 
 export const JOBS = ["vitest", "lint-build", "perf-bench", "rust", "gpui", "literature-worker", "open-slide-runtime", "research-env", "synara-pin"];
 const CI_JOBS = JOBS.filter((job) => job !== "gpui");
-// What decides which jobs run and which a CI-local trailer may skip: a
-// change to any of them runs everything.
-const CI_CONTROL = new Set(["scripts/ci-tier.mjs", "scripts/ci-local-select.mjs", "scripts/gpui-e2e-modules.mjs", "scripts/ci-local.mjs", "scripts/windows-e2e-tier.mjs", "scripts/linux-gpui-e2e-tier.mjs"]);
+// What decides which jobs run and which a CI-local trailer may skip. A
+// change to them alone runs CI_CONTROL_TESTS, every test that imports one of
+// them (ci-tier.test.mjs checks the list); beside any other file, everything
+// (selectorOnly). A diff that edits these lists themselves runs everything
+// (github), so a change never widens the rule that judges it.
+export const CI_CONTROL_TESTS = ["scripts/ci-local-select.test.mjs", "scripts/ci-local.test.mjs", "scripts/ci-tier.test.mjs", "scripts/gpui-e2e-light.test.mjs", "scripts/gpui-e2e-modules.test.mjs", "scripts/gpui-e2e-verdict.test.mjs", "scripts/gpui-main-baseline-agent.test.mjs", "scripts/gpui-main-baseline.test.mjs", "scripts/gpui-nightly.test.mjs", "scripts/linux-gpui-e2e-tier.test.mjs", "scripts/windows-e2e-tier.test.mjs"];
+export const CI_CONTROL = new Set(["scripts/ci-tier.mjs", "scripts/ci-local-select.mjs", "scripts/gpui-e2e-modules.mjs", "scripts/ci-local.mjs", "scripts/windows-e2e-tier.mjs", "scripts/linux-gpui-e2e-tier.mjs"]);
 
 // What `pnpm build` reads besides the sources tsc already checked: a change
 // to any of them can move the bundle the budgets measure.
@@ -147,13 +156,30 @@ function gpuiIncludes() {
 }
 
 /**
+ * Whether the diff from `base` edits a line (not a comment) naming one of
+ * the lists that decide what counts as the selector's change alone. Such a
+ * diff takes every job (ciTier's `selector: false`), so a change never
+ * widens the rule that judges it; the lists stay one-line literals for this
+ * (ci-tier.test.mjs).
+ */
+export function selectorListsEdited(base, files) {
+  if (!base || !files.includes("scripts/ci-tier.mjs")) return false;
+  // Against the working tree, which is HEAD in CI and holds a local run's
+  // uncommitted edits too.
+  return git("diff", "-U0", base, "--", "scripts/ci-tier.mjs")
+    .split("\n")
+    .filter((line) => /^[-+](?![-+])/.test(line) && !/^[-+]\s*(\/\/|\*|\/\*)/.test(line))
+    .some((line) => /\b(CI_CONTROL|CI_CONTROL_TESTS|DOCS)\b/.test(line));
+}
+
+/**
  * The tier for these changed files: each job's flag, and the first files
  * that turned each on. When the only Vitest inputs that changed are files
  * tests name (a Rust source, a spec), `vitestFiles` lists just those tests
  * and the shards run them alone. `scan` carries what the git scans find;
  * tests pass their own.
  */
-export function ciTier(files, { full = false, scan = null } = {}) {
+export function ciTier(files, { full = false, scan = null, selector = true } = {}) {
   const jobs = Object.fromEntries(JOBS.map((job) => [job, full]));
   const why = Object.fromEntries(JOBS.map((job) => [job, full ? ["full run"] : []]));
   if (full) return { full, jobs, why, vitestFiles: [], gpuiFiles: [], docsOnly: false };
@@ -172,6 +198,26 @@ export function ciTier(files, { full = false, scan = null } = {}) {
     if (job === "gpui" && !gpuiFiles.includes(file)) gpuiFiles.push(file);
     if (why[job].length < 5 && !why[job].includes(file)) why[job].push(file);
   };
+  // Only the selector, its tests and documentation: their tests and the
+  // lint, not the apps' jobs on code main already ran.
+  // A deleted test of the list would match nothing and pass, so it runs
+  // everything.
+  const selectorOnly =
+    selector &&
+    files.some((file) => CI_CONTROL.has(file)) &&
+    files.every((file) => CI_CONTROL.has(file) || CI_CONTROL_TESTS.includes(file) || DOCS.test(file)) &&
+    CI_CONTROL_TESTS.every((test) => existsSync(path.join(repo, test)));
+  if (selectorOnly) {
+    for (const file of files.filter((file) => !DOCS.test(file))) {
+      on("vitest", file);
+      on("lint-build", file);
+    }
+    // A test that reads a changed doc runs, as it would without the selector.
+    for (const { read, test } of testReads) {
+      if (files.some((file) => DOCS.test(file) && (file === read || file.startsWith(`${read}/`)))) vitestFiles.add(test);
+    }
+    return { full, jobs, why, vitestFiles: [...new Set([...CI_CONTROL_TESTS, ...vitestFiles])].sort(), gpuiFiles, docsOnly: false };
+  }
   for (const file of files) {
     if (CI_CONTROL.has(file) || file.startsWith(".github/actions/")) {
       vitestAll = true;
@@ -269,14 +315,14 @@ function github() {
 
   const files = base ? git("-c", "core.quotePath=false", "diff", "--no-renames", "--name-only", base, "HEAD").split("\n").filter(Boolean) : [];
   if (!reason && event === "workflow_dispatch" && files.length === 0) reason = "a dispatch of a branch that changes nothing (a baseline)";
-  const tier = ciTier(files, { full: Boolean(reason) });
+  const tier = ciTier(files, { full: Boolean(reason), selector: !selectorListsEdited(base, files) });
   if (platform !== "all") for (const job of JOBS) tier.jobs[job] = job === "rust" || job === "gpui";
   const named = trailerHonoured({ full: tier.full, ref }) && localMacosPass(message, git("rev-parse", "HEAD^{tree}")) ? parseTrailer(message) : null;
   // A docs-only pass checked the text files since its gate; the gate's own
   // cover has to cover everything else the branch changes.
   const { cover, docsFiles, reason: docsRefused } = resolveCover(named, { cwd: repo });
   const gated = files.filter((file) => !docsFiles.includes(file));
-  const local = coveredJobs(cover, macosNeeds(docsFiles.length ? ciTier(gated) : tier, gated));
+  const local = coveredJobs(cover, macosNeeds(docsFiles.length ? ciTier(gated, { selector: !selectorListsEdited(base, gated) }) : tier, gated));
   const windows = windowsE2e(tier.gpuiFiles, { full: tier.full });
   const linux = linuxE2e(tier.gpuiFiles, { full: tier.full });
   const groups = { rust: "Rust", gpui: "GPUI", webkit: "WebKit benchmark" };
@@ -299,7 +345,7 @@ function github() {
     "",
     "| jobs | run | first inputs |",
     "| --- | --- | --- |",
-    ...(tier.vitestFiles.length ? [`Vitest runs only the tests that name a changed file: ${tier.vitestFiles.join(", ")}.`, ""] : []),
+    ...(tier.vitestFiles.length ? [`Vitest runs only these tests (those that name a changed file, or the CI-selection scripts' own): ${tier.vitestFiles.join(", ")}.`, ""] : []),
     ...JOBS.map((job) => `| ${job} | ${tier.jobs[job] ? "yes" : "no"} | ${tier.why[job].map((file) => `\`${file}\``).join(", ")} |`),
     ...(tier.jobs.gpui
       ? [
