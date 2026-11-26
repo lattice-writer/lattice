@@ -168,8 +168,9 @@ def drop_ticket(ticket):
 
 def waiters():
     """The live, polling tickets in the order they came. Those whose waiter is
-    gone (nothing holds their flock) are removed, a draft one died before
-    renaming included; a live one untouched for STALLED seconds is left out."""
+    gone (nothing holds their flock) are removed, and so is a draft left
+    unlocked for STALLED seconds (one is unlocked for an instant while its
+    waiter makes it); a live ticket untouched that long is left out."""
     try:
         names = sorted(os.listdir(QUEUE))
     except FileNotFoundError:
@@ -187,6 +188,8 @@ def waiters():
             if not name.startswith(".") and time.time() - os.fstat(fd).st_mtime < STALLED:
                 live.append(path)
         else:
+            if name.startswith(".") and time.time() - os.fstat(fd).st_mtime < STALLED:
+                continue
             try:
                 os.unlink(path)
             except FileNotFoundError:
