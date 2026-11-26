@@ -147,9 +147,9 @@ impl Run {
                     .map(|comment| comment.id.clone())
             })
         });
-        let copied = match &id {
+        let (copied, drags, selected) = match &id {
             Some(id) => self.copy_note_words(cx, &editor, QUOTE, id).await?,
-            None => None,
+            None => (None, 0, String::new()),
         };
         let shared = id.as_ref().and_then(|id| {
             cx.update(|cx| editor.read(cx).annotation_card_parts())
@@ -174,7 +174,7 @@ impl Run {
         steps.check(
             "a note's words in its card are selected with a drag and copied with ⌘C; unlinked, neither the selection toolbar nor the card offers Overleaf",
             copied.as_deref() == Some(NOTE) && shared == Some(false) && !toolbar_offers,
-            json!({ "id": id, "copied": copied, "card_shares": shared, "toolbar_offers": toolbar_offers }),
+            json!({ "id": id, "copied": copied, "drags": drags, "selected": selected, "card_shares": shared, "toolbar_offers": toolbar_offers }),
         );
 
         // The titlebar's button opens the panel, which lists it.
@@ -308,18 +308,19 @@ impl Run {
     }
 
     /// The note `id`'s words selected in its card with a native drag across
-    /// them, and what ⌘C put on the clipboard.
+    /// them, and what ⌘C put on the clipboard, with how many drags it took
+    /// and what the window's selection held before ⌘C.
     async fn copy_note_words(
         &self,
         cx: &mut AsyncApp,
         editor: &Entity<EditorPanel>,
         quote: &str,
         id: &str,
-    ) -> Result<Option<String>> {
+    ) -> Result<(Option<String>, u32, String)> {
         // The pasteboard is read and written inside a foreground section.
         let _front = self.foreground(cx, "annotation card copy").await?;
         let Some(note) = self.open_note_card(cx, editor, quote, id).await? else {
-            return Ok(None);
+            return Ok((None, 0, String::new()));
         };
         cx.update(|cx| cx.write_to_clipboard(gpui::ClipboardItem::new_string(String::new())));
         // From the first line's start to past the last line's end.
@@ -330,8 +331,11 @@ impl Run {
         // ⌘C copies the window's selection only once the drag has made one.
         // On GitHub's macOS runner a drag can end with none, and ⌘C then falls
         // through to the editor's own Copy of its current line, so the drag is
-        // tried again until the selection holds words, and ⌘C waits for them.
-        for _ in 0..3 {
+        // tried again, up to three times, until the selection holds words.
+        let mut drags = 0;
+        let mut selected = String::new();
+        while drags < 3 && selected.is_empty() {
+            drags += 1;
             native::send_mouse(native, native::Mouse::Down, from)?;
             for step in 1..=12 {
                 let t = step as f32 / 12.;
@@ -341,20 +345,17 @@ impl Run {
             }
             native::send_mouse(native, native::Mouse::Up, to)?;
             let started = std::time::Instant::now();
-            let mut selected = false;
-            while !selected && started.elapsed() < Duration::from_secs(2) {
+            while selected.is_empty() && started.elapsed() < Duration::from_secs(2) {
                 self.pause(cx, Duration::from_millis(100)).await;
                 selected = self.with_window(cx, |_, window, cx| {
-                    !gpui_kit::base::TextSelection::selected_text(window, cx).trim().is_empty()
+                    gpui_kit::base::TextSelection::selected_text(window, cx).trim().to_string()
                 })?;
-            }
-            if selected {
-                break;
             }
         }
         self.press(cx, 'c', true).await?;
         self.pause(cx, Duration::from_millis(200)).await;
-        Ok(cx.update(|cx| cx.read_from_clipboard().and_then(|item| item.text())))
+        let copied = cx.update(|cx| cx.read_from_clipboard().and_then(|item| item.text()));
+        Ok((copied, drags, selected))
     }
 }
 
