@@ -253,6 +253,17 @@ mod tests {
         }
     }
 
+    /// A project at `<temp>/lattice-<label>-<id>/ProjectA/paper`, so the
+    /// folder above it is deep enough (`MIN_COMPONENTS`) wherever the
+    /// temporary folder is: Linux's `/tmp` is a single named folder, so a
+    /// project made straight in it has a folder above that is never given.
+    fn deep_project(label: &str) -> (Fixture, PathBuf, PathBuf) {
+        let folder = Fixture::folder(label, "ProjectA");
+        let root = crate::project::create(&folder.root, "paper").unwrap();
+        let parent = folder.root.clone();
+        (folder, parent, root)
+    }
+
     #[test]
     fn only_folders_above_the_project_are_read_from_the_manifest() {
         assert_eq!(levels(".."), Some(1));
@@ -264,45 +275,42 @@ mod tests {
 
     #[test]
     fn the_agent_works_in_the_folder_the_person_gave_and_no_other() {
-        let fixture = Fixture::project("agent-folder");
+        let (_fixture, parent, root) = deep_project("agent-folder");
         let elsewhere = Fixture::empty("agent-folder-elsewhere");
         let places = scratch(&elsewhere);
-        let mut manifest = read_manifest(&fixture.root).unwrap();
-        assert_eq!(places.agent_folder(&fixture.root, &manifest), fixture.root);
+        let mut manifest = read_manifest(&root).unwrap();
+        assert_eq!(places.agent_folder(&root, &manifest), root);
         // A manifest that names the folder above (a cloned project, or the
         // Agent's own edit) grants nothing.
         manifest.agent_folder = Some("..".to_string());
-        assert_eq!(places.agent_folder(&fixture.root, &manifest), fixture.root);
-        let manifest = places.set_agent_folder(&fixture.root, Some(&fixture.parent)).unwrap();
-        assert_eq!(places.agent_folder(&fixture.root, &manifest), fixture.parent);
+        assert_eq!(places.agent_folder(&root, &manifest), root);
+        let manifest = places.set_agent_folder(&root, Some(&parent)).unwrap();
+        assert_eq!(places.agent_folder(&root, &manifest), parent);
         let mut other = manifest.clone();
         other.agent_folder = Some("../analysis".to_string());
-        assert_eq!(places.agent_folder(&fixture.root, &other), fixture.root);
+        assert_eq!(places.agent_folder(&root, &other), root);
         other.agent_folder = Some("../..".to_string());
-        assert_eq!(places.agent_folder(&fixture.root, &other), fixture.root);
-        let cleared = places.set_agent_folder(&fixture.root, None).unwrap();
-        assert_eq!(places.agent_folder(&fixture.root, &manifest), fixture.root);
+        assert_eq!(places.agent_folder(&root, &other), root);
+        let cleared = places.set_agent_folder(&root, None).unwrap();
+        assert_eq!(places.agent_folder(&root, &manifest), root);
         assert_eq!(cleared.agent_folder, None);
     }
 
     #[test]
     fn shallow_folders_home_and_the_apps_own_are_never_given() {
-        let fixture = Fixture::project("agent-folder-refused");
+        let (_fixture, parent, root) = deep_project("agent-folder-refused");
         let elsewhere = Fixture::empty("agent-folder-elsewhere");
         let places = scratch(&elsewhere);
         for refused in ["/", "/Volumes", "/opt", "/private"] {
             assert!(!places.allows(Path::new(refused)), "{refused}");
         }
-        assert!(places.allows(&fixture.parent));
-        let home = Places { home: Some(fixture.root.clone()), ..scratch(&elsewhere) };
-        assert!(!home.allows(&fixture.parent));
-        let own = Places {
-            grants: Some(fixture.root.join("support").join(GRANTS)),
-            ..scratch(&elsewhere)
-        };
-        assert!(!own.allows(&fixture.parent));
+        assert!(places.allows(&parent));
+        let home = Places { home: Some(root.clone()), ..scratch(&elsewhere) };
+        assert!(!home.allows(&parent));
+        let own = Places { grants: Some(root.join("support").join(GRANTS)), ..scratch(&elsewhere) };
+        assert!(!own.allows(&parent));
         let homeless = Places { home: None, ..scratch(&elsewhere) };
-        assert!(!homeless.allows(&fixture.parent));
+        assert!(!homeless.allows(&parent));
     }
 
     #[cfg(unix)]
@@ -321,20 +329,18 @@ mod tests {
 
     #[test]
     fn the_setting_is_kept_as_levels_and_cleared_again() {
-        let fixture = Fixture::project("agent-folder-set");
+        let (_fixture, parent, root) = deep_project("agent-folder-set");
         let elsewhere = Fixture::empty("agent-folder-elsewhere");
         let places = scratch(&elsewhere);
-        let manifest = places.set_agent_folder(&fixture.root, Some(&fixture.parent)).unwrap();
+        let manifest = places.set_agent_folder(&root, Some(&parent)).unwrap();
         assert_eq!(manifest.agent_folder.as_deref(), Some(".."));
-        let written = fs::read_to_string(fixture.root.join(".research/project.json")).unwrap();
+        let written = fs::read_to_string(root.join(".research/project.json")).unwrap();
         assert!(written.contains("\"agentFolder\": \"..\""), "{written}");
         assert_eq!(places.granted().len(), 1);
-        assert!(places
-            .set_agent_folder(&fixture.root, Some(&fixture.root.join("figures")))
-            .is_err());
-        let cleared = places.set_agent_folder(&fixture.root, None).unwrap();
+        assert!(places.set_agent_folder(&root, Some(&root.join("figures"))).is_err());
+        let cleared = places.set_agent_folder(&root, None).unwrap();
         assert_eq!(cleared.agent_folder, None);
-        let written = fs::read_to_string(fixture.root.join(".research/project.json")).unwrap();
+        let written = fs::read_to_string(root.join(".research/project.json")).unwrap();
         assert!(!written.contains("agentFolder"), "{written}");
         assert!(places.granted().is_empty());
     }
