@@ -133,7 +133,11 @@ fn typst_includes(file: &str, content: &str) -> Vec<String> {
 /// `content` with its `// …` line comments and `/* … */` block comments
 /// (which nest in Typst, and may span lines) blanked out, newlines kept. A
 /// `//` inside a quoted string is text; a quote left open ends with its line,
-/// as a stray quote in markup is not a string.
+/// as a stray quote in markup is not a string, and `\"` outside one is an
+/// escaped quote. Raw text, from a run of backticks to the next run of as
+/// many, is blanked too, newlines kept: a glob such as `chapters/*.typ` in a
+/// code example opened a comment that never closed and hid every include
+/// after it, and an `#include` shown in one includes nothing.
 fn strip_typst_comments(content: &str) -> String {
     let mut out = String::with_capacity(content.len());
     let mut chars = content.chars().peekable();
@@ -181,6 +185,30 @@ fn strip_typst_comments(content: &str) -> String {
                 chars.next();
                 depth = 1;
                 out.push(' ');
+            }
+            ('\\', Some('"')) => {
+                chars.next();
+                out.push_str("\\\"");
+            }
+            ('`', _) => {
+                let mut fence = 1;
+                while chars.next_if_eq(&'`').is_some() {
+                    fence += 1;
+                }
+                out.push(' ');
+                while let Some(c) = chars.next() {
+                    if c == '\n' {
+                        out.push(c);
+                    } else if c == '`' {
+                        let mut run = 1;
+                        while chars.next_if_eq(&'`').is_some() {
+                            run += 1;
+                        }
+                        if run == fence {
+                            break;
+                        }
+                    }
+                }
             }
             _ => {
                 quoted = c == '"';
@@ -313,6 +341,15 @@ mod tests {
             "#link(\"https://example.org\") #include \"i.typ\"\n",
         );
         assert_eq!(typst_includes("x.typ", commented), ["a.typ", "f.typ", "h.typ", "i.typ"]);
+        // Raw text is not code: a glob in a fenced block or inline opens no
+        // comment, an include shown in one names nothing, and \" is no quote.
+        let raw = concat!(
+            "```sh\nls chapters/*.typ\n#include \"shown.typ\"\n```\n",
+            "#include \"a.typ\"\n",
+            "Files under `src/*` and `` `x` /* ``, then \\\" // #include \"c.typ\"\n",
+            "#include \"b.typ\"\n",
+        );
+        assert_eq!(typst_includes("x.typ", raw), ["a.typ", "b.typ"]);
         // A part only a hidden folder or node_modules includes stands alone.
         fixture.write(".cache/copy.typ", "#include \"../parts/b.typ\"\n");
         fixture.write("node_modules/pkg/lib.typ", "#include \"../../parts/b.typ\"\n");
