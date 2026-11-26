@@ -103,6 +103,7 @@ import type { OpenSlideContext } from "../../../src/editor/presentation/open-sli
 import { parseSynaraNotificationMessage } from "../../../src/agent/synara-notifications";
 import { agentDeckPresence, parseAgentTurnActivity, subscribeAgentDeckPresence } from "../../../src/agent/agent-turn-activity";
 import { noteHostFileWrites } from "../../../src/agent/agent-host-writes";
+import { agentFolderView, fromAgentFolder, toAgentFolder } from "../../../src/agent/agent-folder-view";
 import { useAgentFileDrops } from "./drops";
 import { SYNARA_POPUP_OPEN, LATTICE_OUTSIDE_POINTER_DOWN } from "../../../src/agent/synara-popup-dismissal";
 import type { AgentGitWorkspaceView } from "../../../src/agent/synara-runtime";
@@ -120,6 +121,8 @@ type GitState = { view: AgentGitWorkspaceView; turnReview: AgentTurnReview | nul
 type AgentOpen = {
   surface: Surface;
   projectRoot: string;
+  /** The folder above the project the Agent works in, when the project gave it one (lattice#1293). */
+  agentRoot?: string | null;
   locale: Locale;
   visible: boolean;
   appearance: Appearance;
@@ -240,6 +243,12 @@ function Agent({ opened, workspace, visible, appearance, git, overleaf, deckRequ
   projectRef.current = project;
   const projectRootRef = useRef<string | null>(opened.projectRoot);
   projectRootRef.current = opened.projectRoot;
+  // The Synara frame works in the Agent's folder: its threads, kept by the
+  // folder it was opened on, are that folder's.
+  const agentRoot = opened.surface === "agent" ? opened.agentRoot ?? null : null;
+  const frameRoot = agentRoot ?? opened.projectRoot;
+  const frameRootRef = useRef(frameRoot);
+  frameRootRef.current = frameRoot;
   const agentVisible = opened.surface === "agent" && visible;
   // The project's annotations and comments, held by this page (`library.ts`).
   const annotations = useAgentAnnotations(opened.projectRoot, overleaf);
@@ -261,15 +270,20 @@ function Agent({ opened, workspace, visible, appearance, git, overleaf, deckRequ
     projectDocumentCreator: () => createProjectDocument,
     onHistorySnapshot: (snapshot: { activeThreadId: string }) => {
       // The panel reopens on the thread its checkpoints are of.
-      if (projectRootRef.current) persistSynaraThread(projectRootRef.current, snapshot.activeThreadId);
+      persistSynaraThread(frameRootRef.current, snapshot.activeThreadId);
       host().post("agent:history", snapshot);
     },
     onMinimumWidth: (width: number) => host().post("agent:minimum-width", { width }),
   }), []);
 
+  const frameEdge = useMemo(() => {
+    const view = agentFolderView(opened.projectRoot, agentRoot);
+    return view && { toFrame: (message: object) => toAgentFolder(view, message), fromFrame: (data: unknown) => fromAgentFolder(view, data) };
+  }, [agentRoot, opened.projectRoot]);
   const synara = useSynaraHost({
     project,
     projectRef,
+    frameEdge,
     agentVisible,
     bridge,
     appearance: { theme, tint, accent: appearance.accent, translucency: appearance.translucency, translucent: appearance.translucent },
@@ -290,10 +304,11 @@ function Agent({ opened, workspace, visible, appearance, git, overleaf, deckRequ
       frame: () => frameRef.current?.contentWindow ?? null,
       origin,
       projectRoot: opened.projectRoot,
+      fromFrame: frameEdge?.fromFrame ?? null,
       post: (message) => void postMessage(message),
     });
     return () => setDocumentToolTarget(null);
-  }, [frameRef, opened.projectRoot, opened.surface, origin, postMessage]);
+  }, [frameEdge, frameRef, opened.projectRoot, opened.surface, origin, postMessage]);
 
   // Open Slide's Ask AI, Apply comments and Draft a deck
   // (`onOpenSlideAgentRequest` in `use-document-surfaces.tsx`).
@@ -305,7 +320,7 @@ function Agent({ opened, workspace, visible, appearance, git, overleaf, deckRequ
     }
   }, [deckRequest, opened.projectRoot, opened.surface, sendComposerPrompt, takeDeckRequest]);
   // A compile repair's View repair (`SynaraSurface::show_thread`, `showThread` in use-document-surfaces.tsx).
-  useEffect(() => host().on("agent:show-thread", (payload) => { const id = (payload as { threadId?: unknown } | null)?.threadId; if (typeof id === "string") { if (projectRootRef.current) persistSynaraThread(projectRootRef.current, id); synara.showThread(id); } }), [synara.showThread]);
+  useEffect(() => host().on("agent:show-thread", (payload) => { const id = (payload as { threadId?: unknown } | null)?.threadId; if (typeof id === "string") { persistSynaraThread(frameRootRef.current, id); synara.showThread(id); } }), [synara.showThread]);
 
   // useAgentContext's snapshots, from what the owner reports of the window.
   const hostContext = useMemo(() => buildAgentHostContext({
@@ -409,7 +424,7 @@ function Agent({ opened, workspace, visible, appearance, git, overleaf, deckRequ
       // A turn under way means the writer really asked the Agent something
       // (the Tauri host marks Get started's step on it).
       const activity = parseAgentTurnActivity(event.data);
-      if (activity?.state === "running" && activity.workspaceRoot === opened.projectRoot) {
+      if (activity?.state === "running" && activity.workspaceRoot === frameRoot) {
         bridgeHost.post("agent:turn-started");
       }
     };
@@ -418,7 +433,7 @@ function Agent({ opened, workspace, visible, appearance, git, overleaf, deckRequ
       for (const stop of stops) stop();
       window.removeEventListener("message", onMessage);
     };
-  }, [frameRef, opened.projectRoot, opened.surface, origin, sourceControlFrameRef]);
+  }, [frameRef, frameRoot, opened.projectRoot, opened.surface, origin, sourceControlFrameRef]);
 
   // The frame's permission mode, for the picker the owner draws in the
   // panel's header; none while the runtime is not up, as the Tauri header
@@ -506,7 +521,7 @@ function Agent({ opened, workspace, visible, appearance, git, overleaf, deckRequ
     <div className="trellis-agent-host agent-island-host">
       <TrellisAgentSurface
         synara={synara}
-        projectRoot={opened.projectRoot}
+        projectRoot={frameRoot}
         theme={theme}
         appLocale={opened.locale}
         dropActive={dropActive}
@@ -536,7 +551,7 @@ function AgentIsland() {
     const stops = [
       bridge.on("agent:open", (payload) => {
         const open = payload as AgentOpen;
-        if (open.thread) persistSynaraThread(open.projectRoot, open.thread);
+        if (open.thread) persistSynaraThread((open.surface === "agent" ? open.agentRoot : null) ?? open.projectRoot, open.thread);
         setOpened(open);
         setOverleaf(NOT_LINKED);
         setVisible(open.visible);

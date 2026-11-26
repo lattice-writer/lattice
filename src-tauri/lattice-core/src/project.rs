@@ -28,6 +28,7 @@
 //! Content changes go through `history` (atomic writes via
 //! `crate::project_fs::ProjectDir`, an undo record, a search-index refresh).
 
+mod agent_folder;
 mod annotations;
 mod archive;
 mod assets;
@@ -63,6 +64,10 @@ pub mod templates;
 pub(crate) mod test_support;
 mod tree;
 
+pub use agent_folder::{
+    agent_folder, may_widen_to, projects_inside, set_agent_folder,
+    MAX_LEVELS as AGENT_FOLDER_MAX_LEVELS,
+};
 pub(crate) use annotations::retain_open_annotation_saves;
 pub use annotations::{
     discard_annotation_round, read_annotation_round, read_annotations, save_annotation_round,

@@ -311,6 +311,7 @@ fn default_manifest_with_venue(name: &str, venue: Venue) -> ProjectManifest {
         grammar_ignored_rules: Vec::new(),
         grammar_ignored_sentences: Vec::new(),
         submission_items: Vec::new(),
+        agent_folder: None,
         unread: serde_json::Map::new(),
     }
 }

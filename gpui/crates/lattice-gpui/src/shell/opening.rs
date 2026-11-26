@@ -111,6 +111,7 @@ impl Shell {
                 this.overleaf
                     .update(cx, |bridge, cx| bridge.files_changed(paths.as_deref(), cx));
             }
+            crate::project::ProjectEvent::ManifestChanged => this.agent_folder_changed(cx),
             _ => {}
         }));
         self.overleaf

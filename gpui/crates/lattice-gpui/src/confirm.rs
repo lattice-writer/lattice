@@ -180,6 +180,23 @@ impl ConfirmHost {
         true
     }
 
+    /// Answer the open question with its second answer, for a scenario.
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+    pub fn choose_alternative(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        let Some(answer) = self
+            .pending
+            .as_ref()
+            .and_then(|question| question.alternative.as_ref())
+            .map(|(_, answer)| answer.clone())
+        else {
+            return false;
+        };
+        self.pending = None;
+        cx.notify();
+        answer(window, cx);
+        true
+    }
+
     /// Whether a question is up.
     pub fn is_open(&self) -> bool {
         self.pending.is_some()

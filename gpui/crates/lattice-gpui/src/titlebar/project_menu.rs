@@ -9,14 +9,26 @@
 //!
 //! The glyph is the row's secondary action (`MenuAction::secondary`): the
 //! keys reach it with → from its row and run it with Enter, as the app's
-//! glyph is an item of its own. Export ZIP and Export for arXiv… follow Open
+//! glyph is an item of its own.
+//!
+//! First, under This project, where the shown project keeps what it is
+//! (lattice#1293), as paths from the folder around the Agent's: the folder
+//! that holds its history (`.research`), the main document its builds make,
+//! and the folder the Agent works in, which is the project's own unless the
+//! project gave the Agent the folder around it. Each opens what it names: the
+//! History panel, the main document, Settings › Agent › Display.
+//!
+//! Export ZIP and Export for arXiv… follow Open
 //! from Overleaf, and while an export runs the menu ends with "Exporting ZIP…"
 //! after a loader, and the rows that would switch or replace the project
 //! under it (the recent projects and their glyphs, Open from Overleaf, the
 //! Guided tutorial) are dimmed, as the app's `busy` dims them.
 
+use std::path::{Path, PathBuf};
+
 use gpui::{Action as _, App, IntoElement, Styled as _, WeakEntity, Window, px};
 use lattice_i18n::t;
+use lattice_settings::SettingsTab;
 use lattice_ui::{
     Icon,
     components::{Menu, MenuAction, MenuPopover, ToolbarButton},
@@ -53,6 +65,57 @@ pub(super) fn project_menu(
     let others = RecentProjects::others(current.as_deref(), cx);
     let more = others.len() > MAX_SWITCHER_PROJECTS;
     let mut menu = menu.min_w(px(208.));
+    if let Some(places) = shell
+        .upgrade()
+        .and_then(|shell| places(&shell.read(cx), cx))
+    {
+        let (history, main, agent) = (shell.clone(), shell.clone(), shell.clone());
+        let main_document = places.main_document.clone();
+        menu = menu
+            .label(t!("This project"))
+            .item(
+                MenuAction::new(
+                    t!("History in {path}", path = places.history),
+                    move |window, cx| {
+                        history
+                            .update(cx, |shell, cx| shell.open_history(window, cx))
+                            .ok();
+                    },
+                )
+                .icon(Icon::HISTORY),
+            )
+            .item(
+                MenuAction::new(
+                    match &places.main {
+                        Some(path) => t!("Builds {path}", path = path.clone()),
+                        None => t!("No main document").to_string(),
+                    },
+                    move |window, cx| {
+                        let Some(path) = main_document.clone() else {
+                            return;
+                        };
+                        main.update(cx, |shell, cx| shell.open_path(path, None, window, cx))
+                            .ok();
+                    },
+                )
+                .icon(Icon::FILE_TEXT)
+                .disabled(places.main.is_none()),
+            )
+            .item(
+                MenuAction::new(
+                    t!("Agent works in {path}", path = places.agent),
+                    move |window, cx| {
+                        agent
+                            .update(cx, |shell, cx| {
+                                shell.open_settings(Some(SettingsTab::AgentDisplay), window, cx)
+                            })
+                            .ok();
+                    },
+                )
+                .icon(Icon::ROBOT),
+            )
+            .separator();
+    }
     // With no other project to go back to, the menu starts at its actions.
     if !others.is_empty() {
         menu = menu.label(t!("Recent projects"));
@@ -164,6 +227,42 @@ pub(super) fn project_menu(
     } else {
         menu
     }
+}
+
+/// Where the shown project keeps what it is, as the menu names them.
+pub(crate) struct Places {
+    /// The folder that holds the project's `.research`.
+    pub history: String,
+    /// The main document, when the project has one.
+    pub main: Option<String>,
+    /// The folder the Agent works in.
+    pub agent: String,
+    main_document: Option<PathBuf>,
+}
+
+/// The shown project's places, as paths from the folder around the Agent's
+/// (`ProjectA/Manuscript/.research`, `ProjectA/Manuscript/main.tex`,
+/// `ProjectA/`), so the three read alike whichever folder was opened.
+pub(crate) fn places(shell: &Shell, cx: &App) -> Option<Places> {
+    let project = shell.project()?.read(cx);
+    let root = project.root();
+    let agent = project.agent_root();
+    let base = agent.parent().unwrap_or(&agent);
+    let shown = |path: &Path| {
+        path.strip_prefix(base)
+            .unwrap_or(path)
+            .components()
+            .map(|part| part.as_os_str().to_string_lossy().into_owned())
+            .collect::<Vec<_>>()
+            .join("/")
+    };
+    let main_document = project.main_document().map(|main| root.join(main));
+    Some(Places {
+        history: shown(&root.join(".research")),
+        main: main_document.as_deref().map(shown),
+        agent: format!("{}/", shown(&agent)),
+        main_document,
+    })
 }
 
 /// The switcher beside a window's project tabs: the project menu, and a

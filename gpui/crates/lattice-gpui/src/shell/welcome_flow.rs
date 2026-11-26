@@ -381,7 +381,7 @@ impl Shell {
                 return;
             };
             this.update_in(cx, |this, window, cx| {
-                this.reveal_project(root, here, window, cx)
+                this.open_picked_folder(root, here, window, cx)
             })
             .ok();
         })

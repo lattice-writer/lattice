@@ -100,6 +100,11 @@ pub struct SynaraSurface {
     /// Why there is no island: the pages are not built.
     unavailable: Option<String>,
     root: Option<PathBuf>,
+    /// The folder the Agent works in when the project gave it one above
+    /// itself (`lattice_core::project::agent_folder`); `None` while it
+    /// works in the project's own. Only the Agent's surface takes one: the
+    /// Git workspace and Settings' pages stay the project's.
+    agent_root: Option<PathBuf>,
     /// The panel's thread as the page last reported it (`agent:history`).
     /// The page keeps it in its own storage, which goes with the page when
     /// it hibernates, so a page built again is told it with its project.
@@ -221,6 +226,7 @@ impl SynaraSurface {
             island,
             unavailable,
             root: None,
+            agent_root: None,
             thread: None,
             shown: false,
             drawn: false,
@@ -270,6 +276,12 @@ impl SynaraSurface {
         self.root.as_deref()
     }
 
+    /// The folder the Agent works in: the project's, or the one above it the
+    /// project gave the Agent.
+    pub fn agent_root(&self) -> Option<&Path> {
+        self.agent_root.as_deref().or(self.root.as_deref())
+    }
+
     /// The focus the panel hands out: the page's.
     pub fn focus_handle(&self, cx: &App) -> Option<gpui::FocusHandle> {
         self.island
@@ -305,15 +317,26 @@ impl SynaraSurface {
         }
     }
 
-    /// The project the surface shows; none takes the page off screen.
-    pub fn set_project(&mut self, root: Option<PathBuf>, cx: &mut Context<Self>) {
-        if self.root == root {
+    /// The project the surface shows, and the folder its Agent works in when
+    /// that is one above it; none takes the page off screen. Another folder
+    /// for the Agent is another Synara project, so it starts afresh as
+    /// another project does.
+    pub fn set_project(
+        &mut self,
+        root: Option<PathBuf>,
+        agent_root: Option<PathBuf>,
+        cx: &mut Context<Self>,
+    ) {
+        let agent_root = agent_root
+            .filter(|folder| self.kind == SurfaceKind::Agent && Some(folder) != root.as_ref());
+        if self.root == root && self.agent_root == agent_root {
             return;
         }
         if let Some(old) = &self.root {
             commands::forget_turn(old);
         }
         self.root = root;
+        self.agent_root = agent_root;
         self.thread = None;
         // A frame belongs to one project: another project's starts afresh
         // (the page keys its host by the project).
@@ -487,6 +510,7 @@ impl SynaraSurface {
         let payload = json!({
             "surface": self.kind.name(),
             "projectRoot": root.to_string_lossy(),
+            "agentRoot": self.agent_root.as_ref().map(|folder| folder.to_string_lossy()),
             "locale": self.locale.tag(),
             "visible": self.shown,
             "appearance": self.appearance,

@@ -1,4 +1,8 @@
 #: lattice-gpui/src/project.rs
+msgid "Could not change the Agent’s folder"
+msgstr "无法更改 AI 助手的文件夹"
+
+#: lattice-gpui/src/project.rs
 msgid "Could not set the main document"
 msgstr "无法设为主文档"
 
