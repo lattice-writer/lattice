@@ -36,9 +36,9 @@ try {
   const tree = execFileSync("git", ["write-tree"], { cwd: repo, env: index, encoding: "utf8" }).trim();
   const copy = path.join(scratch, "copy");
   execFileSync("sh", ["-c", 'mkdir "$1" && git archive "$2" | tar -x -C "$1"', "sh", copy, tree], { cwd: repo });
-  // A GIT_DIR or GIT_WORK_TREE from a hook would point the copy at this checkout.
-  const { GIT_DIR, GIT_WORK_TREE, GIT_INDEX_FILE, ...clean } = process.env;
-  const env = { ...clean, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" };
+  // A GIT_DIR, GIT_WORK_TREE or the like from a hook would point the copy at this checkout.
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
+  Object.assign(env, { GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" });
   const git = (...args) => execFileSync("git", ["-c", "user.name=shallow-tests", "-c", "user.email=shallow-tests@localhost", "-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null", ...args], { cwd: copy, env, stdio: "ignore" });
   git("init", "-q");
   git("add", "-A");
