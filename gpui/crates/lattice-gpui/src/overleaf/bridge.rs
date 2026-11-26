@@ -195,6 +195,9 @@ pub struct OverleafBridge {
     last_auto_sync: Option<Instant>,
     /// When a probe or a sync last read Overleaf's version: the live poll's
     /// wait counts from it, since that answer was the poll's question too.
+    /// A remote change can wait up to one extra wait for it: the stamp is
+    /// when the read finished, a push probe's "changed" is dropped while a
+    /// sync runs, and a read during a 429 cool-down counts as well.
     version_read: Option<Instant>,
     /// An automatic sync was answered 429: none starts before this.
     rate_limited_until: Option<Instant>,
@@ -383,6 +386,7 @@ impl OverleafBridge {
         self.refusals = 0;
         self.rate_limited_until = None;
         self.rate_limits = 0;
+        self.version_read = None;
         self.entities.clear();
         self.entity_list = None;
         self.review_reset();

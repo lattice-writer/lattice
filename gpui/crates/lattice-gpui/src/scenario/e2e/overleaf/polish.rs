@@ -67,6 +67,9 @@ impl Run {
         // let land, as is any the steps before left; from then to 48 s after
         // the focus the poll must ask nothing. A poll that counted only its
         // own probes asks once at 45 s, and one asking every 3 s many times.
+        // The focus's own probe must arrive, or a poll that never asks
+        // would pass.
+        let asked = mock.requests(&probes);
         let focused = std::time::Instant::now();
         self.with_window(cx, |shell, _, cx| {
             shell.update(cx, |shell, cx| {
@@ -75,27 +78,56 @@ impl Run {
                     .update(cx, |bridge, cx| bridge.set_window_active(true, cx))
             })
         })?;
-        self.pause(cx, Duration::from_secs(5)).await;
-        self.with_window(cx, |shell, _, cx| {
+        let woke = self
+            .wait_for(cx, Duration::from_secs(1), |_, _| {
+                mock.requests(&probes) > asked
+            })
+            .await;
+        self.pause(cx, Duration::from_secs(5).saturating_sub(focused.elapsed()))
+            .await;
+        let told = self.with_window(cx, |shell, _, cx| {
             shell.update(cx, |shell, cx| {
-                shell.overleaf.update(cx, |bridge, cx| {
-                    let _ = bridge.sync_reporting(cx);
-                })
+                shell
+                    .overleaf
+                    .update(cx, |bridge, cx| bridge.sync_reporting(cx))
             })
         })?;
+        let synced = told
+            .await
+            .unwrap_or_else(|_| Err("the sync never reported".into()));
         self.wait_for(cx, Duration::from_secs(40), |shell, cx| {
             let bridge = shell.read(cx).overleaf.read(cx);
             !bridge.push_waiting() && !bridge.syncing()
         })
         .await;
         let settled_after = focused.elapsed();
-        let due = focused + Duration::from_secs(48);
-        let (live_probes, live_quiet) = self
-            .settled_probes(cx, mock, &probes, Duration::MAX, due)
+        // Every probe the window sees while settled counts, but only the
+        // 45 s mark must be settled: the settle wait can pass between the
+        // sync's end and the watcher's report of its writes, and the push
+        // that report schedules is unsettled for its 2.5 s quiet period.
+        let (early_probes, _) = self
+            .settled_probes(
+                cx,
+                mock,
+                &probes,
+                Duration::MAX,
+                focused + Duration::from_secs(42),
+            )
             .await;
-        // The window holds the 45 s mark, settled throughout.
-        let live_measured = settled_after < Duration::from_secs(40)
-            && live_quiet + Duration::from_secs(1) >= Duration::from_secs(48) - settled_after;
+        let (late_probes, late_quiet) = self
+            .settled_probes(
+                cx,
+                mock,
+                &probes,
+                Duration::MAX,
+                focused + Duration::from_secs(48),
+            )
+            .await;
+        let live_probes = early_probes + late_probes;
+        let live_measured = woke
+            && synced.is_ok()
+            && settled_after < Duration::from_secs(40)
+            && late_quiet >= Duration::from_millis(5500);
         // Off screen, with nothing of ours owed, it asks nothing.
         self.with_window(cx, |shell, _, cx| {
             shell.update(cx, |shell, cx| {
@@ -136,7 +168,9 @@ impl Run {
             json!({
                 "live": live_probes,
                 "live_settled_after_ms": settled_after.as_millis() as u64,
-                "live_settled_ms": live_quiet.as_millis() as u64,
+                "live_late_settled_ms": late_quiet.as_millis() as u64,
+                "woke": woke,
+                "synced": synced,
                 "dropped": dropped,
                 "hidden": hidden_probes,
                 "settled_ms": quiet.as_millis() as u64,
