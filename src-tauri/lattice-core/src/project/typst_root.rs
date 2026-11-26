@@ -130,13 +130,13 @@ fn typst_includes(file: &str, content: &str) -> Vec<String> {
     found
 }
 
-/// `content` with its `// …` line comments and `/* … */` block comments
-/// (which nest in Typst, and may span lines) blanked out, newlines kept. A
-/// `//` inside a quoted string is text; a quote left open ends with its line,
-/// as a stray quote in markup is not a string, and `\"` outside one is an
-/// escaped quote. Raw text, from a run of backticks to the next run of as
-/// many, is blanked too, newlines kept: a glob such as `chapters/*.typ` in a
-/// code example opened a comment that never closed and hid every include
+/// `content` with its `// …` line comments and `/* … */` block comments (which
+/// nest in Typst, and may span lines) blanked out, newlines kept. A `//` inside
+/// a quoted string is text; a quote left open ends with its line, as a stray
+/// quote in markup is not a string, and outside one `\` escapes the next
+/// character, as in markup. Raw text, from a run of backticks to the next run
+/// of as many, is blanked too, newlines kept: a glob such as `chapters/*.typ`
+/// in a code example opened a comment that never closed and hid every include
 /// after it, and an `#include` shown in one includes nothing.
 fn strip_typst_comments(content: &str) -> String {
     let mut out = String::with_capacity(content.len());
@@ -186,9 +186,10 @@ fn strip_typst_comments(content: &str) -> String {
                 depth = 1;
                 out.push(' ');
             }
-            ('\\', Some('"')) => {
+            ('\\', Some(&next)) => {
                 chars.next();
-                out.push_str("\\\"");
+                out.push(c);
+                out.push(next);
             }
             ('`', _) => {
                 let mut fence = 1;
@@ -196,17 +197,20 @@ fn strip_typst_comments(content: &str) -> String {
                     fence += 1;
                 }
                 out.push(' ');
-                while let Some(c) = chars.next() {
-                    if c == '\n' {
-                        out.push(c);
-                    } else if c == '`' {
-                        let mut run = 1;
-                        while chars.next_if_eq(&'`').is_some() {
-                            run += 1;
+                if fence == 2 {
+                    continue;
+                }
+                let mut found = 0;
+                while found < fence {
+                    match chars.next() {
+                        Some('`') => found += 1,
+                        Some(c) => {
+                            found = 0;
+                            if c == '\n' {
+                                out.push(c);
+                            }
                         }
-                        if run == fence {
-                            break;
-                        }
+                        None => break,
                     }
                 }
             }
@@ -346,10 +350,13 @@ mod tests {
         let raw = concat!(
             "```sh\nls chapters/*.typ\n#include \"shown.typ\"\n```\n",
             "#include \"a.typ\"\n",
-            "Files under `src/*` and `` `x` /* ``, then \\\" // #include \"c.typ\"\n",
+            "Files under `src/*` and `x /* y`, then \\\" // #include \"c.typ\"\n",
             "#include \"b.typ\"\n",
+            "`` /* #include \"d.typ\" */ #include \"e.typ\"\n",
+            "```raw /* ````x` #include \"f.typ\"\n",
+            "\\` #include \"g.typ\"\n",
         );
-        assert_eq!(typst_includes("x.typ", raw), ["a.typ", "b.typ"]);
+        assert_eq!(typst_includes("x.typ", raw), ["a.typ", "b.typ", "e.typ", "f.typ", "g.typ"]);
         // A part only a hidden folder or node_modules includes stands alone.
         fixture.write(".cache/copy.typ", "#include \"../parts/b.typ\"\n");
         fixture.write("node_modules/pkg/lib.typ", "#include \"../../parts/b.typ\"\n");
