@@ -44,6 +44,10 @@ const SKIPPED: [&str; 1] = ["node_modules"];
 const MIN_COMPONENTS: usize = 3;
 /// The app-local file of the folders the person gave, in Application Support.
 const GRANTS: &str = "agent-folders.json";
+/// Why a folder fewer than `MIN_COMPONENTS` deep is refused.
+const TOO_SHALLOW: &str = "The Agent can only be given a folder at least three levels deep.";
+/// Why the home folder, a folder above it or the app's own is refused.
+const ABOVE_HOME: &str = "The Agent can't be given the home folder or a folder above it.";
 
 /// The levels up from the project a manifest's `agentFolder` names, `None`
 /// for anything but one to `MAX_LEVELS` `..` parts.
@@ -84,25 +88,30 @@ impl Places {
     }
 
     fn allows(&self, folder: &Path) -> bool {
+        self.refusal(folder).is_none()
+    }
+
+    /// Why `folder` may not be given to the Agent, `None` when it may.
+    fn refusal(&self, folder: &Path) -> Option<&'static str> {
         // Both sides resolved the same way, so a symlinked home or parent
         // folder, or Windows' `\\?\` form of a resolved path, can't pass as
         // below home.
         let Ok(folder) = fs::canonicalize(folder) else {
-            return false;
+            return Some(ABOVE_HOME);
         };
         let named = folder.components().filter(|part| matches!(part, Component::Normal(_))).count();
-        if named < MIN_COMPONENTS || !folder.is_dir() {
-            return false;
+        if named < MIN_COMPONENTS {
+            return Some(TOO_SHALLOW);
         }
         let Some(home) = &self.home else {
-            return false;
+            return Some(ABOVE_HOME);
         };
-        !resolved(home).starts_with(&folder)
-            && !self
-                .grants
-                .as_deref()
-                .and_then(Path::parent)
-                .is_some_and(|own| resolved(own).starts_with(&folder))
+        let own = self
+            .grants
+            .as_deref()
+            .and_then(Path::parent)
+            .is_some_and(|own| resolved(own).starts_with(&folder));
+        (!folder.is_dir() || resolved(home).starts_with(&folder) || own).then_some(ABOVE_HOME)
     }
 
     fn granted(&self) -> BTreeMap<String, String> {
@@ -147,9 +156,8 @@ impl Places {
                     .ok_or_else(|| {
                         "The Agent's folder must be a folder above the project.".to_string()
                     })?;
-                if !self.allows(folder) {
-                    return Err("The Agent can't be given the home folder or a folder above it."
-                        .to_string());
+                if let Some(refusal) = self.refusal(folder) {
+                    return Err(refusal.to_string());
                 }
                 Some(vec![".."; levels].join("/"))
             }
@@ -253,7 +261,7 @@ mod tests {
         }
     }
 
-    /// A project at `<temp>/lattice-<label>-<id>/ProjectA/paper`, so the
+    /// A project at `<temp>/research-writer-<label>-<id>/ProjectA/paper`, so the
     /// folder above it is deep enough (`MIN_COMPONENTS`) wherever the
     /// temporary folder is: Linux's `/tmp` is a single named folder, so a
     /// project made straight in it has a folder above that is never given.
@@ -302,11 +310,11 @@ mod tests {
         let elsewhere = Fixture::empty("agent-folder-elsewhere");
         let places = scratch(&elsewhere);
         for refused in ["/", "/Volumes", "/opt", "/private"] {
-            assert!(!places.allows(Path::new(refused)), "{refused}");
+            assert_eq!(places.refusal(Path::new(refused)), Some(TOO_SHALLOW), "{refused}");
         }
         assert!(places.allows(&parent));
         let home = Places { home: Some(root.clone()), ..scratch(&elsewhere) };
-        assert!(!home.allows(&parent));
+        assert_eq!(home.refusal(&parent), Some(ABOVE_HOME));
         let own = Places { grants: Some(root.join("support").join(GRANTS)), ..scratch(&elsewhere) };
         assert!(!own.allows(&parent));
         let homeless = Places { home: None, ..scratch(&elsewhere) };

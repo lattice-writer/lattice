@@ -16654,6 +16654,14 @@ msgstr "AI 助手问"
 msgid "The agent asks: {0}"
 msgstr "AI 助手问：{0}"
 
+#: src/platform/host-errors-project.ts
+msgid "The Agent can only be given a folder at least three levels deep."
+msgstr "只能把至少三层深的文件夹交给 AI 助手。"
+
+#: src/platform/host-errors-project.ts
+msgid "The Agent can't be given the home folder or a folder above it."
+msgstr "不能把主文件夹或其上层文件夹交给 AI 助手。"
+
 #: src/canvas/proofread-layer.tsx
 msgid "The agent could not proofread the selection: {detail}"
 msgstr "AI 校对失败：{detail}"
@@ -16721,6 +16729,10 @@ msgstr "AI 助手一次最多接收 {attached} 个文件，另有 {skipped} 个�
 #: src/settings/model-endpoint-settings.tsx
 msgid "The agent uses it after a restart, which would stop the turn running now."
 msgstr "重启 AI 助手后才会生效，但重启会中断正在进行的对话。"
+
+#: src/platform/host-errors-project.ts
+msgid "The Agent's folder must be a folder above the project."
+msgstr "AI 助手的文件夹必须是项目上层的文件夹。"
 
 #: src/canvas/proofread-layer.tsx
 msgid "The agent's reply did not contain a proofread version of the selection."

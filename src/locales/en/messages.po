@@ -16654,6 +16654,14 @@ msgstr "The agent asks"
 msgid "The agent asks: {0}"
 msgstr "The agent asks: {0}"
 
+#: src/platform/host-errors-project.ts
+msgid "The Agent can only be given a folder at least three levels deep."
+msgstr "The Agent can only be given a folder at least three levels deep."
+
+#: src/platform/host-errors-project.ts
+msgid "The Agent can't be given the home folder or a folder above it."
+msgstr "The Agent can't be given the home folder or a folder above it."
+
 #: src/canvas/proofread-layer.tsx
 msgid "The agent could not proofread the selection: {detail}"
 msgstr "The agent could not proofread the selection: {detail}"
@@ -16721,6 +16729,10 @@ msgstr "The Agent takes {attached} files at a time, so {skipped} more weren’t 
 #: src/settings/model-endpoint-settings.tsx
 msgid "The agent uses it after a restart, which would stop the turn running now."
 msgstr "The agent uses it after a restart, which would stop the turn running now."
+
+#: src/platform/host-errors-project.ts
+msgid "The Agent's folder must be a folder above the project."
+msgstr "The Agent's folder must be a folder above the project."
 
 #: src/canvas/proofread-layer.tsx
 msgid "The agent's reply did not contain a proofread version of the selection."

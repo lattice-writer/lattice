@@ -41,6 +41,21 @@ pub(super) static ENTRIES: &[Entry] = &[
         text: Text::Message("Choose a folder name whose parts are not empty and do not start with a dot.", &[]),
     },
     Entry {
+        file: "project/agent_folder.rs",
+        literal: "The Agent's folder must be a folder above the project.",
+        text: Text::Message("The Agent's folder must be a folder above the project.", &[]),
+    },
+    Entry {
+        file: "project/agent_folder.rs",
+        literal: "The Agent can only be given a folder at least three levels deep.",
+        text: Text::Message("The Agent can only be given a folder at least three levels deep.", &[]),
+    },
+    Entry {
+        file: "project/agent_folder.rs",
+        literal: "The Agent can't be given the home folder or a folder above it.",
+        text: Text::Message("The Agent can't be given the home folder or a folder above it.", &[]),
+    },
+    Entry {
         file: "project/paths.rs",
         literal: "History records cannot edit themselves.",
         text: Text::Message("History records cannot edit themselves.", &[]),

@@ -48,6 +48,10 @@ export const PROJECT_HOST_ERRORS: readonly HostErrorEntry[] = [
   ["project/paths.rs", "Choose a project-relative path outside .research.", () => t`Choose a project-relative path outside .research.`],
   ["project/paths.rs", "Choose a simple name without folders or a leading dot.", () => t`Choose a simple name without folders or a leading dot.`],
   ["project/manuscript.rs", "Choose a folder name whose parts are not empty and do not start with a dot.", () => t`Choose a folder name whose parts are not empty and do not start with a dot.`],
+  // The Agent's folder above a project (project/agent_folder.rs)
+  ["project/agent_folder.rs", "The Agent's folder must be a folder above the project.", () => t`The Agent's folder must be a folder above the project.`],
+  ["project/agent_folder.rs", "The Agent can only be given a folder at least three levels deep.", () => t`The Agent can only be given a folder at least three levels deep.`],
+  ["project/agent_folder.rs", "The Agent can't be given the home folder or a folder above it.", () => t`The Agent can't be given the home folder or a folder above it.`],
   ["project/paths.rs", "History records cannot edit themselves.", () => t`History records cannot edit themselves.`],
   ["project/paths.rs", "{what} has an invalid file name.", ([what]) => {
     const item = unnamedPath(what);
