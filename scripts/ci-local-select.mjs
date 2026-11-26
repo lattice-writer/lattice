@@ -58,6 +58,9 @@
  * built and published.
  */
 import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { ACTIONS_FILE, actionsDiff, actionsNeeds } from "./gpui-actions-e2e.mjs";
 import { readModules } from "./gpui-e2e-modules.mjs";
 import { harnessInputs } from "./perf-bench/harness-inputs.mjs";
@@ -70,6 +73,93 @@ export const FULL = "full";
 // is measured on main.
 const WEBKIT_BENCH_TOOLING = /^(scripts\/perf-bench(\.mjs|\/)|tools\/(mock-backend|perf-bench)\/|\.github\/actions\/bench-page\/)/;
 const NOT_BENCH_TOOLING = /^(src\/|package\.json$|pnpm-lock\.yaml$|\.github\/actions\/setup-pnpm\/)/;
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+// Where a line comment is `//` and a block comment `/* … */`, and where a
+// run of spaces never changes the meaning outside a string.
+const SLASH_COMMENTS = /\.(rs|[cm]?[jt]sx?|css)$/;
+// Where it is `#`, and indentation can matter: shell, Python, TOML, and the
+// extensionless scripts that start with a #! line. Not YAML, whose block
+// scalars hold `#` lines as data.
+const HASH_COMMENTS = /\.(sh|py|toml)$/;
+// Comments a tool reads: a type checker's, a linter's or formatter's, a
+// bundler's or the test runner's directive.
+const DIRECTIVE = /@(ts-|vitest-|jest-|jsx|vite-ignore|__PURE__)|#__PURE__|eslint|oxlint|prettier|biome|webpack|rustfmt|clippy|noqa|type:\s*ignore|shellcheck|cspell/;
+
+/**
+ * Whether the change to `file` from `base` to the working tree is only
+ * comments and whitespace, so building and linting it is the whole check: a
+ * full-line comment added, edited or removed (`//`, a `/* … *\/` block whose
+ * inner lines start with `*`, or `#`), a blank line, or, where a run of
+ * spaces never matters (SLASH_COMMENTS), a change in the amount of space
+ * (`git diff -b`). A new, deleted or unreadable file, a directive comment
+ * (DIRECTIVE), a #! line, or any other line is not. Conservative: a trailing
+ * comment after code counts as code.
+ */
+export function commentOnlyEdit(base, file, cwd = repoRoot) {
+  const git = gitIn(cwd);
+  let before;
+  let after;
+  try {
+    before = git("show", `${base}:${file}`);
+    after = readFileSync(path.join(cwd, file), "utf8");
+  } catch {
+    return false;
+  }
+  const slash = SLASH_COMMENTS.test(file);
+  const hash = HASH_COMMENTS.test(file) || (!path.basename(file).includes(".") && after.startsWith("#!"));
+  if (!slash && !hash) return false;
+  const diff = git("diff", "-U0", "--no-color", "--no-ext-diff", ...(slash ? ["-b", "--ignore-blank-lines"] : []), base, "--", file);
+  const lines = { "-": before.split("\n"), "+": after.split("\n") };
+  let at = { "-": 0, "+": 0 };
+  for (const line of diff.split("\n")) {
+    const hunk = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
+    if (hunk) {
+      at = { "-": Number(hunk[1]), "+": Number(hunk[2]) };
+      continue;
+    }
+    const sign = line[0];
+    if ((sign !== "-" && sign !== "+") || line.startsWith("---") || line.startsWith("+++")) continue;
+    // -U0 hunks name the first changed line; a pure removal or addition names the line before it.
+    const side = lines[sign];
+    const index = (at[sign] || 1) - 1;
+    at[sign] += 1;
+    const text = line.slice(1).trim();
+    if (text === "") continue;
+    if (DIRECTIVE.test(text)) return false;
+    if (hash ? !(text.startsWith("#") && !text.startsWith("#!")) : !(text.startsWith("//") || inBlockComment(side, index))) return false;
+  }
+  return true;
+}
+
+/**
+ * Whether line `index` of `lines` lies in a block comment written the usual
+ * way: a line that is a whole `/* … *\/`, or within an opener line that starts
+ * with `/*` and does not close, inner lines that start with `*`, and a closer
+ * that starts with `*` and ends the comment. A line like `*ptr = 1;` after
+ * a closed comment is code.
+ */
+function inBlockComment(lines, index) {
+  const text = (i) => (lines[i] ?? "").trim();
+  if (/^\/\*.*\*\/$/.test(text(index)) && !text(index).slice(2, -2).includes("*/")) return true;
+  if (!text(index).startsWith("/*") && !text(index).startsWith("*")) return false;
+  let open = index;
+  while (open >= 0 && !text(open).startsWith("/*")) {
+    if (!text(open).startsWith("*") || (open < index && text(open).includes("*/"))) return false;
+    open -= 1;
+  }
+  if (open < 0 || text(open).includes("*/")) return false;
+  for (let close = Math.max(index, open + 1); close < lines.length; close += 1) {
+    if (!text(close).startsWith("*")) return false;
+    if (text(close).includes("*/")) return text(close).endsWith("*/") && text(close).indexOf("*/") === text(close).length - 2;
+  }
+  return false;
+}
+
+/** The changed files whose change is only comments and whitespace (commentOnlyEdit). */
+export function commentOnlyEdits(base, files, cwd = repoRoot) {
+  return new Set(base ? files.filter((file) => existsSync(path.join(cwd, file)) && commentOnlyEdit(base, file, cwd)) : []);
+}
 
 /** Whether these files change the WebKit benchmark itself. */
 export function touchesWebkitBench(files) {
@@ -241,15 +331,22 @@ export function e2eNeeds(gpuiFiles, covers = MODULE_COVERS, actions = null) {
 /**
  * What each macOS job group needs for this tier (`ciTier` in
  * scripts/ci-tier.mjs) and its files. With `base`, a change to the shell's
- * command bindings is read hunk by hunk against it (scripts/gpui-actions-e2e.mjs).
+ * command bindings is read hunk by hunk against it (scripts/gpui-actions-e2e.mjs),
+ * and a file whose change is only comments and whitespace (commentOnlyEdit)
+ * picks no e2e and no WebKit benchmark: its build and lint stages check it,
+ * and the nightly runs the whole scenario. When that leaves no GPUI file, the
+ * GPUI job runs no e2e (`e2e` null).
  */
 export function macosNeeds(tier, files, base = null) {
-  const diff = base && tier.gpuiFiles.includes(ACTIONS_FILE) ? actionsDiff(base) : null;
+  const inert = commentOnlyEdits(base, [...new Set([...tier.gpuiFiles, ...files])]);
+  const gpuiFiles = tier.gpuiFiles.filter((file) => !inert.has(file));
+  const diff = base && gpuiFiles.includes(ACTIONS_FILE) ? actionsDiff(base) : null;
+  const e2e = tier.full ? { full: true, modules: [], why: {}, fullBecause: ["full run"] } : gpuiFiles.length || !tier.gpuiFiles.length ? e2eNeeds(gpuiFiles, MODULE_COVERS, diff && actionsNeeds(diff, MODULE_COVERS)) : null;
   return {
     rust: tier.jobs.rust,
     gpui: tier.jobs.gpui,
-    e2e: !tier.jobs.gpui ? null : tier.full ? { full: true, modules: [], why: {}, fullBecause: ["full run"] } : e2eNeeds(tier.gpuiFiles, MODULE_COVERS, diff && actionsNeeds(diff, MODULE_COVERS)),
-    webkit: tier.jobs["perf-bench"] && touchesWebkitBench(files),
+    e2e: tier.jobs.gpui ? e2e : null,
+    webkit: tier.jobs["perf-bench"] && touchesWebkitBench(files.filter((file) => !inert.has(file))),
     release: files.filter((file) => RELEASE_PATHS.test(file)),
   };
 }

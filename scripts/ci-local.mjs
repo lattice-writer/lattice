@@ -93,7 +93,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as sleep } from "node:timers/promises";
-import { FULL, RELEASE_PATHS, coveredJobs, docsGate, findGate, formatTrailer, macosNeeds, mainMergeRegate } from "./ci-local-select.mjs";
+import { FULL, RELEASE_PATHS, commentOnlyEdits, coveredJobs, docsGate, findGate, formatTrailer, macosNeeds, mainMergeRegate } from "./ci-local-select.mjs";
 import { JOBS, ciTier, knownFailuresInert, selectorListsEdited } from "./ci-tier.mjs";
 import { changedFiles, gateStages, runStages } from "./gate-changed.mjs";
 import { ancestorBaseline, readBaseline } from "./gpui-e2e-light.mjs";
@@ -257,7 +257,7 @@ function mainBaselineStage(mergeBase, verdict = null) {
 export function localStages(tier, files, mergeBase, e2eNeed = macosNeeds(tier, files, mergeBase).e2e) {
   const { jobs, vitestFiles } = tier;
   const stages = [];
-  if (jobs["lint-build"] || (jobs.vitest && !vitestFiles.length)) stages.push(...gateStages(files));
+  if (jobs["lint-build"] || (jobs.vitest && !vitestFiles.length)) stages.push(...gateStages(files, commentOnlyEdits(mergeBase, files)));
   else if (vitestFiles.length) {
     stages.push({ name: "vitest", why: `${vitestFiles.length} test(s) that read the changed files`, command: "pnpm", args: ["exec", "vitest", "run", ...vitestFiles], timeout: 900_000 });
   }
@@ -276,6 +276,10 @@ export function localStages(tier, files, mergeBase, e2eNeed = macosNeeds(tier, f
     if (stage.name.startsWith("gpui-") ? !jobs.gpui : !keep[stage.name]) continue;
     if (stage.name !== "gpui-e2e" || stage.skip) {
       stages.push(heavy.has(stage.name) && !stage.skip ? buildStage(stage) : stage);
+      continue;
+    }
+    if (!e2eNeed) {
+      stages.push({ name: "gpui-e2e", skip: "only comments or whitespace changed in the GPUI inputs; the build checks them" });
       continue;
     }
     const only = e2eNeed.modules.length ? e2eNeed.modules.join(",") : "smoke";
@@ -307,7 +311,7 @@ export function localStages(tier, files, mergeBase, e2eNeed = macosNeeds(tier, f
     stages.push(e2e);
     if (older) stages.push(mainBaselineStage(mergeBase, verdict));
   }
-  if (macosNeeds(tier, files).webkit) {
+  if (macosNeeds(tier, files, mergeBase).webkit) {
     stages.push({
       name: "webkit-bench",
       why: "the WebKit benchmark and layout checks against their ceilings, as CI's macOS shards",

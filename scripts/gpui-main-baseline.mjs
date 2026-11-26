@@ -163,9 +163,9 @@ export function chunkResult(chunkRun, text) {
 }
 
 // How long all the chunks may take, lock waits included: the workflow step's
-// 465 minutes less the gate's and the build's timeouts (45 + 90), the
-// rerun's lock wait and run (30 + 15) and the idle guard's lock wait and runs
-// (30 + 35, scripts/gpui-nightly.mjs).
+// 555 minutes less the gate's and the build's timeouts (45 + 90), the
+// rerun's lock wait and run (30 + 15), the idle guard's lock wait and runs
+// (30 + 35) and the whole Vitest suite's 90 (scripts/gpui-nightly.mjs).
 const CHUNKS_BUDGET_MS = 220 * 60_000;
 // A chunk's own run, at most; a lock wait leaves this much of the budget.
 const CHUNK_RUN_MS = 25 * 60_000;

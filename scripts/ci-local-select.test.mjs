@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { FULL, TEXT_ONLY, coveredJobs, dirModules, docsGate, e2eNeeds, findGate, formatTrailer, fullCover, macosNeeds, touchesWebkitBench, mainMergeRegate, parseTrailer, resolveCover } from "./ci-local-select.mjs";
+import { FULL, TEXT_ONLY, commentOnlyEdit, coveredJobs, dirModules, docsGate, e2eNeeds, findGate, formatTrailer, fullCover, macosNeeds, touchesWebkitBench, mainMergeRegate, parseTrailer, resolveCover } from "./ci-local-select.mjs";
 import { ciTier } from "./ci-tier.mjs";
 
 const covers = new Map([
@@ -407,5 +407,58 @@ describe.skipIf(process.platform === "win32")("ci-local-select: the docs-only pa
     const forged = git("rev-parse", "HEAD");
     git("checkout", "-q", "topic");
     expect(docsGate(forged, { cwd: dir }).ok).toBe(false);
+  });
+});
+
+describe("ci-local-select: a change of comments and whitespace only", () => {
+  it("is only full-line comments, blank lines and, outside the #-languages, spacing; never code, a directive or a #! line", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "comment-only-"));
+    const git = (...args) => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd: dir, encoding: "utf8" });
+    const rust = ["/// Adds one.", "fn add(x: i32) -> i32 {", "    x + 1", "}", "/**", " * The pointer.", " */", "fn set(p: &mut i32) {", "    *p = 1;", "}", ""].join("\n");
+    const files = {
+      "a.rs": rust,
+      "b.ts": "export const x = 1;\n",
+      "e2e": "#!/bin/sh\n# Runs it.\necho hi\n",
+      "c.py": "if True:\n    x = 1\n",
+      "d.yml": "a: 1\n",
+    };
+    try {
+      for (const [file, text] of Object.entries(files)) writeFileSync(path.join(dir, file), text);
+      git("init", "-q");
+      git("add", "-A");
+      git("commit", "-q", "-m", "base");
+      const edit = (file, text) => {
+        writeFileSync(path.join(dir, file), text);
+        const inert = commentOnlyEdit("HEAD", file, dir);
+        writeFileSync(path.join(dir, file), files[file]);
+        return inert;
+      };
+      expect(edit("a.rs", rust.replace("/// Adds one.", "/// Adds one to x.\n// Kept small."))).toBe(true);
+      expect(edit("a.rs", rust.replace(" * The pointer.", " * The pointer\n * it writes."))).toBe(true);
+      expect(edit("a.rs", rust.replace("    x + 1", "        x + 1\n\n"))).toBe(true);
+      expect(edit("a.rs", rust.replace("    x + 1", "    x + 2"))).toBe(false);
+      expect(edit("a.rs", rust.replace("    *p = 1;", "    *p = 2;"))).toBe(false);
+      expect(edit("a.rs", rust.replace("    x + 1", "    x + 1 // one"))).toBe(false);
+      expect(edit("a.rs", rust.replace("    x + 1", "    x+1"))).toBe(false);
+      expect(edit("b.ts", "// @ts-expect-error\nexport const x = 1;\n")).toBe(false);
+      expect(edit("b.ts", "// The answer.\nexport const x = 1;\n")).toBe(true);
+      expect(edit("e2e", "#!/bin/sh\n# Runs it, then says so.\necho hi\n")).toBe(true);
+      expect(edit("e2e", "#!/bin/bash\n# Runs it.\necho hi\n")).toBe(false);
+      expect(edit("c.py", "if True:\n  x = 1\n")).toBe(false);
+      expect(edit("d.yml", "# A.\na: 1\n")).toBe(false);
+      writeFileSync(path.join(dir, "new.rs"), "// New.\n");
+      expect(commentOnlyEdit("HEAD", "new.rs", dir)).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("runs no e2e and no WebKit benchmark when every GPUI file changed only that way, and the e2e for the rest", () => {
+    // Against HEAD, an untouched file has an empty diff: a change of nothing but spacing.
+    const file = "gpui/crates/lattice-gpui/src/main.rs";
+    const other = "gpui/crates/lattice-gpui/src/pdf/new_file_not_in_head.rs";
+    expect(macosNeeds(ciTier([file], { scan }), [file], "HEAD")).toMatchObject({ gpui: true, e2e: null });
+    expect(macosNeeds(ciTier([file, other], { scan }), [file, other], "HEAD").e2e.why[file]).toBeUndefined();
+    expect(macosNeeds(ciTier([file], { scan }), [file]).e2e).not.toBeNull();
   });
 });

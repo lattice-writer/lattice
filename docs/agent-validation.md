@@ -222,6 +222,8 @@ A change to what picks the jobs (`CI_CONTROL` in `scripts/ci-tier.mjs`: `ci-tier
 
 An edit to `scripts/gpui-e2e-known-failures.json` that only removes entries or only changes other platforms' entries, so macOS excuses the same steps in the same tiers or fewer (`knownFailuresInert` in `scripts/ci-tier.mjs`), runs `scripts/gpui-e2e-verdict.test.mjs` (and any test that names the file) alone: no GPUI build and no e2e, on macOS or, in a dispatch for every platform, on Windows and Linux; a dispatch with `platform` set runs that platform's job as usual. Removing an entry only makes the verdict stricter, and main's nightly runs it. Any edit that excuses a new step on macOS, or moves one to another tier, runs the GPUI job as before.
 
+A file whose change is only comments and whitespace (`commentOnlyEdit` in `scripts/ci-local-select.mjs`) is checked by the build and lint stages alone: it picks no e2e module, no WebKit benchmark and no Vitest test. That covers full-line `//` comments, `/* … */` blocks whose inner lines start with `*`, `#` comments in shell, Python and TOML files and `#!` scripts, blank lines, and in Rust, TypeScript, JavaScript and CSS a change in the amount of spacing. A directive comment (`@ts-expect-error`, `eslint-…`, `@vitest-environment` and the like), a `#!` line, a trailing comment after code, a new file and YAML still count as code. When every GPUI file of a diff changed only that way, the GPUI job runs its build and unit tests without an e2e; the nightly runs the whole scenario.
+
 Rust and GPUI build and unit-test stages wait while a perf measurement or a
 hand test holds `/tmp/lattice-inapp-test.lock` (`$INAPP_LOCK_FILE` when set),
 but not while another run's GPUI e2e holds it (a live holder whose record

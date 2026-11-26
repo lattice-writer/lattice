@@ -178,9 +178,8 @@ export function vitestFailures(result, status) {
 }
 
 // The whole suite, one file at a time (vitest.config.ts's maxWorkers: 1;
-// about 13 minutes on the Mac mini). The workflow step's timeout grew by these
-// 90 minutes past the 465 gpui-main-baseline.mjs's CHUNKS_BUDGET_MS counts
-// from, so that budget stands.
+// about 13 minutes on the Mac mini); gpui-main-baseline.mjs's CHUNKS_BUDGET_MS
+// leaves it these 90 minutes of the workflow step's 555.
 const VITEST_TIMEOUT_MS = 90 * 60_000;
 
 /** The whole Vitest suite, headless and outside the in-app lock, as CI's shards run it together. */
