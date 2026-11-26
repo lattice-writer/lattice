@@ -15,7 +15,10 @@
  *   notices    `pnpm notices:check`, when a lockfile, manifest or the notices
  *              themselves changed
  *   rustfmt    `cargo fmt --check`, when a .rs file changed; it builds nothing
- *   vitest     the tests `vitest related` finds from the changed files, plus
+ *   vitest     the tests within two imports of the changed sources (their own
+ *              tests and their importers', scripts/lib/import-graph.mjs; the
+ *              suites that mount the whole app run in release CI), the tests
+ *              `vitest related` finds from any other changed file, plus
  *              every test in src/platform/invariant-tests.json, which read
  *              stylesheets and fixtures, or run scripts, no import graph leads
  *              to (the React Compiler guard among them)
@@ -40,6 +43,7 @@ import { spawn, execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { importers, nearTests } from "./lib/import-graph.mjs";
 import { invariantTests } from "./test-invariants.mjs";
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -177,6 +181,9 @@ export function gateStages(files) {
   const sources = files.filter((file) => /^src\/.*\.tsx?$/.test(file) || file.startsWith("src/locales/"));
   // gpui/ is a Cargo workspace of its own, checked by `pnpm signoff`.
   const rust = files.filter((file) => file.startsWith("src-tauri/") && file.endsWith(".rs"));
+  // The changed sources' own tests and their importers' (scripts/lib/import-graph.mjs);
+  // a stylesheet, a JSON file or a deleted file keeps vitest related's whole closure.
+  const near = code.length ? nearTests(code, importers(repo)) : { tests: [], unknown: [] };
   return [
     { name: "lint", why: "oxlint, src and tools", command: "pnpm", args: ["lint"], timeout: 180_000 },
     { name: "knip", why: "unused files, exports and dependencies", command: "pnpm", args: ["knip"], timeout: 180_000 },
@@ -220,9 +227,10 @@ export function gateStages(files) {
       : { name: "rustfmt", skip: "no .rs file changed" },
     {
       name: "vitest",
-      why: `related to ${code.length} changed file(s), plus ${invariantTests().length} invariant tests`,
+      why: `${near.tests.length} test(s) within two imports of ${code.length - near.unknown.length} changed source(s)${near.unknown.length ? `, those related to ${near.unknown.length} other changed file(s)` : ""}, plus ${invariantTests().length} invariant tests`,
       command: "pnpm",
-      args: ["exec", "vitest", "related", "--run", "--passWithNoTests", ...code, ...invariantTests()],
+      // A test file given to `vitest related` runs itself.
+      args: ["exec", "vitest", "related", "--run", "--passWithNoTests", ...near.unknown, ...near.tests, ...invariantTests()],
       timeout: 900_000,
     },
   ];

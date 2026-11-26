@@ -222,8 +222,9 @@ pnpm gate:changed
 ```
 
 `pnpm gate:changed` (`scripts/gate-changed.mjs`) runs lint, typecheck, the i18n
-catalogs, and the tests that `vitest related` finds from what your branch
-changed against `origin/main`, plus the invariant tests no import leads to. It
+catalogs, and the tests of what your branch changed against `origin/main`
+and of the files that import it (two import steps; `vitest related` for a
+stylesheet or JSON file), plus the invariant tests no import leads to. It
 builds no Rust.
 
 A pull request has no required check, local or remote. GitHub runs CI

@@ -20,8 +20,11 @@ typecheck, the i18n catalogs, and, when their inputs changed, `perf:evidence`,
 `notices:check`, the GPUI host error catalog
 (`scripts/gpui-host-errors.mjs --check`), the GPUI animated icons
 (`scripts/gpui-animated-icons.mjs --check`), the GPUI symbol palette glyphs
-(`scripts/gpui-symbol-glyphs.mjs --check`) and `cargo fmt --check`; then the tests `vitest related` finds
-from your changed files, and `pnpm test:invariants`, the tests that read
+(`scripts/gpui-symbol-glyphs.mjs --check`) and `cargo fmt --check`; then the tests within two imports
+of your changed sources (their own tests and their importers' tests,
+`scripts/lib/import-graph.mjs`; the suites that mount the whole app import
+nearly everything and run in release CI), the tests `vitest related` finds
+from any other changed file (a stylesheet, a JSON file), and `pnpm test:invariants`, the tests that read
 stylesheets and fixtures, or run scripts, no import leads to. Do not assemble
 your own list of test files. The no-mistakes pipeline's test step runs this
 same gate (`.no-mistakes.yaml`).
