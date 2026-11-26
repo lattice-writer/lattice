@@ -327,15 +327,31 @@ impl Run {
         let from: Point<Pixels> = gpui::point(note.text.left() + px(1.), note.text.top() + line);
         let to = gpui::point(note.text.right() - px(1.), note.text.bottom() - line);
         let native = self.native(cx)?;
-        native::send_mouse(native, native::Mouse::Down, from)?;
-        for step in 1..=12 {
-            let t = step as f32 / 12.;
-            let at = gpui::point(from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t);
-            self.pause(cx, Duration::from_millis(16)).await;
-            native::send_mouse(native, native::Mouse::Dragged, at)?;
+        // ⌘C copies the window's selection only once the drag has made one.
+        // On GitHub's macOS runner a drag can end with none, and ⌘C then falls
+        // through to the editor's own Copy of its current line, so the drag is
+        // tried again until the selection holds words, and ⌘C waits for them.
+        for _ in 0..3 {
+            native::send_mouse(native, native::Mouse::Down, from)?;
+            for step in 1..=12 {
+                let t = step as f32 / 12.;
+                let at = gpui::point(from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t);
+                self.pause(cx, Duration::from_millis(16)).await;
+                native::send_mouse(native, native::Mouse::Dragged, at)?;
+            }
+            native::send_mouse(native, native::Mouse::Up, to)?;
+            let started = std::time::Instant::now();
+            let mut selected = false;
+            while !selected && started.elapsed() < Duration::from_secs(2) {
+                self.pause(cx, Duration::from_millis(100)).await;
+                selected = self.with_window(cx, |_, window, cx| {
+                    !gpui_kit::base::TextSelection::selected_text(window, cx).trim().is_empty()
+                })?;
+            }
+            if selected {
+                break;
+            }
         }
-        native::send_mouse(native, native::Mouse::Up, to)?;
-        self.pause(cx, Duration::from_millis(200)).await;
         self.press(cx, 'c', true).await?;
         self.pause(cx, Duration::from_millis(200)).await;
         Ok(cx.update(|cx| cx.read_from_clipboard().and_then(|item| item.text())))
