@@ -73,7 +73,8 @@ main blockquote { margin: 12px 0; padding: 2px 16px; border-left: 3px solid var(
 <ul>
 <li>Choose <strong>Blank Typst document</strong> as the venue template when you create a project, or <strong>New Typst file</strong> in the Project panel&#39;s <strong>+</strong> menu.</li>
 <li>A folder you open that has a <code>main.typ</code> (or another <code>.typ</code> that includes the rest) and no LaTeX document builds that file.</li>
-<li><strong>In a LaTeX project</strong>, a <code>.typ</code> file you build compiles on its own, and the LaTeX paper stays the document other builds compile.</li>
+<li>With no Typst main document set, saving a part that another <code>.typ</code> file includes builds the document that includes it, not the part alone.</li>
+<li><strong>In a LaTeX project</strong>, a Typst document you build compiles on its own, and the LaTeX paper stays the document other builds compile.</li>
 </ul>
 <h2 id="write-and-build">Write and build</h2>
 <ul>

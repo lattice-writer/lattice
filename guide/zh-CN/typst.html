@@ -73,7 +73,8 @@ main blockquote { margin: 12px 0; padding: 2px 16px; border-left: 3px solid var(
 <ul>
 <li>创建项目时，会议模板选 <strong>Blank Typst document</strong>；或在项目面板的 <strong>+</strong> 菜单中选择 <strong>新建 Typst</strong>。</li>
 <li>打开的文件夹如果没有 LaTeX 文档、但有 <code>main.typ</code>（或引入其他文件的那个 <code>.typ</code>），就会编译这个文件。</li>
-<li><strong>在 LaTeX 项目中</strong>编译某个 <code>.typ</code> 文件时，只单独编译它，其他编译仍然编译原来的 LaTeX 论文。</li>
+<li>没有设定 Typst 主文档时，保存一个被其他 <code>.typ</code> 文件引入的部分，会编译引入它的那个文档，而不是单独编译这个部分。</li>
+<li><strong>在 LaTeX 项目中</strong>编译某个 Typst 文档时，只单独编译它，其他编译仍然编译原来的 LaTeX 论文。</li>
 </ul>
 <h2 id="编写与编译">编写与编译</h2>
 <ul>
