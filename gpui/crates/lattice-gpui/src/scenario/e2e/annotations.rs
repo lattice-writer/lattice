@@ -316,7 +316,8 @@ impl Run {
         quote: &str,
         id: &str,
     ) -> Result<Option<String>> {
-        let _front = self.focused(cx, "annotation card copy").await?;
+        // The pasteboard is read and written inside a foreground section.
+        let _front = self.foreground(cx, "annotation card copy").await?;
         let Some(note) = self.open_note_card(cx, editor, quote, id).await? else {
             return Ok(None);
         };
