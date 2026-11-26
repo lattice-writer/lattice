@@ -107,8 +107,11 @@ const AGENT_MODULES = [...new Set([...ISLAND_MODULES, ...[...MODULE_COVERS.keys(
 const MACOS_SMOKE = [/^gpui\/crates\/lattice-gpui\/src\/native_(linux|windows)\.rs$/, /^src\/locales\//];
 
 export const E2E_TABLE = [
+  // The Overleaf mock servers only the overleaf module's steps start
+  // (scenario/e2e/overleaf/); the mocks use one another, nothing else does.
+  [/^gpui\/crates\/lattice-gpui\/src\/scenario\/overleaf(_[a-z]+)?_mock\.rs$/, ["overleaf"]],
   // The scenario's own harness, runner and fixture: every module runs on them.
-  [/^gpui\/crates\/lattice-gpui\/src\/scenario(\.rs$|\/)/, FULL],
+  [/^gpui\/crates\/lattice-gpui\/src\/scenario(\.rs$|\/(?!overleaf(_[a-z]+)?_mock\.rs$))/, FULL],
   [/^gpui\/(script\/e2e|fixtures\/)/, FULL],
   // Read by no scenario step: documentation, unit tests, benches, the
   // parity report and the compatibility notes.
@@ -116,6 +119,13 @@ export const E2E_TABLE = [
   [/^gpui\/crates\/[^/]+\/(tests|benches)\//, []],
   [/^gpui\/crates\/[^/]+\/src\/(.*\/)?tests?(\.rs$|\/)/, []],
   [/^gpui\/parity\//, []],
+  // The host errors' translations, generated from the Tauri app's catalog
+  // (scripts/gpui-host-errors.mjs; gate:changed checks it is current, and
+  // host_errors.rs's unit tests read it): no step reads a host error in
+  // another language than English, where the text is shown as written.
+  [/^gpui\/crates\/lattice-gpui\/src\/host_errors\/catalog\.rs$/, []],
+  // lattice-core's unit tests, which no window runs.
+  [/^src-tauri\/lattice-core\/(tests\/|src\/(.*\/)?tests?(\.rs$|\/))/, []],
   [/^THIRD_PARTY_NOTICES\.md$/, []],
   // What every window is built from.
   [/^gpui\/patches\//, FULL],
@@ -135,7 +145,7 @@ export const E2E_TABLE = [
   // bindings, is read hunk by hunk instead when its diff can be
   // (scripts/gpui-actions-e2e.mjs); this row is for when it cannot.
   [/^gpui\/crates\/lattice-gpui\/src\/(shell\.rs|shell\/(actions|views|parts|workspaces|entries|ground|editor_events)\.rs|native\.rs)$|^gpui\/crates\/lattice-gpui\/src\/native\//, FULL],
-  [/^src-tauri\/lattice-(core|theme)\//, FULL],
+  [/^src-tauri\/lattice-(core|theme)\/(?!tests\/|src\/(.*\/)?tests?(\.rs$|\/))/, FULL],
   [/^design-system\//, FULL],
   [/^\.github\/workflows\/gpui\.yml$/, FULL],
   // lattice-i18n's string catalogs: the build and the unit tests check them

@@ -177,7 +177,7 @@ module's `covers` names it: the scenario harness, `gpui/patches/`, the
 manifests, each crate's `main.rs`/`lib.rs` and the app's `app.rs`,
 the vendored crates under `gpui/compat/` (gpui-fast, which draws every
 window, gpui-pre and libsqlite3-sys), lattice-ui, lattice-i18n's code,
-lattice-core, and lattice-gpui's root view and native input (`shell.rs` and
+lattice-core (but not its unit tests), and lattice-gpui's root view and native input (`shell.rs` and
 every file under `shell/` that no module's `covers` names, `native.rs` and
 `native/`, the private pasteboard among them). The exception is
 `shell/actions.rs`, the command bindings, which `ci:local` reads hunk by

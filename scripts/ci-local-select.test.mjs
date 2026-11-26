@@ -34,6 +34,12 @@ describe("ci-local-select: the e2e a change needs", () => {
     expect(e2eNeeds([file], covers, { full: false, modules: [], why: [] })).toMatchObject({ full: false, modules: [] });
   });
 
+  it("runs the overleaf module for its mock servers, and the smoke flow for the host error catalog and lattice-core's tests", () => {
+    for (const mock of ["overleaf_mock", "overleaf_realtime_mock", "overleaf_review_mock", "overleaf_history_mock"]) expect(e2eNeeds([`gpui/crates/lattice-gpui/src/scenario/${mock}.rs`]), mock).toMatchObject({ full: false, modules: ["overleaf"] });
+    for (const file of ["gpui/crates/lattice-gpui/src/host_errors/catalog.rs", "src-tauri/lattice-core/src/latex/build/tests.rs", "src-tauri/lattice-core/src/latex/synctex/highlighted/tests.rs", "src-tauri/lattice-core/tests/build.rs"]) expect(e2eNeeds([file]), file).toMatchObject({ full: false, modules: [] });
+    for (const file of ["gpui/crates/lattice-gpui/src/scenario/e2e.rs", "gpui/crates/lattice-gpui/src/scenario/drag.rs", "gpui/crates/lattice-gpui/src/host_errors.rs", "src-tauri/lattice-core/src/latex.rs", "src-tauri/lattice-core/src/testsupport.rs"]) expect(e2eNeeds([file]), file).toMatchObject({ full: true });
+  });
+
   it("runs what the island config picks for the script that builds the island pages", () => {
     expect(e2eNeeds(["gpui/script/build-islands"]).modules).toEqual(e2eNeeds(["gpui/islands/vite.config.ts"]).modules);
     expect(e2eNeeds(["gpui/script/build-islands"])).toMatchObject({ full: false, modules: ["islands", "markdown", "structured"] });
