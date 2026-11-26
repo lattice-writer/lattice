@@ -75,15 +75,24 @@ fn user_guide_answers(url: &str) -> bool {
 /// interface language either way. Without a copy (island pages never
 /// built) the website opens straight away.
 fn open_user_guide(cx: &mut App) {
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    // A second click while the website is still being asked opens nothing:
+    // the first click's page is on its way.
+    static CHECKING: AtomicBool = AtomicBool::new(false);
     let locale = lattice_i18n::locale();
     let url = user_guide_url(locale);
     let Some(guide) = crate::structured::resources::user_guide_dir() else {
         cx.open_url(url);
         return;
     };
+    if CHECKING.swap(true, Ordering::SeqCst) {
+        return;
+    }
     let online = cx.background_spawn(async move { user_guide_answers(url) });
     cx.spawn(async move |cx| {
         let online = online.await;
+        CHECKING.store(false, Ordering::SeqCst);
         cx.update(|cx| {
             if online {
                 cx.open_url(url);
@@ -440,7 +449,8 @@ mod tests {
             user_guide_url(lattice_i18n::Locale::ZhCn),
             "https://lattice-writer.github.io/lattice/guide/zh-CN/"
         );
-        let guide = std::path::Path::new("/Applications/Lattice.app/Contents/Resources/guide");
+        let guide =
+            std::path::Path::new("/Applications/Lattice.app/Contents/Resources/islands/guide");
         assert_eq!(
             offline_user_guide(guide, lattice_i18n::Locale::En),
             guide.join("index.html")
