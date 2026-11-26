@@ -23,7 +23,6 @@ import { dismissAppToastByDedupeKey } from "../../../telemetry/app-log-store";
 import { rebaseMarkdownDraft } from "../markdown-collab";
 import { openMarkdownLink } from "../markdown-link-routing";
 import { markdownPreviewSyncPolicy } from "../markdown-preview-sync-policy";
-import { isPaperLibraryPath } from "../../../papers/paper-link";
 import { ProjectImageHostProvider } from "../project-image-host";
 import { DocumentHeadingRail } from "../document-heading-rail";
 import type { VisualMarkdownEditorProps, VisualRevealTarget } from "../visual-editor-props";
@@ -37,7 +36,8 @@ import { PassiveView, passiveModel, type PassiveModel } from "./passive-view";
 import type { ImeGuard } from "./engine-keymap";
 import { MathMacrosContext, engineNodeViews } from "./engine-node-views";
 import { engineSchema, engineSchemaExtensions, type RawBlockKind } from "./engine-schema";
-import { adoptNodes, openMarkdown, serializeMarkdown, type MarkdownBaseline, type OpenOptions } from "./markdown-document";
+import { adoptNodes, openMarkdown, serializeMarkdown, type MarkdownBaseline } from "./markdown-document";
+import { openOptions } from "./open-options";
 import { SourceMap } from "./source-map";
 import { SourceOverlays, buildOverlays, setOverlays } from "./source-overlays";
 import { REVEAL_FLASH_MS, RevealFlash, setRevealFlash } from "./reveal-flash";
@@ -170,11 +170,6 @@ function selectionMarkdown(host: Host): string {
   if (map && from != null && to != null && to > from) return map.text.slice(from, to);
   return doc.textBetween(selection.from, selection.to, "\n\n", " ");
 }
-
-/** How the file at `path` is read: paper reading mode infers merged table cells (R-BLK-11). */
-const openOptions = (props: VisualMarkdownEditorProps): OpenOptions => ({
-  paperSpans: Boolean(props.optimizeForReading && isPaperLibraryPath(props.activePath)),
-});
 
 type HostMessages = { unavailable: string; source: string; title: string; detail: string; copy: string; restore: string };
 
@@ -535,7 +530,7 @@ function readingExtensions(labels: Partial<Record<RawBlockKind, string>>, ime: I
 
 /** The passive layout for a large read-only document (R-PERF-1), or null to draw it whole. */
 function passiveFor(text: string, activePath: string, reading: boolean): PassiveModel | null {
-  const opened = openMarkdown(text, engineSchema(), { paperSpans: reading && isPaperLibraryPath(activePath) });
+  const opened = openMarkdown(text, engineSchema(), openOptions({ activePath, optimizeForReading: reading }));
   return "unavailable" in opened ? null : passiveModel(opened.doc, opened.baseline, text.length, reading);
 }
 
