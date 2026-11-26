@@ -289,7 +289,7 @@ function github() {
   const lines = [
     reason ? `Every job: ${reason}.` : `Compared with ${base.slice(0, 9)}: ${files.length} changed file(s).`,
     ...(docsRefused ? [`The head commit's docs-only trailer is not taken: ${docsRefused}.`] : []),
-    ...(tier.jobs["perf-bench"] && !cover && webkitSkipped ? ["macOS WebKit benchmark: skipped, the branch does not touch its tooling (WEBKIT_BENCH_TOOLING)."] : []),
+    ...(tier.jobs["perf-bench"] && !cover && webkitSkipped ? ["macOS WebKit benchmark: skipped, the branch does not touch its tooling (touchesWebkitBench)."] : []),
     ...(cover
       ? [
           `The head commit's CI-local trailer names this tree (${cover.line.trim()}).`,

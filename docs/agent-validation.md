@@ -155,9 +155,9 @@ that stand for them, chosen from the diff against the merge base
 | The branch changes | `ci:local` runs |
 | --- | --- |
 | documentation only | nothing |
-| `src-tauri/` or web code only | the gate (lint, knip, tsc, i18n, notices, the related Vitest tests); rustfmt, clippy `-D warnings` and `cargo test` for the Tauri crates; the bundle budgets when the bundle's inputs changed, and the WebKit benchmark only when its own tooling changed (`WEBKIT_BENCH_TOOLING`: `scripts/perf-bench/`, `scripts/perf-bench.mjs`). No GPUI stage. |
+| `src-tauri/` or web code only | the gate (lint, knip, tsc, i18n, notices, the related Vitest tests); rustfmt, clippy `-D warnings` and `cargo test` for the Tauri crates; the bundle budgets when the bundle's inputs changed, and the WebKit benchmark only when the benchmark itself changed (`touchesWebkitBench`: `scripts/perf-bench/`, `scripts/perf-bench.mjs`, `tools/perf-bench/`, `tools/mock-backend/` and the files the bench imports, not a dependency bump). No GPUI stage. |
 | `gpui/` only | GPUI fmt, release build and unit tests, and the e2e below. No WebKit benchmark. |
-| a release path (`RELEASE_PATHS`: release workflows, `src-tauri/tauri*.conf.json`, `Info.plist`, `Entitlements.plist`, the icons, either app's updater, `fetch-pdfium`, the bundle, packaging, signing and release scripts) | everything, as `--full` does, and a trailer that records it (`rust gpui e2e=full`) |
+| a release path (`RELEASE_PATHS`: release workflows, `src-tauri/tauri*.conf.json`, `Info.plist`, `Entitlements.plist`, the icons, either app's updater, `fetch-pdfium`, the bundle, packaging, signing and release scripts) | everything but the WebKit benchmark, as `--full` does, and a trailer that records it (`rust gpui e2e=full`) |
 | only text since a gated commit (below) | the docs-only profile: the build and the tests that read those files, no e2e and no WebKit benchmark, and a `docs from=<gate>` trailer |
 
 The GPUI e2e is the smoke flow (open, build, SyncTeX both ways, edits and ⌘S,
@@ -209,7 +209,7 @@ on GitHub. A release is still built and checked for real on GitHub when its
 tag is pushed: a tag runs every job and ignores any trailer (so does every
 push to main), and
 `release.yml` and `gpui-package.yml` take no trailer at all.
-`pnpm ci:local --full` runs every stage and the whole e2e.
+`pnpm ci:local --full` runs every stage and the whole e2e, except the WebKit benchmark unless the diff changes it.
 
 **Docs-only commits on a gated branch.** When everything since the newest
 commit on HEAD's first-parent line whose trailer names its own tree and

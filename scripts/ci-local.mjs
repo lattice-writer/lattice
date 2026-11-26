@@ -19,7 +19,7 @@
  *   perf-bench           also the WebKit benchmark against its ceilings, as
  *                        CI's macOS perf-bench-webkit shards run it, only
  *                        when the benchmark's own tooling changed
- *                        (WEBKIT_BENCH_TOOLING): it measures the classic app,
+ *                        (touchesWebkitBench): it measures the classic app,
  *                        frozen on macOS, and holds the in-app lock
  *   gpui                 rustfmt, the release build, the unit tests and the
  *                        e2e scenario, judged like CI's against
@@ -73,7 +73,8 @@
  *
  * Options:
  *   --base REF   compare against REF instead of origin/main (its merge base)
- *   --full       every stage and the whole e2e, whatever changed, and no
+ *   --full       every stage (the WebKit benchmark only when the diff
+ *                changes it) and the whole e2e, whatever changed, and no
  *                quick re-gate
  *   --plan       print the plan only
  *   --headless   skip the stages that open windows (the GPUI e2e, its main

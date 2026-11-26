@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { FULL, TEXT_ONLY, coveredJobs, docsGate, e2eNeeds, findGate, formatTrailer, fullCover, macosNeeds, mainMergeRegate, parseTrailer, resolveCover } from "./ci-local-select.mjs";
+import { FULL, TEXT_ONLY, coveredJobs, docsGate, e2eNeeds, findGate, formatTrailer, fullCover, macosNeeds, touchesWebkitBench, mainMergeRegate, parseTrailer, resolveCover } from "./ci-local-select.mjs";
 import { ciTier } from "./ci-tier.mjs";
 
 const covers = new Map([
@@ -68,6 +68,8 @@ describe("ci-local-select: stages by diff", () => {
     expect(needsFor(["src/App.tsx"])).toMatchObject({ rust: false, gpui: false, webkit: false });
     expect(needsFor(["scripts/perf-bench/scenarios.mjs"])).toMatchObject({ webkit: true });
     expect(needsFor(["scripts/perf-bench.mjs", "src/App.tsx"])).toMatchObject({ webkit: true });
+    for (const file of ["tools/perf-bench/bench-page.ts", "tools/mock-backend/server.ts", "scripts/lib/util.mjs", "vite.config.ts"]) expect(touchesWebkitBench([file]), file).toBe(true);
+    for (const file of ["package.json", "pnpm-lock.yaml", "src/App.tsx", "scripts/ci-tier.mjs"]) expect(touchesWebkitBench([file]), file).toBe(false);
     expect(needsFor(["gpui/crates/lattice-gpui/src/pdf/view/notes.rs"])).toMatchObject({ rust: false, gpui: true, webkit: false, e2e: { full: false } });
   });
 

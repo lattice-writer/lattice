@@ -14,7 +14,7 @@
  *   webkit   ci.yml's perf-bench-webkit shards, which measure the classic
  *            app in WKWebView. Classic macOS is frozen (no Mac user runs it
  *            since 0.20.0), so a change needs them only when it touches the
- *            benchmark's own tooling (WEBKIT_BENCH_TOOLING); main and tags
+ *            benchmark itself (touchesWebkitBench); main and tags
  *            still run them on GitHub
  *
  * The e2e a change needs is the smoke flow (open, build, SyncTeX both ways,
@@ -54,11 +54,23 @@
  */
 import { execFileSync } from "node:child_process";
 import { readModules } from "./gpui-e2e-modules.mjs";
+import { harnessInputs } from "./perf-bench/harness-inputs.mjs";
 
 export const FULL = "full";
 
-// The WebKit benchmark's own code: a change to it runs the benchmark.
-export const WEBKIT_BENCH_TOOLING = /^scripts\/(perf-bench\/|perf-bench\.mjs$)/;
+// The WebKit benchmark's own code (ci-tier's PERF_BENCH_INPUTS): a change to
+// it, or to a file the bench imports (harnessInputs), runs the benchmark. A
+// dependency bump (package.json, the lockfile, the pnpm setup) does not: it
+// is measured on main.
+const WEBKIT_BENCH_TOOLING = /^(scripts\/perf-bench(\.mjs|\/)|tools\/(mock-backend|perf-bench)\/|\.github\/actions\/bench-page\/)/;
+const NOT_BENCH_TOOLING = /^(src\/|package\.json$|pnpm-lock\.yaml$|\.github\/actions\/setup-pnpm\/)/;
+
+/** Whether these files change the WebKit benchmark itself. */
+export function touchesWebkitBench(files) {
+  if (files.some((file) => WEBKIT_BENCH_TOOLING.test(file))) return true;
+  const inputs = new Set(harnessInputs().filter((file) => !NOT_BENCH_TOOLING.test(file)));
+  return files.some((file) => inputs.has(file));
+}
 
 // What ships or signs a release: the release workflows, the bundle
 // configuration, entitlements, Info.plist and icons, the updater in both
@@ -151,7 +163,7 @@ export function macosNeeds(tier, files) {
     rust: tier.jobs.rust,
     gpui: tier.jobs.gpui,
     e2e: !tier.jobs.gpui ? null : tier.full ? { full: true, modules: [], why: {}, fullBecause: ["full run"] } : e2eNeeds(tier.gpuiFiles),
-    webkit: tier.jobs["perf-bench"] && files.some((file) => WEBKIT_BENCH_TOOLING.test(file)),
+    webkit: tier.jobs["perf-bench"] && touchesWebkitBench(files),
     release: files.filter((file) => RELEASE_PATHS.test(file)),
   };
 }
