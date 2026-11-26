@@ -11,6 +11,15 @@ still the one at the path (its inode), and takes it again when not; a holder
 checks the same every second and, when someone has replaced the file, locks
 the new one too, or says loudly that it could not.
 
+Waiters take the lock in the order they came: each puts a ticket in
+<lock>.queue, named by its arrival and flocked while it waits, and only the
+first live ticket tries the lock (a waiter that died leaves its ticket
+unlocked, and the next one removes it). Before, every waiter polled the lock
+each second and whoever polled first after a release took it, so one gate
+waited over 30 minutes while ten later holders went first (LATA-105).
+Takers that do not go through this script (lockf -k) still take the lock
+whenever it is free.
+
 The holder writes who it is into the file (pid, thread, command, since), so a
 waiter can say what it waits on, and `status` can tell a live holder from a
 gone one. flock is released by the kernel when its holder dies, so a dead
@@ -63,6 +72,7 @@ import time
 
 LOCK = os.environ.get("INAPP_LOCK_FILE", "/tmp/lattice-inapp-test.lock")
 BUILDS = LOCK + ".builds"
+QUEUE = LOCK + ".queue"
 TIMED_OUT = 75
 KINDS = ("quiet", "e2e")
 
@@ -126,23 +136,82 @@ def lock_at_path():
     return lock_at_path()
 
 
+def take_ticket():
+    """This waiter's place in line: a file in QUEUE named by when it came,
+    flocked for as long as it waits. It is locked before it is renamed into
+    the queue, so no other waiter ever sees it unlocked and takes it for a
+    dead one's."""
+    os.makedirs(QUEUE, exist_ok=True)
+    draft = os.path.join(QUEUE, f".draft-{os.getpid()}-{time.time_ns()}")
+    fd = os.open(draft, os.O_RDWR | os.O_CREAT, 0o666)
+    fcntl.flock(fd, fcntl.LOCK_EX)
+    name = os.path.join(QUEUE, f"{time.time_ns():020d}-{os.getpid()}")
+    os.rename(draft, name)
+    return name, fd
+
+
+def drop_ticket(ticket):
+    name, fd = ticket
+    try:
+        os.unlink(name)
+    except FileNotFoundError:
+        pass
+    os.close(fd)
+
+
+def waiters():
+    """The live tickets in the order they came, removing those whose waiter is
+    gone (nothing holds their flock)."""
+    try:
+        names = sorted(name for name in os.listdir(QUEUE) if not name.startswith("."))
+    except FileNotFoundError:
+        return []
+    live = []
+    for name in names:
+        path = os.path.join(QUEUE, name)
+        try:
+            fd = os.open(path, os.O_RDONLY)
+        except FileNotFoundError:
+            continue
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            live.append(path)
+        else:
+            try:
+                os.unlink(path)
+            except FileNotFoundError:
+                pass
+        finally:
+            os.close(fd)
+    return live
+
+
 def acquire(thread, command, wait, notes, kind="quiet"):
     """Take the lock and write the record, or return None after `wait` seconds.
-    A quiet holder also waits, within the same `wait`, for the running builds
-    to end, and keeps them off until its release."""
+    A waiter tries the lock only when no live waiter came before it. A quiet
+    holder also waits, within the same `wait`, for the running builds to end,
+    and keeps them off until its release."""
     started = time.monotonic()
     last_note = None
-    while True:
-        fd = lock_at_path()
-        if fd is not None:
-            break
-        waited = time.monotonic() - started
-        if wait is not None and waited >= wait:
-            return None
-        if last_note is None or waited - last_note >= 60:
-            last_note = waited
-            print(f"inapp-lock: waiting ({int(waited // 60)} min so far) for {describe(holder())}", file=notes, flush=True)
-        time.sleep(1)
+    ticket = take_ticket()
+    try:
+        while True:
+            line = waiters()
+            ahead = line.index(ticket[0]) if ticket[0] in line else 0
+            fd = lock_at_path() if ahead == 0 else None
+            if fd is not None:
+                break
+            waited = time.monotonic() - started
+            if wait is not None and waited >= wait:
+                return None
+            if last_note is None or waited - last_note >= 60:
+                last_note = waited
+                queued = f", {ahead} waiter(s) ahead" if ahead else ""
+                print(f"inapp-lock: waiting ({int(waited // 60)} min so far{queued}) for {describe(holder())}", file=notes, flush=True)
+            time.sleep(1)
+    finally:
+        drop_ticket(ticket)
     record = {
         "pid": os.getpid(),
         "thread": thread,
@@ -355,6 +424,9 @@ def main(argv):
         print(f"inapp-lock: held by {describe(record)}")
         if not record or not alive(record.get("pid", 0)):
             print(f"inapp-lock: the lock file is open in pids {lockers()}; one of them holds it")
+        line = waiters()
+        if line:
+            print(f"inapp-lock: {len(line)} waiting, in this order: pids {[int(os.path.basename(path).split('-')[1]) for path in line]}")
         return 1
     if argv and argv[0] == "hold" and len(argv) <= 2:
         return hold(thread, wait, float(argv[1]) if len(argv) == 2 else 7200.0, kind)

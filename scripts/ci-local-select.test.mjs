@@ -468,4 +468,16 @@ describe("ci-local-select: a change of comments and whitespace only", () => {
     expect(macosNeeds(ciTier([file, other], { scan }), [file, other], "HEAD").e2e.why[file]).toBeUndefined();
     expect(macosNeeds(ciTier([file], { scan }), [file]).e2e).not.toBeNull();
   });
+
+  it("picks no e2e for a known-failures edit no macOS run can show, beside a GPUI change, which the other platforms still read", () => {
+    const known = "scripts/gpui-e2e-known-failures.json";
+    const files = [known, "gpui/crates/lattice-gpui/src/pdf/viewer.rs"];
+    const inert = ciTier(files, { scan, inertKnown: true });
+    expect(inert.gpuiFiles).toContain(known);
+    const e2e = macosNeeds(inert, files).e2e;
+    expect(e2e.fullBecause).not.toContain(known);
+    expect(e2e.why[known]).toBeUndefined();
+    expect(e2e.modules.length).toBeGreaterThan(0);
+    expect(macosNeeds(ciTier(files, { scan }), files).e2e.fullBecause).toContain(known);
+  });
 });

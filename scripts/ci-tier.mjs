@@ -210,7 +210,7 @@ export function macosExcusesKept(before, after) {
 export function ciTier(files, { full = false, scan = null, selector = true, inertKnown = false } = {}) {
   const jobs = Object.fromEntries(JOBS.map((job) => [job, full]));
   const why = Object.fromEntries(JOBS.map((job) => [job, full ? ["full run"] : []]));
-  if (full) return { full, jobs, why, vitestFiles: [], gpuiFiles: [], docsOnly: false };
+  if (full) return { full, jobs, why, vitestFiles: [], gpuiFiles: [], macosInert: [], docsOnly: false };
   const { testReads, rustTargets, gpuiTargets, harness } = scan ?? {
     testReads: testReadPaths(),
     rustTargets: rustIncludes().map(({ target, prefix }) => ({ target, prefix })),
@@ -221,6 +221,10 @@ export function ciTier(files, { full = false, scan = null, selector = true, iner
   const vitestFiles = new Set();
   let vitestAll = false;
   const gpuiFiles = [];
+  // GPUI inputs whose change no macOS run can show (an inert known-failures
+  // edit): the Windows and Linux tiers still read them from gpuiFiles, and
+  // macosNeeds picks no e2e for them.
+  const macosInert = [];
   const on = (job, file) => {
     jobs[job] = true;
     if (job === "gpui" && !gpuiFiles.includes(file)) gpuiFiles.push(file);
@@ -244,7 +248,7 @@ export function ciTier(files, { full = false, scan = null, selector = true, iner
     for (const { read, test } of testReads) {
       if (files.some((file) => DOCS.test(file) && (file === read || file.startsWith(`${read}/`)))) vitestFiles.add(test);
     }
-    return { full, jobs, why, vitestFiles: [...new Set([...CI_CONTROL_TESTS, ...vitestFiles])].sort(), gpuiFiles, docsOnly: false };
+    return { full, jobs, why, vitestFiles: [...new Set([...CI_CONTROL_TESTS, ...vitestFiles])].sort(), gpuiFiles, macosInert: [], docsOnly: false };
   }
   for (const file of files) {
     if (CI_CONTROL.has(file) || file.startsWith(".github/actions/")) {
@@ -266,6 +270,7 @@ export function ciTier(files, { full = false, scan = null, selector = true, iner
     // from gpuiFiles.
     if (file === KNOWN_FAILURES && inertKnown) {
       gpuiFiles.push(file);
+      macosInert.push(file);
       vitestFiles.add("scripts/gpui-e2e-verdict.test.mjs");
       for (const { read, test } of testReads) if (read === file) vitestFiles.add(test);
       on("vitest", file);
@@ -295,7 +300,7 @@ export function ciTier(files, { full = false, scan = null, selector = true, iner
     on("vitest", file);
     on("lint-build", file);
   }
-  return { full, jobs, why, vitestFiles: vitestAll ? [] : [...vitestFiles].sort(), gpuiFiles, docsOnly: files.length > 0 && JOBS.every((job) => !jobs[job]) };
+  return { full, jobs, why, vitestFiles: vitestAll ? [] : [...vitestFiles].sort(), gpuiFiles, macosInert, docsOnly: files.length > 0 && JOBS.every((job) => !jobs[job]) };
 }
 
 /** Whether a `CI-local: macos <tree> …` trailer in the commit message names `tree` (scripts/ci-local-select.mjs reads what it covers). */
