@@ -8,7 +8,8 @@
     "Collected from main runs macos: 44173099111, 44154544765, 44162980527; windows: 44162980527, 44213516921, and the intermittent ones of 44229692959, 44247550879, 44272220139, 44274671758, 44276458780.",
     "Also steps that failed in branch runs 44225936391 and 44226228810, whose GPUI sources equal main's: a hosted-runner flake looks like this.",
     "An entry with \"tier\": \"flaky\" passes on main more often than not and fails the hosted runners now and then for a reason outside the change: the verdict reruns it with its module, a failure on both tries is a warning on a branch and fails the job on main (--strict-flaky). Add one only with the runs that show it failing and passing on the same code; take it off once its cause is fixed. Each flaky-tier entry's followup is its own issue for the real fix.",
-    "Linux (gpui.yml linux, Xvfb, XTEST input, GL on llvmpipe): main has not run the Linux e2e yet, so the Linux entries come from branch runs whose GPUI sources are main's plus only the Linux input layer: 45483277041 (the first whole Linux run), 45505858441 and 45531114205 on main 938cf2726, and 45603069391 and 45631595139 on main 979526541. Check them against main's own Linux runs once it has some."
+    "Linux (gpui.yml linux, Xvfb, XTEST input, GL on llvmpipe): main has not run the Linux e2e yet, so the Linux entries come from branch runs whose GPUI sources are main's plus only the Linux input layer: 45483277041 (the first whole Linux run), 45505858441 and 45531114205 on main 938cf2726, and 45603069391 and 45631595139 on main 979526541. Check them against main's own Linux runs once it has some.",
+    "2026-11-26: 46 macOS entries came off (33 whole, 13 kept for their other platforms): each passed both in the nightly on the Mac mini (run 45749677371, main at 1c1de3af) and on the hosted macOS runner (PR 1298 at 796ec7652, GPUI sources as main's). The quarantine flaky steps stay listed whatever one pass shows."
   ],
   "steps": [
     {
@@ -145,10 +146,9 @@
     {
       "step": "a batch move that fails part-way still moves the open tab of what went first",
       "platforms": [
-        "macos",
         "windows"
       ],
-      "reason": "macOS: failed in 1 of 3 main runs (44173099111), so intermittent; observed {\"moved\":true,\"front\":\"dest/mv-a.tex\",\"notice\":\"the app became active outside a foreground section, after step \\\"switching projects keeps each project's open folders: B'…: the app became active outside a foreground secti… | Windows: failed in 1 of 2 main runs (44213516921), so intermittent; observed {\"moved\":true,\"front\":\"dest/mv-a.tex\",\"notice\":\"Build succeeded in 2.9 s: #4e53eb\"}",
+      "reason": "Windows: failed in 1 of 2 main runs (44213516921), so intermittent; observed {\"moved\":true,\"front\":\"dest/mv-a.tex\",\"notice\":\"Build succeeded in 2.9 s: #4e53eb\"}",
       "followup": "LEO-14"
     },
     {
@@ -158,14 +158,6 @@
         "windows"
       ],
       "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); an earlier step of the tab_policy module failed, which stops the module | Windows: failed in every main run (44162980527, 44213516921); an earlier step of the tab_policy module failed, which stops the module",
-      "followup": "LEO-14"
-    },
-    {
-      "step": "a Finder drag off the tree's rows aims at the project root, and leaving clears it",
-      "platforms": [
-        "macos"
-      ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"aimed\":null,\"after\":null}",
       "followup": "LEO-14"
     },
     {
@@ -196,18 +188,9 @@
     {
       "step": "PDF: a middle press scrolls the pages towards the pointer, and a press stops it",
       "platforms": [
-        "macos",
         "linux"
       ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"started\":false,\"before\":216.66668701171875,\"moved\":216.66668701171875,\"stopped\":true,\"at_stop\":216.66668701171875,\"after\":216.66668701171875} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"started\":true,\"before\":207.22216796875,\"moved\":219.1106719970703,\"stopped\":true,\"at_stop\":219.1106719970703,\"after\":219.1106719970703}",
-      "followup": "LEO-14"
-    },
-    {
-      "step": "PDF: Escape stops autoscroll without the PDF's focus, and a press off the pages stops it",
-      "platforms": [
-        "macos"
-      ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"escape_started\":false,\"escape_stopped\":true,\"press_started\":false,\"off_pages\":\"Point { x: 532px, y: 394px }\",\"press_stopped\":true}",
+      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"started\":true,\"before\":207.22216796875,\"moved\":219.1106719970703,\"stopped\":true,\"at_stop\":219.1106719970703,\"after\":219.1106719970703}",
       "followup": "LEO-14"
     },
     {
@@ -299,22 +282,6 @@
       "followup": "LEO-14"
     },
     {
-      "step": "a click gives the page the keyboard, and ⌘K / Ctrl+K typed in it opens GPUI's palette with the keyboard back in GPUI",
-      "platforms": [
-        "macos"
-      ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"focused\":false,\"relay\":[],\"opened\":true,\"forwarded\":0,\"page_focused\":false}",
-      "followup": "LEO-14"
-    },
-    {
-      "step": "a shortcut the page handles itself stays the page's, and one it leaves alone opens GPUI's palette",
-      "platforms": [
-        "macos"
-      ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"outcomes\":[{\"page_handles\":true,\"prevented\":true,\"palette\":false,\"forwarded\":0},{\"page_handles\":false,\"prevented\":false,\"palette\":false,\"forwarded\":0}]}",
-      "followup": "LEO-14"
-    },
-    {
       "step": "in Split, a click moves the keyboard between the source and the page's child frame, one of them focused at a time",
       "platforms": [
         "macos"
@@ -339,14 +306,6 @@
       "followup": "LEO-14"
     },
     {
-      "step": "the sheet hidden past the delay hibernates, and is drawn again with its edit when shown",
-      "platforms": [
-        "macos"
-      ],
-      "reason": "macOS: failed twice (its module's rerun too) in 2 of 5 main runs (44759657308, 44781141164), failed once and passed on the rerun in 44733890089, passed in 44734249294 and 44767427945, so intermittent; passes on the Mac mini. It fails with the step above: with nothing typed there is no edit to keep; observed {\"hibernated\":true,\"woke\":true,\"builds\":2,\"buffer_kept\":false}",
-      "followup": "LEO-14"
-    },
-    {
       "step": "a rectangle drawn with native input on the board is in the .tldr after its tab closes at once",
       "platforms": [
         "macos"
@@ -360,30 +319,6 @@
         "macos"
       ],
       "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"placed\":\"placed\",\"saved\":true,\"exact\":false,\"text\":\" quokka---\\ntitle: Field notes\\ntags: [gpui, markdown]\\n---\\n\\n# Attention notes\\n\\nSome **bold** text, *italic*, `code`, and a [link](https://example.com).\\n\\n![A do…",
-      "followup": "LEO-14"
-    },
-    {
-      "step": "the visual editor's [[page# completion offers a page added to the project, and its new heading once its text changes on disk",
-      "platforms": [
-        "macos"
-      ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"placed\":\"placed\",\"added\":{\"found\":false,\"labels\":[]},\"changed\":{\"found\":false,\"labels\":[]},\"heard\":[[\"md:assets-changed\",null],[\"md:project\",19],[\"md:pages-changed\",[\"e2e-other.md\"]],[\"md:assets-changed\",null],[\"md:ass…",
-      "followup": "LEO-14"
-    },
-    {
-      "step": "Markdown pages outside the project tree (node_modules/, .github/) changed on disk are not offered by [[page#, while a page of the same name in the tree is",
-      "platforms": [
-        "macos"
-      ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"reread\":{\"found\":false,\"labels\":[]},\"ghost_labels\":[],\"in_tree\":{\"found\":false,\"labels\":[]},\"heard\":[[\"md:assets-changed\",null],[\"md:project\",19],[\"md:pages-changed\",[\"e2e-other.md\"]],[\"md:assets-changed\",null],[\"md:as…",
-      "followup": "LEO-14"
-    },
-    {
-      "step": "closing a Markdown tab while its visual editor in Split holds the keyboard leaves the keyboard in the window: the palette still opens",
-      "platforms": [
-        "macos"
-      ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"view\":\"Some(Split)\",\"in_page\":false,\"focus_after\":\"the shell\",\"palette_rows\":73}",
       "followup": "LEO-14"
     },
     {
@@ -445,10 +380,9 @@
     {
       "step": "a wheel over a strip that overflows scrolls its tabs, with no \"Release to focus\" and the camera still",
       "platforms": [
-        "macos",
         "linux"
       ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"at\":[506.5,66],\"scroll_before\":1643,\"scroll_after\":1643,\"scroll_moved\":false,\"release_to_focus\":false,\"framed_before\":null,\"framed_after\":null,\"framed_kept\":true,\"scrolled\":false} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"at\":[595.5,66],\"scroll_before\":1435,\"scroll_after\":1435,\"scroll_moved\":false,\"release_to_focus\":false,\"framed_before\":null,\"framed_after\":null,\"framed_kept\":true,\"scrolled\":false}",
+      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"at\":[595.5,66],\"scroll_before\":1435,\"scroll_after\":1435,\"scroll_moved\":false,\"release_to_focus\":false,\"framed_before\":null,\"framed_after\":null,\"framed_kept\":true,\"scrolled\":false}",
       "followup": "LEO-14"
     },
     {
@@ -574,29 +508,26 @@
     {
       "step": "an editor tab drags from the center into the right dock",
       "platforms": [
-        "macos",
         "windows",
         "linux"
       ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"presented\":true,\"frames_drawn_by_window\":\"27/27\",\"dragging\":false,\"from\":[364,66],\"to\":[863.9442749023438,354],\"strip\":{\"tabs\":\"[(\\\"file-tduol3\\\", Bounds { origin: Point { x: 343px, y: 52px }, size: Size { 66px × 28px … | Windows: failed in every main run (44162980527, 44213516921); observed {\"presented\":true,\"frames_drawn_by_window\":\"27/27\",\"dragging\":false,\"from\":[300,66],\"to\":[810.9449462890625,377],\"strip\":{\"tabs\":\"[(\\\"file-83b2meu\\\", Bounds { origin: Point { x: 208px, y: 52px }, size: Size { 69px × 28px… | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"presented\":true,\"frames_drawn_by_window\":\"0/27\",\"dragging\":false,\"from\":[402,66],\"to\":[1185.2784423828125,467],\"strip\":{\"tabs\":\"[(\\\"file-0psbjgv\\\", Bounds { origin: Point { x: 294px, y: 52px }, size: Size { 85px × 28px } }), (\\\"file-v8vq13\\\", Bounds { origin: Point { x: 381px, y: 52px }, size: Siz…",
+      "reason": "Windows: failed in every main run (44162980527, 44213516921); observed {\"presented\":true,\"frames_drawn_by_window\":\"27/27\",\"dragging\":false,\"from\":[300,66],\"to\":[810.9449462890625,377],\"strip\":{\"tabs\":\"[(\\\"file-83b2meu\\\", Bounds { origin: Point { x: 208px, y: 52px }, size: Size { 69px × 28px… | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"presented\":true,\"frames_drawn_by_window\":\"0/27\",\"dragging\":false,\"from\":[402,66],\"to\":[1185.2784423828125,467],\"strip\":{\"tabs\":\"[(\\\"file-0psbjgv\\\", Bounds { origin: Point { x: 294px, y: 52px }, size: Size { 85px × 28px } }), (\\\"file-v8vq13\\\", Bounds { origin: Point { x: 381px, y: 52px }, size: Siz…",
       "followup": "LEO-14"
     },
     {
       "step": "the PDF dragged to the documents' left edge splits beside them",
       "platforms": [
-        "macos",
         "linux"
       ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"presented\":true,\"frames_drawn_by_window\":\"27/27\",\"dragging\":false,\"from\":[724,66],\"to\":[367.2640075683594,354],\"pdf_panel\":\"panel-pdf\",\"documents_panel\":\"panel-document-esetwhg\",\"shape\":\"{\\\"root\\\":{\\\"x\\\":[{\\\"y\\\":[[\\\"pr… | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"presented\":true,\"frames_drawn_by_window\":\"0/27\",\"dragging\":false,\"from\":[970,66],\"to\":[340.2864074707031,467],\"pdf_panel\":\"panel-pdf\",\"documents_panel\":\"panel-document-5eiipi8\",\"shape\":\"{\\\"root\\\":{\\\"x\\\":[{\\\"y\\\":[[\\\"project\\\",\\\"agent\\\"],[\\\"papers\\\"]],\\\"weights\\\":[620,380]},[\\\"slot\\\"],[\\\"pdf\\\"]],\\\"w…",
+      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"presented\":true,\"frames_drawn_by_window\":\"0/27\",\"dragging\":false,\"from\":[970,66],\"to\":[340.2864074707031,467],\"pdf_panel\":\"panel-pdf\",\"documents_panel\":\"panel-document-5eiipi8\",\"shape\":\"{\\\"root\\\":{\\\"x\\\":[{\\\"y\\\":[[\\\"project\\\",\\\"agent\\\"],[\\\"papers\\\"]],\\\"weights\\\":[620,380]},[\\\"slot\\\"],[\\\"pdf\\\"]],\\\"w…",
       "followup": "LEO-14"
     },
     {
       "step": "the PDF dragged into the documents' middle becomes their tab",
       "platforms": [
-        "macos",
         "linux"
       ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"presented\":true,\"frames_drawn_by_window\":\"27/27\",\"dragging\":false,\"from\":[724,66],\"to\":[523.6795654296875,384.8000183105469],\"joined\":false,\"left_panel_gone\":true} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"presented\":true,\"frames_drawn_by_window\":\"0/27\",\"dragging\":false,\"from\":[970,66],\"to\":[612.496826171875,509.1000061035156],\"joined\":false,\"left_panel_gone\":true}",
+      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"presented\":true,\"frames_drawn_by_window\":\"0/27\",\"dragging\":false,\"from\":[970,66],\"to\":[612.496826171875,509.1000061035156],\"joined\":false,\"left_panel_gone\":true}",
       "followup": "LEO-14"
     },
     {
@@ -637,52 +568,25 @@
     {
       "step": "\"Why cited\" from the card files the reason, and the card's row then says why",
       "platforms": [
-        "macos",
         "linux"
       ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"opened\":null,\"hidden\":true,\"filed\":false} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"opened\":null,\"hidden\":true,\"filed\":false}",
+      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"opened\":null,\"hidden\":true,\"filed\":false}",
       "followup": "LEO-14"
     },
     {
       "step": "a right-click on a citation key opens \"Why cited\" there",
       "platforms": [
-        "macos",
         "linux"
       ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {}",
+      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {}",
       "followup": "LEO-14"
     },
     {
       "step": "a reason whose cite is deleted joins the notes in the Annotations panel and the titlebar's count",
       "platforms": [
-        "macos",
         "linux"
       ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"listed\":false,\"counted\":0} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"listed\":false,\"counted\":0}",
-      "followup": "LEO-14"
-    },
-    {
-      "step": "the strip leaves out the title and authors while the full text's masthead is on screen",
-      "platforms": [
-        "macos"
-      ],
-      "reason": "macOS: failed in 1 of 3 main runs (44173099111), so intermittent; observed {}",
-      "followup": "LEO-14"
-    },
-    {
-      "step": "back from Blog on the full text's top, the strip still leaves out the title and authors",
-      "platforms": [
-        "macos"
-      ],
-      "reason": "macOS: failed in 1 of 3 main runs (44173099111), so intermittent; observed {\"drawn\":true}",
-      "followup": "LEO-14"
-    },
-    {
-      "step": "a drag over the original PDF's words offers Copy source link and Add to note where it ends",
-      "platforms": [
-        "macos"
-      ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"offered\":false,\"text\":null}",
+      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"listed\":false,\"counted\":0}",
       "followup": "LEO-14"
     },
     {
@@ -691,22 +595,6 @@
         "macos"
       ],
       "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"action\":\"Copy\",\"offered\":false}",
-      "followup": "LEO-14"
-    },
-    {
-      "step": "a paper dragged over a LaTeX source draws the drop caret after the word under the pointer, and goes in there as ~\\citep{key}",
-      "platforms": [
-        "macos"
-      ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"caret_x\":null,\"expected_x\":490,\"text\":\"Prior work shows this.\\nSee \\\\citep{knuth1984}.\\n\"}",
-      "followup": "LEO-14"
-    },
-    {
-      "step": "a paper dropped on a key of a \\citep joins its key list",
-      "platforms": [
-        "macos"
-      ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"text\":\"Prior work shows this.\\nSee \\\\citep{knuth1984}.\\n\\\\citep{vaswani2017attention}\"}",
       "followup": "LEO-14"
     },
     {
@@ -735,20 +623,11 @@
       "followup": "LEO-14"
     },
     {
-      "step": "a view row switches the file, and Dark or Light PDF pages flips the PDF's pages",
-      "platforms": [
-        "macos"
-      ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"ran\":true,\"switched\":true,\"flip\":\"Dark PDF pages\",\"flipped\":false}",
-      "followup": "LEO-14"
-    },
-    {
       "step": "Open in New Window with edits that cannot be saved keeps the window and opens none",
       "platforms": [
-        "macos",
         "windows"
       ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"announced\":false,\"stayed\":false,\"before\":2,\"after\":2} | Windows: failed in 1 of 2 main runs (44213516921), so intermittent; observed {\"announced\":false,\"stayed\":false,\"before\":2,\"after\":2}",
+      "reason": "Windows: failed in 1 of 2 main runs (44213516921), so intermittent; observed {\"announced\":false,\"stayed\":false,\"before\":2,\"after\":2}",
       "followup": "LEO-14"
     },
     {
@@ -758,14 +637,6 @@
         "windows"
       ],
       "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); an earlier step of the saves module failed, which stops the module | Windows: failed in 1 of 2 main runs (44213516921), so intermittent; an earlier step of the saves module failed, which stops the module",
-      "followup": "LEO-14"
-    },
-    {
-      "step": "a file opened again comes back to the caret and first line it was left at",
-      "platforms": [
-        "macos"
-      ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"left\":{\"top\":173,\"caret\":5083},\"back\":{\"top\":276.45454597473145,\"caret\":5083}}",
       "followup": "LEO-14"
     },
     {
@@ -845,108 +716,11 @@
       "followup": "LEO-14"
     },
     {
-      "step": "a native pointer resting on a lint underline opens the lint card over it",
-      "platforms": [
-        "macos"
-      ],
-      "reason": "macOS: failed in 1 of 3 main runs (44173099111), so intermittent; observed {\"card\":null}",
-      "followup": "LEO-14"
-    },
-    {
-      "step": "typing in an \\input's braces lists the project's .tex files; Enter writes the path",
-      "platforms": [
-        "macos"
-      ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"menu\":[],\"text\":\"\\\\newcommand{\\\\Rset}{\\\\mathbb{R}}\\n\\n\"}",
-      "followup": "LEO-14"
-    },
-    {
-      "step": "an \\includegraphics lists a figure by its path and by its path under the \\graphicspath root another file sets",
-      "platforms": [
-        "macos"
-      ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"menu\":[]}",
-      "followup": "LEO-14"
-    },
-    {
-      "step": "after a \\, the commands the open file and another file define with \\newcommand are listed",
-      "platforms": [
-        "macos"
-      ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"own\":[],\"other\":[]}",
-      "followup": "LEO-14"
-    },
-    {
-      "step": "in \\cmpd{ the project's compound keys are listed, and a drawing's mark picked there is written as \\rcmpd{…}",
-      "platforms": [
-        "macos"
-      ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"keys\":[],\"marks\":[],\"line\":\"\",\"facts\":{\"paths\":32,\"keys\":[\"alcohol.a.num\",\"ketone\",\"alcohol\"],\"places\":{\"alcohol.a.num\":\"Scheme 1: Route\"}}}",
-      "followup": "LEO-14"
-    },
-    {
-      "step": "a half-typed \\cmpd{ key the autosave wrote is not listed after Backspace deletes into it",
-      "platforms": [
-        "macos"
-      ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"saved\":false,\"menu\":[],\"line\":\"\",\"facts\":[\"alcohol.a.num\",\"ketone\",\"alcohol\"]}",
-      "followup": "LEO-14"
-    },
-    {
-      "step": "with TexLab installed, its completions join the menu: an \\input's lists TexLab's folder entry beside Lattice's files",
-      "platforms": [
-        "macos"
-      ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"menu\":[]}",
-      "followup": "LEO-14"
-    },
-    {
-      "step": "⌥⌘M in a LaTeX source opens the math symbol palette with the keyboard in its search, every maths command listed and drawn by KaTeX",
-      "platforms": [
-        "macos"
-      ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"listed\":null,\"drawn\":null,\"ms_to_draw_all\":23367,\"search_focused\":false}",
-      "followup": "LEO-14"
-    },
-    {
-      "step": "↓ seven times moves the highlight down seven rows of eight and scrolls the grid to keep it in view",
-      "platforms": [
-        "macos"
-      ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"active\":null,\"in_view\":null}",
-      "followup": "LEO-14"
-    },
-    {
-      "step": "in maths, a search for leq and Enter write \\leq at the caret as it is, and the palette closes",
-      "platforms": [
-        "macos"
-      ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"shown\":null,\"line\":\"Some text with an equation $e^{i\\\\pi} + 1 = 0$, as in \\\\cite{knuth1984}, set out in Section~\\\\ref{sec:method}. \\\\cite{knuth1984} \\\\textbf{x}\",\"caret\":206}",
-      "followup": "LEO-14"
-    },
-    {
-      "step": "outside maths, frac, → ←, and Enter write $\\frac{}{}$ with the caret in its first braces",
-      "platforms": [
-        "macos"
-      ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"moved\":null,\"active\":null,\"line\":\"\\\\maketitle\",\"caret\":110,\"at\":null}",
-      "followup": "LEO-14"
-    },
-    {
-      "step": "a search that matches nothing lists nothing, and Escape closes the palette with the keyboard back in the text",
-      "platforms": [
-        "macos"
-      ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"empty\":false,\"closed\":true}",
-      "followup": "LEO-14"
-    },
-    {
       "step": "the ring is drawn over the manuscript, and a press anywhere takes it down",
       "platforms": [
-        "macos",
         "windows"
       ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"at\":null,\"ringing\":\"Some(Build)\"} | Windows: failed in 1 of 2 main runs (44162980527), so intermittent; observed {\"at\":\"Point { x: 402.83472px, y: 430.5px }\",\"ringing\":\"Some(Build)\"}",
+      "reason": "Windows: failed in 1 of 2 main runs (44162980527), so intermittent; observed {\"at\":\"Point { x: 402.83472px, y: 430.5px }\",\"ringing\":\"Some(Build)\"}",
       "followup": "LEO-14"
     },
     {
@@ -976,11 +750,10 @@
     {
       "step": "the editor's overlay scrollbar shows while the text scrolls, a 4px thumb 5px off the edge, and hides within 0.8 s once it rests",
       "platforms": [
-        "macos",
         "windows",
         "linux"
       ],
-      "reason": "macOS: failed in 2 of 3 main runs (44154544765, 44162980527), so intermittent; observed {\"at_rest\":false,\"bar\":{\"shown\":true,\"thumb\":{\"x\":450,\"y\":251.59600830078125,\"width\":4,\"height\":33.05373001098633},\"track_width\":10,\"gap_to_edge\":5,\"hidden_after_ms\":1343}} | Windows: failed in every main run (44162980527, 44213516921); observed {\"at_rest\":false,\"bar\":{\"shown\":true,\"thumb\":{\"x\":450,\"y\":265.361572265625,\"width\":4,\"height\":38.92496109008789},\"track_width\":10,\"gap_to_edge\":5,\"hidden_after_ms\":1303}} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"at_rest\":false,\"bar\":{\"shown\":true,\"thumb\":{\"x\":577,\"y\":319.2269287109375,\"width\":4,\"height\":66.51053619384766},\"track_width\":10,\"gap_to_edge\":5,\"hidden_after_ms\":1948}}",
+      "reason": "Windows: failed in every main run (44162980527, 44213516921); observed {\"at_rest\":false,\"bar\":{\"shown\":true,\"thumb\":{\"x\":450,\"y\":265.361572265625,\"width\":4,\"height\":38.92496109008789},\"track_width\":10,\"gap_to_edge\":5,\"hidden_after_ms\":1303}} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"at_rest\":false,\"bar\":{\"shown\":true,\"thumb\":{\"x\":577,\"y\":319.2269287109375,\"width\":4,\"height\":66.51053619384766},\"track_width\":10,\"gap_to_edge\":5,\"hidden_after_ms\":1948}}",
       "followup": "LEO-14"
     },
     {
@@ -990,22 +763,6 @@
         "windows"
       ],
       "reason": "macOS: failed in 2 of 3 main runs (44154544765, 44162980527), so intermittent; observed [{\"expected\":[3,16],\"word\":\"introduces\",\"caret\":[3,16]},{\"expected\":[4,3],\"word\":\"second\",\"caret\":[4,3]},{\"expected\":[5,16],\"word\":\"last\",\"caret\":[1,1]}] | Windows: failed in every main run (44162980527, 44213516921); observed [{\"expected\":[3,16],\"word\":\"introduces\",\"caret\":[1,1]},{\"expected\":[4,3],\"word\":\"second\",\"caret\":[1,1]},{\"expected\":[5,16],\"word\":\"last\",\"caret\":[1,1]}]",
-      "followup": "LEO-14"
-    },
-    {
-      "step": "typing \\begin{itemize} in a LaTeX file writes its \\end{itemize} with the caret on its first \\item, Enter on an item starts the next, and Enter on the empty one leaves the list",
-      "platforms": [
-        "macos"
-      ],
-      "reason": "macOS: failed in 1 of 3 main runs (44154544765), so intermittent; observed {\"closed\":\"\\\\begin{itemize}\\n\\\\item |\\n\\\\end{itemize}\",\"next\":\"\\\\begin{itemize}\\n\\\\item one\\n\\\\item |\\n\\\\end{itemize}\",\"left\":\"\\\\begin{itemize}\\n\\\\item one\\n\\\\end{itemize}\\n|\"}",
-      "followup": "LEO-14"
-    },
-    {
-      "step": "in a LaTeX file $ writes a pair with the caret between, and \\left( grows its \\right) after the caret",
-      "platforms": [
-        "macos"
-      ],
-      "reason": "macOS: failed in 1 of 3 main runs (44154544765), so intermittent; observed {\"paired\":\"\\\\begin{itemize}\\n\\\\item one\\n\\\\end{itemize}\\n$|$\",\"sized\":\"\\\\begin{itemize}\\n\\\\item one\\n\\\\end{itemize}\\n$\\\\left(|\\\\right)$\"}",
       "followup": "LEO-14"
     },
     {
@@ -1122,10 +879,9 @@
     {
       "step": "closing a window within the autosave pause saves what was typed, then closes it",
       "platforms": [
-        "windows",
-        "macos"
+        "windows"
       ],
-      "reason": "Windows: failed in every main run (44162980527, 44213516921); observed {\"unsaved_before\":false,\"disk\":\"draft\\n\"} | macOS: failed in main run 44455883121 on the hosted runner; observed {\"unsaved_before\":false,\"disk\":\"draft\\n\"}",
+      "reason": "Windows: failed in every main run (44162980527, 44213516921); observed {\"unsaved_before\":false,\"disk\":\"draft\\n\"}",
       "followup": "LEO-15"
     },
     {
@@ -1332,35 +1088,11 @@
       "followup": "LEO-15"
     },
     {
-      "step": "pen strokes drawn in quick succession with native input are an element each",
-      "platforms": [
-        "macos"
-      ],
-      "reason": "macOS: failed in main run 44408832005, the first after the step landed (passes on the crew Macs); observed {\"strokes\":24,\"elements_added\":0}",
-      "followup": "LEO-14"
-    },
-    {
-      "step": "a rectangle drawn with native input on the board is in the .excalidraw after its tab closes at once",
-      "platforms": [
-        "macos"
-      ],
-      "reason": "macOS: failed in main run 44408832005, the first after the step landed (passes on the crew Macs); observed {\"saved\":false,\"shapes_before\":22,\"on_board_before_close\":22,\"shapes_after\":22}",
-      "followup": "LEO-14"
-    },
-    {
       "step": "the project_tab_drag module runs to its end",
       "platforms": [
         "macos"
       ],
       "reason": "macOS: failed in main run 44408832005, the first after the step landed (passes on the crew Macs); observed {\"error\":\"window not found\"}",
-      "followup": "LEO-14"
-    },
-    {
-      "step": "a word typed into the visual editor just before its tab closes is in the file once the tab has gone",
-      "platforms": [
-        "macos"
-      ],
-      "reason": "macOS: failed in main run 44431384013 (2e39149ce) on the hosted runner, passes on the crew Macs; observed {\"kept\":false}",
       "followup": "LEO-14"
     },
     {
@@ -1460,14 +1192,6 @@
       ],
       "reason": "Windows: failed once in run 44460622331 attempt 2 of #1148, which does not touch it, and passed in every main run since #1103, so intermittent; observed {}",
       "followup": "LEO-15"
-    },
-    {
-      "step": "a native click on the zoom controls over the page reaches GPUI, and the page zooms",
-      "platforms": [
-        "macos"
-      ],
-      "reason": "macOS: failed in 4 of 5 main baselines on the Mac mini's local gate (main 2e39149ce, 5c9197738, a216812a5, b3dd2c790; passed at 54bb273ac), and in both full ci:local runs of #1163 while it passed in all three islands-only runs, so intermittent in a full run; observed {\"scale\":1.0,\"page_presses\":0,\"bounds\":\"Some(Bounds { origin: Point { x: 288px, y: 86px }, size: Size { 648px × 802px } })\"}",
-      "followup": "LEO-14"
     },
     {
       "step": "the PDF's Copy source link copies the PDF at the passage's page, its words as the title",
