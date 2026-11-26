@@ -42,7 +42,8 @@ concurrency:
 jobs:
   # A scheduled run goes ahead only if it is the night's first: a run of this
   # workflow started since 18:00 UTC (scheduled or by hand, and not cancelled)
-  # already covers the night. A run by hand always goes ahead.
+  # already covers the night. A run by hand always goes ahead, and so does one
+  # whose check fails: a duplicate night costs Mac time, a lost one a day.
   due:
     if: github.repository == 'lattice-writer/lattice' || github.repository == 'leo1oel/lattice'
     runs-on: ubuntu-latest
@@ -61,7 +62,8 @@ jobs:
           since=$(date -u -d "$(date -u +%F) 18:00" +%s)
           if [ "$since" -gt "$(date -u +%s)" ]; then since=$((since - 86400)); fi
           started=$(gh api "repos/$REPO/actions/workflows/nightly-e2e.yml/runs?per_page=20" \
-            --jq "[.workflow_runs[] | select(.id != $RUN_ID and .conclusion != \"cancelled\" and (.created_at | fromdateiso8601) >= $since)] | length")
+            --jq "[.workflow_runs[] | select(.id != $RUN_ID and .conclusion != \"cancelled\" and (.created_at | fromdateiso8601) >= $since)] | length") \
+            || { echo "could not list the night's runs; running"; started=0; }
           echo "night's runs so far: $started"
           if [ "$started" = 0 ]; then echo run=true >> "$GITHUB_OUTPUT"; else echo run=false >> "$GITHUB_OUTPUT"; fi
 
