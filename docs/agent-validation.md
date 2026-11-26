@@ -249,8 +249,11 @@ Branch gates run the smoke flow and the modules their diff picks, so the
 whole scenario runs on main once a night instead:
 `.github/workflows/nightly-e2e.yml`, at 18:37 UTC (02:37 in Taipei), on the
 Mac mini through runner-up's `lattice-mac` pool
-([`release-process.md`](release-process.md)), under the in-app lock (it
-waits up to 90 minutes for crew gates to free it). `scripts/gpui-nightly.mjs
+([`release-process.md`](release-process.md)). It runs the e2e as six chunks
+of modules (`gpui-main-baseline.mjs --chunks`, each with the smoke flow), each
+under the in-app lock and letting it go in between, so a queued gate or lab
+run waits for one chunk (a few minutes), not the whole scenario; each chunk
+waits up to 90 minutes for the lock. `scripts/gpui-nightly.mjs
 run` records main with `scripts/gpui-main-baseline.mjs` (the gate, the
 release build and the whole e2e, which also leaves the Mac's main baseline
 for that commit), judges the e2e as gpui.yml judges main (the known failures

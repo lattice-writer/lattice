@@ -8,7 +8,9 @@ name: Nightly e2e
 #
 # On the Mac mini through runner-up's lattice-mac pool, as the release jobs
 # (docs/release-process.md), under the in-app lock every windowed run there
-# takes, so no crew gate or hand test drives the screen under it. The
+# takes, so no crew gate or hand test drives the screen under it. It takes
+# that lock per chunk of e2e modules and lets it go in between, so a queued
+# gate or lab run waits minutes, not the whole scenario. The
 # repository variable LATTICE_MACOS_RUNNER moves it with the release jobs.
 # Holding runner-up's one place, a release tag pushed meanwhile waits for it.
 #
@@ -52,12 +54,13 @@ jobs:
         run: |
           dir="${LATTICE_GPUI_BUILD_DIR:-$HOME/Library/Caches/lattice-gpui-build}"
           mkdir -p "$dir/main-baseline" && ls "$dir/main-baseline" >/dev/null
-      # Waits up to 90 minutes for a crew gate or measurement to free the
-      # lock; giving up (exit 75) leaves no record, which the report counts.
-      # Its own timeout leaves the job time for the report.
+      # Each chunk of modules, and the rerun, waits up to 90 minutes for the
+      # in-app lock (scripts/gpui-main-baseline.mjs --chunks); one that gives
+      # up is an error in the record, which the report counts. Its own
+      # timeout leaves the job time for the report.
       - name: Gate, release build and the whole e2e on main
         timeout-minutes: 400
-        run: scripts/inapp-lock --thread "nightly-e2e $(git rev-parse --short HEAD)" --wait 5400 -- node scripts/gpui-nightly.mjs run
+        run: node scripts/gpui-nightly.mjs run
       - name: Open, update or close the nightly issue
         if: ${{ !cancelled() }}
         env:
