@@ -96,11 +96,15 @@ impl Places {
         // Both sides resolved the same way, so a symlinked home or parent
         // folder, or Windows' `\\?\` form of a resolved path, can't pass as
         // below home.
-        let Ok(folder) = fs::canonicalize(folder) else {
-            return Some(ABOVE_HOME);
+        let named = |path: &Path| {
+            path.components().filter(|part| matches!(part, Component::Normal(_))).count()
         };
-        let named = folder.components().filter(|part| matches!(part, Component::Normal(_))).count();
-        if named < MIN_COMPONENTS {
+        // A folder that isn't there is judged by its depth as written, so
+        // `/Volumes` on Linux reads as too shallow, as it does on a Mac.
+        let Ok(folder) = fs::canonicalize(folder) else {
+            return Some(if named(folder) < MIN_COMPONENTS { TOO_SHALLOW } else { ABOVE_HOME });
+        };
+        if named(&folder) < MIN_COMPONENTS {
             return Some(TOO_SHALLOW);
         }
         let Some(home) = &self.home else {
