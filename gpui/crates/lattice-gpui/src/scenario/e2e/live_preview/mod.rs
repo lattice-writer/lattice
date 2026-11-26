@@ -27,6 +27,8 @@ use crate::{
     shell::StopBuild,
 };
 
+mod window;
+
 /// The first download, the preamble loaded into LuaLaTeX and the first
 /// whole-document layout, on a cold machine.
 const STARTS_WITHIN: Duration = Duration::from_secs(180);
@@ -460,6 +462,8 @@ impl Run {
                 "handed_over": handed_over,
             }),
         );
+
+        self.live_preview_in_window(cx, steps, &chapter, &editor).await?;
 
         // rtex killed mid-session, as macOS does to a process under memory
         // pressure: Lattice starts a new session by itself (its phase passes
