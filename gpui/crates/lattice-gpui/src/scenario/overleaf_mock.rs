@@ -27,6 +27,7 @@ use std::{
     io::{BufRead as _, BufReader, Read as _, Write as _},
     net::{TcpListener, TcpStream},
     sync::{Arc, Mutex},
+    time::Instant,
 };
 
 use serde_json::json;
@@ -55,6 +56,8 @@ pub(super) struct Project {
     pub(super) next_id: u64,
     /// Every request, `METHOD path`, for the scenario's checks.
     requests: Vec<String>,
+    /// When each upload came in, answered 429 or not.
+    uploads_at: Vec<Instant>,
     /// The history and chat requests, `METHOD path` after the project.
     pub(super) history_requests: Vec<String>,
     /// The live channel is served.
@@ -328,6 +331,11 @@ impl MockOverleaf {
         self.project.lock().unwrap().history_requests.clone()
     }
 
+    /// When each upload came in, answered 429 or not, oldest first.
+    pub fn upload_times(&self) -> Vec<Instant> {
+        self.project.lock().unwrap().uploads_at.clone()
+    }
+
     /// How many requests matched `prefix` (`"POST /project/…/upload"`).
     pub fn requests(&self, prefix: &str) -> usize {
         let project = self.project.lock().unwrap();
@@ -562,6 +570,9 @@ fn answer(stream: TcpStream, project: Arc<Mutex<Project>>) -> std::io::Result<()
     let (status, content_type, extra, body): (u16, &str, Option<String>, Vec<u8>) = {
         let mut project = project.lock().unwrap();
         project.requests.push(format!("{method} {path}"));
+        if method == "POST" && path == format!("{project_path}/upload") {
+            project.uploads_at.push(Instant::now());
+        }
         // Comment threads and suggestions (`overleaf_review_mock`).
         let mut review = path
             .strip_prefix(&project_path)

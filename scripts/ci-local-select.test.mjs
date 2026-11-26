@@ -36,6 +36,7 @@ describe("ci-local-select: the e2e a change needs", () => {
 
   it("runs the overleaf module for its mock servers, and the smoke flow for the host error catalog and lattice-core's tests", () => {
     for (const mock of ["overleaf_mock", "overleaf_realtime_mock", "overleaf_review_mock", "overleaf_history_mock"]) expect(e2eNeeds([`gpui/crates/lattice-gpui/src/scenario/${mock}.rs`]), mock).toMatchObject({ full: false, modules: ["overleaf"] });
+    for (const guard of ["gpui/crates/lattice-gpui/src/scenario/idle.rs", "gpui/crates/lattice-gpui/src/scenario/typing.rs", "gpui/script/idle-guard", "gpui/script/typing-guard"]) expect(e2eNeeds([guard]), guard).toMatchObject({ full: false, modules: [] });
     for (const file of ["gpui/crates/lattice-gpui/src/host_errors/catalog.rs", "src-tauri/lattice-core/src/latex/build/tests.rs", "src-tauri/lattice-core/src/latex/synctex/highlighted/tests.rs", "src-tauri/lattice-core/tests/build.rs", "src-tauri/lattice-theme/src/tests.rs"]) expect(e2eNeeds([file]), file).toMatchObject({ full: false, modules: [] });
     for (const file of ["gpui/crates/lattice-gpui/src/scenario/e2e.rs", "gpui/crates/lattice-gpui/src/scenario/drag.rs", "gpui/crates/lattice-gpui/src/host_errors.rs", "src-tauri/lattice-core/src/latex.rs", "src-tauri/lattice-core/src/testsupport.rs"]) expect(e2eNeeds([file]), file).toMatchObject({ full: true });
   });

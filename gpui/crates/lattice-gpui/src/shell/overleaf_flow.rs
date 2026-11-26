@@ -22,7 +22,7 @@
 use std::{cell::Cell, time::Duration};
 
 use gpui::{
-    AnimationExt as _, AnyElement, AppContext as _, Context, Corners, Entity, IntoElement,
+    AnimationExt as _, AnyElement, App, AppContext as _, Context, Corners, Entity, IntoElement,
     ParentElement as _, Styled as _, Subscription, Task, Window, actions, div, px,
 };
 use lattice_i18n::t;
@@ -524,28 +524,22 @@ impl Shell {
             .collect()
     }
 
-    /// The titlebar's Overleaf control, unless Settings › Appearance hides it.
-    pub(super) fn overleaf_sync_control(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let hidden = &crate::settings::get(cx).appearance.hidden_titlebar_tools;
-        if hidden.contains(&TitlebarTool::Overleaf) {
-            return None;
-        }
+    /// The sync status the titlebar's Overleaf control names.
+    pub(crate) fn overleaf_sync_label(&self, cx: &App) -> String {
         let bridge = self.overleaf.read(cx);
-        let palette = cx.palette().clone();
-        let linked = bridge.link().is_some();
-        let syncing = bridge.syncing();
-        let pending = bridge.remote_changes();
         let channel = bridge.channel();
         let detail = bridge.channel_detail();
-        let live_editing = bridge.live_file().is_some();
-        let project_name = bridge.link().map(|link| link.project_name.clone());
-        let label: String = if !linked {
+        if bridge.link().is_none() {
             t!("Open a project from Overleaf").into()
-        } else if syncing {
+        } else if bridge.syncing() {
             t!("Syncing with Overleaf…").into()
-        } else if pending {
+        } else if let Some(waiting) = bridge.cooldown_status() {
+            // Held for a 429: idle-looking words would hide that the edit
+            // is still on its way.
+            waiting
+        } else if bridge.remote_changes() {
             t!("New changes on Overleaf").into()
-        } else if live_editing {
+        } else if bridge.live_file().is_some() {
             t!("Live with Overleaf").into()
         } else {
             // When the channel is not up, say why: silently falling back to
@@ -566,7 +560,24 @@ impl Shell {
                     .unwrap_or_else(|| t!("Live").into()),
                 _ => t!("Sync with Overleaf").into(),
             }
-        };
+        }
+    }
+
+    /// The titlebar's Overleaf control, unless Settings › Appearance hides it.
+    pub(super) fn overleaf_sync_control(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let hidden = &crate::settings::get(cx).appearance.hidden_titlebar_tools;
+        if hidden.contains(&TitlebarTool::Overleaf) {
+            return None;
+        }
+        let label = self.overleaf_sync_label(cx);
+        let bridge = self.overleaf.read(cx);
+        let palette = cx.palette().clone();
+        let linked = bridge.link().is_some();
+        let syncing = bridge.syncing();
+        let pending = bridge.remote_changes();
+        let channel = bridge.channel();
+        let live_editing = bridge.live_file().is_some();
+        let project_name = bridge.link().map(|link| link.project_name.clone());
         let dot = |color: gpui::Hsla| {
             div()
                 .absolute()

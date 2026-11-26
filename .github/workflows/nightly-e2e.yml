@@ -71,7 +71,7 @@ jobs:
     needs: due
     if: needs.due.outputs.run == 'true'
     runs-on: ${{ vars.LATTICE_MACOS_RUNNER || 'lattice-mac' }}
-    timeout-minutes: 580
+    timeout-minutes: 615
     steps:
       - uses: actions/checkout@v7
         with:
@@ -95,7 +95,7 @@ jobs:
       # up is an error in the record, which the report counts. Its own
       # timeout leaves the job time for the report.
       - name: Gate, release build, the whole e2e and the whole Vitest suite on main
-        timeout-minutes: 555
+        timeout-minutes: 590
         run: node scripts/gpui-nightly.mjs run
       - name: Open, update or close the nightly issue
         if: ${{ !cancelled() }}

@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# The typing guard (crates/lattice-gpui/src/scenario/typing.rs, LEO-6): the
+# \`typing\` scenario against the release build, on a scratch copy of
+# fixtures/e2e and with a scratch HOME, as script/e2e runs the e2e. It types
+# into a long .tex document in its source editor and then in its Visual view
+# and holds each view's frames per key and the app's CPU to limits.
+#
+# Usage: script/typing-guard [result.json]
+#   About two minutes, most of it typing in front: run it under
+#   scripts/inapp-lock, as any windowed run.
+#
+# No GPUI_LAB_IGNORE_OCCLUSION or GPUI_LAB_ASSUME_KEY, unlike script/e2e: the
+# frames counted are the ones the display link paces, and the Visual page
+# takes keys only in the real key window.
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+app="$root/target/release/lattice-gpui"
+[ -x "$app" ] || { echo "typing-guard: $app is missing; build the release binary first (node scripts/gpui-build.mjs)" >&2; exit 1; }
+
+scratch="$(mktemp -d -t lattice-gpui-typing)"
+trap 'rm -rf "$scratch"' EXIT
+out="${1:-$scratch/typing.json}"
+mkdir -p "$scratch/home"
+cp -R "$root/fixtures/e2e" "$scratch/project"
+env LATTICE_GPUI_E2E_LOCK_LABEL="${LATTICE_GPUI_E2E_LOCK_LABEL:-$(cd "$root/.." && pwd)}" \
+  PATH="$PATH:/Library/TeX/texbin" HOME="$scratch/home" "$app" "$scratch/project" --scenario typing --out "$out"
+cat "$out"
+jq -e '.passed == true' "$out" >/dev/null || { echo "typing-guard: failed" >&2; exit 1; }
+echo "typing-guard: passed"

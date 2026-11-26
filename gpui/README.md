@@ -144,6 +144,7 @@ On macOS and Windows it builds the app (release profile), runs the unit tests an
 macOS builds with TeX Live and TexLab (so the e2e scenario checks TexLab's diagnostics); Windows builds with MiKTeX and no TexLab, where that step reports itself skipped.
 The macOS e2e step, like `script/e2e`, sets `GPUI_LAB_IGNORE_OCCLUSION`, so the window keeps drawing the editor's carets, gutter marks and cards even when the runner's display stops compositing it.
 The nightly run on main (`../scripts/gpui-nightly.mjs`) also runs the idle guard, `script/idle-guard` (the `idle` scenario, lattice#1025), without either switch. It checks that an idle window with the editor focused draws only the caret, at most 2.5 frames a second, and that in the background it draws nothing. Then, outside the in-app lock (a passive window: no input, never key or active), `--growth 1800` checks that 30 minutes of idle grow the footprint by no more than 24 MB.
+Then, under the lock, the typing guard, `script/typing-guard` (the `typing` scenario, LEO-6), types into a 240 KB `.tex` document for 30 s in its source editor and 30 s in its Visual view, one native key every 110 ms, and checks that each view draws at most 3.0 (source) or 1.6 (Visual) frames a key and costs the app at most 10% of a core.
 The Chinese input method (Microsoft Pinyin on Windows) and MiKTeX's own package-install prompts are checked by hand; CI cannot drive them.
 
 ## How it is put together

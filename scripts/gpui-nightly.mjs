@@ -21,7 +21,8 @@
  *           with the scratch HOME and lab switches gpui/script/e2e gives the
  *           scenario. Then the idle guard (gpui/script/idle-guard, lattice#1025):
  *           its frame counts under the lock, and 30 minutes of idle memory
- *           growth outside it (runIdleGuard). Then the whole Vitest suite,
+ *           growth outside it, then the typing guard (gpui/script/typing-guard,
+ *           LEO-6) under the lock (runGuards). Then the whole Vitest suite,
  *           headless (runVitest): a branch's gate runs only the tests within
  *           two imports of its change (scripts/lib/import-graph.mjs), so the
  *           suites that mount the whole app run here too. Run it outside the
@@ -72,14 +73,14 @@ export function failuresOf(record, verdict, quit = null) {
   return failures;
 }
 
-/** What the idle guard (gpui/script/idle-guard) found, one line each: its failed checks, or why it has none to show. */
-export function idleFailures(result, status) {
-  if (!result) return [`idle guard: no result (exit ${status})`];
-  if (result.error) return [`idle guard did not finish: ${result.error}`];
-  const failed = (result.checks ?? []).filter((check) => check.passed !== true).map((check) => `idle guard: ${check.name}`);
-  if (!result.checks?.length) failed.push("idle guard: ran no checks");
+/** What a guard (gpui/script/idle-guard, gpui/script/typing-guard) found, one line each: its failed checks, or why it has none to show. */
+export function guardFailures(guard, result, status) {
+  if (!result) return [`${guard}: no result (exit ${status})`];
+  if (result.error) return [`${guard} did not finish: ${result.error}`];
+  const failed = (result.checks ?? []).filter((check) => check.passed !== true).map((check) => `${guard}: ${check.name}`);
+  if (!result.checks?.length) failed.push(`${guard}: ran no checks`);
   // A result written before a crash or the quit watchdog's exit.
-  else if (!failed.length && status !== 0) failed.push(`idle guard: exited ${status}`);
+  else if (!failed.length && status !== 0) failed.push(`${guard}: exited ${status}`);
   return failed;
 }
 
@@ -133,33 +134,42 @@ const recordFile = (sha) => path.join(baselineDir(), `nightly@${sha}.json`);
 const runId = () => process.env.GITHUB_RUN_ID ?? "local";
 
 /**
- * The idle guard on the release build the run left: its frame counts under
+ * The guards on the release build the run left. The idle guard: its frame counts under
  * the in-app lock (about a minute, 12 s of it in front), then 30 minutes of
  * idle memory growth outside it. The growth run is a passive window, the
  * CREW.md lock exception approved on 2026-11-26: it never activates, never
  * takes the key window (GPUI_LAB_ASSUME_KEY) and sends no input, so it cannot
  * disturb the runs that hold the lock, and holding it for half an hour would
- * keep them out.
+ * keep them out. Then the typing guard under the lock (about two minutes,
+ * most of it typing in front).
  */
-function runIdleGuard(sha) {
-  const dir = mkdtempSync(path.join(tmpdir(), "gpui-nightly-idle-"));
+// The typing guard's lock wait and run (30 + 5, gpui-main-baseline.mjs's
+// CHUNKS_BUDGET_MS), so a run that hangs before its quit watchdog cannot take
+// the Vitest suite's time.
+const TYPING_GUARD_TIMEOUT_MS = 35 * 60_000;
+
+function runGuards(sha) {
+  const dir = mkdtempSync(path.join(tmpdir(), "gpui-nightly-guards-"));
   const guard = path.join(repo, "gpui", "script", "idle-guard");
-  const run = (out, command) => {
-    const status = spawnSync(command[0], command.slice(1), { cwd: repo, stdio: "inherit" });
+  const lock = path.join(repo, "scripts", "inapp-lock");
+  const run = (name, out, command, timeout) => {
+    const status = spawnSync(command[0], command.slice(1), { cwd: repo, stdio: "inherit", timeout });
     let result = null;
     try {
       result = JSON.parse(readFileSync(out, "utf8"));
     } catch {
-      // idleFailures reports the missing result.
+      // guardFailures reports the missing result.
     }
-    return idleFailures(result, status.status ?? status.signal);
+    return guardFailures(name, result, status.status ?? status.signal);
   };
   try {
     const frames = path.join(dir, "frames.json");
     const growth = path.join(dir, "growth.json");
+    const typing = path.join(dir, "typing.json");
     return [
-      ...run(frames, [path.join(repo, "scripts", "inapp-lock"), "--thread", `nightly-e2e ${sha.slice(0, 9)} idle`, "--wait", "1800", "--", guard, frames]),
-      ...run(growth, [guard, "--growth", "1800", growth]),
+      ...run("idle guard", frames, [lock, "--thread", `nightly-e2e ${sha.slice(0, 9)} idle`, "--wait", "1800", "--", guard, frames]),
+      ...run("idle guard", growth, [guard, "--growth", "1800", growth]),
+      ...run("typing guard", typing, [lock, "--thread", `nightly-e2e ${sha.slice(0, 9)} typing`, "--wait", "1800", "--", path.join(repo, "gpui", "script", "typing-guard"), typing], TYPING_GUARD_TIMEOUT_MS),
     ];
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -176,7 +186,7 @@ export function vitestFailures(result, status) {
 
 // The whole suite, one file at a time (vitest.config.ts's maxWorkers: 1;
 // about 13 minutes on the Mac mini); gpui-main-baseline.mjs's CHUNKS_BUDGET_MS
-// leaves it these 90 minutes of the workflow step's 555.
+// leaves it these 90 minutes of the workflow step's 590.
 const VITEST_TIMEOUT_MS = 90 * 60_000;
 
 /** The whole Vitest suite, headless and outside the in-app lock, as CI's shards run it together. */
@@ -251,12 +261,12 @@ function runNightly() {
   const nightly = { sha, subject, run: runId(), finished: new Date().toISOString(), baseline: record ? path.basename(baselineFile) : null, failures: failuresOf(record, verdict, existsSync(quitFile) ? readFileSync(quitFile, "utf8").trim() : null), flaky: verdict?.flaky ?? [], fixed: verdict?.fixed ?? [] };
   const write = () => writeFileSync(recordFile(sha), `${JSON.stringify(nightly, null, 2)}\n`);
   if (record.build?.status === "ok") {
-    // Recorded first, so a step that times out during the guard's half hour
+    // Recorded first, so a step that times out during the guards' half hour
     // still reports what the gate, the build and the e2e found.
     const failures = nightly.failures;
-    nightly.failures = [...failures, "idle guard: did not finish"];
+    nightly.failures = [...failures, "guards: did not finish"];
     write();
-    nightly.failures = [...failures, ...runIdleGuard(sha)];
+    nightly.failures = [...failures, ...runGuards(sha)];
   }
   // Recorded first too, for a suite that outlives the step.
   const judged = nightly.failures;
