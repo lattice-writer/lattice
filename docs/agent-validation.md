@@ -155,9 +155,9 @@ that stand for them, chosen from the diff against the merge base
 | The branch changes | `ci:local` runs |
 | --- | --- |
 | documentation only | nothing |
-| `src-tauri/` or web code only | the gate (lint, knip, tsc, i18n, notices, the related Vitest tests); rustfmt, clippy `-D warnings` and `cargo test` for the Tauri crates; the bundle budgets and the WebKit benchmark when the bundle's inputs changed. No GPUI stage. |
+| `src-tauri/` or web code only | the gate (lint, knip, tsc, i18n, notices, the related Vitest tests); rustfmt, clippy `-D warnings` and `cargo test` for the Tauri crates; the bundle budgets when the bundle's inputs changed, and the WebKit benchmark only when the benchmark itself changed (`touchesWebkitBench`: `scripts/perf-bench/`, `scripts/perf-bench.mjs`, `tools/perf-bench/`, `tools/mock-backend/` and the files the bench imports, not a dependency bump). No GPUI stage. |
 | `gpui/` only | GPUI fmt, release build and unit tests, and the e2e below. No WebKit benchmark. |
-| a release path (`RELEASE_PATHS`: release workflows, `src-tauri/tauri*.conf.json`, `Info.plist`, `Entitlements.plist`, the icons, either app's updater, `fetch-pdfium`, the bundle, packaging, signing and release scripts) | everything, as `--full` does, and a trailer that records it (`rust gpui e2e=full webkit`) |
+| a release path (`RELEASE_PATHS`: release workflows, `src-tauri/tauri*.conf.json`, `Info.plist`, `Entitlements.plist`, the icons, either app's updater, `fetch-pdfium`, the bundle, packaging, signing and release scripts) | everything but the WebKit benchmark, as `--full` does, and a trailer that records it (`rust gpui e2e=full`) |
 | only text since a gated commit (below) | the docs-only profile: the build and the tests that read those files, no e2e and no WebKit benchmark, and a `docs from=<gate>` trailer |
 
 The GPUI e2e is the smoke flow (open, build, SyncTeX both ways, edits and ⌘S,
@@ -180,28 +180,44 @@ owner in the scenario.
 
 A change to `scripts/ci-local.mjs`, `scripts/ci-local-select.mjs`, `scripts/gpui-e2e-modules.mjs` or `scripts/windows-e2e-tier.mjs`, like one to `scripts/ci-tier.mjs`, runs every job.
 
-Rust, GPUI and benchmark stages wait while a perf measurement holds
-`/tmp/lattice-inapp-test.lock` (`$INAPP_LOCK_FILE` when set). The literature
+Rust and GPUI build and unit-test stages wait while a perf measurement or a
+hand test holds `/tmp/lattice-inapp-test.lock` (`$INAPP_LOCK_FILE` when set),
+but not while another run's GPUI e2e holds it (a live holder whose record
+says `--kind e2e`): a waiting gate builds meanwhile and queues for the lock
+only for its own windowed stages (the e2e, its main baseline and the WebKit
+benchmark). Those builds run as `scripts/inapp-lock build`, and a quiet
+holder (anything not `--kind e2e`) that takes the lock after that e2e waits
+for them to end before its command starts, so a measurement never runs
+beside a build. The main baseline builds main while it holds the lock, so a
+gate's build beside it can stretch its hold. The literature
 Worker, the Open Slide runtime, the research environment, the Chromium
 benchmark, Linux and Windows run in CI only.
 
 When it passes on a clean tree and the change needed a macOS job, it prints
 "local macOS gate passed at <sha>" and a trailer naming the commit's tree and
 the stages that ran, such as `CI-local: macos 1a2b3c4d5e6f gpui e2e=smoke+pdf+pdf_notes`
-or `CI-local: macos 1a2b3c4d5e6f rust gpui e2e=full webkit`. On a pushed head
+or `CI-local: macos 1a2b3c4d5e6f rust gpui e2e=full`. On a pushed head
 commit whose tree it names, CI skips each macOS job (Rust, GPUI, the WebKit
 benchmark) whose needs those stages cover for the diff; a job they do not
 cover, such as GPUI after a change that needs a module the trailer's e2e did
 not run, still runs on GitHub, and its `changes` summary says why. A trailer
 with only a tree, from before the stages were recorded, still stands for every
-macOS job. For a release path only the full gate's trailer
-(`rust gpui e2e=full webkit`, which `ci:local` prints for such a diff) stands
+macOS job.
+
+The WebKit benchmark measures the classic app in WKWebView, and classic
+macOS is frozen (no Mac user runs it since 0.20.0), so neither `ci:local`
+nor a branch's CI runs it unless the change touches its tooling; it then
+appears in the trailer as `webkit`. A push to main and a tag still run it
+on GitHub.
+
+For a release path only the full gate's trailer
+(`rust gpui e2e=full`, which `ci:local` prints for such a diff) stands
 for the macOS jobs; a tree-only or partial trailer does not, and those jobs run
 on GitHub. A release is still built and checked for real on GitHub when its
 tag is pushed: a tag runs every job and ignores any trailer (so does every
 push to main), and
 `release.yml` and `gpui-package.yml` take no trailer at all.
-`pnpm ci:local --full` runs every stage and the whole e2e.
+`pnpm ci:local --full` runs every stage and the whole e2e, except the WebKit benchmark unless the diff changes it.
 
 **Docs-only commits on a gated branch.** When everything since the newest
 commit on HEAD's first-parent line whose trailer names its own tree and

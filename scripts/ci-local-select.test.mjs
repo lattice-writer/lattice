@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { FULL, TEXT_ONLY, coveredJobs, docsGate, e2eNeeds, findGate, formatTrailer, fullCover, macosNeeds, mainMergeRegate, parseTrailer, resolveCover } from "./ci-local-select.mjs";
+import { FULL, TEXT_ONLY, coveredJobs, docsGate, e2eNeeds, findGate, formatTrailer, fullCover, macosNeeds, touchesWebkitBench, mainMergeRegate, parseTrailer, resolveCover } from "./ci-local-select.mjs";
 import { ciTier } from "./ci-tier.mjs";
 
 const covers = new Map([
@@ -65,7 +65,11 @@ describe("ci-local-select: the e2e a change needs", () => {
 describe("ci-local-select: stages by diff", () => {
   it("leaves the GPUI stages out of a Tauri or web change, and the WebKit benchmark out of a GPUI one", () => {
     expect(needsFor(["src-tauri/src/lib.rs"])).toMatchObject({ rust: true, gpui: false, e2e: null, webkit: false });
-    expect(needsFor(["src/App.tsx"])).toMatchObject({ rust: false, gpui: false, webkit: true });
+    expect(needsFor(["src/App.tsx"])).toMatchObject({ rust: false, gpui: false, webkit: false });
+    expect(needsFor(["scripts/perf-bench/scenarios.mjs"])).toMatchObject({ webkit: true });
+    expect(needsFor(["scripts/perf-bench.mjs", "src/App.tsx"])).toMatchObject({ webkit: true });
+    for (const file of ["tools/perf-bench/bench-page.ts", "tools/mock-backend/server.ts", "scripts/lib/util.mjs", "vite.config.ts"]) expect(touchesWebkitBench([file]), file).toBe(true);
+    for (const file of ["package.json", "pnpm-lock.yaml", "src/App.tsx", "scripts/ci-tier.mjs"]) expect(touchesWebkitBench([file]), file).toBe(false);
     expect(needsFor(["gpui/crates/lattice-gpui/src/pdf/view/notes.rs"])).toMatchObject({ rust: false, gpui: true, webkit: false, e2e: { full: false } });
   });
 
@@ -116,7 +120,10 @@ describe("ci-local-select: the trailer", () => {
   it("takes only the full gate's trailer for a release path", () => {
     const release = needsFor(["gpui/crates/lattice-gpui/src/updater/install.rs", "src-tauri/tauri.conf.json"]);
     expect(coveredJobs(parseTrailer("CI-local: macos 0123456789ab"), release).gpui.reason).toMatch(/release paths .* full gate/);
-    expect(coveredJobs(parseTrailer("CI-local: macos 0123456789ab rust gpui e2e=full"), release).rust.reason).toMatch(/release paths/);
+    // The full gate has no WebKit benchmark unless its tooling changed.
+    expect(coveredJobs(parseTrailer("CI-local: macos 0123456789ab rust gpui e2e=full"), release)).toEqual({ rust: { covered: true }, gpui: { covered: true }, webkit: { covered: true } });
+    expect(coveredJobs(parseTrailer("CI-local: macos 0123456789ab rust e2e=full"), release).rust.reason).toMatch(/release paths/);
+    expect(coveredJobs(parseTrailer("CI-local: macos 0123456789ab rust gpui e2e=full"), needsFor(["src-tauri/tauri.conf.json", "scripts/perf-bench/budgets-webkit.json"])).webkit.reason).toMatch(/no webkit stage/);
     expect(coveredJobs(parseTrailer("CI-local: macos 0123456789ab rust gpui e2e=smoke+pdf webkit"), release).gpui.reason).toMatch(/release paths/);
     const full = parseTrailer(formatTrailer("0123456789ab", { rust: true, gpui: true, e2e: FULL, webkit: true }));
     expect(fullCover(full)).toBe(true);

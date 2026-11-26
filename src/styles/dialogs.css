@@ -887,10 +887,19 @@ button.checklist-row:hover { background: var(--control-hover-surface); }
 .settings-api-actions { margin-top: var(--space-8); display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: var(--space-4); }
 .modal-actions { margin-top: var(--space-12); display: flex; justify-content: flex-end; gap: var(--space-4); }
 .destructive-button-icon { display: inline-flex; flex: none; align-items: center; justify-content: center; transform-origin: 50% 70%; }
-.confirm-action-modal { width: min(410px, calc(100vw - 40px)); }
+/* Keep confirmations within the viewport so a long message can never push the
+   title or action buttons off screen; the description scrolls between them.
+   Flex children do not collapse margins, so zero the heading and paragraph
+   bottom margins and put the heading-to-body gap on `h2 + p` to match block
+   layout for both description and title-only confirmations. */
+.confirm-action-modal { width: min(410px, calc(100vw - 40px)); max-height: calc(100vh - 40px); display: flex; flex-direction: column; }
+.confirm-action-modal > :is(.modal-icon, h2, .modal-actions) { flex: none; }
+.confirm-action-modal > h2 { margin-bottom: 0; }
 /* A message's own line breaks (a second paragraph, a list of names) show as
    written rather than running together. */
 .confirm-action-modal > p { max-width: 340px; white-space: pre-line; }
+.confirm-action-modal > h2 + p { margin-top: var(--space-2); }
+.confirm-action-modal > p:where(:not(.ui-inline-message)) { margin-bottom: 0; flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .confirm-action-modal .ui-button--ghost.confirm-action-danger { color: var(--status-danger); }
 .confirm-action-modal .ui-button--ghost.confirm-action-danger:hover:not(:disabled) { background: var(--status-danger-soft); color: var(--status-danger); }
 /* An import's name conflicts (import-conflict-dialog.tsx): the title names
@@ -899,7 +908,7 @@ button.checklist-row:hover { background: var(--control-hover-surface); }
    buttons, Replace a ghost in the danger ink (GPUI's ButtonVariant::
    GhostDanger), the destructive answer beside a safe default. */
 .import-conflict-modal { width: min(420px, calc(100vw - 40px)); }
-.import-conflict-names { margin: calc(-1 * var(--space-6)) 0 var(--space-10); padding: 0; list-style: none; }
+.import-conflict-names { margin: calc(-1 * var(--space-6)) 0 var(--space-10); padding: 0; max-height: min(40vh, 240px); overflow-y: auto; overscroll-behavior: contain; list-style: none; }
 .import-conflict-names li { overflow: hidden; color: var(--text-primary); font-family: var(--editor-font); font-size: var(--type-caption-size); line-height: var(--type-caption-line-height); text-overflow: ellipsis; white-space: nowrap; }
 .import-conflict-names li.import-conflict-more { color: var(--text-tertiary); font-family: inherit; }
 .import-conflict-modal .ui-button--ghost.import-conflict-replace { color: var(--status-danger); }

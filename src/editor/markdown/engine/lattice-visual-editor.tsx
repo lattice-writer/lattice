@@ -23,7 +23,6 @@ import { dismissAppToastByDedupeKey } from "../../../telemetry/app-log-store";
 import { rebaseMarkdownDraft } from "../markdown-collab";
 import { openMarkdownLink } from "../markdown-link-routing";
 import { markdownPreviewSyncPolicy } from "../markdown-preview-sync-policy";
-import { isPaperLibraryPath } from "../../../papers/paper-link";
 import { ProjectImageHostProvider } from "../project-image-host";
 import { DocumentHeadingRail } from "../document-heading-rail";
 import type { VisualMarkdownEditorProps, VisualRevealTarget } from "../visual-editor-props";
@@ -33,11 +32,12 @@ import { blockAnchors } from "./block-anchors";
 import { blockWindow, mayDrawInWindow, revealPosition, scrollToTarget } from "./block-window";
 import { HeadingAnchors, REFRESH_ANCHORS, plannedHeadings } from "./heading-anchors";
 import { NO_HEADINGS, railHeadings, sameHeadings } from "./rail-headings";
-import { PassiveView, passiveModel, type PassiveModel } from "./passive-view";
+import { PassiveView, passiveFor, revealPassiveLine } from "./passive-view";
 import type { ImeGuard } from "./engine-keymap";
 import { MathMacrosContext, engineNodeViews } from "./engine-node-views";
 import { engineSchema, engineSchemaExtensions, type RawBlockKind } from "./engine-schema";
-import { adoptNodes, openMarkdown, serializeMarkdown, type MarkdownBaseline, type OpenOptions } from "./markdown-document";
+import { adoptNodes, openMarkdown, serializeMarkdown, type MarkdownBaseline } from "./markdown-document";
+import { openOptions } from "./open-options";
 import { SourceMap } from "./source-map";
 import { SourceOverlays, buildOverlays, setOverlays } from "./source-overlays";
 import { REVEAL_FLASH_MS, RevealFlash, setRevealFlash } from "./reveal-flash";
@@ -170,11 +170,6 @@ function selectionMarkdown(host: Host): string {
   if (map && from != null && to != null && to > from) return map.text.slice(from, to);
   return doc.textBetween(selection.from, selection.to, "\n\n", " ");
 }
-
-/** How the file at `path` is read: paper reading mode infers merged table cells (R-BLK-11). */
-const openOptions = (props: VisualMarkdownEditorProps): OpenOptions => ({
-  paperSpans: Boolean(props.optimizeForReading && isPaperLibraryPath(props.activePath)),
-});
 
 type HostMessages = { unavailable: string; source: string; title: string; detail: string; copy: string; restore: string };
 
@@ -533,12 +528,6 @@ function readingExtensions(labels: Partial<Record<RawBlockKind, string>>, ime: I
   return [...engineSchemaExtensions({ rawBlockLabels: labels }).filter((extension) => !viewNames.has(extension.name)), ...views];
 }
 
-/** The passive layout for a large read-only document (R-PERF-1), or null to draw it whole. */
-function passiveFor(text: string, activePath: string, reading: boolean): PassiveModel | null {
-  const opened = openMarkdown(text, engineSchema(), { paperSpans: reading && isPaperLibraryPath(activePath) });
-  return "unavailable" in opened ? null : passiveModel(opened.doc, opened.baseline, text.length, reading);
-}
-
 /** The complete editor: a long document is drawn only near the viewport (R-PERF-3). */
 function editorExtensions(labels: Partial<Record<RawBlockKind, string>>, ime: ImeGuard, chrome: Chrome): AnyExtension[] {
   return blockWindow([
@@ -620,23 +609,6 @@ function rebindBaseline(baseline: MarkdownBaseline, editor: Editor): MarkdownBas
   return { ...baseline, entries };
 }
 
-/**
- * The passive view's jump: center the last block starting at or before `line`.
- * Its chunk may not be drawn yet; then the chunk is brought into view, which
- * draws it, and the jump is not landed until the block itself is centered.
- */
-function revealPassiveLine(layer: HTMLElement | null, model: PassiveModel, line: number): boolean {
-  const chunk = model.chunks.filter((candidate) => candidate.labels[0]!.line <= line).at(-1) ?? model.chunks[0]!;
-  const label = chunk.labels.filter((candidate) => candidate.line <= line).at(-1) ?? chunk.labels[0]!;
-  const block = layer?.querySelector<HTMLElement>(`[data-source-line="${label.line}"]`);
-  if (block) {
-    block.scrollIntoView({ block: "center" });
-    return true;
-  }
-  layer?.querySelector<HTMLElement>(`[data-visual-chunk-id="${chunk.id}"]`)?.scrollIntoView({ block: "center" });
-  return false;
-}
-
 export function LatticeVisualMarkdownEditor(props: VisualMarkdownEditorProps): JSX.Element {
   const { text, activePath, editable = true, optimizeForReading, onEligibilityChange, onFlushPendingChange } = props;
   const { t } = useLingui();
@@ -680,10 +652,10 @@ export function LatticeVisualMarkdownEditor(props: VisualMarkdownEditorProps): J
   // A large read-only document opens passive until the reader asks for the complete editor (R-PERF-1–3).
   const [activated, setActivated] = useState<{ path: string; href: string | null } | null>(null);
   const passiveWanted = !editable && activated?.path !== activePath;
-  // Only the text, the file and reading mode shape the passive layout.
+  // Only these shape the passive layout.
   const passive = useMemo(
-    () => (passiveWanted ? passiveFor(text, activePath, Boolean(optimizeForReading)) : null),
-    [passiveWanted, text, activePath, optimizeForReading],
+    () => (passiveWanted ? passiveFor(text, activePath, optimizeForReading, props.textColors) : null),
+    [passiveWanted, text, activePath, optimizeForReading, props.textColors],
   );
 
   useLayoutEffect(() => {
