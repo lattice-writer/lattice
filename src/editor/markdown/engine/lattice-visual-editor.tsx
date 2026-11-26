@@ -609,7 +609,6 @@ function rebindBaseline(baseline: MarkdownBaseline, editor: Editor): MarkdownBas
   return { ...baseline, entries };
 }
 
-
 export function LatticeVisualMarkdownEditor(props: VisualMarkdownEditorProps): JSX.Element {
   const { text, activePath, editable = true, optimizeForReading, onEligibilityChange, onFlushPendingChange } = props;
   const { t } = useLingui();

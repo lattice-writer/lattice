@@ -336,7 +336,9 @@ here, with the requirement it rests on.
   this does not enable arbitrary HTML rendering. Only a host that asks for
   it (`textColors`, the native app's editor) reads them; elsewhere they stay
   raw. A colour is painted refitted to 4.5:1 on the editor ground of the
-  theme in use, as code-theme tokens are, while the file keeps it as written.
+  theme in use, as code-theme tokens are, while the file keeps it as written;
+  a value that names `currentColor` (it follows the enclosing, already fitted
+  colour) and a fully transparent one are painted as written.
 - **Task lists (R-BLK-19, R-FMT-14).** A list may mix task and plain items,
   and stays a task list only while every item has a box. An `[X]` box is
   recorded and written back uppercase while it stays checked. The typed-box

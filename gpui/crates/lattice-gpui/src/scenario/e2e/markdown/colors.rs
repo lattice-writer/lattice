@@ -85,26 +85,20 @@ impl Run {
             return Ok(());
         };
 
-        let read = |value: Value| -> Value {
-            value
-                .as_str()
-                .and_then(|text| serde_json::from_str(text).ok())
-                .unwrap_or(Value::Null)
-        };
-        let light = read(self.evaluate(cx, &island, READ).await);
+        let light = self.evaluate(cx, &island, READ).await;
         cx.update(|cx| LatticeTheme::set_appearance(Appearance::Dark, cx));
         let mut dark = Value::Null;
         let started = std::time::Instant::now();
         while started.elapsed() < Duration::from_secs(3) {
             self.pause(cx, Duration::from_millis(150)).await;
-            dark = read(self.evaluate(cx, &island, READ).await);
+            dark = self.evaluate(cx, &island, READ).await;
             if dark["theme"] == "dark" && painted(&dark, "navy note") != painted(&light, "navy note") {
                 break;
             }
         }
         cx.update(|cx| LatticeTheme::set_appearance(Appearance::Light, cx));
         self.pause(cx, Duration::from_millis(300)).await;
-        let back = read(self.evaluate(cx, &island, READ).await);
+        let back = self.evaluate(cx, &island, READ).await;
         let authored = |page: &Value| {
             run_of(page, "navy note").is_some_and(|run| run["authored"] == "navy")
                 && run_of(page, "gold").is_some_and(|run| run["authored"] == "#ffd700")
@@ -159,7 +153,7 @@ impl Run {
             .await;
         self.pause(cx, Duration::from_millis(400)).await;
         let text = std::fs::read_to_string(&path).unwrap_or_default();
-        let after = read(self.evaluate(cx, &island, READ).await);
+        let after = self.evaluate(cx, &island, READ).await;
         steps.check(
             "a word typed inside a coloured run in the visual editor is saved inside its colour span, the file's other bytes as they were",
             unchanged
