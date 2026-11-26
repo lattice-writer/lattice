@@ -45,9 +45,10 @@
  * `inapp-lock build`, so a quiet holder queued behind that e2e waits for it
  * to end before measuring. They compile in the machine's
  * shared build tree under its build lock (scripts/gpui-build.mjs). Only the
- * stages that open windows (gpui-main, gpui-e2e, webkit-bench) take that lock,
- * holding it for their whole run through scripts/inapp-lock, so no hand test
- * or other run drives the screen under them.
+ * stages that open windows take that lock: gpui-e2e and webkit-bench hold it
+ * for their whole run through scripts/inapp-lock, so no hand test or other run
+ * drives the screen under them, and gpui-main builds main first and takes it
+ * only for each chunk of main's e2e (gpui-main-baseline.mjs --chunks).
  *
  * When every stage passes and the change needed a macOS job, it prints a
  * `CI-local: macos <tree> rust gpui e2e=… [webkit]` trailer naming the stages
@@ -97,7 +98,7 @@ import { FULL, RELEASE_PATHS, coveredJobs, docsGate, findGate, formatTrailer, ma
 import { JOBS, ciTier, knownFailuresInert, selectorListsEdited } from "./ci-tier.mjs";
 import { changedFiles, gateStages, runStages } from "./gate-changed.mjs";
 import { ancestorBaseline, readBaseline } from "./gpui-e2e-light.mjs";
-import { baselineDir } from "./gpui-main-baseline.mjs";
+import { CHUNKS, baselineDir } from "./gpui-main-baseline.mjs";
 import { isMain } from "./lib/util.mjs";
 import { extraStages } from "./signoff.mjs";
 
@@ -218,23 +219,30 @@ function mainBaselineStage(mergeBase, verdict = null) {
   // the second's `git worktree remove` pulled the tree from under the first's
   // baseline (spawnSync git ENOENT once its e2e had finished).
   const worktree = path.join(baselineDir(), "..", `ci-local-main-${process.pid}`);
-  const record = 'git worktree remove --force "$1" 2>/dev/null; git worktree add --detach "$1" "$2" && (cd "$1" && node scripts/gpui-main-baseline.mjs --sha "$2"); status=$?; git worktree remove --force "$1"';
+  // It takes the in-app lock itself, per chunk of the e2e, so main's gate and
+  // build run without it (27-40 min holds when the whole run held it, LATA-104).
+  // A merge base from before --chunks (#1298) runs whole under the lock.
+  const lock = `"${path.join(repo, "scripts", "inapp-lock")}" --thread "ci:local gpui-main $2" --wait ${INAPP_WAIT_S} --kind e2e --`;
+  const record = `git worktree remove --force "$1" 2>/dev/null; git worktree add --detach "$1" "$2" && (cd "$1" && if grep -q '"--chunks"' scripts/gpui-main-baseline.mjs; then node scripts/gpui-main-baseline.mjs --sha "$2" --chunks ${CHUNKS}; else ${lock} node scripts/gpui-main-baseline.mjs --sha "$2"; fi); status=$?; git worktree remove --force "$1"`;
+  const timeout = 3_600_000 + INAPP_WAIT_S * 1000;
   if (!verdict) {
     return {
       name: "gpui-main",
       why: `the merge base's e2e on this Mac, for the baseline (${mergeBase.slice(0, 9)})`,
+      locksItself: true,
       command: "sh",
       args: ["-c", `${record}; exit $status`, "sh", worktree, mergeBase],
-      timeout: 3_600_000,
+      timeout,
     };
   }
   return {
     name: "gpui-main",
     why: `the e2e failed beyond the older baseline: the merge base's own (${mergeBase.slice(0, 9)}), and those failures judged against it`,
     rescues: "gpui-e2e",
+    locksItself: true,
     command: "sh",
     args: ["-c", `[ -f "$3" ] || { echo "gpui-main: the e2e saved no verdict (it did not finish), so a baseline would not settle it"; exit 1; }; [ -f "$4" ] || { ${record}; [ $status = 0 ] || exit $status; }; exec node scripts/gpui-e2e-verdict.mjs --rejudge "$3" --baseline "$4"`, "sh", worktree, mergeBase, verdict, path.join(baselineDir(), `known-failures@${mergeBase}.json`)],
-    timeout: 3_600_000,
+    timeout,
   };
 }
 
@@ -247,7 +255,7 @@ function mainBaselineStage(mergeBase, verdict = null) {
  *
  * The whole scenario is judged against this Mac's baseline for the merge base.
  * Recording one takes a build and the whole e2e of main (about 20 minutes,
- * with the in-app lock held), and most gates land on a merge base that has
+ * the in-app lock held only for the e2e's chunks), and most gates land on a merge base that has
  * none yet, so without one it is judged against the newest baseline of an
  * ancestor up to OLDER_BASELINE_MAX commits back (ancestorBaseline), and the
  * merge base's own is recorded only when steps outside that one fail
@@ -414,7 +422,8 @@ async function main() {
     .filter((stage) => !regate || !WINDOWED.has(stage.name))
     .map((stage) => {
       if (!WINDOWED.has(stage.name) || stage.skip) return stage;
-      return options.headless ? { name: stage.name, skip: "opens windows; --headless" } : holdingInappLock(stage);
+      if (options.headless) return { name: stage.name, skip: "opens windows; --headless" };
+      return stage.locksItself ? stage : holdingInappLock(stage);
     });
   if (options.plan) {
     for (const stage of stages) console.log(`  ${stage.name.padEnd(12)} ${stage.skip ? `skip (${stage.skip})` : stage.why}`);

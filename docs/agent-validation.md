@@ -205,7 +205,9 @@ check them, and the strings as shown are left to the nightly full gate,
 except that lattice-i18n's also run `settings` and `find_in_file`, which
 read zh-CN strings. Only the whole scenario records this Mac's main baseline for the
 merge base, in a scratch worktree, when the machine has none (one more build
-and e2e, about 20 minutes, per merge base), and only when it needs it: the
+and e2e, about 20 minutes, per merge base; it builds main outside the in-app
+lock and takes the lock only for each of the e2e's six chunks, as the nightly
+does), and only when it needs it: the
 e2e runs first, judged against the newest baseline this Mac has for an
 ancestor of the merge base at most 30 commits back (less the steps the known
 list dropped since), and `gpui-main` records the merge base's own only when

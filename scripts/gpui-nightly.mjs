@@ -44,7 +44,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { judge, knownFailures, rerun, rerunModules, settle } from "./gpui-e2e-verdict.mjs";
-import { baselineDir } from "./gpui-main-baseline.mjs";
+import { CHUNKS, baselineDir } from "./gpui-main-baseline.mjs";
 import { isMain } from "./lib/util.mjs";
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -52,9 +52,6 @@ const git = (...args) => execFileSync("git", args, { cwd: repo, encoding: "utf8"
 export const LABEL = "nightly-e2e";
 // The system disk floor release builds keep on the Mac mini (CREW.md).
 const MIN_FREE_GB = Number(process.env.LATTICE_NIGHTLY_MIN_FREE_GB ?? 20);
-// The whole scenario takes 16-26 min on the Mac mini; six chunks hold the
-// in-app lock about 3-5 min each.
-const CHUNKS = 6;
 
 /** What failed tonight, one line each: gate stages, the build, and the e2e steps the verdict counts. */
 export function failuresOf(record, verdict, quit = null) {

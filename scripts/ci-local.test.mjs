@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { docsStages, holderRunsE2e, holdingInappLock, localStages } from "./ci-local.mjs";
+import { CHUNKS } from "./gpui-main-baseline.mjs";
 import { ciTier } from "./ci-tier.mjs";
 import { runStages } from "./gate-changed.mjs";
 
@@ -44,7 +45,7 @@ describe.skipIf(process.platform === "win32")("ci:local", () => {
 
   it("marks the e2e stages as e2e holders and the WebKit benchmark as quiet", () => {
     const kind = (name) => { const args = holdingInappLock({ name, command: "true", timeout: 1 }).args; return args[args.indexOf("--kind") + 1]; };
-    expect([kind("gpui-e2e"), kind("gpui-main"), kind("webkit-bench")]).toEqual(["e2e", "e2e", "quiet"]);
+    expect([kind("gpui-e2e"), kind("webkit-bench")]).toEqual(["e2e", "quiet"]);
   });
 
   it("runs a rescue only after the stage it rescues failed, and clears that failure when it passes", async () => {
@@ -65,9 +66,14 @@ describe.skipIf(process.platform === "win32")("ci:local", () => {
       const files = ["gpui/crates/lattice-gpui/src/main.rs"];
       const order = () => localStages(ciTier(files), files, head, { full: true, modules: [] }).filter((stage) => ["gpui-main", "gpui-e2e"].includes(stage.name));
       expect(order().map((stage) => [stage.name, stage.rescues])).toEqual([["gpui-main", undefined], ["gpui-e2e", undefined]]);
+      // Main's gate and build run outside the in-app lock; only its e2e chunks take it.
+      const [main] = order();
+      expect(main.locksItself).toBe(true);
+      expect(main.args[1]).toContain(`--chunks ${CHUNKS}`);
       spawnSync("mkdir", ["-p", path.join(dir, "main-baseline")]);
       writeFileSync(path.join(dir, "main-baseline", `known-failures@${parent}.json`), JSON.stringify({ sha: parent, e2e: { failing: [] } }));
       expect(order().map((stage) => [stage.name, stage.rescues])).toEqual([["gpui-e2e", undefined], ["gpui-main", "gpui-e2e"]]);
+      expect(order()[1].locksItself).toBe(true);
       writeFileSync(path.join(dir, "main-baseline", `known-failures@${head}.json`), JSON.stringify({ sha: head, e2e: { failing: [] } }));
       expect(order().map((stage) => [stage.name, stage.skip ? "skip" : stage.rescues])).toEqual([["gpui-main", "skip"], ["gpui-e2e", undefined]]);
     } finally {

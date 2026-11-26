@@ -52,7 +52,8 @@
  *                between chunks, so a queued gate or lab run gets the screen
  *                in between instead of waiting out the whole scenario
  *                (scripts/gpui-nightly.mjs); the chunks' results are merged
- *                into the one e2e@<sha>.json (mergeChunks)
+ *                into the one e2e@<sha>.json (mergeChunks); the build then
+ *                runs as an `inapp-lock build` instead, outside the lock
  */
 import { execFileSync, spawn } from "node:child_process";
 import { createWriteStream, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
@@ -64,6 +65,9 @@ import { readModules } from "./gpui-e2e-modules.mjs";
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const git = (...args) => execFileSync("git", args, { cwd: repo, encoding: "utf8" }).trim();
+// The whole scenario takes 16-26 min on the Mac mini; six chunks hold the
+// in-app lock about 3-5 min each (the nightly and ci:local's gpui-main).
+export const CHUNKS = 6;
 
 function parseArgs(argv) {
   const options = { sha: null, out: null, e2e: true, chunks: 0 };
@@ -273,7 +277,11 @@ async function main() {
   const stages = parseGate(gateRun.output);
   const gate = { status: gateRun.status, seconds: gateRun.seconds, failing: stages.filter((stage) => stage.verdict === "failed").map((stage) => stage.name), stages };
 
-  const buildRun = await run("node", ["scripts/gpui-build.mjs"], { log: path.join(logs, "build.log"), timeoutMs: 90 * 60_000 });
+  // Chunks take the in-app lock one at a time, so nothing holds it over the
+  // build: it runs as an `inapp-lock build`, which waits while a quiet holder
+  // measures and keeps the next one from starting until the build ends.
+  const buildCommand = options.chunks ? [path.join(repo, "scripts", "inapp-lock"), "build", "--", "node", "scripts/gpui-build.mjs"] : ["node", "scripts/gpui-build.mjs"];
+  const buildRun = await run(buildCommand[0], buildCommand.slice(1), { log: path.join(logs, "build.log"), timeoutMs: 90 * 60_000 });
   const build = { status: buildRun.status, seconds: buildRun.seconds };
 
   let e2e = { status: "not run", reason: options.e2e ? "the build failed" : "--skip-e2e" };
