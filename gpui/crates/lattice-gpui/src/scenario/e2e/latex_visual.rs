@@ -519,9 +519,12 @@ impl Run {
                 });
             }
         })?;
+        // On GitHub's macOS runner the edit had not reached the page within
+        // 6 s (the v0.20.1 tag run), though it does on the Mac mini; the
+        // bound allows a slow machine, and `ms` records how long it took.
         let mut followed = false;
         let started = std::time::Instant::now();
-        while started.elapsed() < Duration::from_secs(6) {
+        while started.elapsed() < Duration::from_secs(20) {
             let page = self.evaluate(cx, island, DRAWN).await;
             followed = page["text"]
                 .as_str()
@@ -534,7 +537,7 @@ impl Run {
         steps.check(
             "text put into the buffer reaches the Visual view",
             followed,
-            json!({ "followed": followed }),
+            json!({ "followed": followed, "ms": started.elapsed().as_millis() }),
         );
         Ok(())
     }
