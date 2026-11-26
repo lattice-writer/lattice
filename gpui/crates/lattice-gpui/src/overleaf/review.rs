@@ -718,6 +718,7 @@ impl Render for OverleafReview {
                     },
                 )
                 .variant(ButtonVariant::Primary)
+                .parity("overleaf-review/apply")
                 .disabled(
                     self.applying || self.loading || total == 0 || self.render_error().is_some(),
                 )

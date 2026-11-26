@@ -14,8 +14,9 @@
 //!   the editor with Keep mine / Keep theirs / Keep both on the spot;
 //! - manual mode badges new work on Overleaf, and Review changes lists it
 //!   and applies it;
-//! - pausing sync holds each side's edits, and resuming merges them
-//!   (`pause_resume`);
+//! - pausing sync holds each side's edits, and resuming merges them; in
+//!   manual mode, resuming from Settings › Overleaf closes Settings and
+//!   leaves Review changes in front (`pause_resume`);
 //! - a sync Overleaf rate-limits is owed quietly and goes up after the
 //!   cool-down (`rate_limit`);
 //! - Settings › Overleaf says who is signed in and which project syncs;
@@ -493,6 +494,7 @@ impl Run {
         linked.overleaf_margin_walk(cx, steps, &mock, &root)
             .await?;
         linked.overleaf_pause_resume(cx, steps, &mock).await?;
+        linked.overleaf_resume_from_settings(cx, steps, &mock).await?;
         linked.overleaf_rate_limit(cx, steps, &mock).await?;
 
         // Settings › Overleaf.
