@@ -2,7 +2,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { GPUI_INPUTS, JOBS, ciTier, localMacosPass, trailerHonoured, wantsFull } from "./ci-tier.mjs";
+import { CI_CONTROL, CI_CONTROL_TESTS, GPUI_INPUTS, JOBS, ciTier, localMacosPass, trailerHonoured, wantsFull } from "./ci-tier.mjs";
 
 const repo = path.resolve(import.meta.dirname, "..");
 
@@ -85,10 +85,28 @@ describe("ci-tier", () => {
       expect(JOBS.filter((job) => tier.jobs[job]), file).toEqual(["vitest", "lint-build"]);
       expect(tier.vitestFiles, file).toContain("scripts/windows-e2e-tier.test.mjs");
     }
+    const reads = ciTier(["scripts/ci-tier.mjs", "docs/spec.md"], { scan: { ...scan, testReads: [{ read: "docs/spec.md", test: "src/spec.test.ts" }] } });
+    expect(reads.vitestFiles).toContain("src/spec.test.ts");
     for (const other of ["gpui/crates/lattice-gpui/src/shell.rs", "src/App.tsx", "scripts/inapp-lock", "src-tauri/src/lib.rs"]) {
       expect(running(["scripts/ci-local-select.mjs", other]).on, other).toEqual(JOBS);
     }
     expect(ciTier(["README.md"], { full: true, scan }).jobs).toEqual(Object.fromEntries(JOBS.map((job) => [job, true])));
+  });
+
+  it("lists every test that imports a CI-selection script as its own", () => {
+    const scripts = path.resolve(import.meta.dirname);
+    const imports = (file, seen = new Set()) => {
+      if (seen.has(file) || !existsSync(file)) return seen;
+      seen.add(file);
+      for (const [, spec] of readFileSync(file, "utf8").matchAll(/(?:from|import\()\s*["'](\.{1,2}\/[^"']+)["']/g)) imports(path.resolve(path.dirname(file), spec), seen);
+      return seen;
+    };
+    const control = [...CI_CONTROL].map((file) => path.resolve(scripts, "..", file));
+    const reaching = readdirSync(scripts)
+      .filter((name) => name.endsWith(".test.mjs"))
+      .filter((name) => [...imports(path.join(scripts, name))].some((file) => control.includes(file)))
+      .map((name) => "scripts/" + name);
+    expect(reaching.sort()).toEqual([...CI_CONTROL_TESTS].sort());
   });
 
   it("reads the CI: full trailer and the ci:full label", () => {

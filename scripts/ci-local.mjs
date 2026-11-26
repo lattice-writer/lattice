@@ -374,7 +374,10 @@ async function main() {
     return;
   }
   console.log(`ci:local: every stage passed in ${minutes} min`);
-  if (!tier.jobs.rust && !tier.jobs.gpui && !needs.webkit) return;
+  if (!tier.jobs.rust && !tier.jobs.gpui && !needs.webkit) {
+    console.log("ci:local: no macOS job to cover; push without a CI-local trailer");
+    return;
+  }
   if (stages.some((stage) => stage.skip === "opens windows; --headless")) {
     console.log("ci:local: --headless skipped the stages that open windows; run it whole on a Mac that may open windows for the CI-local trailer");
     return;
