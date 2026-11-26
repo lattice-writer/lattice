@@ -147,6 +147,8 @@ pub enum OverleafBridgeEvent {
     OpenSettings,
     /// Who is in the project, or where they are, changed.
     PresenceChanged,
+    /// A paused link was resumed and may sync again (`pause`).
+    Resumed,
 }
 
 #[derive(Clone, Default)]
@@ -216,6 +218,8 @@ pub struct OverleafBridge {
     badge_task: Option<Task<()>>,
     channel_task: Option<Task<()>>,
     link_task: Option<Task<()>>,
+    /// Resumed, until the link read after it says whether it may sync.
+    resuming: bool,
     /// Staged by a scenario (`scenario_stage`): shown as linked and live,
     /// but nothing reads the link again or asks Overleaf anything.
     staged: bool,
@@ -274,6 +278,7 @@ impl OverleafBridge {
             badge_task: None,
             channel_task: None,
             link_task: None,
+            resuming: false,
             staged: false,
             client: None,
             presence: Default::default(),
@@ -495,6 +500,9 @@ impl OverleafBridge {
                 });
                 this.status = status;
                 this.apply(cx);
+                if std::mem::take(&mut this.resuming) && this.link().is_some() {
+                    cx.emit(OverleafBridgeEvent::Resumed);
+                }
                 cx.notify();
             })
             .ok();

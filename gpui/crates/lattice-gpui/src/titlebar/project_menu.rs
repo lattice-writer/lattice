@@ -3,7 +3,8 @@
 //! project on the Cloud glyph), each opened in a window of its own by its
 //! row or in this window by the row's trailing window glyph, and with more
 //! than eight, "All recent projects…", the recent project finder; then Open another folder (with its own in-this-window
-//! glyph), New project, Clone repository…, Open from Overleaf, the Guided
+//! glyph), New project, Clone repository…, Open from Overleaf (and, with a
+//! linked project, Pause or Resume Overleaf sync), the Guided
 //! tutorial, and Settings, the titlebar's way into Settings, as the app's
 //! menu ends.
 //!
@@ -49,6 +50,12 @@ pub(super) fn project_menu(
     let exporting = shell
         .upgrade()
         .is_some_and(|shell| shell.read(cx).exporting_zip());
+    // A linked project's sync, paused or not (GPUI's own: the Tauri menu
+    // has no row for it); `Some(true)` while paused.
+    let overleaf_paused = shell.upgrade().and_then(|shell| {
+        let bridge = shell.read(cx).overleaf.read(cx);
+        bridge.linked().then(|| bridge.paused())
+    });
     RecentProjects::refresh(cx);
     let others = RecentProjects::others(current.as_deref(), cx);
     let more = others.len() > MAX_SWITCHER_PROJECTS;
@@ -99,7 +106,7 @@ pub(super) fn project_menu(
         }
         menu = menu.separator();
     }
-    let menu = menu
+    let mut menu = menu
         .item(
             MenuAction::dispatch(t!("Open another folder"), Box::new(OpenFolder))
                 .icon(Icon::FOLDER_OPEN)
@@ -121,7 +128,31 @@ pub(super) fn project_menu(
             )
             .icon(Icon::CLOUD)
             .disabled(exporting),
-        )
+        );
+    // On its shell directly, as Settings below is.
+    if let Some(paused) = overleaf_paused {
+        let shell = shell.clone();
+        let (label, icon) = if paused {
+            (t!("Resume Overleaf sync"), Icon::CLOUD)
+        } else {
+            (t!("Pause Overleaf sync"), Icon::CLOUD_OFF)
+        };
+        menu = menu.item(
+            MenuAction::new(label, move |_, cx| {
+                shell
+                    .update(cx, |shell, cx| {
+                        if paused {
+                            shell.resume_overleaf_sync(cx)
+                        } else {
+                            shell.pause_overleaf_sync(cx)
+                        }
+                    })
+                    .ok();
+            })
+            .icon(icon),
+        );
+    }
+    let menu = menu
         .item(
             MenuAction::dispatch(t!("Export ZIP"), Box::new(crate::shell::ExportProjectZip))
                 .icon(Icon::FILE_ARCHIVE),

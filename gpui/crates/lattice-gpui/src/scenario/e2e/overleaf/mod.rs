@@ -14,6 +14,8 @@
 //!   the editor with Keep mine / Keep theirs / Keep both on the spot;
 //! - manual mode badges new work on Overleaf, and Review changes lists it
 //!   and applies it;
+//! - pausing sync holds each side's edits, and resuming merges them
+//!   (`pause_resume`);
 //! - Settings › Overleaf says who is signed in and which project syncs;
 //! - a project the Tauri app linked somewhere else opens from that folder,
 //!   and syncs there, instead of downloading again (`local_copy`).
@@ -29,6 +31,7 @@ mod margin_visual;
 mod margin_walk;
 mod markdown_review;
 mod network_return;
+mod pause_resume;
 mod pdf_note;
 mod polish;
 mod presence;
@@ -481,6 +484,7 @@ impl Run {
         let root = linked.root(cx).await?;
         linked.overleaf_margin_walk(cx, steps, &mock, &root)
             .await?;
+        linked.overleaf_pause_resume(cx, steps, &mock).await?;
 
         // Settings › Overleaf.
         linked.with_window(cx, |shell, window, cx| {

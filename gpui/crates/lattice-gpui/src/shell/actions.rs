@@ -8,7 +8,9 @@ use trellis::runtime::keymap::Command as Trellis;
 
 use super::help_flow::{ReportProblem, WhatsNew};
 use super::history_flow::{OpenHistory, ResolveConflicts};
-use super::overleaf_flow::{OpenOnOverleaf, OpenOverleafProject, SyncOverleaf};
+use super::overleaf_flow::{
+    OpenOnOverleaf, OpenOverleafProject, PauseOverleafSync, ResumeOverleafSync, SyncOverleaf,
+};
 use super::tools_flow::{ExportArxiv, OpenChecklist, OpenTodos};
 use super::{Shell, commands::*, trellis_layout::Preset, windows, workspaces::Workspaces};
 
@@ -96,6 +98,7 @@ impl Shell {
             projects: self.projects.len(),
             overleaf_linked: self.overleaf.read(cx).link().is_some(),
             overleaf_syncing: self.overleaf.read(cx).syncing(),
+            overleaf_paused: self.overleaf.read(cx).paused(),
             latex_source: self.latex_source_in_front(cx),
             typst_source: self.active_editor().is_some_and(|editor| {
                 lattice_core::project::is_typst_path(editor.read(cx).relative())
@@ -212,6 +215,12 @@ impl Shell {
                 cx.listener(|this, _: &SyncOverleaf, window, cx| this.sync_overleaf(window, cx)),
             )
             .on_action(cx.listener(|this, _: &OpenOnOverleaf, _, cx| this.open_on_overleaf(cx)))
+            .on_action(
+                cx.listener(|this, _: &PauseOverleafSync, _, cx| this.pause_overleaf_sync(cx)),
+            )
+            .on_action(
+                cx.listener(|this, _: &ResumeOverleafSync, _, cx| this.resume_overleaf_sync(cx)),
+            )
             .on_action(cx.listener(
                 |this, _: &super::overleaf_collab::AnnotateSelection, window, cx| {
                     this.annotate_selection(window, cx)

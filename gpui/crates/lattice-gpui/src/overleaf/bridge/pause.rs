@@ -2,10 +2,20 @@
 //! not unlinking: the link, the last sync's copy and the file table stay in
 //! the project's sync state (`lattice_core::overleaf::set_paused`), so the
 //! pause holds across restarts and resuming merges what moved meanwhile.
+//!
+//! Resuming syncs at once (`OverleafBridgeEvent::Resumed`, which the window
+//! answers with its Sync: Review changes in manual mode), so what was
+//! edited on either side while paused goes through the regular three-way
+//! sync rather than waiting for the next edit or the writer's own Sync.
 
 use super::*;
 
 impl OverleafBridge {
+    /// The project's link is paused.
+    pub fn paused(&self) -> bool {
+        self.link.as_ref().is_some_and(|link| link.link.paused)
+    }
+
     /// Pause or resume syncing this project. Pausing keeps the link and
     /// everything it needs, so resuming is an ordinary sync that merges
     /// whatever changed on either side meanwhile.
@@ -26,6 +36,7 @@ impl OverleafBridge {
             let result = task.await;
             this.update(cx, |this, cx| match result {
                 Ok(()) => {
+                    this.resuming = !paused;
                     this.reload_link(cx);
                     if paused {
                         let weak = cx.entity().downgrade();

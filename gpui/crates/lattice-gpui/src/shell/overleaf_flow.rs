@@ -46,7 +46,16 @@ use crate::{
     },
 };
 
-actions!(lattice, [OpenOverleafProject, SyncOverleaf, OpenOnOverleaf]);
+actions!(
+    lattice,
+    [
+        OpenOverleafProject,
+        SyncOverleaf,
+        OpenOnOverleaf,
+        PauseOverleafSync,
+        ResumeOverleafSync
+    ]
+);
 
 /// The window's Overleaf dialogs, while they are open.
 #[derive(Default)]
@@ -157,6 +166,10 @@ impl Shell {
                 self.open_settings(Some(SettingsTab::Overleaf), window, cx)
             }
             OverleafBridgeEvent::PresenceChanged => self.show_overleaf_carets(cx),
+            // What was edited while paused was kept on disk here and
+            // against the last sync's copy there, so this sync merges both
+            // sides line by line and leaves a clash marked up, as any sync.
+            OverleafBridgeEvent::Resumed => self.sync_overleaf(window, cx),
         }
     }
 
@@ -309,6 +322,37 @@ impl Shell {
         } else {
             self.run_overleaf_sync(cx);
         }
+    }
+
+    /// Pause syncing this project (the status bar's slot, the project
+    /// menu, the palette): the link and the last sync's copy stay, and
+    /// edits stay on this Mac until it resumes.
+    pub(crate) fn pause_overleaf_sync(&mut self, cx: &mut Context<Self>) {
+        let bridge = self.overleaf.read(cx);
+        if !bridge.linked() || bridge.paused() {
+            return;
+        }
+        // What is typed but not yet on disk is part of what resuming
+        // merges, so it is saved first.
+        let saved = self.save_before_leaving(cx);
+        self.overleaf_layers.pending = Some(cx.spawn(async move |this, cx| {
+            if let Some(saved) = saved {
+                saved.await;
+            }
+            this.update(cx, |this, cx| {
+                this.overleaf
+                    .update(cx, |bridge, cx| bridge.set_paused(true, cx));
+            })
+            .ok();
+        }));
+    }
+
+    pub(crate) fn resume_overleaf_sync(&mut self, cx: &mut Context<Self>) {
+        self.overleaf.update(cx, |bridge, cx| {
+            if bridge.paused() {
+                bridge.set_paused(false, cx);
+            }
+        });
     }
 
     /// Save the window's editors, then sync.

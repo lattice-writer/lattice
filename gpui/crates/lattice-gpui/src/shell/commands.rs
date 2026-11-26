@@ -154,6 +154,8 @@ pub struct CommandContext {
     /// The project is linked to Overleaf, and the session may sync it.
     pub overleaf_linked: bool,
     pub overleaf_syncing: bool,
+    /// The project's link is paused: Resume, not Sync, is offered.
+    pub overleaf_paused: bool,
     /// The editor in front is a LaTeX source (Insert table's `latexSource`).
     pub latex_source: bool,
     /// The editor in front is a Typst source, which its helper maps to the
@@ -584,6 +586,28 @@ mod tests {
         assert!(commands.iter().any(|command| command.id == "overleaf-open"));
         assert!(!commands.iter().any(|command| command.id == "overleaf-sync"));
         assert!(commands.iter().any(|command| command.id == "open-folder"));
+    }
+
+    #[test]
+    fn a_linked_project_offers_pause_and_a_paused_one_resume() {
+        let has = |context: &CommandContext, id: &str| {
+            commands(context).iter().any(|command| command.id == id)
+        };
+        let linked = CommandContext {
+            in_project: true,
+            overleaf_linked: true,
+            ..CommandContext::default()
+        };
+        assert!(has(&linked, "overleaf-pause"));
+        assert!(!has(&linked, "overleaf-resume"));
+        let paused = CommandContext {
+            in_project: true,
+            overleaf_paused: true,
+            ..CommandContext::default()
+        };
+        assert!(has(&paused, "overleaf-resume"));
+        assert!(!has(&paused, "overleaf-pause"));
+        assert!(!has(&paused, "overleaf-sync"));
     }
 
     #[test]
