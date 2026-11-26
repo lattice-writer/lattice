@@ -43,6 +43,7 @@ pub mod folding;
 pub mod format_toggle;
 pub mod graphics;
 pub mod highlights;
+pub mod inline_colors;
 pub mod input_rules;
 pub mod lint;
 pub mod math_preview;

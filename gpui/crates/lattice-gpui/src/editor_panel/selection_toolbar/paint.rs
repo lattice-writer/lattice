@@ -1,10 +1,10 @@
-//! The highlights painted in a `.tex` source (`highlights::paint`), read
+//! The highlights and inline colours painted in a `.tex` source, read
 //! around the lines the editor shows and painted again as they change.
 
 use std::ops::Range;
 
 use gpui::{App, Context};
-use lattice_editor::latex::highlights;
+use lattice_editor::latex::{highlights, inline_colors};
 use lattice_ui::ActiveLattice as _;
 
 use super::{EditorPanel, Kind};
@@ -14,6 +14,8 @@ use super::{EditorPanel, Kind};
 const PAINT: &str = "highlight-paint";
 const PAINT_MARKS: &str = "highlight-paint-marks";
 const PAINT_SWATCHES: &str = "highlight-paint-swatches";
+/// The `\color` and `\textcolor` text painted in its colour (lattice#1328).
+const PAINT_COLORS: &str = "inline-color-paint";
 /// How far past the lines the editor shows the paint reads (the Tauri
 /// paint's `MARGIN`), so a long document costs what its view costs.
 const PAINT_MARGIN: usize = 2000;
@@ -35,8 +37,8 @@ impl EditorPanel {
         })
     }
 
-    /// Paint the `.tex` file's highlights (`highlights::paint`) around the
-    /// lines the editor shows.
+    /// Paint the `.tex` file's highlights (`highlights::paint`) and inline
+    /// colours (`inline_colors::paint`) around the lines the editor shows.
     pub(in crate::editor_panel) fn paint_highlights(&mut self, cx: &mut Context<Self>) {
         if self.toolbar_kind() != Some(Kind::Latex) {
             return;
@@ -44,10 +46,13 @@ impl EditorPanel {
         let dark = cx.palette().appearance == lattice_ui::Appearance::Dark;
         let shown = self.shown_bytes(cx);
         let buffer = self.buffer.read(cx);
-        let start = buffer.clip_offset(
-            shown.start.saturating_sub(PAINT_MARGIN),
-            language::Bias::Left,
-        );
+        // From a line's start, so a `%` comment is read whole.
+        let start = buffer.point_to_offset(language::Point::new(
+            buffer
+                .offset_to_point(shown.start.saturating_sub(PAINT_MARGIN))
+                .row,
+            0,
+        ));
         let end = buffer.clip_offset(
             (shown.end + PAINT_MARGIN).min(buffer.len()),
             language::Bias::Right,
@@ -56,6 +61,12 @@ impl EditorPanel {
         let version = buffer.version();
         let breaks = self.box_breaks(cx);
         let paint = highlights::paint(&text, start, dark, breaks);
+        let inked: Vec<Range<usize>> = if dark {
+            Vec::new()
+        } else {
+            paint.washes.iter().map(|wash| wash.range.clone()).collect()
+        };
+        let colors = inline_colors::paint(&text, start, dark, &inked);
         self.toolbar.painted_dark = Some(dark);
         self.toolbar.painted = paint.washes.len();
         self.toolbar.painted_window = start..end;
@@ -65,6 +76,7 @@ impl EditorPanel {
             lattice.set_highlights(PAINT, paint.washes, cx);
             lattice.set_marks(PAINT_MARKS, paint.marks, cx);
             lattice.set_inline_texts(PAINT_SWATCHES, paint.swatches, cx);
+            lattice.set_marks(PAINT_COLORS, colors, cx);
         });
     }
 

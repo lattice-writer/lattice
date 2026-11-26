@@ -19,3 +19,16 @@
   border-radius: 0;
   padding-inline: 3pt;
 }
+
+/* `\color` and `\textcolor` text in its colour (lattice#1328), made
+   readable for the editor's ground by `readableColor`
+   (latex-inline-colors.ts): the inner spans the syntax colours draw take it
+   too, as the passage prints in one colour. */
+.cm-tc,
+.cm-tc * {
+  color: var(--tc-light) !important;
+}
+:root[data-code-theme-kind="dark"] .cm-tc,
+:root[data-code-theme-kind="dark"] .cm-tc * {
+  color: var(--tc-dark) !important;
+}

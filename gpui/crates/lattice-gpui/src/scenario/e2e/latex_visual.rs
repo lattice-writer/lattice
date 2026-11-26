@@ -72,6 +72,8 @@ Visual citations~\\cite{e2evisual2024}, and its fifth page~\\cite[p.~5]{e2evisua
 
 A box set as TeX sets it, after enough prose to reach the end of a line, \\colorbox[HTML]{FFF1A6}{a highlighted passage kept on one line}, and soul's \\hl{highlighter}.
 
+Revisions in {\\color{blue} blue for the \\emph{editor}} and \\textcolor{red}{red for the reviewer}, unknown \\textcolor{myaccent}{left alone}.
+
 \\end{document}
 ";
 
@@ -98,6 +100,17 @@ const BOXES: &str = "JSON.stringify((() => { \
       lines: boxes[0] ? boxes[0].getClientRects().length : 0, \
       white_space: boxes[0] ? getComputedStyle(boxes[0]).whiteSpace : null, \
       fill: fill ? getComputedStyle(fill).backgroundColor : null }; })())";
+
+/// The page's inline colours (lattice#1328): each `\\color` and
+/// `\\textcolor` passage, drawn in the colour the theme's ground takes
+/// (`--tc-light` or `--tc-dark`), its inner spans in it too.
+const COLORS: &str = "JSON.stringify((() => { \
+    const dark = document.documentElement.dataset.codeThemeKind === 'dark'; \
+    const rgb = (hex) => `rgb(${parseInt(hex.slice(1, 3), 16)}, ${parseInt(hex.slice(3, 5), 16)}, ${parseInt(hex.slice(5, 7), 16)})`; \
+    return [...document.querySelectorAll('.cm-latex-visual .cm-tc')].map((mark) => { \
+      const want = rgb(mark.style.getPropertyValue(dark ? '--tc-dark' : '--tc-light').trim()); \
+      const drawn = [mark, ...mark.querySelectorAll('*')].map((node) => getComputedStyle(node).color); \
+      return { text: mark.textContent, want, drawn: drawn.every((color) => color === want) }; }); })())";
 
 impl Run {
     pub(super) async fn latex_visual(
@@ -294,6 +307,22 @@ impl Run {
                     .as_str()
                     .is_some_and(|fill| fill != "rgba(0, 0, 0, 0)" && fill != "transparent"),
             json!({ "boxes": boxes }),
+        );
+        let colors = self.evaluate(cx, &island, COLORS).await;
+        let texts: Vec<&str> = colors
+            .as_array()
+            .map(|marks| marks.iter().filter_map(|mark| mark["text"].as_str()).collect())
+            .unwrap_or_default();
+        steps.check(
+            "a \\color declaration to the end of its group and a \\textcolor's text are drawn in their colours, readable on the page's ground; an unknown colour is left alone",
+            texts.len() == 2
+                && texts[0].contains("blue for the")
+                && texts[0].contains("editor")
+                && texts[1] == "red for the reviewer"
+                && colors
+                    .as_array()
+                    .is_some_and(|marks| marks.iter().all(|mark| mark["drawn"] == true)),
+            json!({ "colors": colors }),
         );
         Some(island)
     }

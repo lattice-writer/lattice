@@ -45,6 +45,7 @@ import { LATEX_SHORTCUTS, type LatexShortcut } from "./latex-shortcuts";
 import { toggleLatexInline, toggleLatexMath, type FormatEdit } from "./latex-format-toggle";
 import { compactSearchPanel } from "./search-panel";
 import { highlightPaint } from "./latex-highlight-paint";
+import { inlineColorPaint } from "./latex-inline-colors";
 import { prefersReducedMotion } from "../../lib/reduced-motion";
 import type { CitationReasonData } from "./citation-reasons";
 import { citationReasons } from "./citation-reason-editor";
@@ -129,6 +130,8 @@ export type LatexEditorOptions = {
   onTexlabGoto?: (path: string, line: number, column?: number) => void;
   /** Draw each `\colorbox` as one unbreakable box, as TeX sets it (`highlightPaint`). */
   colorboxes?: boolean;
+  /** Paint `\color` and `\textcolor` text in its colour (`inlineColorPaint`). */
+  inlineColors?: boolean;
 };
 
 /**
@@ -438,6 +441,7 @@ export function latexEditorExtensions(options: LatexEditorOptions): Extension[] 
   return [
     ...textEditorExtensions(options.spellcheck ? "latex" : false, options.live, options.onPasteImage, currentPath),
     highlightPaint({ boxes: options.colorboxes }),
+    options.inlineColors ? inlineColorPaint() : [],
     reasons?.extension ?? [],
     citationTooltips(live, onGotoDefinition, reasonsContext),
     referenceTooltips(live, options.loadReferenceImage, onGotoDefinition),
