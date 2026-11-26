@@ -18,10 +18,12 @@ on:
     paths:
       - docs/guide/**
       - scripts/user-guide.mjs
+      - scripts/lib/util.mjs
       - .github/workflows/user-guide.yml
   workflow_dispatch:
 
-# A newer push to main replaces a publish that has not started yet.
+# A newer push to main cancels the run before it, started or not; each run
+# renders and pushes guide/ whole, so the newest one leaves the site right.
 concurrency:
   group: user-guide-${{ github.ref }}
   cancel-in-progress: true
@@ -49,7 +51,10 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    # Shares web-demo.yml's group: one push to gh-pages at a time.
+    # Shares web-demo.yml's group: one push to gh-pages at a time. GitHub
+    # keeps one pending job per group, so a guide publish queued behind
+    # another can replace a pending web-demo publish (and the reverse);
+    # docs/release-process.md says to check the demo after a release.
     concurrency:
       group: web-demo-publish
       cancel-in-progress: false
