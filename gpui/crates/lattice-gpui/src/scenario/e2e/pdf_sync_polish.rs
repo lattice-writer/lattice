@@ -4,7 +4,10 @@
 //! command table does; and a PDF of the project open in a tab says when it
 //! was removed, and takes the file back once it returns.
 
-use std::{path::Path, time::Duration};
+use std::{
+    path::Path,
+    time::{Duration, Instant},
+};
 
 use anyhow::{Result, anyhow};
 use gpui::AsyncApp;
@@ -139,7 +142,26 @@ impl Run {
     pub(super) async fn find_word_in(&self, cx: &mut AsyncApp, pdf: &Path, word: &str) -> Result<Option<Found>> {
         let engine = cx.update(PdfEngine::global).map_err(|error| anyhow!("{error}"))?;
         let doc = engine.new_document();
-        let info = engine.open(doc, std::fs::read(pdf)?).await??;
+        // latexmk writes the PDF in place, so a build that starts as a step
+        // reads it (an automatic one after an edit, or one an earlier step
+        // set off) leaves it missing or half written, and PDFium refuses it
+        // with FormatError: read it again until PDFium opens it, as the
+        // build that is writing it finishes.
+        let deadline = Instant::now() + Duration::from_secs(30);
+        let info = loop {
+            let opened = match std::fs::read(pdf) {
+                Ok(bytes) => engine.open(doc, bytes).await?,
+                Err(error) => Err(anyhow!(error)),
+            };
+            match opened {
+                Ok(info) => break info,
+                Err(_) if Instant::now() < deadline => self.pause(cx, Duration::from_millis(250)).await,
+                Err(error) => {
+                    engine.close(doc);
+                    return Err(error.context(format!("{} did not open", pdf.display())));
+                }
+            }
+        };
         let wanted: Vec<char> = word.chars().collect();
         let mut found = None;
         for page in 0..info.page_sizes.len() {
