@@ -274,7 +274,7 @@ export function localStages(tier, files, mergeBase, e2eNeed = macosNeeds(tier, f
  * first-parent line when everything since it is text and its trailer covers
  * the rest of the branch, or null with the reason printed.
  */
-export function docsOnlyPass(files, cwd = repo) {
+export function docsOnlyPass(files, cwd = repo, mergeBase = null) {
   const gate = findGate({ cwd });
   if (!gate) return null;
   const check = docsGate(gate, { cwd, worktree: true });
@@ -284,7 +284,7 @@ export function docsOnlyPass(files, cwd = repo) {
   }
   if (!check.files.length) return null;
   const rest = files.filter((file) => !check.files.includes(file));
-  const gap = Object.values(coveredJobs(check.cover, macosNeeds(ciTier(rest), rest))).find((group) => !group.covered);
+  const gap = Object.values(coveredJobs(check.cover, macosNeeds(ciTier(rest, { selector: !selectorListsEdited(mergeBase, rest) }), rest))).find((group) => !group.covered);
   if (gap) {
     console.log(`ci:local: no docs-only pass: the gate at ${gate.slice(0, 9)} does not cover the rest of the branch (${gap.reason})`);
     return null;
@@ -316,7 +316,7 @@ async function main() {
   }
   const started = Date.now();
   const { mergeBase, files } = changedFiles(options.base);
-  const docs = options.full ? null : docsOnlyPass(files);
+  const docs = options.full ? null : docsOnlyPass(files, repo, mergeBase);
   if (docs) {
     await docsOnlyMain({ docs, mergeBase, files, options, started });
     return;

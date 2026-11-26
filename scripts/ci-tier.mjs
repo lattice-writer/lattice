@@ -153,13 +153,6 @@ function gpuiIncludes() {
 }
 
 /**
- * The tier for these changed files: each job's flag, and the first files
- * that turned each on. When the only Vitest inputs that changed are files
- * tests name (a Rust source, a spec), `vitestFiles` lists just those tests
- * and the shards run them alone. `scan` carries what the git scans find;
- * tests pass their own.
- */
-/**
  * Whether the diff from `base` edits a line (not a comment) naming one of
  * the lists that decide what counts as the selector's change alone. Such a
  * diff takes every job (ciTier's `selector: false`), so a change never
@@ -176,6 +169,13 @@ export function selectorListsEdited(base, files) {
     .some((line) => /\b(CI_CONTROL|CI_CONTROL_TESTS|DOCS)\b/.test(line));
 }
 
+/**
+ * The tier for these changed files: each job's flag, and the first files
+ * that turned each on. When the only Vitest inputs that changed are files
+ * tests name (a Rust source, a spec), `vitestFiles` lists just those tests
+ * and the shards run them alone. `scan` carries what the git scans find;
+ * tests pass their own.
+ */
 export function ciTier(files, { full = false, scan = null, selector = true } = {}) {
   const jobs = Object.fromEntries(JOBS.map((job) => [job, full]));
   const why = Object.fromEntries(JOBS.map((job) => [job, full ? ["full run"] : []]));
@@ -323,7 +323,7 @@ function github() {
   // cover has to cover everything else the branch changes.
   const { cover, docsFiles, reason: docsRefused } = resolveCover(named, { cwd: repo });
   const gated = files.filter((file) => !docsFiles.includes(file));
-  const local = coveredJobs(cover, macosNeeds(docsFiles.length ? ciTier(gated) : tier, gated));
+  const local = coveredJobs(cover, macosNeeds(docsFiles.length ? ciTier(gated, { selector: !selectorListsEdited(base, gated) }) : tier, gated));
   const windows = windowsE2e(tier.gpuiFiles, { full: tier.full || (event === "push" && branch === "main") });
   const linux = linuxE2e(tier.gpuiFiles, { full: tier.full || (event === "push" && branch === "main") });
   const groups = { rust: "Rust", gpui: "GPUI", webkit: "WebKit benchmark" };
