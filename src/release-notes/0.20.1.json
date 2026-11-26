@@ -1,0 +1,102 @@
+{
+  "version": "0.20.1",
+  "date": "2026-11-26",
+  "highlights": [
+    {
+      "icon": "git",
+      "title": {
+        "en": "Overleaf sync that comes back on its own",
+        "zh": "Overleaf 同步会自己恢复"
+      },
+      "body": {
+        "en": "In the native Lattice, Overleaf sync picks up again by itself after your Mac sleeps: the live connection counts the time asleep and joins again on wake, instead of leaving files at \"Syncing is paused for this file\". When the network changes under it, such as Wi-Fi to Ethernet or a VPN going up or down, Lattice checks the connection with a quick probe and joins again only if it has gone silent. An edit whose answer never comes on a silent connection ends that connection, and the edit is checked again on the new one. When Overleaf answers \"too many requests\", live sync waits out a cool-down instead of showing an error, and copies of Lattice that dropped together no longer all join again at the same moment.",
+        "zh": "在原生 Lattice 中，Mac 睡眠唤醒后 Overleaf 同步会自己接上：实时连接会把睡眠的时间也算进去，唤醒后重新加入，不再让文件停在「暂停同步」。网络在底下切换时，例如从 Wi-Fi 换到有线网络，或 VPN 连上、断开，Lattice 会先用一次快速探测检查连接，只有连接已经没有回应时才重新加入。在没有回应的连接上迟迟等不到答复的编辑会结束这条连接，并在新连接上重新核对。Overleaf 回复「请求过多」时，实时同步会等过一段冷却时间，而不是报错；同时掉线的多个 Lattice 也不再在同一时刻一起重新加入。"
+      }
+    },
+    {
+      "icon": "undo",
+      "title": {
+        "en": "Pause and resume Overleaf sync where you look",
+        "zh": "在你常看的地方暂停和恢复 Overleaf 同步"
+      },
+      "body": {
+        "en": "While a project's sync is paused, the status bar reads Saved, sync paused, and its menu offers Resume syncing; on a syncing project it offers Pause syncing. The project menu and the command palette (⌘K) have Pause Overleaf sync and Resume Overleaf sync. Resuming syncs at once, and edits made on both sides while paused are merged, so nothing is overwritten.",
+        "zh": "项目的同步暂停时，状态栏显示「已保存，同步已暂停」，它的菜单里有「继续同步」；正在同步的项目则提供「暂停同步」。项目菜单和命令面板（⌘K）里有「暂停 Overleaf 同步」和「恢复 Overleaf 同步」。恢复后会立即同步，暂停期间两边做的修改会合并，不会有内容被覆盖。"
+      }
+    },
+    {
+      "icon": "message",
+      "title": {
+        "en": "Comment on Overleaf from the source editor",
+        "zh": "在源码编辑器里直接评论到 Overleaf"
+      },
+      "body": {
+        "en": "In a project linked to Overleaf, Comment on Overleaf in the selection toolbar starts a comment on the passage that your co-authors see on Overleaf; Annotate still saves a note of your own. A saved note gets Share to Overleaf, which posts it as a comment on its passage, and a note's text can now be selected and copied (#1290).",
+        "zh": "在关联了 Overleaf 的项目里，选区工具栏中的「评论到 Overleaf」会在这段文字上发起一条合作者在 Overleaf 上能看到的评论；「批注」仍然只保存你自己的笔记。已保存的笔记多了「分享到 Overleaf」，可以把它作为评论发到对应的段落上；笔记的文字现在也可以选中和复制（#1290）。"
+      }
+    },
+    {
+      "icon": "bot",
+      "title": {
+        "en": "Let the Agent work in the folder around your manuscript",
+        "zh": "让 AI 助手在稿件所在的整个文件夹里工作"
+      },
+      "body": {
+        "en": "When you open a folder that holds one Lattice project, such as ProjectA with ProjectA/Manuscript inside, Lattice asks whether to open Manuscript with the whole folder available to the Agent, or to make the folder a project of its own. The first keeps the manuscript's one history and its builds where they are, and lets the Agent read the analysis scripts beside it. Settings › Agent shows the choice under Agent's folder and can undo it, and the project menu shows where History, Builds and the Agent work (#1293).",
+        "zh": "打开一个只包含一个 Lattice 项目的文件夹时，例如里面有 ProjectA/Manuscript 的 ProjectA，Lattice 会问你：是打开 Manuscript 并让 AI 助手可以使用整个文件夹，还是「将此文件夹设为独立项目」。选前者时，稿件仍保持唯一的一份历史，编译结果也留在原处，AI 助手则可以读取旁边的分析脚本。设置 › AI 助手 中的「AI 助手的文件夹」会显示这个选择，也可以撤销；项目菜单会显示历史、编译和 AI 助手各在哪里工作（#1293）。"
+      }
+    },
+    {
+      "icon": "feather",
+      "title": {
+        "en": "Coloured boxes and coloured text look as they print",
+        "zh": "彩色方框和彩色文字与打印效果一致"
+      },
+      "body": {
+        "en": "In the native Lattice's visual view, a \\colorbox is drawn as one box that never breaks across lines, as in the PDF, instead of a highlight that wraps from line to line (#1327). The visual Markdown editor shows inline text colours written as <span style=\"color: …\">, so red and blue revisions stay visible, and saves them exactly as written (#831).",
+        "zh": "在原生 Lattice 的可视视图中，\\colorbox 会像 PDF 里一样画成一个不会跨行断开的方框，而不是逐行换行的高亮（#1327）。可视 Markdown 编辑器会显示用 <span style=\"color: …\"> 写的行内文字颜色，红色、蓝色的修订一目了然，并按原样保存（#831）。"
+      }
+    },
+    {
+      "icon": "menu",
+      "title": {
+        "en": "A user guide for the native app, in English and Chinese",
+        "zh": "原生版本的使用指南，中英双语"
+      },
+      "body": {
+        "en": "The guide was checked against the native Lattice, grouped by task, given new screenshots and searchable in both languages. Help › User Guide opens it, and opens the copy that comes with Lattice when the website can't be reached.",
+        "zh": "使用指南已对照原生 Lattice 逐页核对，按任务分组，换上新截图，并支持中英文搜索。「帮助 › 使用指南」会打开它；网站无法访问时，会打开 Lattice 自带的那份。"
+      }
+    }
+  ],
+  "fixes": [
+    {
+      "en": "Overleaf sync no longer risks replacing a file with an empty copy from Overleaf when your computer's clock is more than 10 minutes behind Overleaf's. Lattice now reads Overleaf's time from each answer and dates its own uploads by it. This applies to both the native and the classic app.",
+      "zh": "当电脑时钟比 Overleaf 慢 10 分钟以上时，Overleaf 同步不再可能用 Overleaf 上的空副本替换你的文件。Lattice 现在会从每次答复中读取 Overleaf 的时间，并按它给自己的上传记时。原生版本和经典版本都包含这个修复。"
+    },
+    {
+      "en": "In the native Lattice, the PDF stays sharp while you type at high zoom: past about 175%, the live preview is drawn at full size instead of being stretched over the page.",
+      "zh": "在原生 Lattice 中，高倍缩放时一边输入 PDF 也保持清晰：超过约 175% 后，实时预览会按实际尺寸绘制，不再被拉伸到页面上。"
+    },
+    {
+      "en": "In the native Lattice's terminal, Tab and Shift+Tab go to the shell, so Tab completes a command instead of moving out of the terminal (#1272).",
+      "zh": "在原生 Lattice 的终端里，Tab 和 Shift+Tab 会交给 shell，所以 Tab 会补全命令，而不是跳出终端（#1272）。"
+    },
+    {
+      "en": "The Agent's bundled runtime no longer re-reads old Claude Code transcripts every 30 seconds for its usage figures, which caused short bursts of high CPU for heavy Claude Code users (#1247).",
+      "zh": "AI 助手自带的运行时不再每 30 秒重新读取旧的 Claude Code 对话记录来计算用量，这曾让大量使用 Claude Code 的用户出现短暂的高 CPU 占用（#1247）。"
+    },
+    {
+      "en": "Confirmation dialogs that list many files, such as Overleaf's, now fit the window and scroll, so their buttons stay on screen.",
+      "zh": "列出很多文件的确认对话框（例如 Overleaf 的）现在会限制在窗口之内并可滚动，按钮始终留在屏幕上。"
+    },
+    {
+      "en": "In the native Lattice, Add your first paper in an empty Papers panel opens Add papers (#1280).",
+      "zh": "在原生 Lattice 中，空的论文面板里点「添加第一篇论文」会打开「添加论文」（#1280）。"
+    },
+    {
+      "en": "On Windows and Linux, reveal actions name the system's file manager instead of Finder, and the title bar no longer leaves room for the Mac's window buttons.",
+      "zh": "在 Windows 和 Linux 上，「显示所在位置」类操作会写出系统的文件管理器而不是「访达」，标题栏也不再给 Mac 的窗口按钮留位置。"
+    }
+  ]
+}
