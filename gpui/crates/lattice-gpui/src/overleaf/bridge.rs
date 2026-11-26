@@ -197,6 +197,8 @@ pub struct OverleafBridge {
     rate_limited_until: Option<Instant>,
     /// Automatic syncs Overleaf answered 429 in a row.
     rate_limits: u32,
+    /// Counts a 429's cool-down down and sends the owed sync at its end.
+    cooldown_task: Option<Task<()>>,
     /// Files the writer chose to keep on Overleaf when asked, for the
     /// session: the safe side of forgetting is a file left on Overleaf.
     declined_deletes: HashSet<(PathBuf, String)>,
@@ -271,6 +273,7 @@ impl OverleafBridge {
             last_auto_sync: None,
             rate_limited_until: None,
             rate_limits: 0,
+            cooldown_task: None,
             declined_deletes: HashSet::new(),
             sync_task: None,
             sync_trace: None,
@@ -379,6 +382,7 @@ impl OverleafBridge {
         self.refusals = 0;
         self.rate_limited_until = None;
         self.rate_limits = 0;
+        self.cooldown_task = None;
         self.entities.clear();
         self.entity_list = None;
         self.review_reset();

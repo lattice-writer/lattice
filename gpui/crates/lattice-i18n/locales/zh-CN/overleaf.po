@@ -46,6 +46,10 @@ msgstr "这是讨论中唯一的消息，因此会删除整个讨论。此操作
 msgid "Its span was deleted from the document."
 msgstr "它所在的文字已从文档中删除。"
 
+#: lattice-gpui/src/overleaf/bridge/finished.rs
+msgid "Overleaf asked to wait, retrying in {seconds} s"
+msgstr "Overleaf 要求稍候，{seconds} 秒后重试"
+
 #: lattice-gpui/src/shell/commands/projects.rs
 #: lattice-gpui/src/titlebar/project_menu.rs
 msgid "Pause Overleaf sync"

@@ -39,6 +39,24 @@ fn rate_limit_cooldown(rate_limits: u32, retry_after: Option<Duration>) -> Durat
         .clamp(RATE_LIMIT_COOLDOWN, RATE_LIMIT_COOLDOWN_MAX)
 }
 
+/// What the sync status says at `now` while a 429's cool-down runs until
+/// `until`, in whole seconds rounded up so it never reads 0 s while it still
+/// waits; nothing once it is over.
+fn cooldown_status_at(until: Option<Instant>, now: Instant) -> Option<String> {
+    let left = until?.saturating_duration_since(now);
+    if left.is_zero() {
+        return None;
+    }
+    let seconds = left.as_secs() + u64::from(left.subsec_nanos() > 0);
+    Some(
+        t!(
+            "Overleaf asked to wait, retrying in {seconds} s",
+            seconds = seconds
+        )
+        .to_string(),
+    )
+}
+
 impl OverleafBridge {
     /// A failed sync is owed again, quietly, for a scenario's checks.
     #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
@@ -46,11 +64,16 @@ impl OverleafBridge {
         self.transport_retry
     }
 
-    /// What is left of a 429's cool-down, for a scenario's checks.
-    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+    /// What is left of a 429's cool-down.
     pub fn rate_limit_left(&self) -> Option<Duration> {
         self.rate_limited_until
             .map(|until| until.saturating_duration_since(Instant::now()))
+    }
+
+    /// The sync status while a 429's cool-down holds live mode's syncs:
+    /// waiting, and for how long, rather than idle.
+    pub fn cooldown_status(&self) -> Option<String> {
+        cooldown_status_at(self.rate_limited_until, Instant::now())
     }
 }
 
@@ -263,6 +286,7 @@ impl OverleafBridge {
             self.rate_limits += 1;
             let cooldown = rate_limit_cooldown(self.rate_limits, outcome::retry_after(&error));
             self.rate_limited_until = Some(Instant::now() + cooldown);
+            self.cooldown_task = Some(self.wait_out_cooldown(cx));
         }
         let retryable = outcome::is_transient_transport_failure(&error)
             || (rate_limited && self.rate_limits != RATE_LIMIT_RETRIES)
@@ -345,5 +369,32 @@ mod tests {
             rate_limit_cooldown(1, secs(86_400)),
             RATE_LIMIT_COOLDOWN_MAX
         );
+    }
+
+    #[test]
+    fn a_cool_down_says_it_is_waiting_and_counts_the_seconds_down() {
+        let start = Instant::now();
+        let until = Some(start + Duration::from_secs(40));
+        let at = |millis| cooldown_status_at(until, start + Duration::from_millis(millis));
+        assert_eq!(
+            at(0).as_deref(),
+            Some("Overleaf asked to wait, retrying in 40 s")
+        );
+        assert_eq!(
+            at(800).as_deref(),
+            Some("Overleaf asked to wait, retrying in 40 s")
+        );
+        assert_eq!(
+            at(10_000).as_deref(),
+            Some("Overleaf asked to wait, retrying in 30 s")
+        );
+        // Never 0 s while it still waits.
+        assert_eq!(
+            at(39_900).as_deref(),
+            Some("Overleaf asked to wait, retrying in 1 s")
+        );
+        assert_eq!(at(40_000), None);
+        assert_eq!(at(45_000), None);
+        assert_eq!(cooldown_status_at(None, start), None);
     }
 }

@@ -529,20 +529,7 @@ impl OverleafBridge {
         let owed = self.transport_retry || self.local_pending;
         let since_last = self.last_auto_sync.map(|last| last.elapsed());
         if owed && gap_elapsed {
-            let held = std::mem::take(&mut self.whole_files.boundary);
-            self.sync(
-                SyncOptions {
-                    automatic: true,
-                    include_whole_files: held.clone(),
-                    ..Default::default()
-                },
-                cx,
-            );
-            // Not started (a sync began since the probe): they wait for the
-            // next retry rather than being dropped.
-            if !self.syncing {
-                self.whole_files.boundary.extend(held);
-            }
+            self.retry_owed(cx);
         } else if !version_known {
             // No change signal: sync on a slow clock instead.
             if since_last.is_none_or(|since| since >= BLIND_POLL) {
@@ -564,6 +551,59 @@ impl OverleafBridge {
                 cx,
             );
         }
+    }
+
+    /// Send the sync that is owed, with the whole-file documents held for it.
+    fn retry_owed(&mut self, cx: &mut Context<Self>) {
+        let held = std::mem::take(&mut self.whole_files.boundary);
+        self.sync(
+            SyncOptions {
+                automatic: true,
+                include_whole_files: held.clone(),
+                ..Default::default()
+            },
+            cx,
+        );
+        // Not started (a sync began since the probe): they wait for the
+        // next retry rather than being dropped.
+        if !self.syncing {
+            self.whole_files.boundary.extend(held);
+        }
+    }
+
+    /// Redraw the cool-down's countdown each time its seconds change, and
+    /// send what it holds the moment it is over: left to the poll, it went
+    /// at the poll's next turn, up to 45 s later with the channel up.
+    pub(super) fn wait_out_cooldown(&mut self, cx: &mut Context<Self>) -> Task<()> {
+        cx.spawn(async move |this, cx| {
+            loop {
+                let left = this
+                    .update(cx, |this, cx| {
+                        cx.notify();
+                        this.rate_limit_left()
+                    })
+                    .ok()
+                    .flatten()
+                    .unwrap_or_default();
+                if left.is_zero() {
+                    break;
+                }
+                let fraction = Duration::from_nanos(u64::from(left.subsec_nanos()));
+                let step = if fraction.is_zero() {
+                    Duration::from_secs(1)
+                } else {
+                    fraction
+                };
+                cx.background_executor().timer(step.min(left)).await;
+            }
+            this.update(cx, |this, cx| {
+                let owed = this.transport_retry || this.local_pending;
+                if this.mode == OverleafSyncMode::Live && owed && this.gap_left().is_zero() {
+                    this.retry_owed(cx);
+                }
+            })
+            .ok();
+        })
     }
 
     /// Manual mode only badges incoming work; a check that cannot run leaves
