@@ -98,7 +98,7 @@ import { FULL, RELEASE_PATHS, coveredJobs, docsGate, findGate, formatTrailer, ma
 import { JOBS, ciTier, knownFailuresInert, selectorListsEdited } from "./ci-tier.mjs";
 import { changedFiles, gateStages, runStages } from "./gate-changed.mjs";
 import { ancestorBaseline, readBaseline } from "./gpui-e2e-light.mjs";
-import { CHUNKS, baselineDir } from "./gpui-main-baseline.mjs";
+import { CHUNKS, CHUNKS_BUDGET_MS, baselineDir } from "./gpui-main-baseline.mjs";
 import { isMain } from "./lib/util.mjs";
 import { extraStages } from "./signoff.mjs";
 
@@ -114,6 +114,9 @@ const INAPP_WAIT_S = 3600;
 // excused by it; the nightly records one a day, and a merge base further back
 // records its own first.
 const OLDER_BASELINE_MAX = 30;
+// What gpui-main-baseline.mjs runs its build as under --chunks: a script with
+// it builds outside the in-app lock as an `inapp-lock build` (mainBaselineStage).
+export const CHUNKED_BUILD = '"build", "--", "node", "scripts/gpui-build.mjs"';
 
 /**
  * Runs a windowed stage under the in-app lock. Waiting for the lock to be free
@@ -221,10 +224,13 @@ function mainBaselineStage(mergeBase, verdict = null) {
   const worktree = path.join(baselineDir(), "..", `ci-local-main-${process.pid}`);
   // It takes the in-app lock itself, per chunk of the e2e, so main's gate and
   // build run without it (27-40 min holds when the whole run held it, LATA-104).
-  // A merge base from before --chunks (#1298) runs whole under the lock.
+  // A merge base whose script still builds bare under --chunks (before this
+  // change) runs whole under the lock, so no quiet holder measures beside its build.
   const lock = `"${path.join(repo, "scripts", "inapp-lock")}" --thread "ci:local gpui-main $2" --wait ${INAPP_WAIT_S} --kind e2e --`;
-  const record = `git worktree remove --force "$1" 2>/dev/null; git worktree add --detach "$1" "$2" && (cd "$1" && if grep -q '"--chunks"' scripts/gpui-main-baseline.mjs; then node scripts/gpui-main-baseline.mjs --sha "$2" --chunks ${CHUNKS}; else ${lock} node scripts/gpui-main-baseline.mjs --sha "$2"; fi); status=$?; git worktree remove --force "$1"`;
-  const timeout = 3_600_000 + INAPP_WAIT_S * 1000;
+  const record = `git worktree remove --force "$1" 2>/dev/null; git worktree add --detach "$1" "$2" && (cd "$1" && if grep -qF '${CHUNKED_BUILD}' scripts/gpui-main-baseline.mjs; then node scripts/gpui-main-baseline.mjs --sha "$2" --chunks ${CHUNKS}; else ${lock} node scripts/gpui-main-baseline.mjs --sha "$2"; fi); status=$?; git worktree remove --force "$1"`;
+  // The script's own bounds (the gate's 45 min, the build's 90, the chunks'
+  // budget), so it writes its record and the worktree comes off before this kills it.
+  const timeout = (45 + 90 + 5) * 60_000 + CHUNKS_BUDGET_MS;
   if (!verdict) {
     return {
       name: "gpui-main",

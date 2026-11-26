@@ -1,10 +1,10 @@
 // @vitest-environment node
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { docsStages, holderRunsE2e, holdingInappLock, localStages } from "./ci-local.mjs";
+import { CHUNKED_BUILD, docsStages, holderRunsE2e, holdingInappLock, localStages } from "./ci-local.mjs";
 import { CHUNKS } from "./gpui-main-baseline.mjs";
 import { ciTier } from "./ci-tier.mjs";
 import { runStages } from "./gate-changed.mjs";
@@ -70,6 +70,15 @@ describe.skipIf(process.platform === "win32")("ci:local", () => {
       const [main] = order();
       expect(main.locksItself).toBe(true);
       expect(main.args[1]).toContain(`--chunks ${CHUNKS}`);
+      // A merge base whose script builds bare runs whole under the lock instead.
+      const script = (text) => {
+        const file = path.join(dir, "gpui-main-baseline.mjs");
+        writeFileSync(file, text);
+        return spawnSync("sh", ["-c", `grep -qF '${CHUNKED_BUILD}' "$1"`, "sh", file]).status;
+      };
+      expect(script(readFileSync(path.join(repo, "scripts", "gpui-main-baseline.mjs"), "utf8"))).toBe(0);
+      expect(script('const buildRun = await run("node", ["scripts/gpui-build.mjs"], {}); if (arg === "--chunks") {}')).toBe(1);
+      expect(main.args[1]).toContain("--kind e2e -- node scripts/gpui-main-baseline.mjs");
       spawnSync("mkdir", ["-p", path.join(dir, "main-baseline")]);
       writeFileSync(path.join(dir, "main-baseline", `known-failures@${parent}.json`), JSON.stringify({ sha: parent, e2e: { failing: [] } }));
       expect(order().map((stage) => [stage.name, stage.rescues])).toEqual([["gpui-e2e", undefined], ["gpui-main", "gpui-e2e"]]);
