@@ -79,7 +79,7 @@ fn agent_folder(
         .take(lattice_core::project::AGENT_FOLDER_MAX_LEVELS)
     {
         if !lattice_core::project::may_widen_to(folder) {
-            break;
+            continue;
         }
         options.push((levels, format!("{}/", folder_name(folder)).into()));
     }

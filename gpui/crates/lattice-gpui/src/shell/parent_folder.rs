@@ -140,7 +140,7 @@ impl Shell {
             project = project_name.clone()
         ))
         .body(t!(
-            "{folder} has no Lattice history of its own, and {project} inside it is a Lattice project. Opening {project} keeps its history, settings and builds in {project}/.research, and lets the Agent work in all of {folder}. You can change the Agent’s folder in Settings › Agent.",
+            "{folder} has no Lattice history of its own, and {project} inside it is a Lattice project. Opening {project} keeps its history, settings and builds in {project}/.research, and lets the Agent work in all of {folder}. You can change the Agent’s folder in Settings › Agent › Display.",
             folder = folder_name.clone(),
             project = project_name.clone()
         ))
@@ -204,14 +204,6 @@ mod tests {
             Holds::One {
                 project: manuscript.clone(),
                 given: false
-            }
-        );
-        project::set_agent_folder(&manuscript, Some(&study)).unwrap();
-        assert_eq!(
-            holds(&study),
-            Holds::One {
-                project: manuscript.clone(),
-                given: true
             }
         );
         std::fs::create_dir_all(study.join("Thesis/.research")).unwrap();

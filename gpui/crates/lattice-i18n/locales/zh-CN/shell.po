@@ -162,8 +162,8 @@ msgid "Writing layout"
 msgstr "写作布局"
 
 #: lattice-gpui/src/shell/parent_folder.rs
-msgid "{folder} has no Lattice history of its own, and {project} inside it is a Lattice project. Opening {project} keeps its history, settings and builds in {project}/.research, and lets the Agent work in all of {folder}. You can change the Agent’s folder in Settings › Agent."
-msgstr "{folder} 没有自己的 Lattice 历史记录，而其中的 {project} 是一个 Lattice 项目。打开 {project} 会把历史记录、设置和构建保留在 {project}/.research 中，并让 AI 助手可以在整个 {folder} 中工作。你可以在“设置 › AI 助手”中更改 AI 助手的文件夹。"
+msgid "{folder} has no Lattice history of its own, and {project} inside it is a Lattice project. Opening {project} keeps its history, settings and builds in {project}/.research, and lets the Agent work in all of {folder}. You can change the Agent’s folder in Settings › Agent › Display."
+msgstr "{folder} 没有自己的 Lattice 历史记录，而其中的 {project} 是一个 Lattice 项目。打开 {project} 会把历史记录、设置和构建保留在 {project}/.research 中，并让 AI 助手可以在整个 {folder} 中工作。你可以在“设置 › AI 助手 › 显示”中更改 AI 助手的文件夹。"
 
 #: lattice-gpui/src/shell/pdf_notes.rs
 msgid "{name} is opening live with Overleaf beside the PDF. Comment again once it has opened."
