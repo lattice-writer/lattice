@@ -1,3 +1,7 @@
+#: lattice-gpui/src/pdf/review_sheet/view.rs
+msgid "1 note is in {document}, which this PDF does not show."
+msgstr "1 条批注在 {document} 中，此 PDF 不包含它。"
+
 #: lattice-gpui/src/pdf/panel.rs
 msgid "Build the project, or pick a PDF in the file tree"
 msgstr "编译项目，或在文件树中选择一个 PDF"
@@ -5,6 +9,10 @@ msgstr "编译项目，或在文件树中选择一个 PDF"
 #: lattice-gpui/src/pdf/panel.rs
 msgid "Build this document"
 msgstr "编译此文档"
+
+#: lattice-gpui/src/pdf/review_sheet/view.rs
+msgid "Build {document}"
+msgstr "编译 {document}"
 
 #: lattice-gpui/src/pdf/panel.rs
 msgid "Could not open the PDF in a new window"
@@ -33,3 +41,7 @@ msgstr "PDF 无法读取：{0}"
 #: lattice-gpui/src/pdf/panel.rs
 msgid "The PDFium worker stopped."
 msgstr "PDFium 渲染进程已停止。"
+
+#: lattice-gpui/src/pdf/review_sheet/view.rs
+msgid "{count} notes are in {document}, which this PDF does not show."
+msgstr "{count} 条批注在 {document} 中，此 PDF 不包含它们。"

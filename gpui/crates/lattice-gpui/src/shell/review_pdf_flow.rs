@@ -42,7 +42,6 @@ impl Shell {
             return;
         };
         let view = view.unwrap_or_else(|| self.pdf.read(cx).live_view().clone());
-        let source = view.read(cx).review_source();
         let notes: Vec<_> = store::try_store(cx)
             .map(|store| {
                 store
@@ -54,13 +53,28 @@ impl Shell {
             })
             .unwrap_or_default();
         let author = store::author(&root, cx).name;
-        let sheet = cx.new(|cx| ReviewSheet::new(source, notes, author, cx));
-        let subscription = cx.subscribe_in(&sheet, window, |this, _, event, _, cx| match event {
-            ReviewSheetEvent::Close => {
-                this.parts.get_mut::<ReviewFlow>().sheet = None;
-                cx.notify();
-            }
-        });
+        let sheet = cx.new(|cx| ReviewSheet::new(&view, notes, author, cx));
+        let subscription =
+            cx.subscribe_in(
+                &sheet,
+                window,
+                move |this, _, event, window, cx| match event {
+                    ReviewSheetEvent::Close => {
+                        this.parts.get_mut::<ReviewFlow>().sheet = None;
+                        cx.notify();
+                    }
+                    // A build compiles the root of the file in front, so the root
+                    // asked for opens first; the sheet stays up over it.
+                    ReviewSheetEvent::Build(document) => {
+                        if this
+                            .open_path(root.join(document), None, window, cx)
+                            .is_some()
+                        {
+                            this.build(&super::Build, window, cx);
+                        }
+                    }
+                },
+            );
         self.parts.get_mut::<ReviewFlow>().sheet = Some((sheet, subscription));
         cx.notify();
     }

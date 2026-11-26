@@ -90,6 +90,13 @@ pub fn choose_document(root: &Path, open_document: Option<&str>) -> Result<(Stri
     let document = compiled_document(root, &manifest)?;
     Ok((document, compile_root::is_one_off_root(root)))
 }
+/// The document a build with `open_document` in the editor would compile,
+/// without recording anything as [`choose_document`] does: the file's own
+/// root when it is one, the root that reads it when the default does not,
+/// else the default.
+pub fn build_document(root: &Path, open_document: Option<&str>) -> Result<String, String> {
+    compile_root::build_target(root, &project::read_manifest(root)?, open_document)
+}
 pub(crate) use build_log::{is_pass_noise_warning, unwrap_log_lines};
 pub use build_steps::{BuildStep, BuildSteps};
 pub use changes::{

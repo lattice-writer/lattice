@@ -12,9 +12,10 @@ use std::{collections::HashSet, path::PathBuf};
 
 use chrono::{DateTime, Local};
 use gpui::{
-    AnyElement, AppContext as _, Context, EventEmitter, FontWeight, InteractiveElement as _,
-    IntoElement, ParentElement as _, Render, SharedString, StatefulInteractiveElement as _,
-    Styled as _, Task, Window, div, prelude::FluentBuilder as _, px,
+    AnyElement, AppContext as _, Context, Entity, EventEmitter, FontWeight,
+    InteractiveElement as _, IntoElement, ParentElement as _, Render, SharedString,
+    StatefulInteractiveElement as _, Styled as _, Subscription, Task, Window, div,
+    prelude::FluentBuilder as _, px,
 };
 use lattice_core::{
     project::EditorComment,
@@ -28,7 +29,7 @@ use lattice_ui::{
 };
 
 use super::{
-    ReviewSource,
+    PdfView, ReviewSource,
     review_place::{ReviewPlacement, review_file_name, separate_notes, short_quote},
 };
 use crate::annotations::{
@@ -42,6 +43,9 @@ const COVER_ID: &str = "review-cover";
 /// What the sheet asks of the window.
 pub enum ReviewSheetEvent {
     Close,
+    /// Build this root document, whose PDF has a place for notes this one
+    /// leaves unplaced.
+    Build(String),
 }
 
 pub struct ReviewSheet {
@@ -51,20 +55,26 @@ pub struct ReviewSheet {
     notes: Vec<EditorComment>,
     author: String,
     placements: Option<Vec<ReviewPlacement>>,
+    /// Root documents other than this PDF's that typeset unplaced notes,
+    /// each with how many.
+    elsewhere: Vec<(String, usize)>,
+    /// The root asked to be built, until its PDF is the one on screen.
+    building: Option<String>,
     selected: HashSet<String>,
     with_replies: bool,
     busy: bool,
     error: Option<SharedString>,
     _placing: Option<Task<()>>,
+    _view: Subscription,
 }
 
 impl EventEmitter<ReviewSheetEvent> for ReviewSheet {}
 
 impl ReviewSheet {
-    /// The sheet over `source`, for `annotations` (the local ones; an
+    /// The sheet over `view`'s PDF, for `annotations` (the local ones; an
     /// Overleaf thread has no number), signed by `author`.
     pub fn new(
-        source: Option<ReviewSource>,
+        view: &Entity<PdfView>,
         annotations: Vec<EditorComment>,
         author: String,
         cx: &mut Context<Self>,
@@ -74,37 +84,95 @@ impl ReviewSheet {
             .filter(|note| note.number > 0)
             .collect();
         notes.sort_by_key(|note| note.number);
-        let placing = source.clone().filter(|_| !notes.is_empty()).map(|source| {
-            let wanted = notes.clone();
-            let placing = cx.background_spawn(async move { source.place(&wanted) });
-            cx.spawn(async move |this, cx| {
-                let placed = placing.await;
-                this.update(cx, |this, cx| {
-                    // What a collaborator should see: every open note on the PDF.
-                    this.selected = this
-                        .notes
-                        .iter()
-                        .zip(&placed)
-                        .filter(|(note, place)| !note.resolved && place.page().is_some())
-                        .map(|(note, _)| note.id.clone())
-                        .collect();
-                    this.placements = Some(placed);
-                    cx.notify();
-                })
-                .ok();
-            })
+        // Once the root asked for is built and shown, its notes are placed
+        // on it.
+        let observing = cx.observe(view, |this: &mut Self, view, cx| {
+            let Some(wanted) = this.building.clone() else {
+                return;
+            };
+            let Some(source) = view
+                .read(cx)
+                .review_source()
+                .filter(|source| source.shows(&wanted))
+            else {
+                return;
+            };
+            this.building = None;
+            this.source = Some(source);
+            this.place(cx);
         });
-        Self {
-            source,
+        let mut sheet = Self {
+            source: view.read(cx).review_source(),
             notes,
             author,
             placements: None,
+            elsewhere: Vec::new(),
+            building: None,
             selected: HashSet::new(),
             with_replies: true,
             busy: false,
             error: None,
-            _placing: placing,
-        }
+            _placing: None,
+            _view: observing,
+        };
+        sheet.place(cx);
+        sheet
+    }
+
+    /// Find each note on the PDF, off the main thread, and tick the open
+    /// ones it places.
+    fn place(&mut self, cx: &mut Context<Self>) {
+        self.placements = None;
+        self.elsewhere.clear();
+        self._placing = self
+            .source
+            .clone()
+            .filter(|_| !self.notes.is_empty())
+            .map(|source| {
+                let wanted = self.notes.clone();
+                let placing = cx.background_spawn(async move {
+                    let placed = source.place(&wanted);
+                    let elsewhere = source.elsewhere(&wanted, &placed);
+                    (placed, elsewhere)
+                });
+                cx.spawn(async move |this, cx| {
+                    let (placed, elsewhere) = placing.await;
+                    this.update(cx, |this, cx| {
+                        // What a collaborator should see: every open note on the PDF.
+                        this.selected = this
+                            .notes
+                            .iter()
+                            .zip(&placed)
+                            .filter(|(note, place)| !note.resolved && place.page().is_some())
+                            .map(|(note, _)| note.id.clone())
+                            .collect();
+                        this.placements = Some(placed);
+                        this.elsewhere = elsewhere;
+                        cx.notify();
+                    })
+                    .ok();
+                })
+            });
+        cx.notify();
+    }
+
+    /// Ask the window to build `document`; its notes are placed once its
+    /// PDF is shown.
+    fn build(&mut self, document: String, cx: &mut Context<Self>) {
+        self.building = Some(document.clone());
+        cx.emit(ReviewSheetEvent::Build(document));
+        cx.notify();
+    }
+
+    /// The other roots unplaced notes belong to, each with how many, once
+    /// placed, for a scenario.
+    pub fn elsewhere(&self) -> &[(String, usize)] {
+        &self.elsewhere
+    }
+
+    /// Press the hint's build button for `document`, for a scenario.
+    pub fn build_for_scenario(&mut self, document: &str, cx: &mut Context<Self>) {
+        self.build(document.to_string(), cx);
     }
 
     fn placement(&self, ix: usize) -> Option<&ReviewPlacement> {

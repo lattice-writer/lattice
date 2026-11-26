@@ -81,6 +81,13 @@ impl ReviewSheet {
             .map(|(ix, note)| self.row(ix, &note, &placements[ix], cx))
             .collect();
         let has_replies = chosen.iter().any(|ix| !self.notes[*ix].replies.is_empty());
+        let hints: Vec<AnyElement> = self
+            .elsewhere
+            .clone()
+            .into_iter()
+            .enumerate()
+            .map(|(ix, (document, count))| self.elsewhere_hint(ix, document, count, cx))
+            .collect();
         let view = cx.entity().downgrade();
         div()
             .flex()
@@ -94,6 +101,7 @@ impl ReviewSheet {
                     .text_color(palette.danger)
                     .child(error)
             }))
+            .children(hints)
             .child(div().px(SPACING_6).child(select_all))
             .child(
                 div()
@@ -130,6 +138,77 @@ impl ReviewSheet {
                             .ok();
                         }),
                     ),
+                )
+            })
+            .into_any_element()
+    }
+
+    /// Notes this PDF leaves unplaced because another root typesets them:
+    /// which root, and, on the live PDF, a button that builds it, after
+    /// which they are placed on its PDF.
+    fn elsewhere_hint(
+        &self,
+        ix: usize,
+        document: String,
+        count: usize,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let palette = cx.palette().clone();
+        let text = if count == 1 {
+            t!(
+                "1 note is in {document}, which this PDF does not show.",
+                document = document
+            )
+        } else {
+            t!(
+                "{count} notes are in {document}, which this PDF does not show.",
+                count = count,
+                document = document
+            )
+        };
+        let building = self.building.as_deref() == Some(document.as_str());
+        let live = self.source.as_ref().is_some_and(ReviewSource::is_live);
+        let view = cx.entity().downgrade();
+        div()
+            .id(("review-pdf-elsewhere", ix))
+            .mx(SPACING_6)
+            .flex()
+            .items_center()
+            .gap(SPACING_4)
+            .py(SPACING_4)
+            .px(SPACING_5)
+            .rounded(RADIUS_SURFACE)
+            .bg(palette.warning_soft)
+            .child(Icon::CIRCLE_ALERT.element(px(14.), palette.warning))
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .text_role(TextRole::Caption, cx)
+                    .text_color(palette.text)
+                    .child(text),
+            )
+            .when(live, |hint| {
+                let label = if building {
+                    t!("Building {document}…", document = document)
+                } else {
+                    t!("Build {document}", document = document)
+                };
+                hint.child(
+                    Button::new(("review-pdf-build", ix), label)
+                        .compact()
+                        .disabled(building || self.busy)
+                        .map(|button| {
+                            if building {
+                                button.icon(Icon::LOADER)
+                            } else {
+                                button
+                            }
+                        })
+                        .on_click(move |_, _, cx| {
+                            let document = document.clone();
+                            view.update(cx, |this, cx| this.build(document, cx)).ok();
+                        }),
                 )
             })
             .into_any_element()
