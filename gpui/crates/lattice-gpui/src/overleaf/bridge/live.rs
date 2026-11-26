@@ -533,11 +533,16 @@ impl OverleafBridge {
             self.sync(
                 SyncOptions {
                     automatic: true,
-                    include_whole_files: held,
+                    include_whole_files: held.clone(),
                     ..Default::default()
                 },
                 cx,
             );
+            // Not started (a sync began since the probe): they wait for the
+            // next retry rather than being dropped.
+            if !self.syncing {
+                self.whole_files.boundary.extend(held);
+            }
         } else if !version_known {
             // No change signal: sync on a slow clock instead.
             if since_last.is_none_or(|since| since >= BLIND_POLL) {
