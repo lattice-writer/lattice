@@ -275,8 +275,8 @@ impl Run {
             })
             .await;
         // The autosave of the notes builds them again (an automatic build
-        // of the document in front): let it land first, or it would build
-        // the part on its own once the part is in front (no main document).
+        // of the document in front): let it land first, so the jump below
+        // reads a settled PDF.
         let settled = self
             .wait_for(cx, Duration::from_secs(20), |shell, cx| {
                 !editor.read(cx).is_dirty(cx) && !shell.read(cx).building()
@@ -335,8 +335,38 @@ impl Run {
         );
         self.snapshot(cx, "typst-jump-to-source").await;
 
+        // LEO-117: ⌘S with the part in front and no Typst main document
+        // builds the notes that include it; built alone, the part's own PDF
+        // replaced the notes' pages.
+        let part_pdf = root.join("notes-part.pdf");
+        let builds = cx.update(|cx| self.shell.read(cx).build_panel().read(cx).builds());
+        let part_buffer = cx.update(|cx| part_editor.read(cx).lattice_editor().read(cx).buffer().clone());
+        cx.update(|cx| {
+            part_buffer.update(cx, |buffer, cx| {
+                let end = buffer.len();
+                buffer.edit([(end..end, "Saved with the part in front.\n")], None, cx)
+            })
+        });
+        self.with_window(cx, |_, window, cx| window.dispatch_action(Box::new(crate::shell::Save), cx))?;
+        let saved_build = self
+            .wait_for(cx, Duration::from_secs(20), |shell, cx| {
+                let shell = shell.read(cx);
+                let panel = shell.build_panel().read(cx);
+                !shell.building() && panel.builds() > builds && !part_editor.read(cx).is_dirty(cx)
+            })
+            .await;
+        let document = cx.update(|cx| {
+            self.shell.read(cx).build_panel().read(cx).last().map(|last| last.root_document.clone())
+        });
+        steps.check(
+            "Typst: saving an included part with no main document builds the document that includes it",
+            saved_build && document.as_deref() == Some("notes.typ") && !part_pdf.exists(),
+            json!({ "built": saved_build, "document": document, "part_pdf": part_pdf.exists() }),
+        );
+
         self.close_panel(cx, &part_editor).await?;
         std::fs::remove_file(&part).ok();
+        std::fs::remove_file(&part_pdf).ok();
         Ok(())
     }
 }
