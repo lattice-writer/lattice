@@ -59,6 +59,8 @@ pub(super) struct Project {
     pub(super) history_requests: Vec<String>,
     /// The live channel is served.
     realtime: bool,
+    /// Uploads still to answer 429, as Overleaf's rate limit does.
+    rate_limited_uploads: u32,
     pub(super) live: Live,
 }
 
@@ -160,6 +162,12 @@ impl MockOverleaf {
             bump(&mut self.project.lock().unwrap(), path, CO_AUTHOR);
         }
         typed
+    }
+
+    /// Answer the next `count` uploads 429 Too Many Requests, with a
+    /// Retry-After past what a request waits out on its own.
+    pub fn rate_limit_uploads(&self, count: u32) {
+        self.project.lock().unwrap().rate_limited_uploads = count;
     }
 
     /// Drop the live socket at the app's next update, after it lands
@@ -593,6 +601,17 @@ fn answer(stream: TcpStream, project: Arc<Mutex<Project>>) -> std::io::Result<()
             ("GET", p) if p == format!("{project_path}/download/zip") => {
                 (200, "application/zip", None, zip(&project.files))
             }
+            ("POST", p)
+                if p == format!("{project_path}/upload") && project.rate_limited_uploads > 0 =>
+            {
+                project.rate_limited_uploads -= 1;
+                (
+                    429,
+                    "text/plain",
+                    Some("Retry-After: 30".into()),
+                    b"Too Many Requests".to_vec(),
+                )
+            }
             ("POST", p) if p == format!("{project_path}/upload") => {
                 let content_type = headers.get("content-type").cloned().unwrap_or_default();
                 match multipart(&body, &content_type) {
@@ -634,6 +653,7 @@ fn answer(stream: TcpStream, project: Arc<Mutex<Project>>) -> std::io::Result<()
         200 => "OK",
         302 => "Found",
         400 => "Bad Request",
+        429 => "Too Many Requests",
         _ => "Not Found",
     };
     let mut stream = stream;

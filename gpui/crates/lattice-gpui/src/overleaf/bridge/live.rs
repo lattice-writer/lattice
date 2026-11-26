@@ -389,9 +389,15 @@ impl OverleafBridge {
         } else {
             MIN_SYNC_GAP
         };
-        self.last_auto_sync
+        let gap = self
+            .last_auto_sync
             .map(|last| gap.saturating_sub(last.elapsed()))
-            .unwrap_or_default()
+            .unwrap_or_default();
+        let cooling = self
+            .rate_limited_until
+            .map(|until| until.saturating_duration_since(Instant::now()))
+            .unwrap_or_default();
+        gap.max(cooling)
     }
 
     /// The poll's cadence while probes answer with a version.

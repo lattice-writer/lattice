@@ -192,6 +192,8 @@ pub struct OverleafBridge {
     /// Syncs Overleaf refused in a row while the session stayed valid.
     refusals: u32,
     last_auto_sync: Option<Instant>,
+    /// An automatic sync was answered 429: none starts before this.
+    rate_limited_until: Option<Instant>,
     /// Files the writer chose to keep on Overleaf when asked, for the
     /// session: the safe side of forgetting is a file left on Overleaf.
     declined_deletes: HashSet<(PathBuf, String)>,
@@ -264,6 +266,7 @@ impl OverleafBridge {
             transport_retry: false,
             refusals: 0,
             last_auto_sync: None,
+            rate_limited_until: None,
             declined_deletes: HashSet::new(),
             sync_task: None,
             sync_trace: None,

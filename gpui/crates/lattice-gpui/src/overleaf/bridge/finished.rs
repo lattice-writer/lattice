@@ -9,6 +9,17 @@ use serde_json::json;
 use super::*;
 use crate::app_log::trace::Trace;
 
+/// How long live mode holds its syncs after Overleaf answers one with 429.
+const RATE_LIMIT_COOLDOWN: Duration = Duration::from_secs(30);
+
+impl OverleafBridge {
+    /// A failed sync is owed again, quietly, for a scenario's checks.
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+    pub fn sync_owed(&self) -> bool {
+        self.transport_retry
+    }
+}
+
 /// End a sync's operation in the log: its counts, then the summary, or the
 /// failure under the words its notice uses (`runOverleafSync`'s trace).
 pub(super) fn trace_outcome(
@@ -73,6 +84,7 @@ impl OverleafBridge {
         cx: &mut Context<Self>,
     ) {
         self.transport_retry = false;
+        self.rate_limited_until = None;
         self.refusals = 0;
         self.remote_changes = false;
         // Edited here while the sync ran: left as they were, so they still
@@ -208,7 +220,15 @@ impl OverleafBridge {
         if refused {
             self.refusals += 1;
         }
+        // A 429 on live mode's own sync is Overleaf asking us to slow
+        // down, not a failure to report: the edit stays owed and goes once
+        // the cool-down is over, with nothing in the way meanwhile.
+        let rate_limited = options.automatic && outcome::is_rate_limited(&error);
+        if rate_limited {
+            self.rate_limited_until = Some(Instant::now() + RATE_LIMIT_COOLDOWN);
+        }
         let retryable = outcome::is_transient_transport_failure(&error)
+            || rate_limited
             || (refused && self.refusals < outcome::REFUSAL_RETRIES);
         let this = cx.entity().downgrade();
         let sync_again = || {

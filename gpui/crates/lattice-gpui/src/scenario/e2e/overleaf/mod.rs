@@ -16,6 +16,8 @@
 //!   and applies it;
 //! - pausing sync holds each side's edits, and resuming merges them
 //!   (`pause_resume`);
+//! - a sync Overleaf rate-limits is owed quietly and goes up after the
+//!   cool-down (`rate_limit`);
 //! - Settings › Overleaf says who is signed in and which project syncs;
 //! - a project the Tauri app linked somewhere else opens from that folder,
 //!   and syncs there, instead of downloading again (`local_copy`).
@@ -37,6 +39,7 @@ mod pdf_note;
 mod polish;
 mod presence;
 mod project_history;
+mod rate_limit;
 mod reconnect;
 mod review;
 mod review_marks;
@@ -486,6 +489,7 @@ impl Run {
         linked.overleaf_margin_walk(cx, steps, &mock, &root)
             .await?;
         linked.overleaf_pause_resume(cx, steps, &mock).await?;
+        linked.overleaf_rate_limit(cx, steps, &mock).await?;
 
         // Settings › Overleaf.
         linked.with_window(cx, |shell, window, cx| {

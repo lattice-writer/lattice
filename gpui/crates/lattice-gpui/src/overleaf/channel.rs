@@ -122,6 +122,23 @@ fn backoff(attempt: u32) -> Duration {
         .min(RECONNECT_MAX)
 }
 
+/// `delay` spread over 80–120 % by `roll` (any u64). Every window of a
+/// project, and every co-author's app, loses the channel at the same moment
+/// when Overleaf restarts an instance; without the spread they all knock
+/// again on the same second, every time, which is what an overloaded
+/// server rate-limits.
+fn jittered(delay: Duration, roll: u64) -> Duration {
+    delay.mul_f64(0.8 + 0.4 * (roll as f64 / u64::MAX as f64))
+}
+
+/// A fresh random u64 (std's per-instance hasher keys), for the spread.
+fn roll() -> u64 {
+    use std::hash::{BuildHasher as _, Hasher as _};
+    std::collections::hash_map::RandomState::new()
+        .build_hasher()
+        .finish()
+}
+
 /// Join `root`'s project and hold the connection, telling `bridge` as it
 /// changes, until the returned task is dropped (which closes it). A message
 /// on `retry` cuts a backoff wait short; one sent while the channel is up,
@@ -225,7 +242,7 @@ pub(super) fn hold(
                     .ok();
                 return;
             }
-            let delay = backoff(attempt);
+            let delay = jittered(backoff(attempt), roll());
             attempt += 1;
             recovering = true;
             let told = bridge.update(cx, |bridge, cx| {
@@ -333,6 +350,21 @@ mod tests {
         assert_eq!(backoff(0), Duration::from_secs(1));
         assert_eq!(backoff(3), Duration::from_secs(8));
         assert_eq!(backoff(10), RECONNECT_MAX);
+    }
+
+    #[test]
+    fn joining_again_is_spread_a_fifth_either_way() {
+        let delay = Duration::from_secs(10);
+        assert_eq!(jittered(delay, 0), Duration::from_secs(8));
+        assert_eq!(jittered(delay, u64::MAX), Duration::from_secs(12));
+        let spread: std::collections::BTreeSet<_> =
+            (0..8).map(|_| jittered(delay, roll())).collect();
+        assert!(spread.len() > 1, "the spread should differ between tries");
+        assert!(
+            spread
+                .iter()
+                .all(|d| *d >= Duration::from_secs(8) && *d <= Duration::from_secs(12))
+        );
     }
 
     #[test]
