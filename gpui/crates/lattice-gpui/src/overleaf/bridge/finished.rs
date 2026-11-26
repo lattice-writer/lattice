@@ -15,7 +15,8 @@ const RATE_LIMIT_COOLDOWN: Duration = Duration::from_secs(30);
 const RATE_LIMIT_COOLDOWN_MAX: Duration = Duration::from_secs(300);
 /// 429s in a row held quietly (30 s + 60 s + 120 s + 240 s, about 7.5 min)
 /// before one is reported, so the writer learns their edits aren't
-/// reaching Overleaf; the cool-down still holds after that.
+/// reaching Overleaf; that one is reported once, and later ones in the same
+/// run stay quiet, with the cool-down still holding.
 const RATE_LIMIT_RETRIES: u32 = 4;
 
 /// The cool-down after the `rate_limits`th 429 in a row (from 1).
@@ -243,7 +244,7 @@ impl OverleafBridge {
             self.rate_limited_until = Some(Instant::now() + rate_limit_cooldown(self.rate_limits));
         }
         let retryable = outcome::is_transient_transport_failure(&error)
-            || (rate_limited && self.rate_limits < RATE_LIMIT_RETRIES)
+            || (rate_limited && self.rate_limits != RATE_LIMIT_RETRIES)
             || (refused && self.refusals < outcome::REFUSAL_RETRIES);
         let this = cx.entity().downgrade();
         let sync_again = || {

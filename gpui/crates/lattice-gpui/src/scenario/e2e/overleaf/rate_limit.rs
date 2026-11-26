@@ -37,9 +37,9 @@ impl Run {
                 crate::notices::install(cx)
                     .read(cx)
                     .titles()
-                    .iter()
+                    .into_iter()
                     .filter(|title| title.ends_with(" failed") || title.starts_with("Couldn"))
-                    .count()
+                    .collect::<std::collections::BTreeSet<_>>()
             })
         };
         let failures_before = failures(cx);
@@ -54,7 +54,8 @@ impl Run {
                 shell.read(cx).overleaf.read(cx).sync_owed()
             })
             .await;
-        let quiet_owed = failures(cx) == failures_before;
+        // No failure shown that wasn't up before (one expiring is fine).
+        let quiet_owed = failures(cx).is_subset(&failures_before);
         let landed = self
             .wait_for(cx, Duration::from_secs(90), |_, _| mock.file(PATH).is_some())
             .await;
@@ -63,7 +64,7 @@ impl Run {
         // One answered 429, then the one that went up after the cool-down.
         let uploads = mock.requests(&upload) - uploads_before;
         let waited = took >= Duration::from_secs(25);
-        let quiet = quiet_owed && failures(cx) == failures_before;
+        let quiet = quiet_owed && failures(cx).is_subset(&failures_before);
         steps.check(
             "a sync Overleaf answers 429 stays owed without an error, and goes up once after the cool-down",
             settled && owed && landed && text && uploads == 2 && waited && quiet,

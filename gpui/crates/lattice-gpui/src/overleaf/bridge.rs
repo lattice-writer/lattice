@@ -735,6 +735,7 @@ impl OverleafBridge {
                 .is_some_and(|until| until > Instant::now())
         {
             self.transport_retry = true;
+            self.hold_whole_files_for_retry(options.include_whole_files);
             return;
         }
         if options.automatic {

@@ -174,6 +174,12 @@ impl OverleafBridge {
         }
     }
 
+    /// A flush held by a 429's cool-down: its whole files go with the
+    /// poll's retry once the cool-down is over.
+    pub(super) fn hold_whole_files_for_retry(&mut self, paths: BTreeSet<String>) {
+        self.whole_files.boundary.extend(paths);
+    }
+
     fn arm_boundary_flush(&mut self, cx: &mut Context<Self>) {
         self.whole_files.boundary_task = Some(cx.spawn(async move |this, cx| {
             cx.background_executor().timer(WHOLE_FILE_SETTLE).await;
@@ -523,9 +529,11 @@ impl OverleafBridge {
         let owed = self.transport_retry || self.local_pending;
         let since_last = self.last_auto_sync.map(|last| last.elapsed());
         if owed && gap_elapsed {
+            let held = std::mem::take(&mut self.whole_files.boundary);
             self.sync(
                 SyncOptions {
                     automatic: true,
+                    include_whole_files: held,
                     ..Default::default()
                 },
                 cx,
