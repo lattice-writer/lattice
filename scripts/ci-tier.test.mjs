@@ -121,6 +121,7 @@ describe("ci-tier", () => {
     const inert = ciTier([file], { scan, inertKnown: true });
     expect(JOBS.filter((job) => inert.jobs[job])).toEqual(["vitest"]);
     expect(inert.vitestFiles).toEqual(["scripts/gpui-e2e-verdict.test.mjs"]);
+    expect(ciTier([file], { scan: { ...scan, testReads: [{ test: "scripts/reads-known.test.mjs", read: file }] }, inertKnown: true }).vitestFiles).toEqual(["scripts/gpui-e2e-verdict.test.mjs", "scripts/reads-known.test.mjs"]);
     expect(inert.gpuiFiles).toEqual([file]);
     expect(ciTier([file], { scan }).jobs.gpui).toBe(true);
     expect(ciTier([file, "gpui/crates/lattice-gpui/src/main.rs"], { scan, inertKnown: true }).jobs.gpui).toBe(true);

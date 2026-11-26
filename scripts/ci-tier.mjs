@@ -261,11 +261,13 @@ export function ciTier(files, { full = false, scan = null, selector = true, iner
       on("gpui", file);
       continue;
     }
-    // Still a GPUI file for the Windows and Linux e2e tiers, which read
-    // gpuiFiles, but no macOS GPUI job (knownFailuresInert).
+    // No GPUI job (knownFailuresInert); a dispatch for one platform still
+    // forces it on, and then the Windows and Linux e2e tiers read the file
+    // from gpuiFiles.
     if (file === KNOWN_FAILURES && inertKnown) {
       gpuiFiles.push(file);
       vitestFiles.add("scripts/gpui-e2e-verdict.test.mjs");
+      for (const { read, test } of testReads) if (read === file) vitestFiles.add(test);
       on("vitest", file);
       continue;
     }
