@@ -152,8 +152,13 @@ export const E2E_TABLE = [
   // The Overleaf mock servers only the overleaf module's steps start
   // (scenario/e2e/overleaf/); the mocks use one another, nothing else does.
   [/^gpui\/crates\/lattice-gpui\/src\/scenario\/overleaf(_[a-z]+)?_mock\.rs$/, ["overleaf"]],
+  // The stand-alone guards the nightly runs after the e2e (scenario/idle.rs,
+  // scenario/typing.rs, script/idle-guard, script/typing-guard): scenarios of
+  // their own that no e2e module runs, so the smoke flow alone; a guard is
+  // checked by running it, which its PR shows.
+  [/^gpui\/(crates\/lattice-gpui\/src\/scenario\/(idle|typing)\.rs|script\/(idle|typing)-guard)$/, []],
   // The scenario's own harness, runner and fixture: every module runs on them.
-  [/^gpui\/crates\/lattice-gpui\/src\/scenario(\.rs$|\/(?!overleaf(_[a-z]+)?_mock\.rs$))/, FULL],
+  [/^gpui\/crates\/lattice-gpui\/src\/scenario(\.rs$|\/(?!overleaf(_[a-z]+)?_mock\.rs$|(idle|typing)\.rs$))/, FULL],
   [/^gpui\/(script\/e2e|fixtures\/)/, FULL],
   // Read by no scenario step: documentation, unit tests, benches, the
   // parity report and the compatibility notes.
