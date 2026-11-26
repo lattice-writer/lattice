@@ -113,6 +113,8 @@ pub(super) struct ToolbarState {
     /// Where the toolbar and its open menu were drawn: a press there is not
     /// the start of a selection.
     areas: Rc<std::cell::RefCell<Vec<Bounds<Pixels>>>>,
+    /// Where Comment on Overleaf was drawn this frame, for scripted presses.
+    pub(super) overleaf_button: Rc<Cell<Option<Bounds<Pixels>>>>,
     /// Bumped each time it shows anew, which replays its entrance.
     shown: u64,
     last: Option<Range<usize>>,
@@ -336,6 +338,11 @@ impl EditorPanel {
         })
     }
 
+    /// Where the toolbar drew Comment on Overleaf, when it shows it.
+    pub fn toolbar_overleaf_button(&self) -> Option<Bounds<Pixels>> {
+        self.toolbar.overleaf_button.get()
+    }
+
     /// Whether the toolbar offers Comment on Overleaf: the file is in a
     /// project linked to Overleaf.
     pub fn toolbar_offers_overleaf_comment(&self) -> bool {
@@ -343,8 +350,7 @@ impl EditorPanel {
     }
 
     /// Press one of the toolbar's tools by name (scripted runs): `bold`,
-    /// `pen`, `unhighlight`, `comment-overleaf` (only where it is offered),
-    /// a block such as `heading-1` in Markdown, or
+    /// `pen`, `unhighlight`, a block such as `heading-1` in Markdown, or
     /// `custom`, the highlight palette's "+" (its custom colour view).
     #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn scripted_toolbar(&mut self, name: &str, window: &mut Window, cx: &mut Context<Self>) {
@@ -355,9 +361,6 @@ impl EditorPanel {
             "pen" => ToolbarAction::Highlight(highlight_palette::prefs(cx).last.clone()),
             "unhighlight" => ToolbarAction::Unhighlight,
             "heading-1" => ToolbarAction::Block(BlockType::Heading(1)),
-            "comment-overleaf" if self.toolbar_offers_overleaf_comment() => {
-                ToolbarAction::CommentOnOverleaf
-            }
             "palette" => {
                 self.open_menu(Menu::Highlight, window, cx);
                 return;
@@ -549,6 +552,7 @@ impl EditorPanel {
         {
             self.paint_highlights(cx);
         }
+        self.toolbar.overleaf_button.set(None);
         let view_cell = self.toolbar.view.clone();
         let this = cx.entity().downgrade();
         let shown = this.clone();

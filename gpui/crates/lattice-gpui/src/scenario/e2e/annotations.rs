@@ -158,7 +158,19 @@ impl Run {
                 .map(|note| note.share.is_some())
         });
         select(self, cx, QUOTE)?;
-        let toolbar_offers = cx.update(|cx| editor.read(cx).toolbar_offers_overleaf_comment());
+        let zed = cx.update(|cx| editor.read(cx).editor().clone());
+        self.with_window(cx, |_, window, cx| {
+            use gpui::Focusable as _;
+            window.focus(&zed.focus_handle(cx), cx)
+        })?;
+        let toolbar_shown = self
+            .wait_for(cx, Duration::from_secs(5), |_, cx| {
+                editor.read(cx).selection_toolbar_shown()
+            })
+            .await;
+        self.pause(cx, Duration::from_millis(100)).await;
+        let toolbar_offers = !toolbar_shown
+            || cx.update(|cx| editor.read(cx).toolbar_overleaf_button().is_some());
         steps.check(
             "a note's words in its card are selected with a drag and copied with ⌘C; unlinked, neither the selection toolbar nor the card offers Overleaf",
             copied.as_deref() == Some(NOTE) && shared == Some(false) && !toolbar_offers,

@@ -112,9 +112,22 @@ impl Shell {
         if self.overleaf.read(cx).link().is_none() {
             return self.annotate_locally(window, cx);
         }
-        let Some(editor) = self.active_editor() else {
+        if let Some(editor) = self.active_editor() {
+            self.comment_on_overleaf(&editor, window, cx);
+        }
+    }
+
+    /// Start a thread on `editor`'s selection, in a file live with Overleaf
+    /// (Annotate selection, and the selection toolbar's Comment on Overleaf).
+    pub(crate) fn comment_on_overleaf(
+        &mut self,
+        editor: &gpui::Entity<crate::editor_panel::EditorPanel>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.overleaf.read(cx).link().is_none() {
             return;
-        };
+        }
         let path = editor.read(cx).relative().to_string();
         if self.overleaf.read(cx).live_file() != Some(path.as_str()) {
             crate::notices::show(
@@ -137,8 +150,10 @@ impl Shell {
 
     /// Post the local note `id` as an Overleaf comment on its passage, in a
     /// file live with Overleaf (its card's Share to Overleaf). Once Overleaf
-    /// has it, the note is resolved here, so the passage shows Overleaf's
-    /// thread alone; its words and replies stay in the project's notes.
+    /// has it anchored on the passage, the note is resolved here, so the
+    /// passage shows Overleaf's thread alone; its words and replies stay in
+    /// the project's notes. While another comment is on its way, nothing is
+    /// sent, so a second press cannot post the note twice.
     pub(crate) fn share_annotation(
         &mut self,
         id: &str,
@@ -148,7 +163,8 @@ impl Shell {
         let Some(root) = self.root(cx) else {
             return;
         };
-        if self.overleaf.read(cx).link().is_none() {
+        if self.overleaf.read(cx).link().is_none() || self.overleaf.read(cx).review_busy().is_some()
+        {
             return;
         }
         let Some(note) = crate::annotations::store::try_store(cx)
@@ -190,9 +206,11 @@ impl Shell {
                 from,
                 quote,
                 body,
-                move |cx| {
-                    let store = crate::annotations::store::store(cx);
-                    store.update(cx, |store, cx| store.set_resolved(&root, &shared, true, cx));
+                move |anchored, cx| {
+                    if anchored {
+                        let store = crate::annotations::store::store(cx);
+                        store.update(cx, |store, cx| store.set_resolved(&root, &shared, true, cx));
+                    }
                 },
                 cx,
             )

@@ -1,7 +1,7 @@
 //! The e2e checks of commenting on Overleaf from the source editor, with
 //! main.tex live against the stand-in (`scenario::overleaf_mock`):
 //!
-//! - the selection toolbar offers Comment on Overleaf, which opens the
+//! - the selection toolbar offers Comment on Overleaf; a native click on it opens the
 //!   collaboration panel's composer on the selection, as the palette's
 //!   Annotate selection does; the comment typed and sent with Enter is
 //!   posted and anchored on Overleaf;
@@ -90,13 +90,22 @@ impl Run {
                 editor.read(cx).selection_toolbar_shown()
             })
             .await;
-        let offered = cx.update(|cx| editor.read(cx).toolbar_offers_overleaf_comment());
+        let watched = editor.clone();
+        self.wait_for(cx, Duration::from_secs(3), move |_, cx| {
+            watched.read(cx).toolbar_overleaf_button().is_some()
+        })
+        .await;
+        let button = cx.update(|cx| editor.read(cx).toolbar_overleaf_button());
         self.adapter_shot(cx, "overleaf-toolbar-comment").await;
-        self.with_window(cx, |_, window, cx| {
-            editor.update(cx, |editor, cx| {
-                editor.scripted_toolbar("comment-overleaf", window, cx)
-            })
-        })?;
+        // A native click on the toolbar's Comment on Overleaf.
+        if let Some(button) = button {
+            let _front = self.focused(cx, "overleaf toolbar button").await?;
+            let native = self.native(cx)?;
+            native::send_mouse(native, native::Mouse::Down, button.center())?;
+            self.pause(cx, Duration::from_millis(40)).await;
+            native::send_mouse(native, native::Mouse::Up, button.center())?;
+        }
+        let offered = button.is_some();
         let composing = self
             .wait_for(cx, Duration::from_secs(5), |shell, cx| {
                 shell.read(cx).overleaf_collab.read(cx).composing_comment()
@@ -116,7 +125,7 @@ impl Run {
         steps.check(
             "in a linked project the selection toolbar offers Comment on Overleaf, which opens the comment on the selection; sent with Enter, it is anchored on Overleaf",
             selected && shown && offered && composing && anchored && mock.rejected().is_empty(),
-            json!({ "selected": selected, "shown": shown, "offered": offered, "composing": composing, "anchored": anchored, "comments": mock.comments("main.tex") }),
+            json!({ "selected": selected, "shown": shown, "button": button.map(|b| format!("{b:?}")), "composing": composing, "anchored": anchored, "comments": mock.comments("main.tex") }),
         );
         Ok(())
     }

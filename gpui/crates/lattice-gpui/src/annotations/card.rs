@@ -259,6 +259,11 @@ pub fn comment_card_sized(
     cx: &App,
 ) -> AnyElement {
     let palette = cx.palette().clone();
+    // This frame's parts only: the canvases below record them again.
+    parts
+        .painted
+        .borrow_mut()
+        .retain(|note| comments.iter().all(|comment| comment.id != note.id));
     let indent = px(PIN + 6.);
     let card = div().id("annotation-card").flex().flex_col().gap(SPACING_5);
     let mut card = match width {
