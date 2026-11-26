@@ -37,6 +37,8 @@ The project menu (the project name at the top left of the window) and the **File
 
 Recent projects are at the top of the project menu and in **File › Open Recent**. A window can hold several projects as tabs in the title bar.
 
+When the folder you open isn't a project yet but holds exactly one, such as `ProjectA/` with the project `ProjectA/Manuscript/` inside, Lattice asks before making a second project of it. **Open Manuscript with the whole folder available to the Agent** opens `Manuscript` with its one history and builds where they are, and lets the Agent read and edit everything in `ProjectA/`, such as your analysis scripts; opening `ProjectA/` later opens `Manuscript` straight away. **Make this folder its own project** starts a new project in `ProjectA/`. **Settings › Agent** shows which folder the Agent works in under **Agent’s folder**, and can put it back to the project's own folder. The project menu's **This project** section shows where History, Builds and the Agent work.
+
 ### A repository with several manuscripts
 
 A project is just a folder, so it can be a whole repository: analysis code, data and one or more papers side by side. Opening the repository's root as the project lets the Agent work across all of it, for example checking a number in the Results against the output in `analysis/` and then revising the paper in the same conversation.
