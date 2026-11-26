@@ -122,10 +122,11 @@ export const E2E_TABLE = [
   // The host errors' translations, generated from the Tauri app's catalog
   // (scripts/gpui-host-errors.mjs; gate:changed checks it is current, and
   // host_errors.rs's unit tests read it): no step reads a host error in
-  // another language than English, where the text is shown as written.
+  // another language than English, where the text is shown as written, so
+  // those checks, not a step, are what catch a broken catalog.
   [/^gpui\/crates\/lattice-gpui\/src\/host_errors\/catalog\.rs$/, []],
-  // lattice-core's unit tests, which no window runs.
-  [/^src-tauri\/lattice-core\/(tests\/|src\/(.*\/)?tests?(\.rs$|\/))/, []],
+  // lattice-core's and lattice-theme's unit tests, which no window runs.
+  [/^src-tauri\/lattice-(core|theme)\/(tests\/|src\/(.*\/)?tests?(\.rs$|\/))/, []],
   [/^THIRD_PARTY_NOTICES\.md$/, []],
   // What every window is built from.
   [/^gpui\/patches\//, FULL],
