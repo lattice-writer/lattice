@@ -3,8 +3,8 @@
 //! Open Slide runtime the Tauri app stages (`src-tauri/presentation-runtime`,
 //! with the Node the Agent's runtime bundles, `src-tauri/synara-runtime/bin`)
 //! and the Agent's Synara service (`src-tauri/synara-runtime`); and the user
-//! guide's pages, which `scripts/gpui-bundle.mjs` renders into the bundle for
-//! Help ▸ User Guide to open offline.
+//! guide's pages beside the island pages, for Help ▸ User Guide to open
+//! offline.
 //!
 //! In order, each is looked for:
 //!
@@ -101,11 +101,11 @@ pub fn agent_bundle() -> PathBuf {
     first_with(candidates, "synara-runtime/server/dist/index.mjs").unwrap_or(fallback)
 }
 
-/// The user guide rendered into the bundle (`Contents/Resources/guide`, by
-/// `scripts/gpui-bundle.mjs`, which packages macOS only). A binary run from
-/// the checkout has none and always opens the website.
+/// The user guide's pages, which `script/build-islands` renders beside the
+/// island pages (`islands/dist/guide`), so the bundle and a checkout's
+/// build both carry them.
 pub fn user_guide_dir() -> Option<PathBuf> {
-    first_with([exe_dir()?.join("../Resources/guide")], "index.html")
+    first_with([islands_dir()?.join("guide")], "index.html")
 }
 
 /// The app's data and cache folders, for the runtime's shadow copy and Vite

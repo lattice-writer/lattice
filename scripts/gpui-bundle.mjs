@@ -13,9 +13,7 @@
  *      Agent's Synara runtime and the Open Slide runtime staged as the Tauri
  *      build stages them (prepare-synara-sidecar.mjs needs SYNARA_SOURCE_DIR,
  *      docs/synara-runtime.md; prepare-presentation-runtime.mjs), the bundled
- *      skills, the user guide (scripts/user-guide.mjs, the website's pages,
- *      which Help ▸ User Guide opens when the website can't be reached), the
- *      icon and the Chinese InfoPlist.strings;
+ *      skills, the icon and the Chinese InfoPlist.strings;
  *   3. an Info.plist with the Tauri bundle's keys (src-tauri/Info.plist, the
  *      version and minimum macOS from tauri.conf.json) under the flavor's
  *      name and identifier (FLAVORS below): Lattice Beta, which installs
@@ -64,7 +62,6 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { codesign, signMachOTree } from "./lib/codesign.mjs";
-import { renderGuide } from "./user-guide.mjs";
 
 /**
  * The repository whose releases the archive is published to: the workflow's
@@ -304,7 +301,6 @@ async function main() {
     mkdirSync(path.dirname(target), { recursive: true });
     run("ditto", [source, target]);
   }
-  renderGuide(path.join(contents, "Resources", "guide"));
   cpSync(path.join(tauri, "icons", "icon.icns"), path.join(contents, "Resources", "icon.icns"));
   cpSync(path.join(tauri, "macos", "zh-Hans.lproj", "InfoPlist.strings"), path.join(contents, "Resources", "zh-Hans.lproj", "InfoPlist.strings"));
   const extra = JSON.parse(capture("plutil", ["-convert", "json", "-o", "-", path.join(tauri, "Info.plist")]));

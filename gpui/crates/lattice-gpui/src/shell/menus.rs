@@ -71,9 +71,9 @@ fn user_guide_answers(url: &str) -> bool {
 
 /// Help ▸ User Guide: the website's pages, or the copy the bundle carries
 /// (`structured::resources::user_guide_dir`, rendered by
-/// `scripts/gpui-bundle.mjs`) when the website doesn't answer, in the
-/// interface language either way. Without a bundled copy (a binary run from
-/// the checkout) the website opens straight away.
+/// `script/build-islands`) when the website doesn't answer, in the
+/// interface language either way. Without a copy (island pages never
+/// built) the website opens straight away.
 fn open_user_guide(cx: &mut App) {
     let locale = lattice_i18n::locale();
     let url = user_guide_url(locale);
