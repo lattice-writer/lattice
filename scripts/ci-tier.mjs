@@ -28,10 +28,15 @@
  *
  * Documentation alone (docs/, top-level and .github/ Markdown, gpui/docs/,
  * LICENSE) turns on nothing. A change to ci.yml turns on all of ci.yml's
- * jobs, one to gpui.yml all of gpui.yml's, and one to this file, to what
- * picks the local stages and the trailer's cover (ci-local.mjs,
- * ci-local-select.mjs, gpui-e2e-modules.mjs) or to .github/actions/
- * everything.
+ * jobs, one to gpui.yml all of gpui.yml's, and one to .github/actions/
+ * everything. A change to what picks the jobs, the local stages and the
+ * trailer's cover (CI_CONTROL: this file, ci-local.mjs, ci-local-select.mjs,
+ * gpui-e2e-modules.mjs and the Windows and Linux e2e tiers) runs their unit
+ * tests and the lint and build job when nothing else but their tests and
+ * documentation changed (selectorOnly): what can go wrong there is a wrong
+ * pick, which those tests check, while the apps' own jobs would only run
+ * main's code again. With any other file it runs everything, so a selector
+ * change is never judged by its own picks.
  *
  * `--github` is the workflows' `changes` step. It runs every job (full)
  * for a tag, the schedule, a dispatch on main or with `full`, a dispatch
@@ -81,6 +86,8 @@ export const JOBS = ["vitest", "lint-build", "perf-bench", "rust", "gpui", "lite
 const CI_JOBS = JOBS.filter((job) => job !== "gpui");
 // What decides which jobs run and which a CI-local trailer may skip: a
 // change to any of them runs everything.
+// The selector's own tests, which a CI_CONTROL change runs (selectorOnly).
+const CI_CONTROL_TESTS = ["scripts/ci-local-select.test.mjs", "scripts/ci-local.test.mjs", "scripts/ci-tier.test.mjs", "scripts/gpui-e2e-modules.test.mjs", "scripts/linux-gpui-e2e-tier.test.mjs", "scripts/windows-e2e-tier.test.mjs"];
 const CI_CONTROL = new Set(["scripts/ci-tier.mjs", "scripts/ci-local-select.mjs", "scripts/gpui-e2e-modules.mjs", "scripts/ci-local.mjs", "scripts/windows-e2e-tier.mjs", "scripts/linux-gpui-e2e-tier.mjs"]);
 
 // What `pnpm build` reads besides the sources tsc already checked: a change
@@ -169,6 +176,16 @@ export function ciTier(files, { full = false, scan = null } = {}) {
     if (job === "gpui" && !gpuiFiles.includes(file)) gpuiFiles.push(file);
     if (why[job].length < 5 && !why[job].includes(file)) why[job].push(file);
   };
+  // Only the selector, its tests and documentation: their tests and the
+  // lint, not the apps' jobs on code main already ran.
+  const selectorOnly = files.some((file) => CI_CONTROL.has(file)) && files.every((file) => CI_CONTROL.has(file) || CI_CONTROL_TESTS.includes(file) || DOCS.test(file));
+  if (selectorOnly) {
+    for (const file of files.filter((file) => !DOCS.test(file))) {
+      on("vitest", file);
+      on("lint-build", file);
+    }
+    return { full, jobs, why, vitestFiles: CI_CONTROL_TESTS, gpuiFiles, docsOnly: false };
+  }
   for (const file of files) {
     if (CI_CONTROL.has(file) || file.startsWith(".github/actions/")) {
       vitestAll = true;

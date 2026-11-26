@@ -63,15 +63,19 @@ describe("linux-gpui-e2e-tier", () => {
       "gpui/crates/lattice-gpui/Cargo.toml",
       "gpui/islands/markdown/main.tsx",
       "src/editor/spreadsheet/grid.ts",
-      "scripts/windows-e2e-tier.mjs",
       "scripts/typst-helper-fake-release.mjs",
       ".github/workflows/gpui.yml",
       "scripts/gpui-e2e-known-failures.json",
-      "scripts/linux-gpui-e2e-tier.mjs",
     ]) {
       expect(wholeReason(file, read), file).not.toBeNull();
       expect(ciTier([file], { scan }).jobs.gpui, file).toBe(true);
       expect(e2eFor([file]), file).toBe(WHOLE);
+    }
+    // The tiers alone run their own tests (ci-tier's selectorOnly); beside a
+    // GPUI input they still make the Linux run whole.
+    for (const file of ["scripts/windows-e2e-tier.mjs", "scripts/linux-gpui-e2e-tier.mjs"]) {
+      expect(ciTier([file], { scan }).jobs.gpui, file).toBe(false);
+      expect(e2eFor([file, "gpui/crates/lattice-gpui/src/app.rs"]), file).toBe(WHOLE);
     }
   });
 

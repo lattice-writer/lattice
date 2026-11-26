@@ -78,9 +78,16 @@ describe("ci-tier", () => {
   it("runs a workflow's every job when it changes, and everything for the shared pieces", () => {
     expect(running([".github/workflows/gpui.yml"]).on).toEqual(["gpui"]);
     expect(running([".github/workflows/ci.yml"]).on).toEqual(JOBS.filter((job) => job !== "gpui"));
-    expect(running(["scripts/ci-tier.mjs"]).on).toEqual(JOBS);
     expect(running([".github/actions/setup-pnpm/action.yml"]).on).toEqual(JOBS);
-    for (const file of ["scripts/ci-local.mjs", "scripts/ci-local-select.mjs", "scripts/gpui-e2e-modules.mjs"]) expect(running([file]).on, file).toEqual(JOBS);
+    // The selector alone runs its own tests; with any other file, everything.
+    for (const file of ["scripts/ci-tier.mjs", "scripts/ci-local.mjs", "scripts/ci-local-select.mjs", "scripts/gpui-e2e-modules.mjs", "scripts/windows-e2e-tier.mjs", "scripts/linux-gpui-e2e-tier.mjs"]) {
+      const tier = ciTier([file, "scripts/ci-tier.test.mjs", "docs/agent-validation.md"], { scan });
+      expect(JOBS.filter((job) => tier.jobs[job]), file).toEqual(["vitest", "lint-build"]);
+      expect(tier.vitestFiles, file).toContain("scripts/windows-e2e-tier.test.mjs");
+    }
+    for (const other of ["gpui/crates/lattice-gpui/src/shell.rs", "src/App.tsx", "scripts/inapp-lock", "src-tauri/src/lib.rs"]) {
+      expect(running(["scripts/ci-local-select.mjs", other]).on, other).toEqual(JOBS);
+    }
     expect(ciTier(["README.md"], { full: true, scan }).jobs).toEqual(Object.fromEntries(JOBS.map((job) => [job, true])));
   });
 

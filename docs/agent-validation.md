@@ -191,7 +191,7 @@ failures alone. Either way a step that fails is rerun once with its module on
 a fresh fixture. Add a row to the table when a crate or path has a clear
 owner in the scenario.
 
-A change to `scripts/ci-local.mjs`, `scripts/ci-local-select.mjs`, `scripts/gpui-e2e-modules.mjs` or `scripts/windows-e2e-tier.mjs`, like one to `scripts/ci-tier.mjs`, runs every job.
+A change to what picks the jobs (`CI_CONTROL` in `scripts/ci-tier.mjs`: `ci-tier.mjs`, `ci-local.mjs`, `ci-local-select.mjs`, `gpui-e2e-modules.mjs`, `windows-e2e-tier.mjs`, `linux-gpui-e2e-tier.mjs`) runs those scripts' unit tests and the lint and build job when nothing but them, their tests and documentation changed: a wrong pick is what can go wrong there, and those tests check it, while the apps' jobs would only run main's code again. With any other file in the diff, a GPUI input among them, it runs every job, so a selector change is never judged by its own picks.
 
 Rust and GPUI build and unit-test stages wait while a perf measurement or a
 hand test holds `/tmp/lattice-inapp-test.lock` (`$INAPP_LOCK_FILE` when set),
