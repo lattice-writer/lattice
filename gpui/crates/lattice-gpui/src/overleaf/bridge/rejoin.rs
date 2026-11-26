@@ -1,6 +1,7 @@
 //! What has a channel waiting out its backoff join now: the window coming
 //! on screen or forward (`retryNow` on the page's focus), and the network
-//! coming back (`network.rs`).
+//! coming back (`network.rs`). The system waking from sleep also has a
+//! live channel join again.
 
 use super::*;
 
@@ -40,5 +41,19 @@ impl OverleafBridge {
         if let Some(retry) = &self.channel_retry {
             retry.unbounded_send(()).ok();
         }
+    }
+
+    /// The system woke from sleep (`network.rs`): a channel that was up
+    /// joins again, as its socket may have died while the system slept, and
+    /// one waiting to join does so now. Documents with work out are held
+    /// over the drop and carried on (`documents/resume.rs`).
+    pub fn system_woke(&mut self) {
+        if self.channel == ChannelStatus::Live {
+            if let Some(client) = &self.client {
+                client.rejoin_after_sleep();
+                return;
+            }
+        }
+        self.network_came_back();
     }
 }

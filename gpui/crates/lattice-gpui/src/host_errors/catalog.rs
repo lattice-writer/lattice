@@ -1651,7 +1651,7 @@ pub(super) static ENTRIES: &[Entry] = &[
         text: Text::Message("The Overleaf realtime connection failed: {error}", &[("error", Arg::Param(0))]),
     },
     Entry {
-        file: "overleaf_rt/client.rs",
+        file: "overleaf_rt/client/heartbeat.rs",
         literal: "Overleaf has sent nothing for {}s, so the connection is presumed lost.",
         text: Text::Message("Overleaf has sent nothing for {seconds}s, so the connection is presumed lost.", &[("seconds", Arg::Param(0))]),
     },

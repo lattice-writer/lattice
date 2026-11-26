@@ -168,6 +168,19 @@ impl MockOverleaf {
         self.project.lock().unwrap().live.sever = Some(landed);
     }
 
+    /// The live sockets open now go quiet while staying open, as one the
+    /// computer slept on does: no heartbeats, no answers, and what the app
+    /// sends on them is lost (`overleaf_realtime_mock`).
+    pub fn go_silent(&self) {
+        realtime::go_silent(&mut self.project.lock().unwrap().live);
+    }
+
+    /// The heartbeat timeout the handshake names from now on, in seconds
+    /// (a minute until this).
+    pub fn heartbeat_timeout(&self, seconds: u64) {
+        self.project.lock().unwrap().live.heartbeat_timeout = Some(seconds);
+    }
+
     /// The scripted collaborator suggests `ops` in `path` (tracked
     /// changes); false when they do not fit.
     pub fn peer_suggested(&self, path: &str, ops: Vec<lattice_core::overleaf_rt::OtOp>) -> bool {
@@ -513,7 +526,7 @@ fn answer(stream: TcpStream, project: Arc<Mutex<Project>>) -> std::io::Result<()
             return realtime::upgrade(stream, &key, project);
         }
         let mut stream = stream;
-        let body = realtime::handshake();
+        let body = realtime::handshake(&project.lock().unwrap().live);
         write!(
             stream,
             "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",

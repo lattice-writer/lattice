@@ -87,6 +87,20 @@ impl Shell {
             }
         })
         .detach();
+        // So does the system waking from sleep, and a live channel joins
+        // again: its socket may have died meanwhile.
+        let mut wakes = crate::overleaf::network::wakes();
+        let listening = bridge.downgrade();
+        cx.spawn(async move |_, cx| {
+            use futures::StreamExt as _;
+            while wakes.next().await.is_some() {
+                let heard = listening.update(cx, |bridge, _| bridge.system_woke());
+                if heard.is_err() {
+                    break;
+                }
+            }
+        })
+        .detach();
         let subscriptions = vec![
             cx.subscribe_in(&collab, window, |this, _, event, window, cx| {
                 this.on_collab_event(event, window, cx)

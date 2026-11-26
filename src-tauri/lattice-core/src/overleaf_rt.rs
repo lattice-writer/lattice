@@ -53,6 +53,8 @@ mod codec;
 mod events;
 mod handshake;
 #[cfg(test)]
+mod heartbeat_tests;
+#[cfg(test)]
 mod mock_ot;
 #[cfg(test)]
 pub(crate) mod mock_server;

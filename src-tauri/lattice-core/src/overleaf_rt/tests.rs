@@ -34,7 +34,7 @@ fn wait_until(secs: u64, mut ready: impl FnMut() -> bool) -> bool {
 }
 
 /// The first recorded event `pick` accepts, waiting up to `secs` for one.
-fn wait_for<T>(
+pub(super) fn wait_for<T>(
     events: &Events, secs: u64, mut pick: impl FnMut(&RealtimeEvent) -> Option<T>,
 ) -> Option<T> {
     let mut found = None;
@@ -538,18 +538,6 @@ fn comment_operations_never_reach_the_text_stream() {
 }
 
 // -- end to end against a mock socket.io 0.9 server -------------------------
-
-#[test]
-fn a_server_that_goes_quiet_past_its_heartbeat_timeout_is_reported_lost() {
-    // The mock never sends a heartbeat after joining: a half-open socket.
-    let (host, _state) = start_mock_with(false, 1);
-    let (_client, events) = connect(mock_config(&host, "overleaf_session2=test-cookie"));
-    let lost = wait_for(&events, 5, |event| match event {
-        RealtimeEvent::Disconnected { reason } => Some(reason.clone()),
-        _ => None,
-    });
-    assert!(lost.is_some_and(|reason| reason.contains("sent nothing")), "{:?}", lock(&events));
-}
 
 #[test]
 fn joins_a_project_the_server_pushes_without_being_asked() {

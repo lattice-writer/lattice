@@ -143,6 +143,14 @@ impl OverleafBridge {
             .is_some_and(|doc| doc.send.is_some() || !doc.ot.settled())
     }
 
+    /// Some document's last send has no proven outcome, so regular sync is
+    /// paused on it (`uncertain`), for a scenario that checks a drop was
+    /// taken as one.
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+    pub fn unconfirmed(&self) -> bool {
+        !self.documents.uncertain.is_empty()
+    }
+
     /// `path` is live with typing still coalescing: its buffer is ahead of
     /// the positions review has for it until the typing is handed over.
     pub fn typing_unsent(&self, path: &str) -> bool {
