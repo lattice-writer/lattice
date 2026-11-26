@@ -131,7 +131,8 @@ export const E2E_TABLE = [
 ];
 
 /**
- * The modules that exercise the directory of a file no `covers` names:
+ * The modules that exercise the directory of a file no `covers` names
+ * (never for lattice-gpui's shell/):
  * those covering something under its own module directory (`x/` for
  * `x.rs`), else under the nearest directory above it that any module covers
  * something in, stopping short of the crate's `src/`, else the module named
@@ -139,7 +140,9 @@ export const E2E_TABLE = [
  */
 export function dirModules(file, covers = MODULE_COVERS) {
   const src = /^gpui\/crates\/[^/]+\/src\//.exec(file)?.[0];
-  if (!src) return [];
+  // shell/ holds the root view's feature flows: a module covering one of
+  // them says nothing about another, so one no covers names runs it all.
+  if (!src || file.startsWith("gpui/crates/lattice-gpui/src/shell/")) return [];
   const prefixes = [file.replace(/\.rs$/, "/")];
   for (let dir = file.slice(0, file.lastIndexOf("/") + 1); dir.length > src.length; dir = dir.slice(0, dir.slice(0, -1).lastIndexOf("/") + 1)) prefixes.push(dir);
   for (const prefix of prefixes) {

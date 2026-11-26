@@ -69,6 +69,10 @@ describe("ci-local-select: the e2e a change needs", () => {
     }
   });
 
+  it("runs the whole scenario for a shell/ flow no module covers", () => {
+    expect(dirModules("gpui/crates/lattice-gpui/src/shell/settings_flow.rs", covers)).toEqual([]);
+  });
+
   it("runs the documents and find_in_file modules for project find and replace", () => {
     for (const file of ["gpui/crates/lattice-gpui/src/search/find.rs", "gpui/crates/lattice-gpui/src/search/replace.rs"]) {
       expect(e2eNeeds([file], covers), file).toMatchObject({ full: false, modules: ["documents", "find_in_file"] });

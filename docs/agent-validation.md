@@ -170,7 +170,7 @@ manifests, each crate's `main.rs`/`lib.rs` and the app's `app.rs`,
 the vendored crates under `gpui/compat/` (gpui-fast, which draws every
 window, gpui-pre and libsqlite3-sys), lattice-ui, lattice-i18n's code,
 lattice-core, and lattice-gpui's root view and native input (`shell.rs` and
-the root-view files split out of it under `shell/`, `native.rs` and
+every file under `shell/` that no module's `covers` names, `native.rs` and
 `native/`, the private pasteboard among them). Any other file picks the modules whose `covers` name it, else
 the table's row for it, else the modules that exercise its directory
 (`dirModules`: those covering something under `x/` for `x.rs`, else under
