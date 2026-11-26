@@ -1945,6 +1945,14 @@
       "tier": "flaky",
       "reason": "Linux: failed in main run 45697918320 (881a0c9ac), where its module rerun timed out without a result, and failed twice (its module rerun) in branch run 45717317312, and passed in main runs 45713416093 and 45716281447; observed {\"panels_before\":4,\"panels_after\":5}: the pointer's path across the row reached the submenu, which opened a split",
       "followup": "LEO-129"
+    },
+    {
+      "step": "PDF: resting on a compound's number shows its chemnum key, and a click on the number copies \\cmpd{key}",
+      "platforms": [
+        "linux"
+      ],
+      "reason": "Linux: failed in branch run 45777036795 (gpui.yml full=true at 183f98d51, #1296's head, merged as 41dfb2672) and again in its module rerun, while macOS and Windows passed it in the same run; the step was first reached on Linux there, once chemnum was installed; observed {\"built\":true,\"shown\":true,\"card\":null}",
+      "followup": "LEO-144"
     }
   ]
 }
