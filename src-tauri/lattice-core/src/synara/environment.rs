@@ -31,6 +31,12 @@ const PROXY_NAMES: &[&str] = &[
 /// that sets this. A writing app has no simulator to drive, so no layer may
 /// hand it to the sidecar.
 const DEVICE_CONTROL_ENTITLEMENT: &str = "LATTICE_DEVICE_CONTROL_ENABLED";
+/// A Lattice started from a shell that forces colour (a dev or test script)
+/// would otherwise hand it to every provider CLI the sidecar pipes: Claude
+/// Code then writes its errors with SGR codes, and the fork shows them, and
+/// caches them, as provider status text (LEO-58). Nothing the sidecar runs
+/// reads a terminal, and its own terminals pin their colour themselves.
+const FORCED_COLOR: &[&str] = &["FORCE_COLOR", "CLICOLOR_FORCE"];
 /// Every variable of these families configures a provider CLI: Claude Code
 /// pointed at Kimi, GLM or DeepSeek through `ANTHROPIC_BASE_URL`, its model
 /// overrides, Codex's `OPENAI_BASE_URL`.
@@ -173,6 +179,9 @@ impl AgentEnvironment {
         }
         // Not even from Lattice's launch, which the sidecar inherits.
         command.env_remove(DEVICE_CONTROL_ENTITLEMENT);
+        for name in FORCED_COLOR {
+            command.env_remove(name);
+        }
     }
 
     /// Whether a sidecar started with `self` would now start differently.
@@ -278,8 +287,27 @@ mod tests {
         // As if the login shell or Lattice's own launch exported it.
         command.env(DEVICE_CONTROL_ENTITLEMENT, "true");
         AgentEnvironment::default().apply(&mut command);
-        let removed = (std::ffi::OsStr::new(DEVICE_CONTROL_ENTITLEMENT), None);
-        assert_eq!(command.get_envs().collect::<Vec<_>>(), [removed]);
+        assert_eq!(command_env_entry(&command, DEVICE_CONTROL_ENTITLEMENT), Some(None));
+    }
+
+    #[test]
+    fn the_sidecar_never_receives_forced_color() {
+        let mut command = Command::new("node");
+        // As if Lattice was started from a script that forces colour.
+        command.env("FORCE_COLOR", "1").env("CLICOLOR_FORCE", "1").env("NO_COLOR", "1");
+        AgentEnvironment::default().apply(&mut command);
+        assert_eq!(command_env_entry(&command, "FORCE_COLOR"), Some(None));
+        assert_eq!(command_env_entry(&command, "CLICOLOR_FORCE"), Some(None));
+        assert_eq!(command_env_entry(&command, "NO_COLOR"), Some(Some("1".into())));
+    }
+
+    /// What `command` does with `name`: `None` when it leaves it alone,
+    /// `Some(None)` when it removes it, `Some(Some(value))` when it sets it.
+    fn command_env_entry(command: &Command, name: &str) -> Option<Option<std::ffi::OsString>> {
+        command
+            .get_envs()
+            .find(|(key, _)| *key == name)
+            .map(|(_, value)| value.map(std::ffi::OsStr::to_os_string))
     }
 
     #[test]
