@@ -37,9 +37,13 @@
  * for a tag, the schedule, a dispatch on main or with `full`, a dispatch
  * whose branch changes nothing against its base (a baseline of main), a head
  * commit with a `CI: full` trailer, or an open pull request labelled
- * `ci:full`. A push to main is compared with the commit before it; any
- * other push or dispatch with its merge base with origin/main, or with the
- * dispatch's `base`. A head commit whose `CI-local: macos <tree> …` trailer
+ * `ci:full`. A push to main is compared with the last main commit whose run
+ * of the same workflow is running or finished without being cancelled
+ * (mainPushBase): main's pushes share one concurrency group per workflow, so
+ * a newer push replaces one still pending, and the run that goes ahead has to
+ * cover the merges it replaced. With no such run it runs every job. Any
+ * other push or dispatch is compared with its merge base with origin/main, or
+ * with the dispatch's `base`. A head commit whose `CI-local: macos <tree> …` trailer
  * names its own tree (printed by `pnpm ci:local` after a green local pass)
  * skips each macOS job (Rust, GPUI, the WebKit benchmark) whose stages the
  * trailer records and whose needs they cover (scripts/ci-local-select.mjs):
@@ -231,6 +235,35 @@ export function wantsFull(message, labels = []) {
   return /^CI:\s*full\s*$/im.test(message) || labels.includes("ci:full");
 }
 
+/**
+ * The run a push to main is compared with: the newest run of this workflow
+ * on main, other than this one and not at HEAD, that holds or held the
+ * concurrency group (queued, in progress, or completed without being
+ * cancelled) and whose commit is an ancestor of HEAD. A pending run may still
+ * be replaced, and a cancelled one may not have run its jobs, so neither
+ * counts: skipping a run only widens the diff. `runs` come newest first, as
+ * GitHub lists them; null means no run qualifies and every job runs.
+ */
+export function mainPushBase(runs, { runId, head, isAncestor }) {
+  return (
+    runs.find(
+      (run) =>
+        String(run.id) !== String(runId) &&
+        run.head_sha !== head &&
+        (run.status === "queued" || run.status === "in_progress" || (run.status === "completed" && run.conclusion !== "cancelled")) &&
+        isAncestor(run.head_sha),
+    ) ?? null
+  );
+}
+
+function mainRuns() {
+  const repository = process.env.GITHUB_REPOSITORY;
+  const workflow = (process.env.GITHUB_WORKFLOW_REF ?? "").split("@")[0].split("/").pop();
+  if (!repository || !workflow || !process.env.GH_TOKEN) throw new Error("no repository, workflow or token");
+  const out = execFileSync("gh", ["api", `repos/${repository}/actions/workflows/${workflow}/runs?branch=main&per_page=100`, "--jq", "[.workflow_runs[] | {id, head_sha, status, conclusion}]"], { encoding: "utf8" });
+  return JSON.parse(out || "[]");
+}
+
 function pullRequestLabels(branch) {
   const repository = process.env.GITHUB_REPOSITORY;
   if (!repository || !branch || !process.env.GH_TOKEN) return [];
@@ -257,16 +290,25 @@ function github() {
   else if (wantsFull(message, pullRequestLabels(branch))) reason = "a `CI: full` trailer or the `ci:full` label";
 
   let base = null;
+  let baseRun = null;
   if (!reason && process.env.INPUT_BASE) base = git("rev-parse", "--verify", `${process.env.INPUT_BASE}^{commit}`);
   else if (!reason && event === "push" && branch === "main") {
-    const before = process.env.BEFORE ?? "";
+    const head = git("rev-parse", "HEAD");
+    const isAncestor = (sha) => {
+      try {
+        git("merge-base", "--is-ancestor", sha, "HEAD");
+        return true;
+      } catch {
+        return false;
+      }
+    };
     try {
-      if (!before || /^0+$/.test(before)) throw new Error("no previous commit");
-      git("merge-base", "--is-ancestor", before, "HEAD");
-      base = before;
-    } catch {
-      reason = "a push to main whose previous commit is unknown";
+      baseRun = mainPushBase(mainRuns(), { runId: process.env.GITHUB_RUN_ID, head, isAncestor });
+    } catch (error) {
+      console.log(`ci-tier: could not list this workflow's runs on main (${error.message.split("\n")[0]})`);
     }
+    if (baseRun) base = baseRun.head_sha;
+    else reason = "a push to main with no earlier run of this workflow on main to compare with";
   } else if (!reason) base = git("merge-base", "origin/main", "HEAD");
 
   const files = base ? git("-c", "core.quotePath=false", "diff", "--no-renames", "--name-only", base, "HEAD").split("\n").filter(Boolean) : [];
@@ -288,6 +330,7 @@ function github() {
   const webkitSkipped = trailerHonoured({ full: tier.full, event, ref }) && (cover ? local.webkit.covered : !macosNeeds(tier, gated).webkit);
   const lines = [
     reason ? `Every job: ${reason}.` : `Compared with ${base.slice(0, 9)}: ${files.length} changed file(s).`,
+    ...(baseRun ? [`That is the last main commit this workflow ran for (run ${baseRun.id}, ${baseRun.status}); this run covers the ${git("rev-list", "--count", `${base}..HEAD`)} commit(s) since.`] : []),
     ...(docsRefused ? [`The head commit's docs-only trailer is not taken: ${docsRefused}.`] : []),
     ...(tier.jobs["perf-bench"] && !cover && webkitSkipped ? ["macOS WebKit benchmark: skipped, the branch does not touch its tooling (touchesWebkitBench)."] : []),
     ...(cover
@@ -321,6 +364,7 @@ function github() {
     "windows-e2e": windows.e2e,
     "linux-e2e": linux.e2e,
     full: tier.full,
+    base: base ?? "",
   };
   if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, Object.entries(outputs).map(([key, value]) => `${key}=${value}\n`).join(""));
 }

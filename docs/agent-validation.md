@@ -116,8 +116,11 @@ scenario. `scripts/windows-e2e-tier.mjs` decides, and the `changes` job's
 summary says which and why; `node scripts/ci-tier.mjs` prints it for your
 branch as `windowsE2e`.
 
-A newer push to a branch cancels its older run. A push to main runs what that
-merge changed and is never cancelled. Everything runs for a release tag, the
+A newer push to a branch cancels its older run. A push to main is never
+cancelled once it starts, but a newer push replaces one still waiting; the run
+that goes ahead compares with the last main commit its workflow ran for, so it
+covers every merge it replaced, and its `changes` summary names that commit.
+With no such run it runs every job. Everything runs for a release tag, the
 weekly schedule, a dispatch on main, `gh workflow run ci.yml --ref <branch> -f
 full=true`, a head commit with a `CI: full` trailer, or a pull request labelled
 `ci:full`. A dispatch's `-f base=<ref>` compares with another ref, such as the

@@ -2,7 +2,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { GPUI_INPUTS, JOBS, ciTier, localMacosPass, trailerHonoured, wantsFull } from "./ci-tier.mjs";
+import { GPUI_INPUTS, JOBS, ciTier, localMacosPass, mainPushBase, trailerHonoured, wantsFull } from "./ci-tier.mjs";
 
 const repo = path.resolve(import.meta.dirname, "..");
 
@@ -103,5 +103,52 @@ describe("ci-tier", () => {
     expect(trailerHonoured({ full: false, event: "push", ref: "refs/heads/main" })).toBe(false);
     expect(trailerHonoured({ full: false, event: "push", ref: "refs/tags/v0.19.3" })).toBe(false);
     expect(trailerHonoured({ full: true, event: "push", ref: "refs/heads/capy/topic" })).toBe(false);
+  });
+
+  describe("mainPushBase", () => {
+    const ancestors = new Set(["c3", "c2", "c1"]);
+    const base = (runs) => mainPushBase(runs, { runId: 9, head: "c4", isAncestor: (sha) => ancestors.has(sha) })?.head_sha ?? null;
+
+    it("compares with the newest run that holds or held the group", () => {
+      expect(base([{ id: 8, head_sha: "c3", status: "in_progress" }, { id: 7, head_sha: "c2", status: "completed", conclusion: "success" }])).toBe("c3");
+      expect(base([{ id: 8, head_sha: "c3", status: "queued" }])).toBe("c3");
+      expect(base([{ id: 8, head_sha: "c3", status: "completed", conclusion: "failure" }])).toBe("c3");
+    });
+
+    it("reaches past runs a newer push replaced or someone cancelled", () => {
+      expect(
+        base([
+          { id: 8, head_sha: "c3", status: "completed", conclusion: "cancelled" },
+          { id: 7, head_sha: "c2", status: "pending" },
+          { id: 6, head_sha: "c1", status: "completed", conclusion: "success" },
+        ]),
+      ).toBe("c1");
+    });
+
+    it("skips this run, its own commit and commits that are not ancestors", () => {
+      expect(
+        base([
+          { id: 9, head_sha: "c3", status: "in_progress" },
+          { id: 5, head_sha: "c4", status: "completed", conclusion: "success" },
+          { id: 4, head_sha: "elsewhere", status: "completed", conclusion: "success" },
+          { id: 3, head_sha: "c2", status: "completed", conclusion: "success" },
+        ]),
+      ).toBe("c2");
+    });
+
+    it("finds nothing, so every job runs, when no run qualifies", () => {
+      expect(base([])).toBe(null);
+      expect(base([{ id: 8, head_sha: "c3", status: "completed", conclusion: "cancelled" }])).toBe(null);
+    });
+  });
+
+  it("queues main's pushes in one group per workflow and leaves tags and dispatches by commit", () => {
+    for (const [file, prefix] of [["ci.yml", "ci"], ["gpui.yml", "gpui"]]) {
+      const text = readFileSync(path.join(repo, ".github/workflows", file), "utf8");
+      const block = text.slice(text.indexOf("\nconcurrency:"), text.indexOf("\n\n", text.indexOf("\nconcurrency:")));
+      expect(block).toContain(`group: ${prefix}-${"${{ github.ref }}"}-${"${{"} (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'push' || (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && github.sha || 'branch' }}`);
+      expect(block).toContain("cancel-in-progress: ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/') }}");
+      expect(text).toMatch(/\n {2}changes:\n[\s\S]*?permissions:\n(?: {6}.*\n)*? {6}actions: read\n/);
+    }
   });
 });

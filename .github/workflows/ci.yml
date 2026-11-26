@@ -7,7 +7,9 @@ name: CI
 # push to a branch cancels the older run. Everything runs for a release tag,
 # weekly on main, for a dispatch on main or with `full`, and for a head commit
 # with a `CI: full` trailer or a pull request labelled `ci:full`. A push to
-# main runs what that merge changed and is never cancelled.
+# main is never cancelled once it starts, but a newer push replaces one still
+# waiting, and the run that goes ahead runs what changed since the last main
+# commit this workflow ran for, so the replaced merges are still tested.
 #
 # Pull requests still have no trigger of their own: a branch in this
 # repository already ran on its push, and code from a fork runs nothing here.
@@ -37,10 +39,13 @@ on:
         default: ""
 
 # One run per branch: a newer push or dispatch cancels the one in progress.
-# Main and tags group by commit instead, so every merge and release runs to
-# its end, and a dispatch for a commit already running queues behind it.
+# Pushes to main share one group that never cancels a started run: GitHub
+# keeps the running one and only the newest waiting one, which compares with
+# the last main commit this workflow ran for (ci-tier's mainPushBase) to cover
+# the merges it replaced. Tags, the schedule and dispatches on main group by
+# commit, so every release and every requested full run goes to its end.
 concurrency:
-  group: ci-${{ github.ref }}-${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && github.sha || 'branch' }}
+  group: ci-${{ github.ref }}-${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'push' || (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && github.sha || 'branch' }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/') }}
 
 # The work is split so the wall clock is the slowest single job rather than the
@@ -59,6 +64,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
+      actions: read
       contents: read
       pull-requests: read
     outputs:
@@ -73,6 +79,7 @@ jobs:
       open-slide-runtime: ${{ steps.tier.outputs.open-slide-runtime }}
       research-env: ${{ steps.tier.outputs.research-env }}
       synara-pin: ${{ steps.tier.outputs.synara-pin }}
+      base: ${{ steps.tier.outputs.base }}
     steps:
       # The whole history without file contents, for the merge base with main.
       - uses: actions/checkout@v7
@@ -82,7 +89,6 @@ jobs:
       - id: tier
         env:
           GH_TOKEN: ${{ github.token }}
-          BEFORE: ${{ github.event.before }}
           INPUT_FULL: ${{ inputs.full }}
           INPUT_BASE: ${{ inputs.base }}
         run: node scripts/ci-tier.mjs --github
@@ -90,8 +96,8 @@ jobs:
   # A Synara pin move must keep the fork's history linear: the pin reachable
   # from its declared branch, and the previous pin its ancestor, so a pin cut
   # from a side branch cannot drop another lane's Synara change. The previous
-  # pin is the base's (the prior commit on a push to main, the merge base with
-  # main on a branch). It fetches only the fork's commits and needs no
+  # pin is the base's (on a push to main, the commit the changes job compared
+  # with, else the prior commit; the merge base with main on a branch). It fetches only the fork's commits and needs no
   # install; the script exits at once when the pin did not move.
   synara-pin:
     needs: changes
@@ -102,8 +108,10 @@ jobs:
         with:
           fetch-depth: 0
           filter: blob:none
-      - run: |
-          if [ "$GITHUB_REF" = refs/heads/main ]; then base=HEAD^1; else base=$(git merge-base origin/main HEAD); fi
+      - env:
+          BASE: ${{ needs.changes.outputs.base }}
+        run: |
+          if [ "$GITHUB_REF" = refs/heads/main ]; then base=${BASE:-HEAD^1}; else base=$(git merge-base origin/main HEAD); fi
           node scripts/check-synara-pin.mjs "$base"
 
   test:
