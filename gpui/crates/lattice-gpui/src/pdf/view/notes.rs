@@ -528,7 +528,13 @@ impl PdfView {
         let content = div()
             .id("pdf-note-card")
             .occlude()
-            .child(card::comment_card(&[note], on, px(320.), cx));
+            .child(card::comment_card(
+                &[note],
+                on,
+                px(320.),
+                &Default::default(),
+                cx,
+            ));
         let painted = self.notes.card_bounds.clone();
         let id = SharedString::from(format!("pdf-note-{id}"));
         Some(self.hover_card(id, about, px(320.), painted, content, window, cx))
@@ -542,6 +548,7 @@ impl PdfView {
             let request = match event {
                 CardEvent::Resolve(id) => AnnotationRequest::Resolve(id),
                 CardEvent::Reply(id) => AnnotationRequest::Reply(id),
+                CardEvent::Share(id) => AnnotationRequest::ShareToOverleaf(id),
             };
             view.update(cx, |this, cx| {
                 this.notes.card = None;

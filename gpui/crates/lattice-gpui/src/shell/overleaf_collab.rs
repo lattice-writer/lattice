@@ -134,4 +134,73 @@ impl Shell {
         });
         self.reveal_tool("comments", window, cx);
     }
+
+    /// Post the local note `id` as an Overleaf comment on its passage, in a
+    /// file live with Overleaf (its card's Share to Overleaf). Once Overleaf
+    /// has it, the note is resolved here, so the passage shows Overleaf's
+    /// thread alone; its words and replies stay in the project's notes.
+    pub(crate) fn share_annotation(
+        &mut self,
+        id: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(root) = self.root(cx) else {
+            return;
+        };
+        if self.overleaf.read(cx).link().is_none() {
+            return;
+        }
+        let Some(note) = crate::annotations::store::try_store(cx)
+            .and_then(|store| store.read(cx).get(&root, id).cloned())
+        else {
+            return;
+        };
+        let notice = |message: gpui::SharedString, cx: &mut Context<Self>| {
+            crate::notices::show(
+                crate::notices::Notice::new(lattice_ui::components::ToastLevel::Info, message),
+                cx,
+            )
+        };
+        if self.overleaf.read(cx).live_file() != Some(note.path.as_str()) {
+            return notice(
+                t!("Comments go to Overleaf once this file is open live with it.").into(),
+                cx,
+            );
+        }
+        let passage = self
+            .open_editors()
+            .into_iter()
+            .find(|editor| editor.read(cx).relative() == note.path)
+            .and_then(|editor| editor.read(cx).annotation_overleaf_range(id, cx));
+        let Some((from, quote)) = passage else {
+            return notice(
+                t!("The selected text changed. Select it again before commenting.").into(),
+                cx,
+            );
+        };
+        let body = crate::annotations::model::note_text(&note);
+        if body.trim().is_empty() {
+            return;
+        }
+        let shared = id.to_string();
+        self.overleaf.update(cx, |bridge, cx| {
+            bridge.add_comment(
+                &note.path,
+                from,
+                quote,
+                body,
+                move |cx| {
+                    let store = crate::annotations::store::store(cx);
+                    store.update(cx, |store, cx| store.set_resolved(&root, &shared, true, cx));
+                },
+                cx,
+            )
+        });
+        self.open_overleaf_collab(
+            Some(crate::overleaf::collab::CollabTab::Comments),
+            window,
+            cx,
+        );
+    }
 }

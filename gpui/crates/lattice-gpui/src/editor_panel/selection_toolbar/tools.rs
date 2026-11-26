@@ -70,6 +70,21 @@ impl EditorPanel {
             }),
             cx,
         ));
+        // In a linked project the note can go to Overleaf instead, as the
+        // PDF's Comment on Overleaf does.
+        if self.toolbar_offers_overleaf_comment() {
+            bar = bar.child(tool(
+                "latex-comment-overleaf",
+                Icon::LEAF,
+                t!("Comment on Overleaf"),
+                None,
+                false,
+                cx.listener(|this, _, window, cx| {
+                    this.toolbar_action(ToolbarAction::CommentOnOverleaf, window, cx)
+                }),
+                cx,
+            ));
+        }
         // The agent's Proofread and Polish, and Rewrite by an instruction.
         if self.can_proofread(cx) {
             let proofread_keys = if cfg!(target_os = "macos") {
@@ -315,6 +330,18 @@ impl EditorPanel {
             }),
             cx,
         ))
+        .when(self.toolbar_offers_overleaf_comment(), |bar| {
+            bar.child(md_tool(
+                "markdown-comment-overleaf",
+                Icon::LEAF,
+                t!("Comment on Overleaf"),
+                None,
+                cx.listener(|this, _, window, cx| {
+                    this.toolbar_action(ToolbarAction::CommentOnOverleaf, window, cx)
+                }),
+                cx,
+            ))
+        })
         .into_any_element()
     }
 }

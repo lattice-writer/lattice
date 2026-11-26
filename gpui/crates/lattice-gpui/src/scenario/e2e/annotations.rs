@@ -5,7 +5,10 @@
 //! `.research/annotations.json`; its passage marked, its pin drawn in the
 //! gutter and the status bar counting it; the titlebar's Annotations button
 //! opening the panel, which lists it; a second note typed and closed with
-//! Esc offered back as "Note discarded"; the first resolved from the panel,
+//! Esc offered back as "Note discarded"; the note's words in its card,
+//! opened under the pointer, selected with a native drag and copied with
+//! ⌘C, with nothing offering Overleaf in this unlinked project; the first
+//! resolved from the panel,
 //! leaving the counter at none; and the project's annotations put back as
 //! they were.
 
@@ -13,11 +16,16 @@ use std::{path::Path, time::Duration};
 
 use anyhow::Result;
 use editor::SelectionEffects;
-use gpui::AsyncApp;
+use gpui::{AsyncApp, Entity, Pixels, Point, px};
 use serde_json::json;
 
 use super::Steps;
-use crate::{annotations::store, scenario::Run};
+use crate::{
+    annotations::{card::PaintedNote, store},
+    editor_panel::EditorPanel,
+    native,
+    scenario::Run,
+};
 
 const QUOTE: &str = "introduces the document";
 const SECOND: &str = "second line";
@@ -126,6 +134,37 @@ impl Run {
             json!({ "placed": placed, "pin": pin, "counted": counted }),
         );
 
+        // Its card, opened under the pointer: the note's words selected with
+        // a native drag, and ⌘C copies them, though the editor keeps the
+        // keyboard. Nothing here offers Overleaf, the project not linked.
+        let id = cx.update(|cx| {
+            store::try_store(cx).and_then(|store| {
+                store
+                    .read(cx)
+                    .annotations(root)
+                    .into_iter()
+                    .find(|comment| comment.quote == QUOTE)
+                    .map(|comment| comment.id.clone())
+            })
+        });
+        let copied = match &id {
+            Some(id) => self.copy_note_words(cx, &editor, QUOTE, id).await?,
+            None => None,
+        };
+        let shared = id.as_ref().and_then(|id| {
+            cx.update(|cx| editor.read(cx).annotation_card_parts())
+                .into_iter()
+                .find(|note| &note.id == id)
+                .map(|note| note.share.is_some())
+        });
+        select(self, cx, QUOTE)?;
+        let toolbar_offers = cx.update(|cx| editor.read(cx).toolbar_offers_overleaf_comment());
+        steps.check(
+            "a note's words in its card are selected with a drag and copied with ⌘C; unlinked, neither the selection toolbar nor the card offers Overleaf",
+            copied.as_deref() == Some(NOTE) && shared == Some(false) && !toolbar_offers,
+            json!({ "id": id, "copied": copied, "card_shares": shared, "toolbar_offers": toolbar_offers }),
+        );
+
         // The titlebar's button opens the panel, which lists it.
         self.dispatch_to_shell(cx, &crate::shell::ShowAnnotations)?;
         let listed = self
@@ -204,6 +243,89 @@ impl Run {
         }
         cx.update(|cx| crate::status_counters::refresh(root.to_path_buf(), cx));
         Ok(())
+    }
+}
+
+impl Run {
+    /// Open the card of the note on `quote` under the pointer, natively,
+    /// the caret moved off the passage first so the selection toolbar is
+    /// not over it; what the card drew of the note `id` once it shows.
+    pub(super) async fn open_note_card(
+        &self,
+        cx: &mut AsyncApp,
+        editor: &Entity<EditorPanel>,
+        quote: &str,
+        id: &str,
+    ) -> Result<Option<PaintedNote>> {
+        let text = self.editor_text(cx, editor);
+        let after = text
+            .find(quote)
+            .map(|start| start + quote.len())
+            .and_then(|end| text.get(end..))
+            .and_then(|rest| rest.lines().next())
+            .unwrap_or_default()
+            .to_string();
+        if !after.is_empty() {
+            self.reveal(cx, editor, &after).await?;
+        }
+        let lattice = cx.update(|cx| editor.read(cx).lattice_editor().clone());
+        let (_, at) = self
+            .text_point(cx, editor, &lattice, quote, quote.len() / 2)
+            .await?;
+        self.hover_at(cx, at.center()).await?;
+        if self.wait_for_card(cx, &lattice, "annotation").await.is_none() {
+            return Ok(None);
+        }
+        let watched = editor.clone();
+        let wanted = id.to_string();
+        self.wait_for(cx, Duration::from_secs(3), move |_, cx| {
+            watched
+                .read(cx)
+                .annotation_card_parts()
+                .iter()
+                .any(|note| note.id == wanted)
+        })
+        .await;
+        Ok(cx.update(|cx| {
+            editor
+                .read(cx)
+                .annotation_card_parts()
+                .into_iter()
+                .find(|note| note.id == id)
+        }))
+    }
+
+    /// The note `id`'s words selected in its card with a native drag across
+    /// them, and what ⌘C put on the clipboard.
+    async fn copy_note_words(
+        &self,
+        cx: &mut AsyncApp,
+        editor: &Entity<EditorPanel>,
+        quote: &str,
+        id: &str,
+    ) -> Result<Option<String>> {
+        let _front = self.focused(cx, "annotation card copy").await?;
+        let Some(note) = self.open_note_card(cx, editor, quote, id).await? else {
+            return Ok(None);
+        };
+        cx.update(|cx| cx.write_to_clipboard(gpui::ClipboardItem::new_string(String::new())));
+        // From the first line's start to past the last line's end.
+        let line: Pixels = px(8.);
+        let from: Point<Pixels> = gpui::point(note.text.left() + px(1.), note.text.top() + line);
+        let to = gpui::point(note.text.right() - px(1.), note.text.bottom() - line);
+        let native = self.native(cx)?;
+        native::send_mouse(native, native::Mouse::Down, from)?;
+        for step in 1..=12 {
+            let t = step as f32 / 12.;
+            let at = gpui::point(from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t);
+            self.pause(cx, Duration::from_millis(16)).await;
+            native::send_mouse(native, native::Mouse::Dragged, at)?;
+        }
+        native::send_mouse(native, native::Mouse::Up, to)?;
+        self.pause(cx, Duration::from_millis(200)).await;
+        self.press(cx, 'c', true).await?;
+        self.pause(cx, Duration::from_millis(200)).await;
+        Ok(cx.update(|cx| cx.read_from_clipboard().and_then(|item| item.text())))
     }
 }
 

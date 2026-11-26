@@ -84,6 +84,8 @@ pub(super) enum ToolbarAction {
     Markdown(MdFormat),
     Block(BlockType),
     Annotate,
+    /// Start an Overleaf comment on the selection, in a linked project.
+    CommentOnOverleaf,
 }
 
 /// Each menu's trigger bounds, shared with the paint that records them.
@@ -334,8 +336,15 @@ impl EditorPanel {
         })
     }
 
+    /// Whether the toolbar offers Comment on Overleaf: the file is in a
+    /// project linked to Overleaf.
+    pub fn toolbar_offers_overleaf_comment(&self) -> bool {
+        self.overleaf_save().is_some()
+    }
+
     /// Press one of the toolbar's tools by name (scripted runs): `bold`,
-    /// `pen`, `unhighlight`, a block such as `heading-1` in Markdown, or
+    /// `pen`, `unhighlight`, `comment-overleaf` (only where it is offered),
+    /// a block such as `heading-1` in Markdown, or
     /// `custom`, the highlight palette's "+" (its custom colour view).
     #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn scripted_toolbar(&mut self, name: &str, window: &mut Window, cx: &mut Context<Self>) {
@@ -346,6 +355,9 @@ impl EditorPanel {
             "pen" => ToolbarAction::Highlight(highlight_palette::prefs(cx).last.clone()),
             "unhighlight" => ToolbarAction::Unhighlight,
             "heading-1" => ToolbarAction::Block(BlockType::Heading(1)),
+            "comment-overleaf" if self.toolbar_offers_overleaf_comment() => {
+                ToolbarAction::CommentOnOverleaf
+            }
             "palette" => {
                 self.open_menu(Menu::Highlight, window, cx);
                 return;
@@ -450,6 +462,13 @@ impl EditorPanel {
             self.annotate_selection(window, cx);
             return;
         }
+        if let ToolbarAction::CommentOnOverleaf = action {
+            self.dismiss_toolbar(cx);
+            cx.emit(super::EditorPanelEvent::Annotation(
+                crate::annotations::AnnotationRequest::CommentOnOverleaf,
+            ));
+            return;
+        }
         let text = self.buffer.read(cx).text();
         let edit = match action {
             ToolbarAction::Latex(format) => {
@@ -468,7 +487,7 @@ impl EditorPanel {
             ToolbarAction::Unhighlight => highlights::highlight_edit(&text, range, None),
             ToolbarAction::Markdown(format) => markdown_format::toggle_inline(&text, range, format),
             ToolbarAction::Block(block) => markdown_format::set_block(&text, range, block),
-            ToolbarAction::Annotate => None,
+            ToolbarAction::Annotate | ToolbarAction::CommentOnOverleaf => None,
         };
         if let Some(edit) = edit {
             self.apply_text_edit(edit, window, cx);

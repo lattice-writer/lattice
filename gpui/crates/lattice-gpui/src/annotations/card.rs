@@ -5,13 +5,14 @@
 //! author and the time with Resolve as a check at the line's end, the note,
 //! the replies, and Reply.
 
-use std::sync::LazyLock;
+use std::{cell::RefCell, rc::Rc, sync::LazyLock};
 
 use gpui::{
-    AnyElement, App, FontWeight, Hsla, InteractiveElement as _, IntoElement, ParentElement as _,
-    SharedString, StatefulInteractiveElement as _, Styled as _, div, prelude::FluentBuilder as _,
-    px,
+    AnyElement, App, Bounds, FontWeight, Hsla, InteractiveElement as _, IntoElement,
+    ParentElement as _, Pixels, SharedString, StatefulInteractiveElement as _, Styled as _, canvas,
+    div, prelude::FluentBuilder as _, px,
 };
+use gpui_kit::base::{SelectableText, TextSelection};
 use lattice_core::project::EditorComment;
 use lattice_i18n::{t, tc};
 use lattice_ui::{
@@ -133,6 +134,59 @@ pub enum CardEvent {
     Resolve(String),
     /// Reply to the note: its reply box in the Annotations panel.
     Reply(String),
+    /// Post the note as an Overleaf comment on its passage.
+    Share(String),
+}
+
+/// What a card offers beyond Resolve and Reply, and where it drew the parts
+/// scripted checks press.
+#[derive(Clone, Default)]
+pub struct CardParts {
+    /// Offer Share to Overleaf on each note (a project linked to Overleaf).
+    pub share: bool,
+    /// Each note's id, its text and its Share to Overleaf, as last drawn.
+    pub painted: Rc<RefCell<Vec<PaintedNote>>>,
+}
+
+#[derive(Clone, Debug)]
+pub struct PaintedNote {
+    pub id: String,
+    pub text: Bounds<Pixels>,
+    pub share: Option<Bounds<Pixels>>,
+}
+
+impl CardParts {
+    /// Record where note `id`'s text (`share` false) or its Share to
+    /// Overleaf was drawn.
+    fn recorder(&self, id: &str, share: bool) -> impl IntoElement {
+        let (painted, id) = (self.painted.clone(), id.to_string());
+        canvas(
+            move |bounds, _, _| {
+                let mut painted = painted.borrow_mut();
+                let index = match painted.iter().position(|note| note.id == id) {
+                    Some(index) => index,
+                    None => {
+                        painted.push(PaintedNote {
+                            id: id.clone(),
+                            text: bounds,
+                            share: None,
+                        });
+                        painted.len() - 1
+                    }
+                };
+                if share {
+                    painted[index].share = Some(bounds);
+                } else {
+                    painted[index].text = bounds;
+                }
+            },
+            |_, _, _, _| {},
+        )
+        .absolute()
+        .top_0()
+        .left_0()
+        .size_full()
+    }
 }
 
 /// Who wrote it and when, with the pin in place of a colour dot.
@@ -182,9 +236,10 @@ pub fn comment_card(
     comments: &[EditorComment],
     on: CardAction,
     max_width: gpui::Pixels,
+    parts: &CardParts,
     cx: &App,
 ) -> AnyElement {
-    comment_card_sized(comments, on, CardWidth::Within(max_width), cx)
+    comment_card_sized(comments, on, CardWidth::Within(max_width), parts, cx)
 }
 
 /// How wide a card stands: a popup's own width within a bound, or the
@@ -200,6 +255,7 @@ pub fn comment_card_sized(
     comments: &[EditorComment],
     on: CardAction,
     width: CardWidth,
+    parts: &CardParts,
     cx: &App,
 ) -> AnyElement {
     let palette = cx.palette().clone();
@@ -220,7 +276,13 @@ pub fn comment_card_sized(
     .shadow(Elevation::Popover.shadows(&palette))
     .text_color(palette.text)
     .text_role(TextRole::Body, cx)
-    .on_mouse_down(gpui::MouseButton::Left, |_, _, cx| cx.stop_propagation());
+    // A press goes no further, except on a note's words, where it starts
+    // a selection to copy with ⌘C (the window's text selection layer).
+    .on_mouse_down(gpui::MouseButton::Left, |event, window, cx| {
+        if !TextSelection::is_selectable_at(event.position, window, cx) {
+            cx.stop_propagation();
+        }
+    });
     for (index, comment) in comments.iter().enumerate() {
         let id = comment.id.clone();
         let on_resolve = on.clone();
@@ -232,6 +294,19 @@ pub fn comment_card_sized(
             })
             .on_click(move |_, window, cx| on_resolve(CardEvent::Resolve(id.clone()), window, cx))
             .into_any_element();
+        let share = parts.share.then(|| {
+            let (id, on_share) = (comment.id.clone(), on.clone());
+            div()
+                .relative()
+                .child(
+                    IconButton::new(("annotation-card-share", index), Icon::LEAF)
+                        .tooltip(t!("Share to Overleaf"))
+                        .on_click(move |_, window, cx| {
+                            on_share(CardEvent::Share(id.clone()), window, cx)
+                        }),
+                )
+                .child(parts.recorder(&comment.id, true))
+        });
         let body = if comment.body.is_empty() {
             model::note_text(comment)
         } else {
@@ -279,7 +354,10 @@ pub fn comment_card_sized(
                                 .child(model::relative_time(&reply.created_at, true)),
                         ),
                 )
-                .child(div().ml(indent).min_w_0().child(reply.body.clone()))
+                .child(div().ml(indent).min_w_0().child(SelectableText::new(
+                    SharedString::from(format!("annotation-reply-text-{}", reply.id)),
+                    reply.body.clone(),
+                )))
         });
         let reply_id = comment.id.clone();
         let on_reply = on.clone();
@@ -312,16 +390,29 @@ pub fn comment_card_sized(
             })
             .child(meta(
                 comment,
-                Some(div().ml_auto().child(resolve).into_any_element()),
+                Some(
+                    div()
+                        .ml_auto()
+                        .flex()
+                        .items_center()
+                        .children(share)
+                        .child(resolve)
+                        .into_any_element(),
+                ),
                 &palette,
                 cx,
             ))
             .child(
                 div()
+                    .relative()
                     .ml(indent)
                     .min_w_0()
                     .whitespace_normal()
-                    .child(SharedString::from(body)),
+                    .child(SelectableText::new(
+                        SharedString::from(format!("annotation-card-text-{}", comment.id)),
+                        body,
+                    ))
+                    .child(parts.recorder(&comment.id, false)),
             )
             .when(!comment.replies.is_empty(), |this| {
                 this.child(
