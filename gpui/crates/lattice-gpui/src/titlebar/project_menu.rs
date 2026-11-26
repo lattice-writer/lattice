@@ -50,11 +50,11 @@ pub(super) fn project_menu(
     let exporting = shell
         .upgrade()
         .is_some_and(|shell| shell.read(cx).exporting_zip());
-    // A linked project's sync, paused or not (GPUI's own: the Tauri menu
-    // has no row for it); `Some(true)` while paused.
+    // A linked project's sync, while it may sync or is paused (GPUI's own:
+    // the Tauri menu has no row for it); `Some(true)` while paused.
     let overleaf_paused = shell.upgrade().and_then(|shell| {
         let bridge = shell.read(cx).overleaf.read(cx);
-        bridge.linked().then(|| bridge.paused())
+        (bridge.paused() || bridge.link().is_some()).then(|| bridge.paused())
     });
     RecentProjects::refresh(cx);
     let others = RecentProjects::others(current.as_deref(), cx);

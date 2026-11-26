@@ -47,6 +47,7 @@ msgid "Its span was deleted from the document."
 msgstr "它所在的文字已从文档中删除。"
 
 #: lattice-gpui/src/shell/commands/projects.rs
+#: lattice-gpui/src/titlebar/project_menu.rs
 msgid "Pause Overleaf sync"
 msgstr "暂停 Overleaf 同步"
 
@@ -67,6 +68,7 @@ msgid "Restore the whole project to this version on Overleaf?"
 msgstr "要在 Overleaf 上将整个项目恢复到此版本吗？"
 
 #: lattice-gpui/src/shell/commands/projects.rs
+#: lattice-gpui/src/titlebar/project_menu.rs
 msgid "Resume Overleaf sync"
 msgstr "恢复 Overleaf 同步"
 

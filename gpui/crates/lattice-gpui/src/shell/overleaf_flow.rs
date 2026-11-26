@@ -46,6 +46,9 @@ use crate::{
     },
 };
 
+/// The longest a pause waits for live typing to be answered.
+const PAUSE_SETTLE: std::time::Duration = std::time::Duration::from_secs(5);
+
 actions!(
     lattice,
     [
@@ -64,6 +67,8 @@ pub(crate) struct OverleafLayers {
     review: Option<(Entity<OverleafReview>, Subscription)>,
     /// Saving the window's editors before a sync or an upload.
     pending: Option<Task<()>>,
+    /// Saving and settling the live document before a pause.
+    pausing: Option<Task<()>>,
     /// The control's icon as last drawn, and how many times it changed:
     /// each change fades the new one in.
     swap: Cell<Option<(&'static str, u32)>>,
@@ -329,15 +334,33 @@ impl Shell {
     /// edits stay on this Mac until it resumes.
     pub(crate) fn pause_overleaf_sync(&mut self, cx: &mut Context<Self>) {
         let bridge = self.overleaf.read(cx);
-        if !bridge.linked() || bridge.paused() {
+        if bridge.link().is_none() || bridge.paused() {
             return;
         }
         // What is typed but not yet on disk is part of what resuming
         // merges, so it is saved first.
         let saved = self.save_before_leaving(cx);
-        self.overleaf_layers.pending = Some(cx.spawn(async move |this, cx| {
+        self.overleaf_layers.pausing = Some(cx.spawn(async move |this, cx| {
             if let Some(saved) = saved {
                 saved.await;
+            }
+            // Typing still going out, or an answer Overleaf still owes, is
+            // waited for, so the live document leaves the channel with an
+            // agreed copy: closed with an update in flight, its outcome is
+            // unknown, and resuming could mark up a clash on text only this
+            // Mac edited. A channel that never answers is waited on no
+            // longer than PAUSE_SETTLE.
+            let deadline = std::time::Instant::now() + PAUSE_SETTLE;
+            while std::time::Instant::now() < deadline {
+                let sending = this
+                    .update(cx, |this, cx| this.overleaf.read(cx).live_sending())
+                    .unwrap_or(false);
+                if !sending {
+                    break;
+                }
+                cx.background_executor()
+                    .timer(std::time::Duration::from_millis(100))
+                    .await;
             }
             this.update(cx, |this, cx| {
                 this.overleaf

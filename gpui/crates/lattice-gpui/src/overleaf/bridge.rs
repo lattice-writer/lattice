@@ -218,8 +218,9 @@ pub struct OverleafBridge {
     badge_task: Option<Task<()>>,
     channel_task: Option<Task<()>>,
     link_task: Option<Task<()>>,
-    /// Resumed, until the link read after it says whether it may sync.
-    resuming: bool,
+    /// The project resumed, until the link read after it says whether it
+    /// may sync.
+    resuming: Option<PathBuf>,
     /// Staged by a scenario (`scenario_stage`): shown as linked and live,
     /// but nothing reads the link again or asks Overleaf anything.
     staged: bool,
@@ -278,7 +279,7 @@ impl OverleafBridge {
             badge_task: None,
             channel_task: None,
             link_task: None,
-            resuming: false,
+            resuming: None,
             staged: false,
             client: None,
             presence: Default::default(),
@@ -400,6 +401,7 @@ impl OverleafBridge {
             return;
         }
         self.root = root;
+        self.resuming = None;
         self.link = None;
         self.remote_changes = false;
         self.local_pending = false;
@@ -500,7 +502,10 @@ impl OverleafBridge {
                 });
                 this.status = status;
                 this.apply(cx);
-                if std::mem::take(&mut this.resuming) && this.link().is_some() {
+                if let Some(resumed) = this.resuming.take()
+                    && this.is_current(&resumed)
+                    && this.link().is_some()
+                {
                     cx.emit(OverleafBridgeEvent::Resumed);
                 }
                 cx.notify();

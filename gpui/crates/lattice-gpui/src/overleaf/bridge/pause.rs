@@ -31,12 +31,16 @@ impl OverleafBridge {
             );
             return;
         };
+        let wrote = root.clone();
         let task = cx.background_spawn(async move { sync::set_paused(&root, paused) });
         cx.spawn(async move |this, cx| {
             let result = task.await;
             this.update(cx, |this, cx| match result {
+                // The window moved to another project meanwhile: its link
+                // was read for it, and nothing here concerns it.
+                Ok(()) if !this.is_current(&wrote) => {}
                 Ok(()) => {
-                    this.resuming = !paused;
+                    this.resuming = (!paused).then(|| wrote.clone());
                     this.reload_link(cx);
                     if paused {
                         let weak = cx.entity().downgrade();
