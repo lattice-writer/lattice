@@ -91,6 +91,7 @@ jobs:
       gpui: ${{ steps.tier.outputs.gpui }}
       macos-local-gpui: ${{ steps.tier.outputs.macos-local-gpui }}
       windows-e2e: ${{ steps.tier.outputs.windows-e2e }}
+      linux-e2e: ${{ steps.tier.outputs.linux-e2e }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -675,9 +676,16 @@ jobs:
       # lavapipe presents reads back black from X11 (the shots of run
       # 45464952474 were black under Vulkan and whole under GL), and the
       # scenario's shots read the window back from the X server.
+      #
+      # As on Windows, the whole scenario runs only for a change that can
+      # behave differently on Linux (the vendored GPUI crates, Linux-only
+      # code, the scenario's harness), and for every tag, full run and push
+      # to main; anything else runs the smoke flow alone
+      # (scripts/linux-gpui-e2e-tier.mjs).
       - name: e2e scenario
         timeout-minutes: 110
         env:
+          LINUX_E2E: ${{ needs.changes.outputs.linux-e2e }}
           VK_ICD_FILENAMES: /dev/null
           VK_DRIVER_FILES: /dev/null
           STRICT_FLAKY: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && '--strict-flaky' || '' }}
@@ -692,12 +700,17 @@ jobs:
           node ../scripts/typst-helper-fake-release.mjs target/release/lattice-typst "$RUNNER_TEMP/typst-release"
           export LATTICE_E2E_TYPST_RELEASE="$RUNNER_TEMP/typst-release"
           export LATTICE_E2E_SHOTS="$shots" LATTICE_GPUI_LOG=info RUST_BACKTRACE=1
+          only=""
+          if [ "$LINUX_E2E" = smoke ]; then
+            echo "The smoke flow alone: nothing this change touches behaves differently on Linux."
+            only="--only smoke"
+          fi
           xvfb-run -a -s "-screen 0 1440x900x24" bash -c '
-            timeout 4500 target/release/lattice-gpui "$1" --scenario e2e --out "$2" || echo "the app exited with $?"
+            timeout 4500 target/release/lattice-gpui "$1" --scenario e2e --out "$2" $4 || echo "the app exited with $?"
             cat "$2" || true
             node ../scripts/gpui-e2e-verdict.mjs --platform linux --check-quit $3 \
               --rerun-app target/release/lattice-gpui --fixture fixtures/e2e "$2"
-          ' e2e "$project" "$out" "$STRICT_FLAKY"
+          ' e2e "$project" "$out" "$STRICT_FLAKY" "$only"
       - if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:

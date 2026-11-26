@@ -1936,6 +1936,15 @@
       "tier": "flaky",
       "reason": "Linux: passed in branch runs 45483277041 to 45603069391 and failed twice (its module rerun) in branch run 45631595139, on the same GPUI sources as 45603069391; observed {\"error\":\"scratch-a.tex's row is laid out\"}, the same wait for a tree row as the tab_policy module's Linux flake",
       "followup": "LEO-129"
+    },
+    {
+      "step": "resting on the crossed ⋯ menu row past the grace closes the Move … to submenu",
+      "platforms": [
+        "linux"
+      ],
+      "tier": "flaky",
+      "reason": "Linux: failed twice (its module rerun) in main run 45697918320 (881a0c9ac) and branch run 45717317312, and passed in main runs 45713416093 and 45716281447; observed {\"panels_before\":4,\"panels_after\":5}: the pointer's path across the row reached the submenu, which opened a split",
+      "followup": "LEO-129"
     }
   ]
 }

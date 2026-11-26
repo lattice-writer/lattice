@@ -53,7 +53,11 @@
  * run, and a push to main or a tag ignores the trailer. GPUI's Windows job runs the whole e2e
  * scenario only for a change that can behave differently on Windows, and
  * for every full run and push to main; otherwise the smoke flow
- * (scripts/windows-e2e-tier.mjs, the `windows-e2e` output).
+ * (scripts/windows-e2e-tier.mjs, the `windows-e2e` output). Its Linux job
+ * runs the whole scenario only for a change to what can behave differently
+ * on Linux (the vendored GPUI crates, Linux-only code, the scenario's
+ * harness), and for every full run and push to main; otherwise the smoke
+ * flow (scripts/linux-gpui-e2e-tier.mjs, the `linux-e2e` output).
  *
  * Usage:
  *   node scripts/ci-tier.mjs [--base REF] [--full]   print the tier as JSON
@@ -67,6 +71,7 @@ import { coveredJobs, macosNeeds, parseTrailer, resolveCover } from "./ci-local-
 import { changedFiles, rustIncludes } from "./gate-changed.mjs";
 import { isMain } from "./lib/util.mjs";
 import { harnessInputs } from "./perf-bench/harness-inputs.mjs";
+import { linuxE2e } from "./linux-gpui-e2e-tier.mjs";
 import { windowsE2e } from "./windows-e2e-tier.mjs";
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -76,7 +81,7 @@ export const JOBS = ["vitest", "lint-build", "perf-bench", "rust", "gpui", "lite
 const CI_JOBS = JOBS.filter((job) => job !== "gpui");
 // What decides which jobs run and which a CI-local trailer may skip: a
 // change to any of them runs everything.
-const CI_CONTROL = new Set(["scripts/ci-tier.mjs", "scripts/ci-local-select.mjs", "scripts/gpui-e2e-modules.mjs", "scripts/ci-local.mjs", "scripts/windows-e2e-tier.mjs"]);
+const CI_CONTROL = new Set(["scripts/ci-tier.mjs", "scripts/ci-local-select.mjs", "scripts/gpui-e2e-modules.mjs", "scripts/ci-local.mjs", "scripts/windows-e2e-tier.mjs", "scripts/linux-gpui-e2e-tier.mjs"]);
 
 // What `pnpm build` reads besides the sources tsc already checked: a change
 // to any of them can move the bundle the budgets measure.
@@ -89,7 +94,7 @@ export const BUNDLE_INPUTS = /^(src\/|public\/(?!pdfjs\/)|index\.html$|vite\.con
 // generates tokens and editor themes from, and the release notes
 // lattice-gpui's build.rs compiles in. Then the Tauri app's modules its
 // webview islands are built from (gpui/islands/vite.config.ts).
-export const GPUI_INPUTS = /^(gpui\/|src\/release-notes\/|src-tauri\/lattice-(core|theme)\/|design-system\/(tokens\.json|code-themes\.(json|mjs)|screens\/)|src\/settings\/(code-themes|theme-customization)\.ts$|src\/editor\/(spreadsheet|board|presentation|markdown)\/|src\/canvas\/markdown-preview-sync\.ts$|src\/editor\/latex\/latex-text\.ts$|src\/(index|App)\.css$|src\/app-utils\.ts$|src\/i18n\/|src\/agent\/|src\/app\/use-synara-host\.ts$|src\/settings\/synara-settings-pane\.tsx$|src\/trellis\/(trellis-agent-surface\.tsx|trellis\.css)$|src\/app\/(git-workspace-frames\.tsx|git-repository-url\.ts|use-app-commands\.ts|key-combos\.ts|app-synara-embed\.ts|annotation-rounds\.ts|use-agent-spreadsheet-resolver\.ts|use-editor-comments\.ts|notify\.ts)$|src\/hooks\/use-latest-ref\.ts$|src\/app-types\.ts$|src\/components\/icon-tip\.tsx$|src\/components\/ui\/(motion|scroll-area)\.(tsx|css)$)/;
+export const GPUI_INPUTS = /^(gpui\/|scripts\/(gpui-e2e-verdict\.mjs|gpui-e2e-known-failures\.json|gpui-main-baseline\.mjs|typst-helper-fake-release\.mjs)$|src\/release-notes\/|src-tauri\/lattice-(core|theme)\/|design-system\/(tokens\.json|code-themes\.(json|mjs)|screens\/)|src\/settings\/(code-themes|theme-customization)\.ts$|src\/editor\/(spreadsheet|board|presentation|markdown)\/|src\/canvas\/markdown-preview-sync\.ts$|src\/editor\/latex\/latex-text\.ts$|src\/(index|App)\.css$|src\/app-utils\.ts$|src\/i18n\/|src\/agent\/|src\/app\/use-synara-host\.ts$|src\/settings\/synara-settings-pane\.tsx$|src\/trellis\/(trellis-agent-surface\.tsx|trellis\.css)$|src\/app\/(git-workspace-frames\.tsx|git-repository-url\.ts|use-app-commands\.ts|key-combos\.ts|app-synara-embed\.ts|annotation-rounds\.ts|use-agent-spreadsheet-resolver\.ts|use-editor-comments\.ts|notify\.ts)$|src\/hooks\/use-latest-ref\.ts$|src\/app-types\.ts$|src\/components\/icon-tip\.tsx$|src\/components\/ui\/(motion|scroll-area)\.(tsx|css)$)/;
 export const CODE_THEME_INPUTS = /^(design-system\/code-themes\.(json|mjs)|src\/settings\/(code-themes|theme-customization)\.ts)$/;
 
 // Read by nothing that builds or tests. THIRD_PARTY_NOTICES.md is not here:
@@ -274,6 +279,7 @@ function github() {
   const gated = files.filter((file) => !docsFiles.includes(file));
   const local = coveredJobs(cover, macosNeeds(docsFiles.length ? ciTier(gated) : tier, gated));
   const windows = windowsE2e(tier.gpuiFiles, { full: tier.full || (event === "push" && branch === "main") });
+  const linux = linuxE2e(tier.gpuiFiles, { full: tier.full || (event === "push" && branch === "main") });
   const groups = { rust: "Rust", gpui: "GPUI", webkit: "WebKit benchmark" };
   const needed = Object.keys(groups).filter((group) => (group === "webkit" ? tier.jobs["perf-bench"] : tier.jobs[group]));
   const lines = [
@@ -291,7 +297,13 @@ function github() {
     "| --- | --- | --- |",
     ...(tier.vitestFiles.length ? [`Vitest runs only the tests that name a changed file: ${tier.vitestFiles.join(", ")}.`, ""] : []),
     ...JOBS.map((job) => `| ${job} | ${tier.jobs[job] ? "yes" : "no"} | ${tier.why[job].map((file) => `\`${file}\``).join(", ")} |`),
-    ...(tier.jobs.gpui ? ["", `GPUI Windows e2e: ${windows.e2e === "full" ? "the whole scenario" : "the smoke flow"} (${windows.why.join("; ")}).`] : []),
+    ...(tier.jobs.gpui
+      ? [
+          "",
+          `GPUI Windows e2e: ${windows.e2e === "full" ? "the whole scenario" : "the smoke flow"} (${windows.why.join("; ")}).`,
+          `GPUI Linux e2e: ${linux.e2e === "full" ? "the whole scenario" : "the smoke flow"} (${linux.why.join("; ")}).`,
+        ]
+      : []),
   ];
   console.log(lines.join("\n"));
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `## CI tier\n\n${lines.join("\n")}\n`);
@@ -302,6 +314,7 @@ function github() {
     "macos-local-gpui": Boolean(cover) && local.gpui.covered,
     "macos-local-webkit": Boolean(cover) && local.webkit.covered,
     "windows-e2e": windows.e2e,
+    "linux-e2e": linux.e2e,
     full: tier.full,
   };
   if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, Object.entries(outputs).map(([key, value]) => `${key}=${value}\n`).join(""));
@@ -313,7 +326,7 @@ function main() {
   const base = argv.includes("--base") ? argv[argv.indexOf("--base") + 1] : "origin/main";
   const { mergeBase, files } = changedFiles(base);
   const tier = ciTier(files, { full: argv.includes("--full") });
-  console.log(JSON.stringify({ base, mergeBase, files: files.length, ...tier, windowsE2e: tier.jobs.gpui ? windowsE2e(tier.gpuiFiles, { full: tier.full }) : null }, null, 2));
+  console.log(JSON.stringify({ base, mergeBase, files: files.length, ...tier, windowsE2e: tier.jobs.gpui ? windowsE2e(tier.gpuiFiles, { full: tier.full }) : null, linuxE2e: tier.jobs.gpui ? linuxE2e(tier.gpuiFiles, { full: tier.full }) : null }, null, 2));
 }
 
 if (isMain(import.meta.url)) main();
