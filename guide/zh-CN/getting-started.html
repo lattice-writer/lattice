@@ -93,6 +93,7 @@ main blockquote { margin: 12px 0; padding: 2px 16px; border-left: 3px solid var(
 </ul>
 <p><img src="../images/zh-new-project.webp" alt="新建论文：项目名、会议模板和选择上级文件夹"></p>
 <p>最近的项目在项目菜单顶部和 <strong>文件 › 打开最近使用</strong> 中。一个窗口可以在标题栏以标签形式打开多个项目。</p>
+<p>如果你打开的文件夹本身还不是项目，但里面恰好有一个项目，例如 <code>ProjectA/</code> 里有项目 <code>ProjectA/Manuscript/</code>，Lattice 会先问你，而不是直接再建一个项目。选 <strong>打开 Manuscript</strong>，稿件的唯一一份历史记录和构建结果都留在原处，AI 助手则可以读取和编辑 <code>ProjectA/</code> 里的所有文件，例如你的分析脚本；以后再打开 <code>ProjectA/</code> 会直接打开 <code>Manuscript</code>。<strong>将此文件夹设为独立项目</strong> 则在 <code>ProjectA/</code> 新建一个项目。<strong>设置 › AI 助手 › 显示</strong> 中的 <strong>AI 助手的文件夹</strong> 会显示 AI 助手在哪个文件夹工作，也可以改回项目自己的文件夹。项目菜单里的 <strong>此项目</strong> 一栏会显示历史记录、构建和 AI 助手各在哪里。</p>
 <h3 id="一个仓库里放多篇稿件">一个仓库里放多篇稿件</h3>
 <p>项目就是一个文件夹，所以它可以是整个代码仓库：分析代码、数据和一篇或几篇论文放在一起。把仓库根目录作为项目打开，Agent 就能在整个仓库里工作，比如先拿 <code>analysis/</code> 的输出核对结果部分的一个数字，再在同一个对话里修改论文。</p>
 <p>每篇论文都可以用 <strong>从模板新建稿件…</strong> 开始。它在文件夹的右键菜单、项目面板空白处的右键菜单、面板的 <strong>+</strong> 菜单和命令面板（<code>⌘K</code>）里。选一个 <strong>模板</strong>（和新建项目里的一样，也包括你保存的模板）和 <strong>文件夹</strong>（默认是 <code>Manuscript</code>），需要的话勾上 <strong>设为主文档</strong>，这样 <strong>编译</strong> 会编译它。点 <strong>创建稿件</strong>，Lattice 把模板文件写进这个文件夹并打开主文件。当前项目保持打开，设置、历史和 Agent 对话都不变，也不会另建项目。如果其中有文件已经存在，就什么也不写，对话框会列出这些文件。</p>
