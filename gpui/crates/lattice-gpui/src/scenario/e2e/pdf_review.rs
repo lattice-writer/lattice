@@ -81,6 +81,19 @@ impl Run {
             steps.check(STEP, false, json!({ "fixture": false }));
             return Ok(());
         };
+        // The note's words are main.tex's, so main.tex must be the live PDF.
+        // An earlier module's document left open can take it: a build that
+        // runs while that editor is the active one typesets it, the file
+        // open winning as Overleaf's rule has it (`open_document`), and on
+        // its PDF the note is rightly unplaced.
+        self.open(cx, &root.join("main.tex"), Some(1))?;
+        self.pause(cx, Duration::from_millis(300)).await;
+        self.build(cx).await?;
+        self.wait_for(cx, Duration::from_secs(20), |shell, cx| {
+            shell.read(cx).live_document() == Some("main.tex")
+        })
+        .await;
+        let live = cx.update(|cx| self.shell.read(cx).live_document().map(str::to_string));
         let store = cx.update(store::store);
         cx.update(|cx| store.update(cx, |store, cx| store.ensure(&project, cx)));
         self.wait_for(cx, Duration::from_secs(10), |_, cx| {
@@ -183,7 +196,8 @@ impl Run {
             && compiled.as_ref().and_then(|path| std::fs::read(path).ok()) == before;
         steps.check(
             STEP,
-            placed
+            live.as_deref() == Some("main.tex")
+                && placed
                 && highlighted
                 && ticked.contains(&id)
                 && closed
@@ -192,7 +206,7 @@ impl Run {
                 && untouched,
             json!({
                 "placed": placed, "kinds": kinds, "ticked": ticked, "closed": closed,
-                "failure": failure, "annotations": annotations, "untouched": untouched,
+                "failure": failure, "annotations": annotations, "untouched": untouched, "live": live,
             }),
         );
         // An export that never ran (nothing placed to tick) leaves the sheet

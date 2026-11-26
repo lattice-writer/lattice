@@ -63,6 +63,9 @@ impl ReviewSource {
     }
 }
 
+#[cfg(test)]
+mod tests;
+
 impl PdfView {
     /// Whether the PDF on screen can host a review copy, as
     /// [`Self::review_source`] would give one, without reading the file.
