@@ -253,3 +253,20 @@ export function passiveFor(text: string, activePath: string, reading: boolean): 
   const opened = openMarkdown(text, engineSchema(), openOptions({ activePath, optimizeForReading: reading }));
   return "unavailable" in opened ? null : passiveModel(opened.doc, opened.baseline, text.length, reading);
 }
+
+/**
+ * The passive view's jump: center the last block starting at or before `line`.
+ * Its chunk may not be drawn yet; then the chunk is brought into view, which
+ * draws it, and the jump is not landed until the block itself is centered.
+ */
+export function revealPassiveLine(layer: HTMLElement | null, model: PassiveModel, line: number): boolean {
+  const chunk = model.chunks.filter((candidate) => candidate.labels[0]!.line <= line).at(-1) ?? model.chunks[0]!;
+  const label = chunk.labels.filter((candidate) => candidate.line <= line).at(-1) ?? chunk.labels[0]!;
+  const block = layer?.querySelector<HTMLElement>(`[data-source-line="${label.line}"]`);
+  if (block) {
+    block.scrollIntoView({ block: "center" });
+    return true;
+  }
+  layer?.querySelector<HTMLElement>(`[data-visual-chunk-id="${chunk.id}"]`)?.scrollIntoView({ block: "center" });
+  return false;
+}

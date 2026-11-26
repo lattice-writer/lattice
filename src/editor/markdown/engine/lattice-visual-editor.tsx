@@ -32,7 +32,7 @@ import { blockAnchors } from "./block-anchors";
 import { blockWindow, mayDrawInWindow, revealPosition, scrollToTarget } from "./block-window";
 import { HeadingAnchors, REFRESH_ANCHORS, plannedHeadings } from "./heading-anchors";
 import { NO_HEADINGS, railHeadings, sameHeadings } from "./rail-headings";
-import { PassiveView, passiveFor, type PassiveModel } from "./passive-view";
+import { PassiveView, passiveFor, revealPassiveLine } from "./passive-view";
 import type { ImeGuard } from "./engine-keymap";
 import { MathMacrosContext, engineNodeViews } from "./engine-node-views";
 import { engineSchema, engineSchemaExtensions, type RawBlockKind } from "./engine-schema";
@@ -609,22 +609,6 @@ function rebindBaseline(baseline: MarkdownBaseline, editor: Editor): MarkdownBas
   return { ...baseline, entries };
 }
 
-/**
- * The passive view's jump: center the last block starting at or before `line`.
- * Its chunk may not be drawn yet; then the chunk is brought into view, which
- * draws it, and the jump is not landed until the block itself is centered.
- */
-function revealPassiveLine(layer: HTMLElement | null, model: PassiveModel, line: number): boolean {
-  const chunk = model.chunks.filter((candidate) => candidate.labels[0]!.line <= line).at(-1) ?? model.chunks[0]!;
-  const label = chunk.labels.filter((candidate) => candidate.line <= line).at(-1) ?? chunk.labels[0]!;
-  const block = layer?.querySelector<HTMLElement>(`[data-source-line="${label.line}"]`);
-  if (block) {
-    block.scrollIntoView({ block: "center" });
-    return true;
-  }
-  layer?.querySelector<HTMLElement>(`[data-visual-chunk-id="${chunk.id}"]`)?.scrollIntoView({ block: "center" });
-  return false;
-}
 
 export function LatticeVisualMarkdownEditor(props: VisualMarkdownEditorProps): JSX.Element {
   const { text, activePath, editable = true, optimizeForReading, onEligibilityChange, onFlushPendingChange } = props;
