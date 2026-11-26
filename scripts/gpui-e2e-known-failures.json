@@ -1943,7 +1943,7 @@
         "linux"
       ],
       "tier": "flaky",
-      "reason": "Linux: failed twice (its module rerun) in main run 45697918320 (881a0c9ac) and branch run 45717317312, and passed in main runs 45713416093 and 45716281447; observed {\"panels_before\":4,\"panels_after\":5}: the pointer's path across the row reached the submenu, which opened a split",
+      "reason": "Linux: failed in main run 45697918320 (881a0c9ac), where its module rerun timed out without a result, and failed twice (its module rerun) in branch run 45717317312, and passed in main runs 45713416093 and 45716281447; observed {\"panels_before\":4,\"panels_after\":5}: the pointer's path across the row reached the submenu, which opened a split",
       "followup": "LEO-129"
     }
   ]
