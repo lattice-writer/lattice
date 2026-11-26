@@ -118,6 +118,9 @@ export const E2E_TABLE = [
   // Project find and replace, which the documents module drives
   // (shell/documents.rs) and find_in_file shares.
   [/^gpui\/crates\/lattice-gpui\/src\/search\/(find|replace)\.rs$/, ["documents", "find_in_file"]],
+  // The shared search field: the shortcut sheet, project find and replace,
+  // and the pickers type into it.
+  [/^gpui\/crates\/lattice-gpui\/src\/search\/field\.rs$/, ["documents", "find_in_file", "focus_trap", "insert_pickers", "shortcut_sheet"]],
   // Compiled only for Linux and Windows: the macOS scenario cannot reach them
   // (scripts/windows-e2e-tier.mjs decides the Windows job's).
   [/^gpui\/crates\/lattice-gpui\/src\/native_(linux|windows)\.rs$/, []],

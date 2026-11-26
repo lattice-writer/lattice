@@ -69,6 +69,10 @@ describe("ci-local-select: the e2e a change needs", () => {
     }
   });
 
+  it("runs every module that types into the shared search field", () => {
+    expect(e2eNeeds(["gpui/crates/lattice-gpui/src/search/field.rs"], covers).modules.toSorted()).toEqual(["documents", "find_in_file", "focus_trap", "insert_pickers", "shortcut_sheet"]);
+  });
+
   it("runs the whole scenario for a shell/ flow no module covers", () => {
     expect(dirModules("gpui/crates/lattice-gpui/src/shell/settings_flow.rs", covers)).toEqual([]);
   });
