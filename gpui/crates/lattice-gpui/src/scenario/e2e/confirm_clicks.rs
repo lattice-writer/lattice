@@ -175,7 +175,11 @@ impl Run {
                 cx,
             )
         });
-        self.pause(cx, Duration::from_millis(600)).await;
+        self.wait_for(cx, Duration::from_secs(5), |_, _| {
+            ["cancel", "answer"].iter().all(|name| Self::drawn_button(name).is_some())
+        })
+        .await;
+        self.pause(cx, Duration::from_millis(300)).await;
 
         let viewport_height =
             self.with_window(cx, |_, window, _| f32::from(window.viewport_size().height))?;
@@ -213,7 +217,7 @@ impl Run {
 
         if let Some(rect) = cancel_bounds {
             self.click_at(cx, rect.center())?;
-            self.pause(cx, Duration::from_millis(600)).await;
+            self.wait_answered(cx, &outcome).await;
         }
         let still_asking = cx.update(|cx| confirm::is_pending(cx));
         steps.check(
