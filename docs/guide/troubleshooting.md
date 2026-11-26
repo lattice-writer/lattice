@@ -38,4 +38,4 @@
 
 **I use Windows or Linux.** Those builds are experimental and still run the classic app, which has no Agent. Most of this guide applies, but labels and menus differ in places.
 
-**Does Lattice work offline?** Yes, except for what needs the network: Overleaf sync, the Agent with a hosted model, looking up papers, the plugin and theme markets, and first-time downloads such as Typst support and Typst packages.
+**Does Lattice work offline?** Yes, except for what needs the network: Overleaf sync, the Agent with a hosted model, looking up papers, the plugin and theme markets, and first-time downloads such as Typst support and Typst packages. When the website can't be reached, **Help › User Guide** opens the copy of this guide that comes with Lattice.
