@@ -230,11 +230,19 @@ def build(command):
     except BlockingIOError:
         print(f"inapp-lock: waiting for {describe(holder())} before this build", file=sys.stderr, flush=True)
         fcntl.flock(builds, fcntl.LOCK_SH)
-    # The build shares this process group, so a signal that ends the group
-    # ends it too; this one only waits and lets the lock go.
+    # The build shares this process group, so a signal to the group reaches
+    # it directly; one sent to this process alone is passed on to it.
+    child = subprocess.Popen(command)
+
+    def forward(signum, _frame):
+        try:
+            os.kill(child.pid, signum)
+        except ProcessLookupError:
+            pass
+
     for signum in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
-        signal.signal(signum, signal.SIG_IGN if signum == signal.SIGHUP else lambda *_: None)
-    status = subprocess.Popen(command).wait()
+        signal.signal(signum, forward)
+    status = child.wait()
     os.close(builds)
     return status if status >= 0 else 128 - status
 
