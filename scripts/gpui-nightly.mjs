@@ -143,12 +143,17 @@ const runId = () => process.env.GITHUB_RUN_ID ?? "local";
  * keep them out. Then the typing guard under the lock (about two minutes,
  * most of it typing in front).
  */
+// The typing guard's lock wait and run (30 + 5, gpui-main-baseline.mjs's
+// CHUNKS_BUDGET_MS), so a run that hangs before its quit watchdog cannot take
+// the Vitest suite's time.
+const TYPING_GUARD_TIMEOUT_MS = 35 * 60_000;
+
 function runGuards(sha) {
   const dir = mkdtempSync(path.join(tmpdir(), "gpui-nightly-guards-"));
   const guard = path.join(repo, "gpui", "script", "idle-guard");
   const lock = path.join(repo, "scripts", "inapp-lock");
-  const run = (name, out, command) => {
-    const status = spawnSync(command[0], command.slice(1), { cwd: repo, stdio: "inherit" });
+  const run = (name, out, command, timeout) => {
+    const status = spawnSync(command[0], command.slice(1), { cwd: repo, stdio: "inherit", timeout });
     let result = null;
     try {
       result = JSON.parse(readFileSync(out, "utf8"));
@@ -164,7 +169,7 @@ function runGuards(sha) {
     return [
       ...run("idle guard", frames, [lock, "--thread", `nightly-e2e ${sha.slice(0, 9)} idle`, "--wait", "1800", "--", guard, frames]),
       ...run("idle guard", growth, [guard, "--growth", "1800", growth]),
-      ...run("typing guard", typing, [lock, "--thread", `nightly-e2e ${sha.slice(0, 9)} typing`, "--wait", "1800", "--", path.join(repo, "gpui", "script", "typing-guard"), typing]),
+      ...run("typing guard", typing, [lock, "--thread", `nightly-e2e ${sha.slice(0, 9)} typing`, "--wait", "1800", "--", path.join(repo, "gpui", "script", "typing-guard"), typing], TYPING_GUARD_TIMEOUT_MS),
     ];
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -181,7 +186,7 @@ export function vitestFailures(result, status) {
 
 // The whole suite, one file at a time (vitest.config.ts's maxWorkers: 1;
 // about 13 minutes on the Mac mini); gpui-main-baseline.mjs's CHUNKS_BUDGET_MS
-// leaves it these 90 minutes of the workflow step's 555.
+// leaves it these 90 minutes of the workflow step's 590.
 const VITEST_TIMEOUT_MS = 90 * 60_000;
 
 /** The whole Vitest suite, headless and outside the in-app lock, as CI's shards run it together. */

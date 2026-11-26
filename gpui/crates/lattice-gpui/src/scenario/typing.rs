@@ -3,8 +3,8 @@
 //! in its Visual view. Native keys go one every 110 ms at a line of prose of
 //! a 240 KB document written into the project (the size of the Ethereum
 //! Yellow Paper that LEO-6 measured), and each view's frames per key and this
-//! process's CPU are held to limits about 1.5 times what main costs on the
-//! Mac mini. A Visual page asking TexLab on every letter again drew 1.8
+//! process's CPU are held to limits a third above (frames) and about twice
+//! (CPU) the most main cost on the Mac mini. A Visual page asking TexLab on every letter again drew 1.8
 //! frames a key (lattice#1347), which its limit catches.
 //!
 //! The frames are GPUI's own count (\`Window::layout_stats\`, test support,
@@ -36,8 +36,8 @@ const SETTLE: Duration = Duration::from_secs(20);
 /// The document typed into, written into the project's folder.
 const FILE: &str = "typing-guard.tex";
 /// Frames a key may draw, and this process's share of a core while typing,
-/// per view. Main on the Mac mini: source 2.2 frames a key at 4.7%, Visual
-/// 1.2 at 4.5%.
+/// per view. Main on the Mac mini, three runs: source 2.2-2.3 frames a key at
+/// 4.2-6.5%, Visual 1.21-1.23 at 4.0-5.5%.
 const SOURCE_FRAMES_PER_KEY: f64 = 3.0;
 const VISUAL_FRAMES_PER_KEY: f64 = 1.6;
 const CPU_PERCENT: f64 = 10.;
@@ -268,6 +268,7 @@ impl Run {
                 "passed": typed && (DRAWING_FRAMES_PER_KEY..=limit).contains(&frames),
                 "detail": phase,
             }));
+            // Keys that never landed cost nothing, which says nothing.
             checks.push(json!({
                 "name": format!("typing in the {view} view of a long document costs the app at most {CPU_PERCENT}% of a core"),
                 "passed": typed && phase["cpu_percent"].as_f64().is_some_and(|cpu| cpu <= CPU_PERCENT),
