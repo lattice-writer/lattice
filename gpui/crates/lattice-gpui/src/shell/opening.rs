@@ -51,6 +51,7 @@ impl Shell {
             }
         }
         self.drop_conflict_notice(cx);
+        self.close_review_sheet(cx);
         self.references = Default::default();
         self.sheets.project_changed();
         self.conflict = None;

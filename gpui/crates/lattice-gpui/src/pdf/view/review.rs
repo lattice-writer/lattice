@@ -105,6 +105,11 @@ impl ReviewSource {
         found
     }
 
+    /// Which load of the viewer's document this is; a later load is higher.
+    pub fn generation(&self) -> u64 {
+        self.generation
+    }
+
     /// Whether this PDF is the build of `document`.
     pub fn shows(&self, document: &str) -> bool {
         self.shown_document().as_deref() == Some(document)

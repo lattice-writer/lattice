@@ -49,7 +49,7 @@ pub(super) fn resolve_typst_root(root: &Path, relative: String) -> Option<Compil
 /// that no other file includes: the document `part` is a piece of. Several
 /// such documents (a book and a handout sharing a chapter) go to the
 /// shallowest, then the first by name, so a build always picks the same one.
-fn including_typst_root(root: &Path, part: &str) -> Option<String> {
+pub(crate) fn including_typst_root(root: &Path, part: &str) -> Option<String> {
     let mut includes: Vec<(String, Vec<String>)> = Vec::new();
     // Every Typst build beside a LaTeX default walks this, live builds
     // included: hidden folders (`.git`, `.research/build`) and

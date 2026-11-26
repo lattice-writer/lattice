@@ -92,9 +92,10 @@ pub fn choose_document(root: &Path, open_document: Option<&str>) -> Result<(Stri
 }
 /// The root document that typesets `file` (project-relative): the one a
 /// build with it open compiles, as [`choose_document`] would pick it without
-/// recording anything, when `file` is that root or a file it reads. `None`
-/// for a file that is gone, or that no root reads (the default is not
-/// credited with a stray chapter, a Markdown note or a `.bib`).
+/// recording anything, when `file` is that root or a file it reads (its
+/// LaTeX inputs, or for a Typst document its includes). `None` for a file
+/// that is gone, or that no root reads (the default is not credited with a
+/// stray chapter, a Markdown note or a `.bib`).
 pub fn typesetting_root(root: &Path, file: &str) -> Option<String> {
     let file = file.trim().replace('\\', "/");
     if !root.join(&file).is_file() {
@@ -102,8 +103,12 @@ pub fn typesetting_root(root: &Path, file: &str) -> Option<String> {
     }
     let manifest = project::read_manifest(root).ok()?;
     let target = compile_root::build_target(root, &manifest, Some(&file)).ok()?;
-    (target == file || changes::input_loop::flattened(root, &target).contains(&file))
-        .then_some(target)
+    let reads = if project::is_typst_path(&target) {
+        project::including_typst_root(root, &file).as_ref() == Some(&target)
+    } else {
+        changes::input_loop::flattened(root, &target).contains(&file)
+    };
+    (target == file || reads).then_some(target)
 }
 
 pub(crate) use build_log::{is_pass_noise_warning, unwrap_log_lines};

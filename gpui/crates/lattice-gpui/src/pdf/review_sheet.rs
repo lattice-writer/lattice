@@ -59,9 +59,10 @@ pub struct ReviewSheet {
     /// each with how many.
     elsewhere: Vec<(String, usize)>,
     /// The root asked to be built, until its PDF is the one on screen, and
-    /// once its build has finished, the digest of the PDF it left.
+    /// once its build has finished, the digest of the PDF it left and the
+    /// generation of the document on screen then.
     building: Option<String>,
-    built: Option<String>,
+    built: Option<(String, u64)>,
     view: WeakEntity<PdfView>,
     selected: HashSet<String>,
     with_replies: bool,
@@ -169,7 +170,12 @@ impl ReviewSheet {
         };
         match built {
             Some(digest) => {
-                self.built = Some(digest);
+                let shown = self
+                    .view
+                    .upgrade()
+                    .and_then(|view| view.read(cx).review_source())
+                    .map_or(0, |source| source.generation());
+                self.built = Some((digest, shown));
                 self.take_built(cx);
             }
             None => {
@@ -180,16 +186,17 @@ impl ReviewSheet {
         cx.notify();
     }
 
-    /// Once the PDF the asked-for build wrote is the one on screen, place
-    /// the notes on it; an older PDF of that root shown first is passed by.
+    /// Once the asked-for root's PDF on screen is the one its build wrote,
+    /// or one loaded after that build (an autosave's, say), place the notes
+    /// on it; an older PDF of that root shown first is passed by.
     fn take_built(&mut self, cx: &mut Context<Self>) {
-        let (Some(wanted), Some(digest)) = (&self.building, &self.built) else {
+        let (Some(wanted), Some((digest, shown))) = (&self.building, &self.built) else {
             return;
         };
         let Some(source) = self.view.upgrade().and_then(|view| {
-            view.read(cx)
-                .review_source()
-                .filter(|source| source.shows(wanted) && source.digest == *digest)
+            view.read(cx).review_source().filter(|source| {
+                source.shows(wanted) && (source.digest == *digest || source.generation() > *shown)
+            })
         }) else {
             return;
         };

@@ -54,27 +54,33 @@ impl Shell {
             .unwrap_or_default();
         let author = store::author(&root, cx).name;
         let sheet = cx.new(|cx| ReviewSheet::new(&view, notes, author, cx));
-        let subscription =
-            cx.subscribe_in(
-                &sheet,
-                window,
-                move |this, _, event, window, cx| match event {
-                    ReviewSheetEvent::Close => {
-                        this.parts.get_mut::<ReviewFlow>().sheet = None;
-                        cx.notify();
+        let subscription = cx.subscribe_in(
+            &sheet,
+            window,
+            move |this, sheet, event, window, cx| match event {
+                ReviewSheetEvent::Close => {
+                    this.parts.get_mut::<ReviewFlow>().sheet = None;
+                    cx.notify();
+                }
+                // A build compiles the root of the file in front, so the root
+                // asked for opens first; the sheet stays up over it.
+                ReviewSheetEvent::Build(document) => {
+                    let started = if this
+                        .open_path(root.join(document), None, window, cx)
+                        .is_some()
+                    {
+                        this.build(&super::Build, window, cx);
+                        // A build turned away (a clean still running) starts nothing.
+                        this.building() || this.queued_build.is_some()
+                    } else {
+                        false
+                    };
+                    if !started {
+                        sheet.update(cx, |sheet, cx| sheet.build_finished(None, cx));
                     }
-                    // A build compiles the root of the file in front, so the root
-                    // asked for opens first; the sheet stays up over it.
-                    ReviewSheetEvent::Build(document) => {
-                        if this
-                            .open_path(root.join(document), None, window, cx)
-                            .is_some()
-                        {
-                            this.build(&super::Build, window, cx);
-                        }
-                    }
-                },
-            );
+                }
+            },
+        );
         self.parts.get_mut::<ReviewFlow>().sheet = Some((sheet, subscription));
         cx.notify();
     }
@@ -93,16 +99,23 @@ impl Shell {
         let Some(wanted) = sheet.read(cx).building().map(str::to_string) else {
             return;
         };
-        let finished = outcome.and_then(|outcome| outcome.as_ref().ok());
-        let other = finished.is_some_and(|finished| finished.result.root_document != wanted);
-        // Another root's build ran first; the one asked for is queued.
-        if other && self.queued_build.is_some() {
+        let digest = outcome
+            .and_then(|outcome| outcome.as_ref().ok())
+            .filter(|finished| finished.result.success && finished.result.root_document == wanted)
+            .and_then(|finished| finished.pdf_digest.clone());
+        // Any other outcome while a build is queued is an earlier build's:
+        // the one asked for is still to run.
+        if digest.is_none() && self.queued_build.is_some() {
             return;
         }
-        let digest = finished
-            .filter(|finished| finished.result.success && !other)
-            .and_then(|finished| finished.pdf_digest.clone());
         sheet.update(cx, |sheet, cx| sheet.build_finished(digest, cx));
+    }
+
+    /// Close the sheet, whose notes and PDF were another project's.
+    pub(super) fn close_review_sheet(&mut self, cx: &mut Context<Self>) {
+        if self.parts.get_mut::<ReviewFlow>().sheet.take().is_some() {
+            cx.notify();
+        }
     }
 
     /// The sheet, for the window to draw over everything.
