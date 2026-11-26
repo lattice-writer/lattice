@@ -121,4 +121,11 @@ describe("gpui-nightly: the workflow", () => {
     // The build tree check runs before the lock, with a short timeout of its own.
     expect(workflow).toMatch(/- name: Reach the shared build tree\n\s+timeout-minutes: 2\n/);
   });
+
+  it("backs its cron up, and a backup runs only when no run started since 18:00 UTC", () => {
+    expect(workflow.match(/- cron: "\d+ (\d+) \* \* \*"/g)).toHaveLength(3);
+    expect(workflow).toMatch(/e2e:\n\s+needs: due\n\s+if: needs\.due\.outputs\.run == 'true'\n/);
+    expect(workflow).toMatch(/if \[ "\$EVENT" != schedule \]; then echo run=true/);
+    expect(workflow).toMatch(/actions: read/);
+  });
 });
