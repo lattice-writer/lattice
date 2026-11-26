@@ -351,7 +351,7 @@ for the test's name before you investigate it. When CI fails on `main`,
 passes records what failed the attempt before. `synara-pin` is never recorded:
 it checks the published Synara fork, so it rightly passes on a re-run once the
 fork branch is pushed. `flake-hunt.yml` records what
-fails in its nightly stress passes. The issue also holds the quarantine policy.
+fails in its stress passes, which run by hand now. The issue also holds the quarantine policy.
 To see how flaky a test is, run its file many times under load with
 `node scripts/burn-in.mjs --runs 20 --burn 4 <file> -- -t "<test name>"`; CI's
 `new-tests` job runs a pull request's added and modified test files five times
