@@ -1735,6 +1735,15 @@
       ],
       "reason": "Linux: failed in branch run 45777036795 (gpui.yml full=true at 183f98d51, #1296's head, merged as 41dfb2672) and again in its module rerun, while macOS and Windows passed it in the same run; the step was first reached on Linux there, once chemnum was installed; observed {\"built\":true,\"shown\":true,\"card\":null}",
       "followup": "LEO-144"
+    },
+    {
+      "step": "live mode probes Overleaf every 45 s while the channel carries documents, and not at all from a window off screen",
+      "platforms": [
+        "macos"
+      ],
+      "tier": "flaky",
+      "reason": "macOS: counted 2 live probes in its 8 s window ({\"live\":2,\"dropped\":true,\"hidden\":0,\"settled_ms\":7001}) in Mac mini local runs of #1323's and #1325's branches and of capy/overleaf-clock-skew (main b0ad7e14a plus lattice-core clock stamps, no GPUI poll change); passed on the rerun of the same code on #1323 and #1325 and in every #1315 and #1322 run",
+      "followup": "LEO-14"
     }
   ]
 }
