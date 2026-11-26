@@ -47,6 +47,8 @@ mod pdf_shots;
 mod shell_steps;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 mod shot;
+#[cfg(all(target_os = "macos", feature = "offscreen-shots"))]
+mod typing;
 
 pub struct ScenarioArgs {
     pub name: String,
@@ -124,6 +126,8 @@ pub fn start(shell: Entity<Shell>, window: AnyWindowHandle, args: ScenarioArgs, 
             "memory" => run.memory(cx).await,
             #[cfg(all(target_os = "macos", feature = "offscreen-shots"))]
             "idle" => run.idle(cx).await,
+            #[cfg(all(target_os = "macos", feature = "offscreen-shots"))]
+            "typing" => run.typing(cx).await,
             #[cfg(target_os = "macos")]
             "ime-protocol" => run.ime_protocol(cx).await,
             #[cfg(any(target_os = "macos", target_os = "linux"))]
