@@ -6,11 +6,11 @@
       "icon": "git",
       "title": {
         "en": "Overleaf's \"too many requests\" waits as long as Overleaf asks, and says so",
-        "zh": "Overleaf 的「请求过多」会按 Overleaf 要求的时间等待，并告诉你"
+        "zh": "Overleaf「请求过多」时按它要求的时间等待，并显示还要等多久"
       },
       "body": {
-        "en": "In the native Lattice, when Overleaf answers live sync with \"too many requests\", the cool-down now lasts as long as Overleaf asks, between 30 seconds and 5 minutes, instead of a fixed guess. While it waits, the Overleaf status in the title bar reads Overleaf asked to wait, retrying in N s, and the waiting sync goes out the moment the cool-down ends instead of on the next check up to 45 seconds later. Error messages for such an answer say how long to wait, in English and Chinese. Live sync also no longer asks Overleaf for its latest version a few seconds after it has just read it.",
-        "zh": "在原生 Lattice 中，Overleaf 对实时同步回复「请求过多」时，冷却时间现在按 Overleaf 要求的长短来等，在 30 秒到 5 分钟之间，而不是固定的估计值。等待期间，标题栏里的 Overleaf 状态显示「Overleaf 要求稍候，N 秒后重试」；冷却一结束，等着的同步就会立即发出，而不是等到最多 45 秒后的下一次检查。这类回复的错误信息会写明需要等多久，中英文都有。实时同步也不再在刚读到 Overleaf 最新版本几秒后又去问一次。"
+        "en": "In the native Lattice, when Overleaf answers live sync with \"too many requests\", the cool-down now lasts as long as Overleaf asks when it says how long, between 30 seconds and 5 minutes, instead of Lattice's own guess of 30 seconds, doubling each time. While it waits, the Overleaf status in the title bar reads Overleaf asked to wait, retrying in N s, and the waiting sync goes out the moment the cool-down ends instead of on the next check up to 45 seconds later. Error messages for such an answer say how long to wait, in English and Chinese. Live sync also no longer asks Overleaf for its latest version a few seconds after it has just read it.",
+        "zh": "在原生 Lattice 中，Overleaf 对实时同步回复「请求过多」时，Overleaf 给出等待时间时，冷却时间现在按它要求的长短来等，在 30 秒到 5 分钟之间，而不是 Lattice 自己从 30 秒起逐次翻倍的估计。等待期间，标题栏里的 Overleaf 状态显示「Overleaf 要求稍候，N 秒后重试」；冷却一结束，等着的同步就会立即发出，而不是等到最多 45 秒后的下一次检查。这类回复的错误信息会写明需要等多久，中英文都有。实时同步也不再在刚读到 Overleaf 最新版本几秒后又去问一次。"
       }
     },
     {
@@ -31,15 +31,15 @@
         "zh": "保存被引入的 Typst 文件时会编译整个文档"
       },
       "body": {
-        "en": "In the native Lattice, in a Typst project with no main document set, ⌘S or an autosave on a part that another .typ file includes now builds the document that includes it, through any number of levels. Before, the part was compiled alone and its PDF replaced the document's, and with no main document at all the part became the project's main document.",
-        "zh": "在原生 Lattice 中，在没有设定主文档的 Typst 项目里，对一个被其他 .typ 文件引入的部分按 ⌘S 或自动保存时，现在会编译引入它的那个文档，引入有多少层都可以。以前这个部分会被单独编译，它的 PDF 会替换文档的 PDF；项目完全没有主文档时，这个部分还会变成项目的主文档。"
+        "en": "In the native Lattice, in a project with no Typst main document, ⌘S or an autosave on a part that another .typ file includes now builds the document that includes it, through any number of levels. Before, the part was compiled alone and its PDF replaced the document's, and with no main document at all the part became the project's main document.",
+        "zh": "在原生 Lattice 中，在没有设定 Typst 主文档的项目里，对一个被其他 .typ 文件引入的部分按 ⌘S 或自动保存时，现在会编译引入它的那个文档，引入有多少层都可以。以前这个部分会被单独编译，它的 PDF 会替换文档的 PDF；项目完全没有主文档时，这个部分还会变成项目的主文档。"
       }
     }
   ],
   "fixes": [
     {
-      "en": "In the native Lattice's visual view, a \\colorbox with one of xcolor's named colours, such as \\colorbox{yellow}{…}, is now filled like an [HTML] colour, and its text stays readable on the fill (#1327).",
-      "zh": "在原生 Lattice 的可视视图中，使用 xcolor 命名颜色的 \\colorbox，例如 \\colorbox{yellow}{…}，现在会像 [HTML] 颜色一样被填充，框里的文字在底色上也保持清晰可读（#1327）。"
+      "en": "In the native Lattice, a \\colorbox with one of xcolor's base colour names, such as \\colorbox{yellow}{…}, is now filled like an [HTML] colour in both the visual and source views, and its text stays readable on the fill (#1327).",
+      "zh": "在原生 Lattice 中，使用 xcolor 基本颜色名的 \\colorbox，例如 \\colorbox{yellow}{…}，现在在可视视图和源码视图中都会像 [HTML] 颜色一样被填充，框里的文字在底色上也保持清晰可读（#1327）。"
     },
     {
       "en": "Typing in a .tex file's visual view in the native Lattice takes less CPU: it no longer asks TexLab again for a word that had no completions a moment before. On a 240 KB paper, CPU while typing fell from about 20% to 15%.",
@@ -47,7 +47,7 @@
     },
     {
       "en": "The Agent panel's provider banner shows plain text instead of raw colour codes when Lattice was started from a shell that forces colour, and a warning saved by an earlier run no longer appears at startup as if it were current.",
-      "zh": "从强制彩色输出的 shell 启动 Lattice 时，AI 助手面板中的服务提供方提示显示为纯文本，不再夹着原始的颜色代码；上次运行保存下来的警告，也不会在启动时被当成当前状态显示出来。"
+      "zh": "从强制彩色输出的 shell 启动 Lattice 时，AI 助手面板中的模型状态提示显示为纯文本，不再夹着原始的颜色代码；上次运行保存下来的警告，也不会在启动时被当成当前状态显示出来。"
     },
     {
       "en": "In a Chinese interface, the native Lattice gives the reasons a live Overleaf connection timed out in Chinese.",
