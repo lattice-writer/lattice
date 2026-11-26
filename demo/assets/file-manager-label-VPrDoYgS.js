@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-C0FnF6B9.js";import{t}from"./host-platform-B4Br5Xk-.js";function n(){return r[t()]}var r;function i(){return(i=e((()=>{r={mac:{id:`t3gf2s`},windows:{id:`Kd-d6a`},linux:{id:`H6nKok`}}})))()}export{n,i as t};
