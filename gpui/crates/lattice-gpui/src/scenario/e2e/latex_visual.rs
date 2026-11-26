@@ -89,16 +89,18 @@ const DRAWN: &str = "JSON.stringify({ \
     text: document.querySelector('.cm-content')?.textContent ?? '', \
     theme: document.documentElement.dataset.theme || null })";
 
-/// Whether the page's document, and its drawn lines, hold the text
-/// `latex_visual_follows` put into the buffer. CodeMirror keeps no public
-/// handle on the page, so the view is found the way `EditorView.findFromDOM`
-/// finds it (`cmTile` now, `cmView` in older releases).
+/// Whether the page's document holds the text `latex_visual_follows` put
+/// into the buffer, whether that text lies in the range CodeMirror draws, and
+/// whether the drawn lines hold it. The page exposes no `EditorView`, so the
+/// view is found the way `EditorView.findFromDOM` finds it (`cmTile` now,
+/// `cmView` in older releases).
 const FOLLOWED: &str = "JSON.stringify((() => { \
     const content = document.querySelector('.cm-latex-visual .cm-content'); \
     const view = (content?.cmTile?.root ?? content?.cmView?.rootView)?.view; \
-    const doc = view ? view.state.doc.toString() : null; \
+    const at = view ? view.state.doc.toString().indexOf('Written in the source.') : null; \
     return { \
-      doc: doc === null ? null : doc.includes('Written in the source.'), \
+      doc: at === null ? null : at >= 0, \
+      viewport: at === null || at < 0 ? null : at >= view.viewport.from && at <= view.viewport.to, \
       drawn: (content?.textContent ?? '').includes('Written in the source.') }; })())";
 
 /// The page's `\\colorbox`es (lattice#1327): each one element over its whole
@@ -531,27 +533,29 @@ impl Run {
                 });
             }
         })?;
-        // The page's own document, not `.cm-content`'s text: CodeMirror draws
-        // only the lines near the viewport, and in GitHub's macOS runner's
-        // 1024×674 window the edit before `\end{document}` lies past them, so
-        // the DOM never held it there however long the step waited (the
-        // v0.20.1 tag run and main at 0fef86e94), while the Mac mini's larger
-        // window draws the whole fixture. `drawn` still records whether the
-        // DOM holds it, and `ms` how long the document took.
+        // CodeMirror draws only the lines near its viewport, so the drawn
+        // lines are asked for the edit only when it lies in that range; past
+        // it the page's document has to hold it. On GitHub's macOS runner,
+        // whose window is smaller than the Mac mini's, `.cm-content` never
+        // held the edit before `\end{document}` (the v0.20.1 tag run, and
+        // main at 0fef86e94), likely because it lay past that range;
+        // `viewport` and `drawn` record which it was, and `ms` how long.
+        let followed = |page: &Value| {
+            page["doc"] == true && (page["drawn"] == true || page["viewport"] == false)
+        };
         let mut page = Value::Null;
         let started = std::time::Instant::now();
         while started.elapsed() < Duration::from_secs(10) {
             page = self.evaluate(cx, island, FOLLOWED).await;
-            if page["doc"] == true {
+            if followed(&page) {
                 break;
             }
             self.pause(cx, Duration::from_millis(150)).await;
         }
-        let followed = page["doc"] == true;
         steps.check(
             "text put into the buffer reaches the Visual view",
-            followed,
-            json!({ "followed": followed, "drawn": page["drawn"], "ms": started.elapsed().as_millis() }),
+            followed(&page),
+            json!({ "page": page, "ms": started.elapsed().as_millis() }),
         );
         Ok(())
     }
