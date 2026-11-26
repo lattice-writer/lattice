@@ -18,7 +18,7 @@ use gpui::AsyncApp;
 use lattice_ui::{Appearance, LatticeTheme};
 use serde_json::{Value, json};
 
-use super::{Run, Steps};
+use super::super::{Run, Steps};
 use crate::native;
 
 const COLORS: &str = "# Colours\n\nPlain <span style=\"color: navy\">navy note</span> and <span style='color:#ffd700'>gold</span> then <span style=\"color: red; display: none\">shown</span> end.\n";
@@ -55,7 +55,7 @@ fn readable(page: &Value, text: &str) -> bool {
 }
 
 impl Run {
-    pub(super) async fn markdown_colors(
+    pub(in crate::scenario) async fn markdown_colors(
         &self,
         cx: &mut AsyncApp,
         steps: &mut Steps,
@@ -136,7 +136,7 @@ impl Run {
         };
         let native = self.native(cx)?;
         let at = self
-            .evaluate(cx, &island, &super::markdown::paragraph_point("Plain"))
+            .evaluate(cx, &island, &super::paragraph_point("Plain"))
             .await
             .as_array()
             .and_then(|xy| Some((xy.first()?.as_f64()?, xy.get(1)?.as_f64()?)))
