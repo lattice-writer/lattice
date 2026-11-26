@@ -76,6 +76,10 @@ msgstr "恢复 Overleaf 同步"
 msgid "Saved, sync paused"
 msgstr "已保存，同步已暂停"
 
+#: lattice-gpui/src/annotations/card.rs
+msgid "Share to Overleaf"
+msgstr "分享到 Overleaf"
+
 #: lattice-gpui/src/overleaf/bridge/documents/reviewing.rs
 msgid "The file is no longer open live with Overleaf. Try again."
 msgstr "此文件已不再与 Overleaf 实时同步。请重试。"

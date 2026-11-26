@@ -81,6 +81,10 @@ impl Shell {
             EditorPanelEvent::Close => self.close_editor(editor, window, cx),
             // The paper's reader wrapping the editor names the paper itself.
             EditorPanelEvent::Masthead(_) | EditorPanelEvent::PaperSource(_) => {}
+            // The toolbar's Comment on Overleaf, on the editor it was pressed in.
+            EditorPanelEvent::Annotation(
+                crate::annotations::AnnotationRequest::CommentOnOverleaf,
+            ) => self.comment_on_overleaf(editor, window, cx),
             EditorPanelEvent::Annotation(request) => {
                 self.on_annotation_request(request, window, cx)
             }

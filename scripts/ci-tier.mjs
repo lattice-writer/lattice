@@ -45,7 +45,7 @@
  * trailer records and whose needs they cover (scripts/ci-local-select.mjs):
  * a GPUI change that needs the whole e2e is covered only by `e2e=full`, one
  * that needs some modules by an e2e that ran them, and a release path only
- * by the full gate (`rust gpui e2e=full webkit`). A docs-only trailer
+ * by the full gate (`rust gpui e2e=full`). A docs-only trailer
  * (`docs from=<gate>`) stands for its gate's trailer when the gate is an
  * ancestor and everything since it is text (resolveCover): the gate's cover
  * must then cover the rest of the branch, release paths included, and the
@@ -282,9 +282,14 @@ function github() {
   const linux = linuxE2e(tier.gpuiFiles, { full: tier.full || (event === "push" && branch === "main") });
   const groups = { rust: "Rust", gpui: "GPUI", webkit: "WebKit benchmark" };
   const needed = Object.keys(groups).filter((group) => (group === "webkit" ? tier.jobs["perf-bench"] : tier.jobs[group]));
+  // The WebKit benchmark measures the classic app, frozen on macOS: a branch
+  // that does not touch its tooling skips it, trailer or not (macosNeeds).
+  // Main and tags, which honour no trailer, still run it.
+  const webkitSkipped = trailerHonoured({ full: tier.full, event, ref }) && (cover ? local.webkit.covered : !macosNeeds(tier, gated).webkit);
   const lines = [
     reason ? `Every job: ${reason}.` : `Compared with ${base.slice(0, 9)}: ${files.length} changed file(s).`,
     ...(docsRefused ? [`The head commit's docs-only trailer is not taken: ${docsRefused}.`] : []),
+    ...(tier.jobs["perf-bench"] && !cover && webkitSkipped ? ["macOS WebKit benchmark: skipped, the branch does not touch its tooling (touchesWebkitBench)."] : []),
     ...(cover
       ? [
           `The head commit's CI-local trailer names this tree (${cover.line.trim()}).`,
@@ -312,7 +317,7 @@ function github() {
     "vitest-files": tier.vitestFiles.join(" "),
     "macos-local-rust": Boolean(cover) && local.rust.covered,
     "macos-local-gpui": Boolean(cover) && local.gpui.covered,
-    "macos-local-webkit": Boolean(cover) && local.webkit.covered,
+    "macos-local-webkit": webkitSkipped,
     "windows-e2e": windows.e2e,
     "linux-e2e": linux.e2e,
     full: tier.full,

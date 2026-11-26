@@ -112,9 +112,22 @@ impl Shell {
         if self.overleaf.read(cx).link().is_none() {
             return self.annotate_locally(window, cx);
         }
-        let Some(editor) = self.active_editor() else {
+        if let Some(editor) = self.active_editor() {
+            self.comment_on_overleaf(&editor, window, cx);
+        }
+    }
+
+    /// Start a thread on `editor`'s selection, in a file live with Overleaf
+    /// (Annotate selection, and the selection toolbar's Comment on Overleaf).
+    pub(crate) fn comment_on_overleaf(
+        &mut self,
+        editor: &gpui::Entity<crate::editor_panel::EditorPanel>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.overleaf.read(cx).link().is_none() {
             return;
-        };
+        }
         let path = editor.read(cx).relative().to_string();
         if self.overleaf.read(cx).live_file() != Some(path.as_str()) {
             crate::notices::show(
@@ -133,5 +146,79 @@ impl Shell {
             panel.compose_comment(path, from, quote, window, cx)
         });
         self.reveal_tool("comments", window, cx);
+    }
+
+    /// Post the local note `id` as an Overleaf comment on its passage, in a
+    /// file live with Overleaf (its card's Share to Overleaf). Once Overleaf
+    /// has it anchored on the passage, the note is resolved here, so the
+    /// passage shows Overleaf's thread alone; its words and replies stay in
+    /// the project's notes. While another comment is on its way, nothing is
+    /// sent, so a second press cannot post the note twice.
+    pub(crate) fn share_annotation(
+        &mut self,
+        id: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(root) = self.root(cx) else {
+            return;
+        };
+        if self.overleaf.read(cx).link().is_none() || self.overleaf.read(cx).review_busy().is_some()
+        {
+            return;
+        }
+        let Some(note) = crate::annotations::store::try_store(cx)
+            .and_then(|store| store.read(cx).get(&root, id).cloned())
+        else {
+            return;
+        };
+        let notice = |message: gpui::SharedString, cx: &mut Context<Self>| {
+            crate::notices::show(
+                crate::notices::Notice::new(lattice_ui::components::ToastLevel::Info, message),
+                cx,
+            )
+        };
+        if self.overleaf.read(cx).live_file() != Some(note.path.as_str()) {
+            return notice(
+                t!("Comments go to Overleaf once this file is open live with it.").into(),
+                cx,
+            );
+        }
+        let passage = self
+            .open_editors()
+            .into_iter()
+            .find(|editor| editor.read(cx).relative() == note.path)
+            .and_then(|editor| editor.read(cx).annotation_overleaf_range(id, cx));
+        let Some((from, quote)) = passage else {
+            return notice(
+                t!("The selected text changed. Select it again before commenting.").into(),
+                cx,
+            );
+        };
+        let body = crate::annotations::model::note_text(&note);
+        if body.trim().is_empty() {
+            return;
+        }
+        let shared = id.to_string();
+        self.overleaf.update(cx, |bridge, cx| {
+            bridge.add_comment(
+                &note.path,
+                from,
+                quote,
+                body,
+                move |anchored, cx| {
+                    if anchored {
+                        let store = crate::annotations::store::store(cx);
+                        store.update(cx, |store, cx| store.set_resolved(&root, &shared, true, cx));
+                    }
+                },
+                cx,
+            )
+        });
+        self.open_overleaf_collab(
+            Some(crate::overleaf::collab::CollabTab::Comments),
+            window,
+            cx,
+        );
     }
 }

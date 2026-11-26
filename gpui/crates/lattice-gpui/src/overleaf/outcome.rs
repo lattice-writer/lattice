@@ -7,6 +7,32 @@
 use lattice_core::overleaf::{ConflictSide, NameProblem, OverleafConflict, OverleafSyncResult};
 use lattice_i18n::t;
 
+/// Show every path inline for small batches; beyond this, summarize or list one
+/// per line (`overleaf-path-summary.ts`).
+pub(crate) const MAX_INLINE_PATHS: usize = 6;
+const SHOWN_WHEN_TRUNCATED: usize = 5;
+
+pub(crate) fn summarize_paths<S: AsRef<str>>(paths: &[S]) -> String {
+    if paths.len() <= MAX_INLINE_PATHS {
+        return paths
+            .iter()
+            .map(AsRef::as_ref)
+            .collect::<Vec<_>>()
+            .join(", ");
+    }
+    let names = paths[..SHOWN_WHEN_TRUNCATED]
+        .iter()
+        .map(AsRef::as_ref)
+        .collect::<Vec<_>>()
+        .join(", ");
+    let count = paths.len() - SHOWN_WHEN_TRUNCATED;
+    t!(
+        "{names} and {count} more files",
+        names = &names,
+        count = count
+    )
+}
+
 /// The line a finished sync ends on: what moved, or why nothing did. A file
 /// held back still marked up is not synced, so it never reads as up to date.
 pub fn summary(result: &OverleafSyncResult) -> String {
@@ -33,7 +59,7 @@ pub fn summary(result: &OverleafSyncResult) -> String {
     if result.unresolved_conflicts.is_empty() {
         t!("Overleaf: already up to date.").into()
     } else {
-        let files = result.unresolved_conflicts.join(", ");
+        let files = summarize_paths(&result.unresolved_conflicts);
         t!(
             "Overleaf: waiting on conflict resolution in {files}.",
             files = &files
@@ -53,7 +79,7 @@ pub struct Warning {
 /// warning each, so the absence is not first discovered from the other side.
 pub fn warnings(result: &OverleafSyncResult) -> Vec<Warning> {
     let mut said: Vec<String> = Vec::new();
-    let files = result.skipped_large.join(", ");
+    let files = summarize_paths(&result.skipped_large);
     if !files.is_empty() {
         said.push(t!(
             "Too large for Overleaf, so left on this machine: {files}.",
@@ -80,12 +106,12 @@ pub fn warnings(result: &OverleafSyncResult) -> Vec<Warning> {
     }
     // Overleaf keeps names apart that this Mac's disk treats as one.
     if !result.case_collisions.is_empty() {
-        let pairs = result
+        let pair_labels: Vec<String> = result
             .case_collisions
             .iter()
             .map(|pair| format!("{} / {}", pair.kept, pair.skipped))
-            .collect::<Vec<_>>()
-            .join(", ");
+            .collect();
+        let pairs = summarize_paths(&pair_labels);
         said.push(t!("Overleaf has names that differ only in capitalization, which this Mac treats as the same name: {pairs}. Only the first of each pair syncs here. Rename one of them on Overleaf to sync both.", pairs = &pairs));
     }
     // Edited here and renamed or removed on Overleaf where the sync could
@@ -96,7 +122,7 @@ pub fn warnings(result: &OverleafSyncResult) -> Vec<Warning> {
     // A folder gone from Overleaf whose build outputs the sync cleared, kept
     // for the writer's own files in it.
     for kept in &result.kept_folders {
-        let names = kept.files.join(", ");
+        let names = summarize_paths(&kept.files);
         said.push(t!("Overleaf no longer has the folder {folder}. It stays here because it still holds files that never sync: {names}. Delete them here if you no longer need them.", folder = &kept.folder, names = &names));
     }
     let mut warnings: Vec<Warning> = said
@@ -159,11 +185,8 @@ pub fn conflict_message(marked: &[&OverleafConflict]) -> String {
     if marked.is_empty() {
         return String::new();
     }
-    let files = marked
-        .iter()
-        .map(|item| item.path.as_str())
-        .collect::<Vec<_>>()
-        .join(", ");
+    let paths: Vec<&str> = marked.iter().map(|item| item.path.as_str()).collect();
+    let files = summarize_paths(&paths);
     t!(
         "{files} changed in the same place here and on Overleaf. Choose what to keep at each marked spot in the editor; nothing uploads until then.",
         files = &files
@@ -305,5 +328,38 @@ mod tests {
         ));
         assert!(is_rate_limited("HTTP 429 Too Many Requests"));
         assert!(!is_signed_out("Could not reach Overleaf"));
+    }
+
+    #[test]
+    fn long_file_lists_are_summarized_instead_of_listing_every_path() {
+        let paths: Vec<String> = (1..=10)
+            .map(|i| format!("figures/data/plot_{i}.csv"))
+            .collect();
+        assert_eq!(
+            summarize_paths(&paths[..6]),
+            "figures/data/plot_1.csv, figures/data/plot_2.csv, figures/data/plot_3.csv, figures/data/plot_4.csv, figures/data/plot_5.csv, figures/data/plot_6.csv"
+        );
+        assert_eq!(
+            summarize_paths(&paths),
+            "figures/data/plot_1.csv, figures/data/plot_2.csv, figures/data/plot_3.csv, figures/data/plot_4.csv, figures/data/plot_5.csv and 5 more files"
+        );
+    }
+
+    #[test]
+    fn actionable_warnings_keep_every_path_while_skipped_large_summarizes() {
+        let paths: Vec<String> = (1..=8).map(|i| format!("ch_{i}.tex")).collect();
+        let mut synced = result();
+        synced.skipped_large = paths.clone();
+        synced.refused_incoming = paths.clone();
+        synced.uploaded_over_edits = paths.clone();
+        let said = warnings(&synced);
+        assert_eq!(said.len(), 3);
+        assert!(said[0].message.contains("and 3 more files"));
+        for path in &paths {
+            assert!(said[1].message.contains(path));
+            assert!(said[2].message.contains(path));
+        }
+        assert!(!said[1].message.contains("more files"));
+        assert!(!said[2].message.contains("more files"));
     }
 }
