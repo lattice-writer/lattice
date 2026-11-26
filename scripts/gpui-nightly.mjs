@@ -216,9 +216,17 @@ function runNightly() {
       verdict = settle(verdict, existsSync(out) ? JSON.parse(readFileSync(out, "utf8")) : null);
     }
   }
-  const idle = record.build?.status === "ok" ? runIdleGuard(sha) : [];
-  const nightly = { sha, subject, run: runId(), finished: new Date().toISOString(), baseline: record ? path.basename(baselineFile) : null, failures: [...failuresOf(record, verdict, existsSync(quitFile) ? readFileSync(quitFile, "utf8").trim() : null), ...idle], flaky: verdict?.flaky ?? [], fixed: verdict?.fixed ?? [] };
-  writeFileSync(recordFile(sha), `${JSON.stringify(nightly, null, 2)}\n`);
+  const nightly = { sha, subject, run: runId(), finished: new Date().toISOString(), baseline: record ? path.basename(baselineFile) : null, failures: failuresOf(record, verdict, existsSync(quitFile) ? readFileSync(quitFile, "utf8").trim() : null), flaky: verdict?.flaky ?? [], fixed: verdict?.fixed ?? [] };
+  const write = () => writeFileSync(recordFile(sha), `${JSON.stringify(nightly, null, 2)}\n`);
+  if (record.build?.status === "ok") {
+    // Recorded first, so a step that times out during the guard's half hour
+    // still reports what the gate, the build and the e2e found.
+    const failures = nightly.failures;
+    nightly.failures = [...failures, "idle guard: did not finish"];
+    write();
+    nightly.failures = [...failures, ...runIdleGuard(sha)];
+  }
+  write();
   const lines = [`Nightly full gate at ${sha.slice(0, 9)}: ${nightly.failures.length ? `${nightly.failures.length} failure(s)` : "green"}`, ...nightly.failures.map((failure) => `- ${failure}`), ...nightly.flaky.map((step) => `- flaky: ${step}`), ...nightly.fixed.map((step) => `- known failure that passed: ${step}`)];
   console.log(lines.join("\n"));
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `## ${lines[0]}\n\n${lines.slice(1).join("\n")}\n`);

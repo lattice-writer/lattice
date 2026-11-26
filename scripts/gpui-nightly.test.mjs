@@ -60,7 +60,6 @@ describe("gpui-nightly: the idle guard", () => {
     expect(idleFailures({ passed: true, checks: [] }, 0)).toEqual(["idle guard: ran no checks"]);
     expect(idleFailures({ passed: true, checks: [{ name: "x", passed: true }] }, 3)).toEqual(["idle guard: exited 3"]);
   });
-
 });
 
 describe("gpui-nightly: the issue", () => {

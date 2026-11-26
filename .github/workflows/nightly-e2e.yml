@@ -35,7 +35,7 @@ jobs:
   e2e:
     if: github.repository == 'lattice-writer/lattice' || github.repository == 'leo1oel/lattice'
     runs-on: ${{ vars.LATTICE_MACOS_RUNNER || 'lattice-mac' }}
-    timeout-minutes: 420
+    timeout-minutes: 490
     steps:
       - uses: actions/checkout@v7
         with:
@@ -59,7 +59,7 @@ jobs:
       # up is an error in the record, which the report counts. Its own
       # timeout leaves the job time for the report.
       - name: Gate, release build and the whole e2e on main
-        timeout-minutes: 400
+        timeout-minutes: 465
         run: node scripts/gpui-nightly.mjs run
       - name: Open, update or close the nightly issue
         if: ${{ !cancelled() }}
