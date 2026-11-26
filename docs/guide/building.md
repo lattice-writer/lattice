@@ -46,4 +46,4 @@ When a build fails, the build button turns red and a card opens over the PDF. Ea
 
 - **Export for arXiv…** (project menu or **File**) writes one ZIP that builds on its own.
 - **Export ZIP** writes the whole project, which Overleaf can import.
-- The PDF toolbar's menu has **Save PDF as…**, and **Export review PDF…**, which writes the PDF with the annotations you pick as ordinary PDF comments.
+- The PDF toolbar's menu has **Save PDF as…**, and **Export review PDF…**, which writes the PDF with the annotations you pick as ordinary PDF comments. A note whose document this PDF doesn't show is marked **Not on this PDF**, and a banner names that document; on the live PDF, **Build main.tex** (with that document's name) builds it and places the notes again.

@@ -12,6 +12,7 @@ The first time you build a Typst document, or it starts compiling as you type, L
 
 - Choose **Blank Typst document** as the venue template when you create a project, or **New Typst file** in the Project panel's **+** menu.
 - A folder you open that has a `main.typ` (or another `.typ` that includes the rest) and no LaTeX document builds that file.
+- With no main document set, saving a part that another `.typ` file includes builds the document that includes it, not the part alone.
 - **In a LaTeX project**, a `.typ` file you build compiles on its own, and the LaTeX paper stays the document other builds compile.
 
 ## Write and build
