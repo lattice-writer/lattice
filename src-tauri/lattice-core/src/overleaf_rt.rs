@@ -67,6 +67,9 @@ pub mod tracked;
 mod tree;
 
 pub use client::{RealtimeClient, RealtimeConfig};
+/// How long `RealtimeClient::probe_after_path_change` waits to hear anything
+/// before it gives the connection up.
+pub const PATH_PROBE: std::time::Duration = std::time::Duration::from_secs(3);
 pub use codec::Submission;
 pub use events::{parse_comment_ranges, presence_hue};
 pub use events::{CatchUpUpdate, CommentRange, Suggester};

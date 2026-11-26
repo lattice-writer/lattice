@@ -115,6 +115,19 @@ impl Shell {
             }
         })
         .detach();
+        // And so does the network changing under it while staying up.
+        let mut changes = crate::overleaf::network::path_changes();
+        let listening = bridge.downgrade();
+        cx.spawn(async move |_, cx| {
+            use futures::StreamExt as _;
+            while changes.next().await.is_some() {
+                let heard = listening.update(cx, |bridge, _| bridge.network_path_changed());
+                if heard.is_err() {
+                    break;
+                }
+            }
+        })
+        .detach();
         let subscriptions = vec![
             cx.subscribe_in(&collab, window, |this, _, event, window, cx| {
                 this.on_collab_event(event, window, cx)

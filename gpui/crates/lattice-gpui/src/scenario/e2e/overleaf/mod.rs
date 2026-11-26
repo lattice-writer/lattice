@@ -34,6 +34,7 @@ mod margin_visual;
 mod margin_walk;
 mod markdown_review;
 mod network_return;
+mod path_change;
 mod pause_resume;
 mod pdf_note;
 mod polish;
@@ -482,6 +483,7 @@ impl Run {
         linked.overleaf_reconnect(cx, steps, &mock).await?;
         linked.overleaf_network_return(cx, steps, &mock).await?;
         linked.overleaf_sleep(cx, steps, &mock).await?;
+        linked.overleaf_path_change(cx, steps, &mock).await?;
         linked.overleaf_review(cx, steps, &mock).await?;
         linked.overleaf_markdown_review(cx, steps, &mock).await?;
         linked.overleaf_chat(cx, steps, &mock).await?;

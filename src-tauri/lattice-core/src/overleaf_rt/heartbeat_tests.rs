@@ -99,3 +99,35 @@ fn an_answer_that_never_comes_on_a_socket_still_heard_from_is_only_a_timeout() {
     assert!(error.contains("timed out"), "{error}");
     assert!(lost.is_none() && live, "{lost:?}");
 }
+
+/// A network change probed on a socket that `answers` or has gone silent:
+/// why it was reported lost, if it was, and when.
+fn probed_path_change(answers: bool) -> (Option<String>, Duration) {
+    // The mock names a minute of heartbeat timeout and sends none of its
+    // own, so the probe's answer is all a healthy socket hears.
+    let (host, state) = start_mock(false);
+    let (client, events) = connect(mock_config(&host, "overleaf_session2=test-cookie"));
+    if !answers {
+        leave_updates_unanswered(&state, Heard::Nothing);
+    }
+    let probed = Instant::now();
+    client.probe_after_path_change();
+    let lost = wait_for(&events, PATH_PROBE.as_secs() + 2, |event| match event {
+        RealtimeEvent::Disconnected { reason } => Some(reason.clone()),
+        _ => None,
+    });
+    (lost, probed.elapsed())
+}
+
+#[test]
+fn a_network_change_on_a_socket_that_answers_the_probe_keeps_the_connection() {
+    let (lost, _) = probed_path_change(true);
+    assert!(lost.is_none(), "{lost:?}");
+}
+
+#[test]
+fn a_network_change_on_a_silent_socket_reports_it_lost_once_the_probe_goes_unanswered() {
+    let (lost, after) = probed_path_change(false);
+    assert!(lost.is_some_and(|reason| reason.contains("network changed")), "{after:?}");
+    assert!(after >= PATH_PROBE && after < PATH_PROBE + Duration::from_secs(1), "{after:?}");
+}

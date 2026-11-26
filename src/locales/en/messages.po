@@ -17268,6 +17268,10 @@ msgstr "The native Lattice is installed. Restarting now stops {running}; otherwi
 msgid "the network became available"
 msgstr "the network became available"
 
+#: src/platform/host-errors-overleaf.ts
+msgid "The network changed, so the connection is joined again."
+msgstr "The network changed, so the connection is joined again."
+
 #: src/platform/host-errors-workspace.ts
 msgid "The operation is not permitted."
 msgstr "The operation is not permitted."

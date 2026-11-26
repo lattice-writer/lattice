@@ -1,7 +1,9 @@
 //! Noticing a connection that died without closing: the heartbeat watchdog,
-//! and the clock it reads.
+//! the clock it reads, and ending one the app has reason to doubt.
 
-use super::{lock, Shared};
+use super::super::codec::{encode_event, encode_frame, FRAME_EVENT};
+use super::super::PATH_PROBE;
+use super::{lock, RealtimeClient, Shared};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -85,4 +87,44 @@ pub(super) const SILENT_SINCE: &str =
 /// socket still heard from keeps the timeout as an unknown outcome.
 pub(super) fn heard_nothing_since(shared: &Shared, since: Duration) -> bool {
     *lock(&shared.last_heard) <= since
+}
+
+const PATH_CHANGED: &str = "The network changed, so the connection is joined again.";
+
+impl RealtimeClient {
+    /// The network under the connection changed while staying reachable
+    /// (Wi-Fi to Ethernet, a VPN): ask the server something, and end the
+    /// connection, reported `Disconnected` as after a sleep, only when
+    /// nothing at all arrives within [`PATH_PROBE`]. A socket bound to an
+    /// interface that is gone fails nothing and hears nothing until the
+    /// watchdog's timeout, and a polite close would wait on it the same way;
+    /// but most changes (a roam, an IPv6 address rotating, a VPN's tunnel
+    /// flapping) leave the socket working, and those should cost nothing.
+    ///
+    /// The probe is `clientTracking.getConnectedUsers`, unawaited: Socket.IO
+    /// 0.9 servers never answer a heartbeat the client sends, and Overleaf
+    /// sends its own only every 25 s or so, while this one it answers within
+    /// a second or two. It is what Overleaf's own editor asks on joining, so
+    /// one more costs the project a roster refresh and nothing else.
+    pub fn probe_after_path_change(&self) {
+        let opened = awake_or_asleep();
+        let Ok(payload) = encode_event("clientTracking.getConnectedUsers", ()) else {
+            return;
+        };
+        let id = self.shared.next_ack.fetch_add(1, Ordering::SeqCst);
+        self.shared.queue(encode_frame(FRAME_EVENT, &format!("{id}+"), "", &payload));
+        let shared = self.shared.clone();
+        std::thread::spawn(move || {
+            let deadline = Instant::now() + PATH_PROBE;
+            while Instant::now() < deadline {
+                if shared.finished.load(Ordering::SeqCst) {
+                    return;
+                }
+                std::thread::sleep(WATCHDOG_TICK);
+            }
+            if heard_nothing_since(&shared, opened) {
+                shared.finish(PATH_CHANGED.to_string());
+            }
+        });
+    }
 }

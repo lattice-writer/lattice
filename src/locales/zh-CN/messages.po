@@ -17268,6 +17268,10 @@ msgstr "原生 Lattice 已安装。现在重启会中断 {running}；不重启�
 msgid "the network became available"
 msgstr "网络已恢复"
 
+#: src/platform/host-errors-overleaf.ts
+msgid "The network changed, so the connection is joined again."
+msgstr "网络刚刚切换，正在重新连接"
+
 #: src/platform/host-errors-workspace.ts
 msgid "The operation is not permitted."
 msgstr "不允许此操作"

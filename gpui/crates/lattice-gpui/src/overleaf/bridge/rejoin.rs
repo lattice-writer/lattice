@@ -56,4 +56,19 @@ impl OverleafBridge {
         }
         self.network_came_back();
     }
+
+    /// The network's path changed while it stayed reachable (`network.rs`):
+    /// a live channel probes its socket, which may be bound to an interface
+    /// that is gone, and joins again over the new one only when the probe
+    /// hears nothing (`probe_after_path_change`); one waiting to join does
+    /// so now. Documents with work out are carried over, as after a wake.
+    pub fn network_path_changed(&mut self) {
+        if self.channel == ChannelStatus::Live {
+            if let Some(client) = &self.client {
+                client.probe_after_path_change();
+                return;
+            }
+        }
+        self.network_came_back();
+    }
 }
