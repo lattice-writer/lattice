@@ -10,7 +10,8 @@
  * closure: every suite that mounts the complete app imports nearly every
  * module, so a one-line change ran a hundred files one at a time
  * (vitest.config.ts's maxWorkers: 1), about 6 minutes, where its importers'
- * tests take one and a half. The deeper suites run in release CI.
+ * tests take one and a half. The deeper suites run in the nightly
+ * (scripts/gpui-nightly.mjs) and in release CI.
  */
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -21,8 +22,22 @@ const TEST = /\.test\.(tsx?|mts|jsx?|mjs)$/;
 const IMPORT = /^(?!\s*(?:import|export)\s+type\b).*?(?:from\s+|import\s*\(\s*|import\s+|vi\.mock\(\s*)["']([^"']+)["']/gm;
 const ENDINGS = ["", ".ts", ".tsx", ".mts", ".js", ".jsx", ".mjs", "/index.ts", "/index.tsx", "/index.js"];
 
-/** Every source file under src, scripts and tools, mapped to the files that import it. */
-export function importers(cwd, read = (file) => readFileSync(path.join(cwd, file), "utf8")) {
+/** The vitest setupFiles (vitest.config.ts), which every test loads without importing them. */
+export function setupFilesOf(cwd) {
+  try {
+    const list = /setupFiles:\s*\[([^\]]*)\]/.exec(readFileSync(path.join(cwd, "vitest.config.ts"), "utf8"))?.[1] ?? "";
+    return [...list.matchAll(/["']\.?\/?([^"']+)["']/g)].map((match) => match[1]);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Every source file under src, scripts and tools, mapped to the files that
+ * import it. Every test counts as importing the setup files, so a change to
+ * one, or to what it imports, reaches them all.
+ */
+export function importers(cwd, read = (file) => readFileSync(path.join(cwd, file), "utf8"), setupFiles = setupFilesOf(cwd)) {
   const files = execFileSync("git", ["ls-files", "src", "scripts", "tools"], { cwd, encoding: "utf8" }).split("\n").filter((file) => SOURCE.test(file));
   const known = new Set(files);
   const resolve = (from, spec) => {
@@ -38,6 +53,9 @@ export function importers(cwd, read = (file) => readFileSync(path.join(cwd, file
       const target = resolve(file, match[1]);
       if (target && target !== file) graph.get(target).add(file);
     }
+  }
+  for (const setup of setupFiles.filter((file) => graph.has(file))) {
+    for (const test of files.filter((file) => TEST.test(file))) graph.get(setup).add(test);
   }
   return graph;
 }

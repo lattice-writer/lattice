@@ -19,6 +19,12 @@ describe("import-graph", () => {
       "src/app/App.tsx": 'export { hold } from "../editor/select";\n',
       "src/app/app.test.tsx": 'import "./App";\n',
       "src/app/style.css": "a {}\n",
+      "src/lib/far.ts": "export const far = 1;\n",
+      "src/lib/barrel.ts": 'export * from "./far";\n',
+      "src/lib/barrel.test.ts": 'import {\n  far,\n} from "./barrel";\n',
+      "src/platform/test-setup.ts": 'import "../lib/parked";\n',
+      "src/lib/parked.ts": "export {};\n",
+      "vitest.config.ts": 'export default { test: { setupFiles: ["./src/platform/test-setup.ts"] } };\n',
     };
     try {
       for (const [file, text] of Object.entries(files)) {
@@ -31,6 +37,11 @@ describe("import-graph", () => {
       expect(nearTests(["src/lib/hold.ts"], graph)).toEqual({ tests: ["src/editor/lazy.test.ts", "src/editor/select.test.ts", "src/lib/hold.test.ts"], unknown: [] });
       expect(nearTests(["src/lib/hold.ts"], graph, 99).tests).toContain("src/app/app.test.tsx");
       expect(nearTests(["src/editor/select.test.ts", "src/app/style.css", "src/gone.ts"], graph)).toEqual({ tests: ["src/editor/select.test.ts"], unknown: ["src/app/style.css", "src/gone.ts"] });
+      expect(nearTests(["src/lib/far.ts"], graph).tests).toEqual(["src/lib/barrel.test.ts"]);
+      // Every test loads the setup file, and so what it imports.
+      const all = Object.keys(files).filter((file) => file.includes(".test.")).sort();
+      expect(nearTests(["src/platform/test-setup.ts"], graph).tests).toEqual(all);
+      expect(nearTests(["src/lib/parked.ts"], graph).tests).toEqual(all);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

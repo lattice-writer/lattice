@@ -36,8 +36,11 @@ describe("the prepared Synara runtime cache", () => {
     expectSameSet(hashedPatterns(cache!.with!.key!));
   });
 
-  it("is rebuilt on main whenever one of those files changes", () => {
-    const paths = workflow("release-cache.yml").on?.push?.paths ?? [];
-    for (const input of SYNARA_RUNTIME_INPUTS) expect(paths.some((pattern) => matches(pattern, input)), input).toBe(true);
+  // Pushes to main run nothing on GitHub (lattice#1314), so a pin bump's
+  // first release may build the runtime on a miss; the weekly run and a
+  // manual one warm it.
+  it("is rebuilt on main every week and by hand, not on a push", () => {
+    const on = workflow("release-cache.yml").on as Record<string, unknown>;
+    expect(Object.keys(on).sort()).toEqual(["schedule", "workflow_dispatch"]);
   });
 });

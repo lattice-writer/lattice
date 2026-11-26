@@ -408,7 +408,7 @@ Run it by hand (`gh workflow run user-guide.yml --ref <ref>`) to publish another
 ### `release-cache.yml`
 
 A separate workflow on `main` warms two caches in parallel.
-A push that changes no Rust input, such as a Synara pin bump, skips the Rust job; the weekly schedule and a manual run warm both.
+Pushes to main run nothing on GitHub, so the weekly schedule and a manual run (`gh workflow run release-cache.yml --ref main`) warm both; after a Synara pin bump the first release builds the runtime on a miss unless someone runs it first.
 The Rust job compiles the release dependency graph with the same target and `MACOSX_DEPLOYMENT_TARGET` as Tauri, so a nominal cache hit does not trigger a second macOS dependency build inside the release.
 It deliberately does **not** set `LATTICE_FIRECRAWL_KEY`, and `rust-cache` removes the workspace crate before saving, so the key never lands in a cache artifact.
 

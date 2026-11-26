@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { failuresOf, idleFailures, issueBody, listedFailures, nightlyFor, planIssue } from "./gpui-nightly.mjs";
+import { failuresOf, idleFailures, issueBody, listedFailures, nightlyFor, planIssue, vitestFailures } from "./gpui-nightly.mjs";
 
 const green = { gate: { status: "ok", failing: [] }, build: { status: "ok" }, e2e: { status: "ok", result: "e2e@x.json" } };
 const clean = { error: null, fresh: [], quarantined: [], flaky: [], fixed: [] };
@@ -59,6 +59,16 @@ describe("gpui-nightly: the idle guard", () => {
     expect(idleFailures({ error: "the editor has not been laid out" }, 1)).toEqual(["idle guard did not finish: the editor has not been laid out"]);
     expect(idleFailures({ passed: true, checks: [] }, 0)).toEqual(["idle guard: ran no checks"]);
     expect(idleFailures({ passed: true, checks: [{ name: "x", passed: true }] }, 3)).toEqual(["idle guard: exited 3"]);
+  });
+});
+
+describe("gpui-nightly: the whole Vitest suite", () => {
+  it("is nothing when it passed, names each file that failed, and fails closed without a result or with a bare failure", () => {
+    const file = (name, status) => ({ name: new URL(`../${name}`, import.meta.url).pathname, status });
+    expect(vitestFailures({ success: true, testResults: [file("src/a.test.ts", "passed"), file("src/b.test.ts", "skipped")] }, 0)).toEqual([]);
+    expect(vitestFailures({ success: false, testResults: [file("src/a.test.ts", "failed"), file("src/b.test.ts", "passed")] }, 1)).toEqual(["vitest: src/a.test.ts"]);
+    expect(vitestFailures(null, "SIGTERM")).toEqual(["vitest: no result (exit SIGTERM)"]);
+    expect(vitestFailures({ success: false, testResults: [] }, 1)).toEqual(["vitest: failed (exit 1) without a failing file"]);
   });
 });
 

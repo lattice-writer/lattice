@@ -17,7 +17,8 @@
  *   rustfmt    `cargo fmt --check`, when a .rs file changed; it builds nothing
  *   vitest     the tests within two imports of the changed sources (their own
  *              tests and their importers', scripts/lib/import-graph.mjs; the
- *              suites that mount the whole app run in release CI), the tests
+ *              suites further out, those that mount the whole app among them,
+ *              run in the nightly, scripts/gpui-nightly.mjs), the tests
  *              `vitest related` finds from any other changed file, plus
  *              every test in src/platform/invariant-tests.json, which read
  *              stylesheets and fixtures, or run scripts, no import graph leads

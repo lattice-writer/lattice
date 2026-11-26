@@ -21,7 +21,11 @@
  *           with the scratch HOME and lab switches gpui/script/e2e gives the
  *           scenario. Then the idle guard (gpui/script/idle-guard, lattice#1025):
  *           its frame counts under the lock, and 30 minutes of idle memory
- *           growth outside it (runIdleGuard). Run it outside the lock.
+ *           growth outside it (runIdleGuard). Then the whole Vitest suite,
+ *           headless (runVitest): a branch's gate runs only the tests within
+ *           two imports of its change (scripts/lib/import-graph.mjs), so the
+ *           suites that mount the whole app run here too. Run it outside the
+ *           lock.
  *   rerun   (internal) MODULES OUT: the rerun of those modules, under the lock.
  *   report  reads that record and keeps one GitHub issue, labelled
  *           `nightly-e2e`, in step (planIssue): it opens one for the first
@@ -165,6 +169,35 @@ function runIdleGuard(sha) {
   }
 }
 
+/** What the whole Vitest suite found, one line each: the files that failed, or why it has none to show. */
+export function vitestFailures(result, status) {
+  if (!result) return [`vitest: no result (exit ${status})`];
+  const failed = (result.testResults ?? []).filter((file) => file.status === "failed").map((file) => `vitest: ${path.relative(repo, file.name)}`);
+  if (!failed.length && (status !== 0 || result.success !== true)) failed.push(`vitest: failed (exit ${status}) without a failing file`);
+  return failed;
+}
+
+// The whole suite, one file at a time (vitest.config.ts's maxWorkers: 1).
+const VITEST_TIMEOUT_MS = 90 * 60_000;
+
+/** The whole Vitest suite, headless and outside the in-app lock, as CI's shards run it together. */
+function runVitest() {
+  const dir = mkdtempSync(path.join(tmpdir(), "gpui-nightly-vitest-"));
+  const out = path.join(dir, "vitest.json");
+  try {
+    const run = spawnSync("pnpm", ["exec", "vitest", "run", "--reporter=default", "--reporter=json", `--outputFile.json=${out}`], { cwd: repo, stdio: "inherit", timeout: VITEST_TIMEOUT_MS });
+    let result = null;
+    try {
+      result = JSON.parse(readFileSync(out, "utf8"));
+    } catch {
+      // vitestFailures reports the missing result.
+    }
+    return vitestFailures(result, run.status ?? run.signal);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 /** The nightly record `report` reads for this run, or a failure that says why there is none. */
 export function nightlyFor(saved, { sha, subject, run }) {
   if (saved?.sha === sha && saved.run === run) return saved;
@@ -226,6 +259,11 @@ function runNightly() {
     write();
     nightly.failures = [...failures, ...runIdleGuard(sha)];
   }
+  // Recorded first too, for a suite that outlives the step.
+  const judged = nightly.failures;
+  nightly.failures = [...judged, "vitest: did not finish"];
+  write();
+  nightly.failures = [...judged, ...runVitest()];
   write();
   const lines = [`Nightly full gate at ${sha.slice(0, 9)}: ${nightly.failures.length ? `${nightly.failures.length} failure(s)` : "green"}`, ...nightly.failures.map((failure) => `- ${failure}`), ...nightly.flaky.map((step) => `- flaky: ${step}`), ...nightly.fixed.map((step) => `- known failure that passed: ${step}`)];
   console.log(lines.join("\n"));
