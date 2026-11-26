@@ -165,7 +165,7 @@ function runNightly() {
     if (retry.length && !verdict.error) {
       const out = path.join(dir, `nightly-rerun@${sha}.json`);
       rmSync(out, { force: true });
-      spawnSync(path.join(repo, "scripts", "inapp-lock"), ["--thread", `nightly-e2e ${sha.slice(0, 9)} rerun`, "--wait", "5400", "--", "node", fileURLToPath(import.meta.url), "rerun", rerunModules(result, retry).join(","), out], { cwd: repo, stdio: "inherit" });
+      spawnSync(path.join(repo, "scripts", "inapp-lock"), ["--thread", `nightly-e2e ${sha.slice(0, 9)} rerun`, "--wait", "1800", "--", "node", fileURLToPath(import.meta.url), "rerun", rerunModules(result, retry).join(","), out], { cwd: repo, stdio: "inherit" });
       verdict = settle(verdict, existsSync(out) ? JSON.parse(readFileSync(out, "utf8")) : null);
     }
   }
