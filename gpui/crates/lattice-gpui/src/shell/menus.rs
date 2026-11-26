@@ -14,7 +14,7 @@
 //! attribution Trellis's license asks a shipped app to show, and the
 //! project's website and repository (`about_links.rs`, `macos_about.rs`).
 
-use gpui::{App, Global, Menu, MenuItem, OsAction, SystemMenuType, actions};
+use gpui::{App, AppContext, Global, Menu, MenuItem, OsAction, SystemMenuType, actions};
 use lattice_i18n::tc;
 
 use super::{commands::*, windows};
@@ -37,6 +37,58 @@ fn user_guide_url(locale: lattice_i18n::Locale) -> &'static str {
     } else {
         "https://lattice-writer.github.io/lattice/guide/"
     }
+}
+
+/// The host serving the guide, whose reachability picks the website or the
+/// bundled copy.
+#[cfg(target_os = "macos")]
+const USER_GUIDE_HOST: &std::ffi::CStr = c"lattice-writer.github.io";
+
+/// The bundled copy's first page in the interface language.
+fn offline_user_guide(guide: &std::path::Path, locale: lattice_i18n::Locale) -> std::path::PathBuf {
+    if locale.is_chinese() {
+        guide.join("zh-CN/index.html")
+    } else {
+        guide.join("index.html")
+    }
+}
+
+/// Whether the system can route to the guide's host, as the system judges
+/// it (`SCNetworkReachability`, as `overleaf/network.rs` watches the
+/// internet): no Wi-Fi or Ethernet, or a connection still to be dialled,
+/// is offline. It may resolve the name, so it runs off the main thread.
+#[cfg(target_os = "macos")]
+fn user_guide_host_reachable() -> bool {
+    use system_configuration::network_reachability::{ReachabilityFlags, SCNetworkReachability};
+
+    SCNetworkReachability::from_host(USER_GUIDE_HOST).is_none_or(|host| {
+        host.reachability().is_ok_and(|flags| {
+            flags.contains(ReachabilityFlags::REACHABLE)
+                && !flags.contains(ReachabilityFlags::CONNECTION_REQUIRED)
+        })
+    })
+}
+
+#[cfg(not(target_os = "macos"))]
+fn user_guide_host_reachable() -> bool {
+    true
+}
+
+/// Help ▸ User Guide: the website's pages, or offline the copy the bundle
+/// carries (`structured::resources::user_guide_dir`), in the same language.
+/// Without a bundled copy (a build run from the checkout) the website opens
+/// whatever the network says, and the browser tells the writer it is offline.
+fn open_user_guide(cx: &mut App) {
+    let locale = lattice_i18n::locale();
+    let reachable = cx.background_spawn(async { user_guide_host_reachable() });
+    cx.spawn(async move |cx| {
+        let online = reachable.await;
+        cx.update(|cx| match crate::structured::resources::user_guide_dir() {
+            Some(guide) if !online => cx.open_with_system(&offline_user_guide(&guide, locale)),
+            _ => cx.open_url(user_guide_url(locale)),
+        });
+    })
+    .detach();
 }
 
 /// The attribution Trellis's license asks a shipped app to show (NOTICE).
@@ -95,7 +147,7 @@ pub fn install(cx: &mut App) {
     cx.on_action(|_: &ShowAll, cx| cx.unhide_other_apps());
     cx.on_action(|_: &NewWindow, cx| windows::new_window(None, None, cx));
     cx.on_action(|_: &About, cx| show_about(cx));
-    cx.on_action(|_: &OpenUserGuide, cx| cx.open_url(user_guide_url(lattice_i18n::locale())));
+    cx.on_action(|_: &OpenUserGuide, cx| open_user_guide(cx));
     cx.on_action(|_: &OpenWebsite, cx| cx.open_url(WEBSITE_URL));
     cx.on_action(|_: &OpenRepository, cx| cx.open_url(REPOSITORY_URL));
     // View ▸ Enter Full Screen (Exit Full Screen in full screen): AppKit's
@@ -383,6 +435,15 @@ mod tests {
         assert_eq!(
             user_guide_url(lattice_i18n::Locale::ZhCn),
             "https://lattice-writer.github.io/lattice/guide/zh-CN/"
+        );
+        let guide = std::path::Path::new("/Applications/Lattice.app/Contents/Resources/guide");
+        assert_eq!(
+            offline_user_guide(guide, lattice_i18n::Locale::En),
+            guide.join("index.html")
+        );
+        assert_eq!(
+            offline_user_guide(guide, lattice_i18n::Locale::ZhCn),
+            guide.join("zh-CN/index.html")
         );
     }
 }
