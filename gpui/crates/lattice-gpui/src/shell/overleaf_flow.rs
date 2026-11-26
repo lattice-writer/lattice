@@ -337,6 +337,7 @@ impl Shell {
         if bridge.link().is_none() || bridge.paused() {
             return;
         }
+        let Some(root) = self.root(cx) else { return };
         // What is typed but not yet on disk is part of what resuming
         // merges, so it is saved first.
         let saved = self.save_before_leaving(cx);
@@ -363,6 +364,11 @@ impl Shell {
                     .await;
             }
             this.update(cx, |this, cx| {
+                // Switched to another project meanwhile: the pause was
+                // asked of this one, not the one shown now.
+                if this.root(cx).as_deref() != Some(root.as_path()) {
+                    return;
+                }
                 this.overleaf
                     .update(cx, |bridge, cx| bridge.set_paused(true, cx));
             })
