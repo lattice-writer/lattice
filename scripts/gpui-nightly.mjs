@@ -129,8 +129,8 @@ const runId = () => process.env.GITHUB_RUN_ID ?? "local";
 const app = path.join(repo, "gpui", "target", "release", "lattice-gpui");
 // The idle guard's memory wait (`growth`, after the in-app lock is given back).
 const GROWTH_SECONDS = 1800;
-// What `run` records for the growth check until `growth` replaces it with
-// what it found, so a growth step that timed out or died fails the night.
+// What `report` counts for a record whose growth check `growth` never
+// finished (it timed out or died): `run` marks it pending, `growth` clears it.
 export const GROWTH_PENDING = "idle guard: the 30-minute memory growth check did not finish";
 
 /** gpui/script/idle-guard with `args`, on the release build the run left. */
@@ -150,7 +150,7 @@ function runIdleGuard(args) {
 
 /** The nightly record `report` reads for this run, or a failure that says why there is none. */
 export function nightlyFor(saved, { sha, subject, run }) {
-  if (saved?.sha === sha && saved.run === run) return saved;
+  if (saved?.sha === sha && saved.run === run) return saved.growth === "pending" ? { ...saved, failures: [...saved.failures, GROWTH_PENDING] } : saved;
   return { sha, subject, run, failures: [saved ? "the nightly run wrote no record of its own (the one on disk is another run's)" : "the nightly run wrote no record (see the run's log: the in-app lock, the disk floor or a crash)"], flaky: [] };
 }
 
@@ -204,8 +204,9 @@ function runNightly() {
   }
   // The idle guard's frame counts, about a minute, while this run still
   // holds the in-app lock; its memory growth runs after (`growth`).
-  const idle = record.build?.status === "ok" ? [...runIdleGuard([]), GROWTH_PENDING] : [];
-  const nightly = { sha, subject, run: runId(), finished: new Date().toISOString(), baseline: record ? path.basename(baselineFile) : null, failures: [...failuresOf(record, verdict, existsSync(quitFile) ? readFileSync(quitFile, "utf8").trim() : null), ...idle], flaky: verdict?.flaky ?? [], fixed: verdict?.fixed ?? [] };
+  const built = record.build?.status === "ok";
+  const idle = built ? runIdleGuard([]) : [];
+  const nightly = { sha, subject, run: runId(), finished: new Date().toISOString(), baseline: record ? path.basename(baselineFile) : null, failures: [...failuresOf(record, verdict, existsSync(quitFile) ? readFileSync(quitFile, "utf8").trim() : null), ...idle], flaky: verdict?.flaky ?? [], fixed: verdict?.fixed ?? [], ...(built ? { growth: "pending" } : {}) };
   writeNightly(nightly, `Nightly full gate at ${sha.slice(0, 9)}`);
 }
 
@@ -229,10 +230,10 @@ function runGrowth() {
   const file = recordFile(sha);
   const saved = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : null;
   if (saved?.run !== runId()) return console.log("gpui-nightly: no record of this run to add the idle growth to");
-  // Without the pending line `run` built nothing to measure, and its record says why.
-  if (!saved.failures.includes(GROWTH_PENDING)) return console.log("gpui-nightly: this run left no idle growth check to run");
+  // Not pending: `run` built nothing to measure, and its record says why.
+  if (saved.growth !== "pending") return console.log("gpui-nightly: this run left no idle growth check to run");
   const failures = runIdleGuard(["--growth", String(GROWTH_SECONDS)]);
-  writeNightly({ ...saved, failures: [...saved.failures.filter((failure) => failure !== GROWTH_PENDING), ...failures] }, `Nightly full gate and idle growth at ${sha.slice(0, 9)}`);
+  writeNightly({ ...saved, growth: "done", failures: [...saved.failures, ...failures] }, `Nightly full gate and idle growth at ${sha.slice(0, 9)}`);
 }
 
 function report({ dryRun }) {

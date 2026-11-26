@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { failuresOf, idleFailures, issueBody, listedFailures, nightlyFor, planIssue } from "./gpui-nightly.mjs";
+import { GROWTH_PENDING, failuresOf, idleFailures, issueBody, listedFailures, nightlyFor, planIssue } from "./gpui-nightly.mjs";
 
 const green = { gate: { status: "ok", failing: [] }, build: { status: "ok" }, e2e: { status: "ok", result: "e2e@x.json" } };
 const clean = { error: null, fresh: [], quarantined: [], flaky: [], fixed: [] };
@@ -59,6 +59,13 @@ describe("gpui-nightly: the idle guard", () => {
     expect(idleFailures({ error: "the editor has not been laid out" }, 1)).toEqual(["idle guard did not finish: the editor has not been laid out"]);
     expect(idleFailures({ passed: true, checks: [] }, 0)).toEqual(["idle guard: ran no checks"]);
     expect(idleFailures({ passed: true, checks: [{ name: "x", passed: true }] }, 3)).toEqual(["idle guard: exited 3"]);
+  });
+
+  it("fails a night whose growth check never finished, without failing a green run before it", () => {
+    const pending = { sha, run: "41", failures: [], flaky: [], growth: "pending" };
+    expect(pending.failures).toEqual([]);
+    expect(nightlyFor(pending, { sha, subject: "x", run: "41" }).failures).toEqual([GROWTH_PENDING]);
+    expect(nightlyFor({ ...pending, growth: "done" }, { sha, subject: "x", run: "41" }).failures).toEqual([]);
   });
 });
 
