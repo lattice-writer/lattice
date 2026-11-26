@@ -94,7 +94,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as sleep } from "node:timers/promises";
 import { FULL, RELEASE_PATHS, coveredJobs, docsGate, findGate, formatTrailer, macosNeeds, mainMergeRegate } from "./ci-local-select.mjs";
-import { JOBS, ciTier, selectorListsEdited } from "./ci-tier.mjs";
+import { JOBS, ciTier, knownFailuresInert, selectorListsEdited } from "./ci-tier.mjs";
 import { changedFiles, gateStages, runStages } from "./gate-changed.mjs";
 import { ancestorBaseline, readBaseline } from "./gpui-e2e-light.mjs";
 import { baselineDir } from "./gpui-main-baseline.mjs";
@@ -334,7 +334,7 @@ export function docsOnlyPass(files, cwd = repo, mergeBase = null) {
   }
   if (!check.files.length) return null;
   const rest = files.filter((file) => !check.files.includes(file));
-  const gap = Object.values(coveredJobs(check.cover, macosNeeds(ciTier(rest, { selector: !selectorListsEdited(mergeBase, rest) }), rest, mergeBase))).find((group) => !group.covered);
+  const gap = Object.values(coveredJobs(check.cover, macosNeeds(ciTier(rest, { selector: !selectorListsEdited(mergeBase, rest), inertKnown: knownFailuresInert(mergeBase, rest) }), rest, mergeBase))).find((group) => !group.covered);
   if (gap) {
     console.log(`ci:local: no docs-only pass: the gate at ${gate.slice(0, 9)} does not cover the rest of the branch (${gap.reason})`);
     return null;
@@ -372,7 +372,7 @@ async function main() {
     return;
   }
   const release = files.filter((file) => RELEASE_PATHS.test(file));
-  const tier = ciTier(files, { full: options.full || release.length > 0, selector: !selectorListsEdited(mergeBase, files) });
+  const tier = ciTier(files, { full: options.full || release.length > 0, selector: !selectorListsEdited(mergeBase, files), inertKnown: knownFailuresInert(mergeBase, files) });
   const needs = macosNeeds(tier, files, mergeBase);
   console.log(`ci:local: ${files.length} changed file(s) against ${options.base} (${mergeBase.slice(0, 9)})`);
   if (release.length) console.log(`ci:local: release paths changed (${release.slice(0, 3).join(", ")}): the full gate runs, and only its full trailer lets GitHub skip the macOS jobs`);

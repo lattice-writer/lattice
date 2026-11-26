@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { CI_CONTROL, CI_CONTROL_TESTS, GPUI_INPUTS, JOBS, ciTier, localMacosPass, trailerHonoured, wantsFull } from "./ci-tier.mjs";
+import { CI_CONTROL, CI_CONTROL_TESTS, GPUI_INPUTS, JOBS, ciTier, knownFailuresInert, localMacosPass, macosExcusesKept, trailerHonoured, wantsFull } from "./ci-tier.mjs";
 
 const repo = path.resolve(import.meta.dirname, "..");
 
@@ -114,6 +114,27 @@ describe("ci-tier", () => {
     const source = readFileSync(path.join(scripts, "ci-tier.mjs"), "utf8");
     for (const name of ["CI_CONTROL_TESTS", "CI_CONTROL", "DOCS"]) expect(source, name).toMatch(new RegExp(`^(export )?const ${name} = .*;$`, "m"));
     expect(JOBS.filter((job) => ciTier(["scripts/ci-tier.mjs"], { scan, selector: false }).jobs[job])).toEqual(JOBS);
+  });
+
+  it("takes only the verdict's tests for a known-failures edit no macOS run can show", () => {
+    const file = "scripts/gpui-e2e-known-failures.json";
+    const inert = ciTier([file], { scan, inertKnown: true });
+    expect(JOBS.filter((job) => inert.jobs[job])).toEqual(["vitest"]);
+    expect(inert.vitestFiles).toEqual(["scripts/gpui-e2e-verdict.test.mjs"]);
+    expect(inert.gpuiFiles).toEqual([file]);
+    expect(ciTier([file], { scan }).jobs.gpui).toBe(true);
+    expect(ciTier([file, "gpui/crates/lattice-gpui/src/main.rs"], { scan, inertKnown: true }).jobs.gpui).toBe(true);
+
+    const list = (...steps) => JSON.stringify({ steps: steps.map(([step, platforms, tier]) => ({ step, platforms, reason: "r", followup: "LEO-14", ...(tier && { tier }) })) });
+    const before = list(["a", ["macos", "linux"]], ["b", ["macos"], "flaky"], ["c", ["windows"]]);
+    expect(macosExcusesKept(before, list(["a", ["macos", "linux"]], ["c", ["windows"]]))).toBe(true);
+    expect(macosExcusesKept(before, list(["a", ["macos"]], ["b", ["macos"], "flaky"], ["c", ["windows", "linux"]], ["d", ["linux"]]))).toBe(true);
+    expect(macosExcusesKept(before, list(["a", ["macos", "linux"]], ["b", ["macos"], "flaky"], ["c", ["windows", "macos"]]))).toBe(false);
+    expect(macosExcusesKept(before, list(["a", ["macos", "linux"]], ["b", ["macos"]], ["c", ["windows"]]))).toBe(false);
+    expect(macosExcusesKept(before, list(["a", ["macos", "linux"]], ["b", ["macos"], "flaky"], ["e", ["macos"]]))).toBe(false);
+    expect(knownFailuresInert("HEAD", [file])).toBe(true);
+    expect(knownFailuresInert("HEAD", ["src/App.tsx"])).toBe(false);
+    expect(knownFailuresInert("no-such-ref", [file])).toBe(false);
   });
 
   it("reads the CI: full trailer and the ci:full label", () => {

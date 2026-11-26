@@ -172,6 +172,34 @@ export function selectorListsEdited(base, files) {
     .some((line) => /\b(CI_CONTROL|CI_CONTROL_TESTS|DOCS)\b/.test(line));
 }
 
+const KNOWN_FAILURES = "scripts/gpui-e2e-known-failures.json";
+
+/**
+ * Whether the diff from `base` to the working tree changes the known GPUI e2e
+ * failures only in ways no macOS run can show: it removes entries, or edits
+ * entries for other platforms, so the steps macOS excuses (each with its
+ * tier) are the same or fewer. Removing one makes the verdict stricter, which
+ * main's nightly checks; another platform's entries matter only to that
+ * platform's hosted job. Such an edit takes the verdict's tests and no GPUI
+ * build or e2e (ciTier's `inertKnown`). A file that cannot be read on either
+ * side is not inert.
+ */
+export function knownFailuresInert(base, files) {
+  if (!base || !files.includes(KNOWN_FAILURES)) return false;
+  try {
+    return macosExcusesKept(git("show", `${base}:${KNOWN_FAILURES}`), readFileSync(path.join(repo, KNOWN_FAILURES), "utf8"));
+  } catch {
+    return false;
+  }
+}
+
+/** Whether `after` (the known-failures file's text) excuses on macOS only steps `before` excused there, each in the same tier. */
+export function macosExcusesKept(before, after) {
+  const macos = (text) => new Map(JSON.parse(text).steps.filter((entry) => entry.platforms.includes("macos")).map((entry) => [entry.step, entry.tier ?? "failing"]));
+  const kept = macos(before);
+  return [...macos(after)].every(([step, tier]) => kept.get(step) === tier);
+}
+
 /**
  * The tier for these changed files: each job's flag, and the first files
  * that turned each on. When the only Vitest inputs that changed are files
@@ -179,7 +207,7 @@ export function selectorListsEdited(base, files) {
  * and the shards run them alone. `scan` carries what the git scans find;
  * tests pass their own.
  */
-export function ciTier(files, { full = false, scan = null, selector = true } = {}) {
+export function ciTier(files, { full = false, scan = null, selector = true, inertKnown = false } = {}) {
   const jobs = Object.fromEntries(JOBS.map((job) => [job, full]));
   const why = Object.fromEntries(JOBS.map((job) => [job, full ? ["full run"] : []]));
   if (full) return { full, jobs, why, vitestFiles: [], gpuiFiles: [], docsOnly: false };
@@ -231,6 +259,14 @@ export function ciTier(files, { full = false, scan = null, selector = true } = {
     }
     if (file === ".github/workflows/gpui.yml") {
       on("gpui", file);
+      continue;
+    }
+    // Still a GPUI file for the Windows and Linux e2e tiers, which read
+    // gpuiFiles, but no macOS GPUI job (knownFailuresInert).
+    if (file === KNOWN_FAILURES && inertKnown) {
+      gpuiFiles.push(file);
+      vitestFiles.add("scripts/gpui-e2e-verdict.test.mjs");
+      on("vitest", file);
       continue;
     }
     for (const { read, test } of testReads) {
@@ -315,14 +351,14 @@ function github() {
 
   const files = base ? git("-c", "core.quotePath=false", "diff", "--no-renames", "--name-only", base, "HEAD").split("\n").filter(Boolean) : [];
   if (!reason && event === "workflow_dispatch" && files.length === 0) reason = "a dispatch of a branch that changes nothing (a baseline)";
-  const tier = ciTier(files, { full: Boolean(reason), selector: !selectorListsEdited(base, files) });
+  const tier = ciTier(files, { full: Boolean(reason), selector: !selectorListsEdited(base, files), inertKnown: knownFailuresInert(base, files) });
   if (platform !== "all") for (const job of JOBS) tier.jobs[job] = job === "rust" || job === "gpui";
   const named = trailerHonoured({ full: tier.full, ref }) && localMacosPass(message, git("rev-parse", "HEAD^{tree}")) ? parseTrailer(message) : null;
   // A docs-only pass checked the text files since its gate; the gate's own
   // cover has to cover everything else the branch changes.
   const { cover, docsFiles, reason: docsRefused } = resolveCover(named, { cwd: repo });
   const gated = files.filter((file) => !docsFiles.includes(file));
-  const local = coveredJobs(cover, macosNeeds(docsFiles.length ? ciTier(gated, { selector: !selectorListsEdited(base, gated) }) : tier, gated, base));
+  const local = coveredJobs(cover, macosNeeds(docsFiles.length ? ciTier(gated, { selector: !selectorListsEdited(base, gated), inertKnown: knownFailuresInert(base, gated) }) : tier, gated, base));
   const windows = windowsE2e(tier.gpuiFiles, { full: tier.full });
   const linux = linuxE2e(tier.gpuiFiles, { full: tier.full });
   const groups = { rust: "Rust", gpui: "GPUI", webkit: "WebKit benchmark" };
