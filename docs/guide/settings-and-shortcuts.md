@@ -2,21 +2,22 @@
 
 ## Settings
 
-Open **Lattice › Settings…** (`⌘,`). The search box at the top finds any setting by name.
+Open **Lattice › Settings…** (`⌘,`). The search box at the top finds any setting by name, and by the words you might use for it: "frosted glass" finds **Translucency**, ".aux" finds **Hide auxiliary files**.
 
-![Settings › Appearance: interface language, size, sounds, notification position and tab style](images/en-settings.webp)
+![Settings › Appearance: interface language, size, sounds, notification position, tab style, fonts and themes](images/en-settings.webp)
 
-| Section | What's there |
-| --- | --- |
-| **Appearance** | Interface language (English or 简体中文), interface size, sounds, notification position, tab style, editor fonts, theme and code theme, title bar tools. |
-| **Editor & builds** | Editor keymap (default, Vim or Emacs), your name, spelling and grammar (on a Mac, spelling only, with macOS's checker), automatic build, auxiliary files, compile engine, shell escape, app updates. |
-| **Agent** | Providers, MCP, Skills, Usage & limits, Archived threads, Model endpoint, Environment, and in the native Lattice, Display (the Agent's font size). See [The Agent](agent.md). |
-| **Integrations** | Overleaf, Literature services (keys for literature search), Plugins. |
-| **Diagnostics** | TeX doctor, Logs. |
+| Section | Page | What's there |
+| --- | --- | --- |
+| **General** | **Appearance** | Interface language (**Match system**, English or Simplified Chinese), interface size, sounds, notification position, tab style; font, size and line height for the source and Visual Markdown editors; **Theme** (color theme, palette, theme files, tint, accent, translucency); **Code theme**; **Title bar tools**. See [Plugins and themes](plugins-and-themes.md). |
+| | **Editor & builds** | **Editor**: keymap (default, Vim or Emacs), your name, **Check spelling** (macOS's checker). **Builds**: automatic build, auxiliary files and **Hide auxiliary files**, Typst support, and with a project open the compile engine, shell escape, **Stop on first error** and Live preview. **App updates**: the version and **Check for updates**. See [Building](building.md). |
+| **Agent** | | Providers, Display, MCP, Skills, Usage & limits, Archived threads, Model endpoint, Environment. See [The Agent](agent.md). |
+| **Integrations** | | [Overleaf](overleaf.md), Literature services (keys for literature search), [Plugins](plugins-and-themes.md#plugins). |
+| **Diagnostics** | | TeX doctor, Logs. |
+| **About** | | Acknowledgements. |
 
-![Settings › Editor & builds: editor keymap, spelling, grammar and builds](images/en-settings-editor.webp)
+![Settings › Editor & builds: editor keymap, spelling, builds and Hide auxiliary files](images/en-settings-editor.webp)
 
-`⌘+`, `⌘−` and `⌘0` (or **View › Bigger / Smaller / Actual Size**) change the interface size for the moment.
+`⌘+`, `⌘−` and `⌘0` (or **View › Bigger / Smaller / Actual Size**) change the interface size, the same setting as **Appearance › Interface size**, for every window.
 
 ## Shortcuts
 
