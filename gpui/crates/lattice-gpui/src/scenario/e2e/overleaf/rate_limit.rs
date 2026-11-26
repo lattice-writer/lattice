@@ -14,9 +14,12 @@ use gpui::AsyncApp;
 use serde_json::json;
 
 use super::super::Steps;
-use crate::scenario::{
-    Run,
-    overleaf_mock::{MockOverleaf, PROJECT_ID},
+use crate::{
+    scenario::{
+        Run,
+        overleaf_mock::{MockOverleaf, PROJECT_ID},
+    },
+    shell::overleaf_flow::control::OverleafBadge,
 };
 
 impl Run {
@@ -84,7 +87,9 @@ impl Run {
                 .and_then(|seconds| seconds.parse::<u64>().ok());
             (label, seconds)
         };
+        let badge = |cx: &mut AsyncApp| cx.update(|cx| self.shell.read(cx).overleaf_badge(cx));
         let (waiting_label, waiting) = seconds_left(cx);
+        let cooling_badge = badge(cx);
         cx.background_executor().timer(Duration::from_secs(3)).await;
         let (_, later) = seconds_left(cx);
         let counts_down = matches!(
@@ -95,6 +100,7 @@ impl Run {
             .wait_for(cx, Duration::from_secs(100), |_, _| mock.file(PATH).is_some())
             .await;
         let took = started.elapsed();
+        let sent_badge = badge(cx);
         // Sent as the cool-down ends, by the mock's own clock: the 45 s poll
         // would leave it anywhere up to 85 s after the 429.
         let upload_times = mock.upload_times();
@@ -115,6 +121,14 @@ impl Run {
             owed && counts_down,
             json!({
                 "label": waiting_label, "seconds": waiting, "three_seconds_later": later,
+            }),
+        );
+        steps.check(
+            "while a 429's cool-down runs, the Overleaf control's dot is amber, and green again once the upload goes",
+            owed && cooling_badge == Some(OverleafBadge::Cooling)
+                && sent_badge == Some(OverleafBadge::Online),
+            json!({
+                "cooling": format!("{cooling_badge:?}"), "sent": format!("{sent_badge:?}"),
             }),
         );
         steps.check(
