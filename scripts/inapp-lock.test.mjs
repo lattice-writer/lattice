@@ -77,6 +77,12 @@ describe.skipIf(process.platform === "win32")("inapp-lock", () => {
     expect(lines.indexOf("start build")).toBeLessThan(lines.indexOf("end e2e"));
   });
 
+  it("lets the builds lock go when the build ends, whatever it leaves running", () => {
+    const daemon = spawnSync(script, ["build", "--", "sh", "-c", "(sleep 5 &) ; exit 2"], { env, encoding: "utf8" });
+    expect(daemon.status).toBe(2);
+    expect(lock("--thread", "Q", "--wait", "1", "--", "true").status).toBe(0);
+  });
+
   it("runs a build under a holder of the lock at once", () => {
     expect(lock("--thread", "A", "--", script, "build", "--", "true").status).toBe(0);
   });

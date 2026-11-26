@@ -219,16 +219,24 @@ def release(fd):
 
 def build(command):
     """Run a build holding the builds file shared, which waits while a quiet
-    holder has it and keeps one from starting until the build ends."""
-    if not os.environ.get("INAPP_LOCK_HELD"):
-        builds = os.open(BUILDS, os.O_RDONLY | os.O_CREAT, 0o666)
-        try:
-            fcntl.flock(builds, fcntl.LOCK_SH | fcntl.LOCK_NB)
-        except BlockingIOError:
-            print(f"inapp-lock: waiting for {describe(holder())} before this build", file=sys.stderr, flush=True)
-            fcntl.flock(builds, fcntl.LOCK_SH)
-        os.set_inheritable(builds, True)
-    os.execvp(command[0], command)
+    holder has it and keeps one from starting until the build ends. This
+    process holds it, not the build: a daemon the build leaves behind (the
+    sccache server) would otherwise keep it, and every quiet holder waiting."""
+    if os.environ.get("INAPP_LOCK_HELD"):
+        os.execvp(command[0], command)
+    builds = os.open(BUILDS, os.O_RDONLY | os.O_CREAT, 0o666)
+    try:
+        fcntl.flock(builds, fcntl.LOCK_SH | fcntl.LOCK_NB)
+    except BlockingIOError:
+        print(f"inapp-lock: waiting for {describe(holder())} before this build", file=sys.stderr, flush=True)
+        fcntl.flock(builds, fcntl.LOCK_SH)
+    # The build shares this process group, so a signal that ends the group
+    # ends it too; this one only waits and lets the lock go.
+    for signum in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+        signal.signal(signum, signal.SIG_IGN if signum == signal.SIGHUP else lambda *_: None)
+    status = subprocess.Popen(command).wait()
+    os.close(builds)
+    return status if status >= 0 else 128 - status
 
 
 def run(thread, wait, command, kind):
