@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { baselineDir, parseE2e, parseGate } from "./gpui-main-baseline.mjs";
+import { baselineDir, chunkModules, chunkResult, mergeChunks, mergeQuits, parseE2e, parseGate } from "./gpui-main-baseline.mjs";
 
 // The main-baseline cache is macOS-only tooling, and its paths are POSIX ones.
 describe.skipIf(process.platform === "win32")("gpui-main-baseline", () => {
@@ -47,5 +47,49 @@ describe.skipIf(process.platform === "win32")("gpui-main-baseline", () => {
 
   it("writes under the shared build directory", () => {
     expect(baselineDir({ LATTICE_GPUI_BUILD_DIR: "/x" })).toBe("/x/main-baseline");
+  });
+});
+
+describe("gpui-main-baseline: the e2e in chunks", () => {
+  it("splits the modules into contiguous chunks of near-equal size, every module once", () => {
+    const modules = Array.from({ length: 106 }, (_, index) => `m${index}`);
+    const chunks = chunkModules(modules, 6);
+    expect(chunks.map((chunk) => chunk.length)).toEqual([18, 18, 18, 18, 18, 16]);
+    expect(chunks.flat()).toEqual(modules);
+    expect(chunkModules(["a", "b"], 6)).toEqual([["a"], ["b"]]);
+  });
+
+  it("merges the chunks into one result, a step failing when it failed in any chunk", () => {
+    const smoke = (passed) => ({ step: "open", passed, module: undefined });
+    const merged = mergeChunks([
+      { passed: true, steps: [smoke(true), { step: "a1", passed: true, module: "a" }] },
+      { passed: false, steps: [smoke(false), { step: "b1", passed: false, module: "b" }] },
+    ]);
+    expect(merged.passed).toBe(false);
+    expect(merged.steps.map((step) => [step.step, step.passed])).toEqual([["open", false], ["a1", true], ["b1", false]]);
+    expect(merged.error).toBeUndefined();
+    expect(mergeChunks([{ passed: true, steps: [smoke(true)] }, { passed: true, steps: [smoke(true)] }]).passed).toBe(true);
+  });
+
+  it("fails closed on a chunk with no result or an error, such as one that never got the lock", () => {
+    const merged = mergeChunks([{ passed: true, steps: [] }, null, { error: "the in-app lock was not free within 90 min" }]);
+    expect(merged).toMatchObject({ passed: false, error: "chunk 2 wrote no result; chunk 3: the in-app lock was not free within 90 min" });
+  });
+
+  it("reads a chunk's result only when that run wrote it, and never past a lock give-up", () => {
+    const pass = JSON.stringify({ passed: true, steps: [] });
+    expect(chunkResult({ status: "ok", code: 0 }, pass)).toEqual({ passed: true, steps: [] });
+    expect(chunkResult({ status: "failed", code: 75 }, pass)).toEqual({ error: "the in-app lock was not free in time" });
+    expect(chunkResult({ status: "failed", code: 101 }, null).error).toMatch(/exited with 101 and wrote no result/);
+    expect(chunkResult({ status: "timed out", code: null }, null).error).toMatch(/exited with timed out/);
+    expect(chunkResult({ status: "ok", code: 0 }, null)).toBeNull();
+    expect(chunkResult({ status: "failed", code: 1 }, "{").error).toMatch(/not JSON/);
+  });
+
+  it("adds up the save-on-quit checks: saved only if every chunk saved", () => {
+    expect(mergeQuits(["saved", "saved"])).toBe("saved");
+    expect(mergeQuits(["saved", "lost", "unknown"])).toBe("lost");
+    expect(mergeQuits(["saved", "unknown"])).toBe("unknown");
+    expect(mergeQuits([])).toBe("unknown");
   });
 });

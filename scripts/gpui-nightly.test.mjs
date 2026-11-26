@@ -82,16 +82,18 @@ describe("gpui-nightly: the issue", () => {
 describe("gpui-nightly: the workflow", () => {
   const workflow = readFileSync(new URL("../.github/workflows/nightly-e2e.yml", import.meta.url), "utf8");
 
-  it("runs on main every night on the Mac mini, under the in-app lock, and reports even when the run failed", () => {
+  it("runs on main every night on the Mac mini, a chunk at a time under the in-app lock, and reports even when the run failed", () => {
     expect(workflow).toMatch(/schedule:\n\s+#.*\n\s+- cron: "\d+ \d+ \* \* \*"/);
     expect(workflow).toMatch(/runs-on: \$\{\{ vars\.LATTICE_MACOS_RUNNER \|\| 'lattice-mac' \}\}\n/);
     expect(workflow).toMatch(/fetch-depth: 0\n/);
     expect(workflow).toMatch(/ref: main\n/);
-    expect(workflow).toMatch(/scripts\/inapp-lock --thread .* -- node scripts\/gpui-nightly\.mjs run/);
+    // It takes the in-app lock per chunk (gpui-main-baseline.mjs --chunks), never for the whole run.
+    expect(workflow).toMatch(/\n\s+run: node scripts\/gpui-nightly\.mjs run\n/);
+    expect(workflow).not.toMatch(/run: .*inapp-lock/);
+    expect(readFileSync(new URL("./gpui-nightly.mjs", import.meta.url), "utf8")).toMatch(/"--chunks", String\(CHUNKS\)/);
     expect(workflow).toMatch(/if: \$\{\{ !cancelled\(\) \}\}\n(.*\n){0,3}\s+run: node scripts\/gpui-nightly\.mjs report/);
     expect(workflow).toMatch(/issues: write/);
     // The build tree check runs before the lock, with a short timeout of its own.
-    expect(workflow.indexOf("Reach the shared build tree")).toBeLessThan(workflow.indexOf("scripts/inapp-lock"));
     expect(workflow).toMatch(/- name: Reach the shared build tree\n\s+timeout-minutes: 2\n/);
   });
 });

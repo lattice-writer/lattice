@@ -4,30 +4,39 @@ name: User guide
 # website's gh-pages branch under guide/ (https://lattice-writer.github.io/lattice/guide/),
 # which Help ▸ User Guide opens in both apps.
 #
-# - After the Release workflow succeeds, the guide is rendered from that
-#   release's commit, so it describes the version people download, and
-#   published. Only guide/ is written: the site's own files belong to the
-#   website, and demo/ to web-demo.yml.
-# - Run by hand (workflow_dispatch) it renders and publishes the chosen ref,
-#   for a guide fix that should not wait for the next release.
+# - A push to main that changes the guide or its renderer publishes it, so a
+#   guide fix is live within minutes. Guide pages land on main with the
+#   pull request that builds what they describe, so between releases the
+#   website can describe a feature a day or two before it ships; the pages
+#   say "in the native Lattice" or name the version where that matters.
+#   Only guide/ is written: the site's own files belong to the website,
+#   and demo/ to web-demo.yml.
+# - Run by hand (workflow_dispatch) it renders and publishes the chosen ref.
 on:
-  workflow_run:
-    workflows: [Release]
-    types: [completed]
+  push:
+    branches: [main]
+    paths:
+      - docs/guide/**
+      - scripts/user-guide.mjs
+      - scripts/lib/util.mjs
+      - .github/workflows/user-guide.yml
   workflow_dispatch:
+
+# A newer push to main cancels the run before it, started or not; each run
+# renders and pushes guide/ whole, so the newest one leaves the site right.
+concurrency:
+  group: user-guide-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
   build:
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
-        with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - uses: ./.github/actions/setup-pnpm
       - run: node scripts/user-guide.mjs --out "$RUNNER_TEMP/guide"
       - uses: actions/upload-artifact@v7
@@ -39,13 +48,13 @@ jobs:
 
   publish:
     needs: build
-    # A rehearsal tag (v0.19.0-rc.1, whose release release.yml keeps a draft)
-    # publishes nothing to the website.
-    if: ${{ !contains(github.event.workflow_run.head_branch, '-') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    # Shares web-demo.yml's group: one push to gh-pages at a time.
+    # Shares web-demo.yml's group: one push to gh-pages at a time. GitHub
+    # keeps one pending job per group, so a guide publish queued behind
+    # another can replace a pending web-demo publish (and the reverse);
+    # docs/release-process.md says to check the demo after a release.
     concurrency:
       group: web-demo-publish
       cancel-in-progress: false
@@ -60,8 +69,8 @@ jobs:
           path: site
       - name: Replace guide/ on gh-pages
         env:
-          REF: ${{ github.event.workflow_run.head_branch || github.ref_name }}
-          SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          REF: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           cd site

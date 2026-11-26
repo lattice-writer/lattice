@@ -4,6 +4,7 @@ import type { OverleafSyncResult } from "../app-types";
 import { parseConflictBlocks } from "../history/conflict-markers";
 import { i18n } from "../i18n";
 import { showError, showingErrors, showWarning } from "./notify";
+import { summarizeOverleafPaths } from "./overleaf-path-summary";
 
 export type ConflictReport = {
   result: OverleafSyncResult;
@@ -34,7 +35,7 @@ export async function reportConflicts({ result, projectRoot, stillCurrent, openC
     if (!stillCurrent()) return false;
   }
   if (marked.length) {
-    const files = marked.map((item) => item.path).join(", ");
+    const files = summarizeOverleafPaths(marked.map((item) => item.path));
     showError(i18n._(msg`${files} changed in the same place here and on Overleaf. Choose what to keep at each marked spot in the editor; nothing uploads until then.`), "Overleaf");
   }
   for (const item of result.conflicts.filter((conflict) => conflict.markers === false)) {

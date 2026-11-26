@@ -14,10 +14,13 @@
  *           judges main (scripts/gpui-e2e-known-failures.json, the flaky tier
  *           counted, one rerun of a new failure's module on a fresh fixture),
  *           and writes nightly@<sha>.json beside the baseline, with this
- *           run's id, or a record of why it stopped. The rerun takes the
- *           scratch HOME and lab switches gpui/script/e2e gives the
- *           scenario. The scenario and the rerun open windows: run it under
- *           scripts/inapp-lock.
+ *           run's id, or a record of why it stopped. The scenario runs in
+ *           chunks of modules (gpui-main-baseline.mjs --chunks), each under
+ *           scripts/inapp-lock, letting the lock go in between so a queued
+ *           gate or lab run gets in; the rerun takes the lock too (`rerun`),
+ *           with the scratch HOME and lab switches gpui/script/e2e gives the
+ *           scenario. Run it outside the lock.
+ *   rerun   (internal) MODULES OUT: the rerun of those modules, under the lock.
  *   report  reads that record and keeps one GitHub issue, labelled
  *           `nightly-e2e`, in step (planIssue): it opens one for the first
  *           failures, rewrites its body every night they persist and comments
@@ -43,6 +46,9 @@ const git = (...args) => execFileSync("git", args, { cwd: repo, encoding: "utf8"
 export const LABEL = "nightly-e2e";
 // The system disk floor release builds keep on the Mac mini (CREW.md).
 const MIN_FREE_GB = Number(process.env.LATTICE_NIGHTLY_MIN_FREE_GB ?? 20);
+// The whole scenario takes 16-26 min on the Mac mini; six chunks hold the
+// in-app lock about 3-5 min each.
+const CHUNKS = 6;
 
 /** What failed tonight, one line each: gate stages, the build, and the e2e steps the verdict counts. */
 export function failuresOf(record, verdict, quit = null) {
@@ -139,7 +145,7 @@ function runNightly() {
   const quitFile = path.join(dir, `quit@${sha}.txt`);
   rmSync(resultFile, { force: true });
   rmSync(quitFile, { force: true });
-  const baseline = spawnSync("node", [path.join(repo, "scripts", "gpui-main-baseline.mjs")], { cwd: repo, stdio: "inherit", env: { ...process.env, LATTICE_E2E_QUIT_RESULT: quitFile } });
+  const baseline = spawnSync("node", [path.join(repo, "scripts", "gpui-main-baseline.mjs"), "--chunks", String(CHUNKS)], { cwd: repo, stdio: "inherit", env: { ...process.env, LATTICE_E2E_QUIT_RESULT: quitFile } });
   const baselineFile = path.join(dir, `known-failures@${sha}.json`);
   const record = existsSync(baselineFile) ? JSON.parse(readFileSync(baselineFile, "utf8")) : null;
   // gpui-main-baseline.mjs exits 0 whether or not main is green; anything
@@ -157,13 +163,10 @@ function runNightly() {
     verdict = judge(result, knownFailures(), "macos", { strict: true });
     const retry = [...verdict.fresh, ...verdict.quarantined];
     if (retry.length && !verdict.error) {
-      const home = mkdtempSync(path.join(tmpdir(), "gpui-nightly-home-"));
-      const env = { ...process.env, HOME: home, GPUI_LAB_IGNORE_OCCLUSION: "1", GPUI_LAB_ASSUME_KEY: "1", PATH: `${process.env.PATH}:/Library/TeX/texbin` };
-      try {
-        verdict = settle(verdict, rerun(path.join(repo, "gpui", "target", "release", "lattice-gpui"), path.join(repo, "gpui", "fixtures", "e2e"), rerunModules(result, retry), env));
-      } finally {
-        rmSync(home, { recursive: true, force: true });
-      }
+      const out = path.join(dir, `nightly-rerun@${sha}.json`);
+      rmSync(out, { force: true });
+      spawnSync(path.join(repo, "scripts", "inapp-lock"), ["--thread", `nightly-e2e ${sha.slice(0, 9)} rerun`, "--wait", "1800", "--kind", "e2e", "--", "node", fileURLToPath(import.meta.url), "rerun", rerunModules(result, retry).join(","), out], { cwd: repo, stdio: "inherit" });
+      verdict = settle(verdict, existsSync(out) ? JSON.parse(readFileSync(out, "utf8")) : null);
     }
   }
   const nightly = { sha, subject, run: runId(), finished: new Date().toISOString(), baseline: record ? path.basename(baselineFile) : null, failures: failuresOf(record, verdict, existsSync(quitFile) ? readFileSync(quitFile, "utf8").trim() : null), flaky: verdict?.flaky ?? [], fixed: verdict?.fixed ?? [] };
@@ -195,12 +198,25 @@ function report({ dryRun }) {
   }
 }
 
+/** The rerun of `modules`, run under the in-app lock by `run`: writes its result to `out`. */
+function rerunModulesInScratch(modules, out) {
+  const home = mkdtempSync(path.join(tmpdir(), "gpui-nightly-home-"));
+  const env = { ...process.env, HOME: home, GPUI_LAB_IGNORE_OCCLUSION: "1", GPUI_LAB_ASSUME_KEY: "1", PATH: `${process.env.PATH}:/Library/TeX/texbin` };
+  try {
+    const result = rerun(path.join(repo, "gpui", "target", "release", "lattice-gpui"), path.join(repo, "gpui", "fixtures", "e2e"), modules.split(","), env);
+    if (result) writeFileSync(out, JSON.stringify(result));
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+}
+
 if (isMain(import.meta.url)) {
   const [command, ...rest] = process.argv.slice(2);
   try {
     if (command === "run") runNightly();
+    else if (command === "rerun") rerunModulesInScratch(rest[0], rest[1]);
     else if (command === "report") report({ dryRun: rest.includes("--dry-run") });
-    else throw new Error("usage: gpui-nightly.mjs run | report [--dry-run]");
+    else throw new Error("usage: gpui-nightly.mjs run | report [--dry-run] | rerun MODULES OUT");
   } catch (error) {
     console.error(`gpui-nightly: ${error.message}`);
     process.exit(1);

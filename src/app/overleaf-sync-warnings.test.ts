@@ -60,4 +60,25 @@ describe("overleafSyncWarnings", () => {
   it("stays quiet about a file the previous sync was already holding", () => {
     expect(overleafSyncWarnings(result({ unresolvedConflicts: ["main.tex"] }), vi.fn())).toEqual([]);
   });
+
+  it("summarizes long file lists in warnings instead of dumping every path", () => {
+    const paths = Array.from({ length: 9 }, (_, i) => `data/file_${i + 1}.csv`);
+    const warnings = overleafSyncWarnings(result({ skippedLarge: paths }), vi.fn());
+    expect(warnings).toEqual([{
+      message: "Too large for Overleaf, so left on this machine: data/file_1.csv, data/file_2.csv, data/file_3.csv, data/file_4.csv, data/file_5.csv and 4 more files.",
+    }]);
+  });
+
+  it("keeps every path in actionable warnings even when more than six files are affected", () => {
+    const paths = Array.from({ length: 8 }, (_, i) => `sections/ch_${i + 1}.tex`);
+    const warnings = overleafSyncWarnings(
+      result({ refusedIncoming: paths, uploadedOverEdits: paths }),
+      vi.fn(),
+    );
+    expect(warnings).toHaveLength(2);
+    for (const warning of warnings) {
+      for (const path of paths) expect(warning.message).toContain(path);
+      expect(warning.message).not.toContain("more files");
+    }
+  });
 });

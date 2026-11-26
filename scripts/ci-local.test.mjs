@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { docsStages, holdingInappLock } from "./ci-local.mjs";
+import { docsStages, holderRunsE2e, holdingInappLock } from "./ci-local.mjs";
 
 const repo = path.resolve(import.meta.dirname, "..");
 const lock = path.join(repo, "scripts", "inapp-lock");
@@ -23,6 +23,26 @@ describe.skipIf(process.platform === "win32")("ci:local", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  it("builds beside a live e2e holder only, and waits for any other, a stale or an unreadable one", () => {
+    const live = () => [process.pid];
+    expect(holderRunsE2e({ kind: "e2e", pid: process.pid, command: "gpui/script/e2e --only smoke out.json" }, live)).toBe(true);
+    expect(holderRunsE2e({ kind: "quiet", pid: process.pid, command: "script/e2e --only smoke out.json" }, live)).toBe(false);
+    expect(holderRunsE2e({ pid: process.pid, command: "node scripts/gpui-e2e-light.mjs && measure/series.sh" }, live)).toBe(false);
+    expect(holderRunsE2e({ pid: process.pid, command: "script/e2e" }, live)).toBe(true);
+    expect(holderRunsE2e({ pid: process.pid, command: "gpui/script/e2e --only smoke out.json" }, live)).toBe(true);
+    expect(holderRunsE2e({ pid: process.pid, command: "script/e2e-light" }, live)).toBe(false);
+    expect(holderRunsE2e({ pid: process.pid }, live)).toBe(false);
+    expect(holderRunsE2e({ kind: "e2e", pid: process.pid }, () => [])).toBe(false);
+    const gone = spawnSync("sh", ["-c", "echo $$"], { encoding: "utf8" }).stdout.trim();
+    expect(holderRunsE2e({ kind: "e2e", pid: Number(gone) }, () => [Number(gone)])).toBe(false);
+    expect(holderRunsE2e(null)).toBe(false);
+  });
+
+  it("marks the e2e stages as e2e holders and the WebKit benchmark as quiet", () => {
+    const kind = (name) => { const args = holdingInappLock({ name, command: "true", timeout: 1 }).args; return args[args.indexOf("--kind") + 1]; };
+    expect([kind("gpui-e2e"), kind("gpui-main"), kind("webkit-bench")]).toEqual(["e2e", "e2e", "quiet"]);
   });
 
   it("runs the docs-only profile without a stage that opens a window, and builds", () => {

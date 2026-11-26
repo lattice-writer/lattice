@@ -337,6 +337,7 @@ impl PdfView {
                         std::slice::from_ref(note),
                         on.clone(),
                         CardWidth::Filling,
+                        &Default::default(),
                         cx,
                     )
                 } else {

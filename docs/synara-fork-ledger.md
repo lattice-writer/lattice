@@ -514,3 +514,16 @@ The pin moved from `773204a14` to `79bc61959` on `amp/lattice-v1.6.2-sync`, thro
 ### Files and folders from the composer's + menu (fork PR 46)
 
 The pin moved from `79bc61959` to `f87641c8b` on `amp/lattice-v1.6.2-sync`, through the merge commit of [fork PR 46](https://github.com/leo1oel/synara/pull/46). In the embed, **+ → Files and folders** opened the native chooser but attached nothing (lattice-writer/lattice#1253). The chooser takes focus from the embedded frame, the embed's blur dismissal (`latticePopupDismissal`) closed the + panel, and the `<input type="file">` inside the panel unmounted before the selection arrived. The input now lives in `ComposerFileInput`, which the composer form keeps mounted; the Files row opens it and closes the panel at once, and the chosen files attach to the thread that is active when the chooser returns. `ChatView.browser.tsx` ("attaches files chosen after the + panel closes for the native chooser in Lattice") covers it in embed mode with the real blur dismissal. `pnpm prepare:synara` reports the staged runtime as 179.1 MB.
+
+### Claude usage polls stop re-reading old transcripts (fork PR 47)
+
+The pin moved from `f87641c8b` to `d2a631b19` on `amp/lattice-v1.6.2-sync`, through the merge commit of [fork PR 47](https://github.com/leo1oel/synara/pull/47). The Agent panel's usage lines (24h, 7d and 30d tokens) come from `readRecentClaudeUsageSamples` in `providerUsageSnapshot.ts`, which reads every Claude Code transcript under `~/.claude/projects` written in the last 30 days.
+
+Its per-file cache kept only the newest 100,000 samples. Every transcript past that cap was read and hashed again on each refresh: on the composer's 30 s poll, and whenever an Agent panel mounts in another project window. On a heavy user's month (2,400 transcripts, 3 GB, 357,000 samples) each refresh cost about 2 s of CPU at over 100% in the bundled node, which matches the 201.5% bursts in lattice-writer/lattice#1247.
+
+Transcripts past the cap now keep their samples packed at 24 bytes each, up to a million samples (about 24 MB), and are not opened again until they change. Transcripts past both caps are still re-read on every refresh. On that month:
+- A later poll drops from 2.1 s to about 55 ms of CPU.
+- In the native app, the node CPU from opening a second project's Agent panel to 60 s later drops from 3.17 s to 1.12 s.
+- The first read after launch is unchanged, at about 3 s once.
+
+`providerUsageSnapshot.test.ts` covers both changes. "Keeps transcripts past the sample cap packed instead of reopening them" checks that a packed transcript isn't reopened, and "packs an unfinished final record and counts it once its newline arrives" checks a packed transcript whose last record has no newline yet. The staged server's `dist/index.mjs` grows by 1,865 bytes over the 0.20.0 bundle, so the staged runtime stays at about 179.1 MB.

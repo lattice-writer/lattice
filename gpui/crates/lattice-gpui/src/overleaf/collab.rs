@@ -215,7 +215,7 @@ impl OverleafCollabPanel {
                 bridge.edit_message(&thread, &message, text, done, cx)
             }
             Draft::New { path, from, quote } => {
-                bridge.add_comment(&path, from, quote, text, done, cx)
+                bridge.add_comment(&path, from, quote, text, move |_, cx| done(cx), cx)
             }
         });
         cx.notify();

@@ -9,7 +9,7 @@
 //                    push, `--kind pr-rerun` for any other (a pull request's
 //                    author re-running a red check). A run that fails twice is
 //                    not recorded: it is red.
-//   flake-hunt.yml   the nightly stress pass failed; `--kind hunt`.
+//   flake-hunt.yml   a dispatched stress pass failed; `--kind hunt`.
 //
 //   node scripts/known-flakes.mjs --run <run id> --attempt <n> --kind rerun|pr-rerun|hunt [--dry-run]
 //

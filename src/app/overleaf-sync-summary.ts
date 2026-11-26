@@ -1,5 +1,6 @@
 import { t } from "@lingui/core/macro";
 import type { OverleafSyncResult } from "../app-types";
+import { summarizeOverleafPaths } from "./overleaf-path-summary";
 
 /**
  * The line a finished sync ends on: what moved, or why nothing did. A file
@@ -15,6 +16,6 @@ export function overleafSyncSummary(result: OverleafSyncResult): string {
   if (merged) return t`Overleaf: pulled ${pulled}, pushed ${pushed}, merged ${merged}.`;
   if (pulled || pushed) return t`Overleaf: pulled ${pulled}, pushed ${pushed}.`;
   const marked = result.conflicts.filter((item) => item.markers !== false).map((item) => item.path);
-  const files = [...new Set([...marked, ...(result.unresolvedConflicts ?? [])])].join(", ");
+  const files = summarizeOverleafPaths([...new Set([...marked, ...(result.unresolvedConflicts ?? [])])]);
   return files ? t`Overleaf: waiting on conflict resolution in ${files}.` : t`Overleaf: already up to date.`;
 }
