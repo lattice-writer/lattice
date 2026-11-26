@@ -29,9 +29,11 @@
  *                        (scripts/ci-local-select.mjs, one table from paths
  *                        to modules), or the whole scenario when a changed
  *                        file maps to none; only the whole one records this
- *                        machine's main baseline for the merge base first
+ *                        machine's main baseline for the merge base
  *                        (scripts/gpui-main-baseline.mjs) when it has none,
- *                        in a scratch worktree of the merge base
+ *                        in a scratch worktree of the merge base, and then
+ *                        only when a step fails that the newest baseline of
+ *                        an ancestor does not (localStages)
  *
  * The literature Worker, the Open Slide runtime, the research environment, the
  * Chromium benchmark, Linux and Windows run only in CI.
@@ -87,14 +89,14 @@
  *                may open windows before pushing
  */
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as sleep } from "node:timers/promises";
 import { FULL, RELEASE_PATHS, coveredJobs, docsGate, findGate, formatTrailer, macosNeeds, mainMergeRegate } from "./ci-local-select.mjs";
 import { JOBS, ciTier, selectorListsEdited } from "./ci-tier.mjs";
 import { changedFiles, gateStages, runStages } from "./gate-changed.mjs";
-import { readBaseline } from "./gpui-e2e-light.mjs";
+import { ancestorBaseline, readBaseline } from "./gpui-e2e-light.mjs";
 import { baselineDir } from "./gpui-main-baseline.mjs";
 import { isMain } from "./lib/util.mjs";
 import { extraStages } from "./signoff.mjs";
@@ -198,29 +200,53 @@ async function waitForPerfLock() {
 /**
  * Records the merge base's GPUI e2e on this Mac (scripts/gpui-main-baseline.mjs)
  * in a scratch worktree, unless the baseline directory already holds it.
+ *
+ * With `verdict` (the e2e's saved verdict, LATTICE_E2E_VERDICT_OUT) it is the
+ * lazy form that comes after the e2e: it runs only when that e2e failed
+ * (`rescues`), records the baseline unless another run has meanwhile, and
+ * passes when every new failure also fails there
+ * (scripts/gpui-e2e-verdict.mjs --rejudge), which clears the e2e's failure.
  */
-function mainBaselineStage(mergeBase) {
-  if (readBaseline(mergeBase)?.exact) return { name: "gpui-main", skip: `this Mac's main baseline has ${mergeBase.slice(0, 9)}` };
+function mainBaselineStage(mergeBase, verdict = null) {
+  if (!verdict && readBaseline(mergeBase)?.exact) return { name: "gpui-main", skip: `this Mac's main baseline has ${mergeBase.slice(0, 9)}` };
   // One per run: two threads' ci:local on the same Mac shared one path, and
   // the second's `git worktree remove` pulled the tree from under the first's
   // baseline (spawnSync git ENOENT once its e2e had finished).
   const worktree = path.join(baselineDir(), "..", `ci-local-main-${process.pid}`);
+  const record = 'git worktree remove --force "$1" 2>/dev/null; git worktree add --detach "$1" "$2" && (cd "$1" && node scripts/gpui-main-baseline.mjs --sha "$2"); status=$?; git worktree remove --force "$1"';
+  if (!verdict) {
+    return {
+      name: "gpui-main",
+      why: `the merge base's e2e on this Mac, for the baseline (${mergeBase.slice(0, 9)})`,
+      command: "sh",
+      args: ["-c", `${record}; exit $status`, "sh", worktree, mergeBase],
+      timeout: 3_600_000,
+    };
+  }
   return {
     name: "gpui-main",
-    why: `the merge base's e2e on this Mac, for the baseline (${mergeBase.slice(0, 9)})`,
+    why: `the e2e failed beyond the older baseline: the merge base's own (${mergeBase.slice(0, 9)}), and those failures judged against it`,
+    rescues: "gpui-e2e",
     command: "sh",
-    args: ["-c", 'git worktree remove --force "$1" 2>/dev/null; git worktree add --detach "$1" "$2" && (cd "$1" && node scripts/gpui-main-baseline.mjs --sha "$2"); status=$?; git worktree remove --force "$1"; exit $status', "sh", worktree, mergeBase],
+    args: ["-c", `[ -f "$4" ] || { ${record}; [ $status = 0 ] || exit $status; }; exec node scripts/gpui-e2e-verdict.mjs --rejudge "$3" --baseline "$4"`, "sh", worktree, mergeBase, verdict, path.join(baselineDir(), `known-failures@${mergeBase}.json`)],
     timeout: 3_600_000,
   };
 }
 
 /**
  * The stages for this tier: the gate's, then signoff's, kept by the jobs they
- * stand for. The GPUI e2e is the whole scenario, after this Mac's main
- * baseline for the merge base, when `e2e` (macosNeeds in
+ * stand for. The GPUI e2e is the whole scenario when `e2e` (macosNeeds in
  * scripts/ci-local-select.mjs) needs it whole; otherwise the smoke flow and
  * the modules the diff picks, judged against the known failures and the
  * baseline when this Mac already has one for the merge base.
+ *
+ * The whole scenario is judged against this Mac's baseline for the merge base.
+ * Recording one takes a build and the whole e2e of main (about 20 minutes,
+ * with the in-app lock held), and most gates land on a merge base that has
+ * none yet, so without one it is judged against the newest baseline of an
+ * ancestor (ancestorBaseline), and the merge base's own is recorded only when
+ * steps outside that one fail (mainBaselineStage's lazy form). Only a Mac
+ * with no baseline for any ancestor records it first.
  */
 export function localStages(tier, files, mergeBase, e2eNeed = macosNeeds(tier, files, mergeBase).e2e) {
   const { jobs, vitestFiles } = tier;
@@ -247,7 +273,9 @@ export function localStages(tier, files, mergeBase, e2eNeed = macosNeeds(tier, f
       continue;
     }
     const only = e2eNeed.modules.length ? e2eNeed.modules.join(",") : "smoke";
-    if (e2eNeed.full) stages.push(mainBaselineStage(mergeBase));
+    const older = e2eNeed.full && !readBaseline(mergeBase)?.exact ? ancestorBaseline(mergeBase) : null;
+    const verdict = path.join(repo, ".tmp", "ci-local", "e2e-verdict.json");
+    if (e2eNeed.full && !older) stages.push(mainBaselineStage(mergeBase));
     const e2e = e2eNeed.full
       ? { ...stage, why: "the whole e2e scenario, failing only on steps main fails too" }
       : { ...stage, why: `the smoke flow${e2eNeed.modules.length ? ` and ${e2eNeed.modules.length} module(s) the diff picks` : ""}, failing only on steps main fails too`, args: ["--only", only] };
@@ -256,10 +284,21 @@ export function localStages(tier, files, mergeBase, e2eNeed = macosNeeds(tier, f
     // The stage waits for the in-app lock itself (holdingInappLock).
     e2e.before = async () => {
       const baseline = readBaseline(mergeBase);
+      if (older) {
+        mkdirSync(path.dirname(verdict), { recursive: true });
+        rmSync(verdict, { force: true });
+        e2e.env.LATTICE_E2E_VERDICT_OUT = verdict;
+      }
       if (baseline?.exact) e2e.env.LATTICE_E2E_BASELINE = baseline.file;
-      else console.log("  gpui-e2e: no main baseline for the merge base; judging against the known failures alone");
+      else if (older) {
+        // The verdict reads only the record's e2e.failing.
+        e2e.env.LATTICE_E2E_BASELINE = path.join(path.dirname(verdict), `older-baseline@${older.sha}.json`);
+        writeFileSync(e2e.env.LATTICE_E2E_BASELINE, `${JSON.stringify({ sha: older.sha, e2e: { failing: older.failing } })}\n`);
+        console.log(`  gpui-e2e: no main baseline for ${mergeBase.slice(0, 9)} yet; judging against ${older.sha.slice(0, 9)}'s, ${older.distance} commit(s) back, and recording ${mergeBase.slice(0, 9)}'s only if a step outside it fails`);
+      } else console.log("  gpui-e2e: no main baseline for the merge base; judging against the known failures alone");
     };
     stages.push(e2e);
+    if (older) stages.push(mainBaselineStage(mergeBase, verdict));
   }
   if (macosNeeds(tier, files).webkit) {
     stages.push({

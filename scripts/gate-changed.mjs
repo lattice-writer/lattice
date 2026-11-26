@@ -232,16 +232,19 @@ export function gateStages(files) {
  * Runs the stages one after another, printing a line each, and returns how
  * many failed. A stage with `needs` is skipped when the stage it names failed;
  * one with `before`/`after` runs them around itself (signoff's machine-wide
- * lock), and `after` runs however the stage ended.
+ * lock), and `after` runs however the stage ended. One that `rescues` an
+ * earlier stage runs only when that one failed, and its pass clears that
+ * failure (ci:local's lazy main baseline).
  */
 export async function runStages(stages) {
   mkdirSync(logDir, { recursive: true });
   const failedNames = new Set();
   for (const stage of stages) {
-    const skip = stage.skip ?? (failedNames.has(stage.needs) && `${stage.needs} failed`);
+    const unneeded = stage.rescues && !failedNames.has(stage.rescues) && `${stage.rescues} passed`;
+    const skip = stage.skip ?? (unneeded || (failedNames.has(stage.needs) && `${stage.needs} failed`));
     if (skip) {
       console.log(`  ${stage.name.padEnd(10)} skipped  (${skip})`);
-      if (!stage.skip) failedNames.add(stage.name);
+      if (!stage.skip && !unneeded) failedNames.add(stage.name);
       continue;
     }
     await stage.before?.();
@@ -253,6 +256,10 @@ export async function runStages(stages) {
     }
     const verdict = result.ok ? "ok" : result.timedOut ? `TIMED OUT after ${stage.timeout / 1000} s` : "FAILED";
     console.log(`  ${stage.name.padEnd(10)} ${verdict.padEnd(8)} ${result.seconds.toFixed(1).padStart(6)} s  (${stage.why})`);
+    if (result.ok && stage.rescues) {
+      failedNames.delete(stage.rescues);
+      console.log(`  ${stage.rescues.padEnd(10)} passes after all (${stage.name})`);
+    }
     if (!result.ok) {
       failedNames.add(stage.name);
       console.log(excerpt(result.log).map((line) => `    | ${line}`).join("\n"));

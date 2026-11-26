@@ -1,10 +1,10 @@
 // @vitest-environment node
 import { spawnSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { PLATFORMS, TIERS, judge, knownFailures, rerunModules, settle } from "./gpui-e2e-verdict.mjs";
+import { PLATFORMS, TIERS, judge, knownFailures, rejudge, rerunModules, settle } from "./gpui-e2e-verdict.mjs";
 
 const entries = [
   { step: "known on both", platforms: ["macos", "windows"], reason: "r", followup: "LEO-14" },
@@ -83,6 +83,36 @@ describe("gpui-e2e-verdict", () => {
       expect(verdict.stdout).toContain("::warning title=Flaky e2e step (macos)::flaky one");
       expect(verdict.status).toBe(0);
       expect(spawnSync("cat", [path.join(dir, "args")], { encoding: "utf8" }).stdout).toMatch(/--scenario e2e --only tree --out /);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("passes a saved verdict again only when the baseline also fails every new failure and nothing else failed", () => {
+    expect(rejudge({ fresh: ["a", "b"], rest: true }, ["a", "b", "c"])).toEqual({ ok: true, fresh: [] });
+    expect(rejudge({ fresh: ["a", "b"], rest: true }, ["a"])).toEqual({ ok: false, fresh: ["b"] });
+    expect(rejudge({ fresh: ["a"], rest: false }, ["a"])).toEqual({ ok: false, fresh: [] });
+  });
+
+  it("saves the verdict for a later --rejudge, which passes only against a baseline failing the same new steps", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "verdict-"));
+    try {
+      const script = path.join(import.meta.dirname, "gpui-e2e-verdict.mjs");
+      const result = path.join(dir, "result.json");
+      const saved = path.join(dir, "saved.json");
+      writeFileSync(result, JSON.stringify(run({ "new on this mac": false, fine: true })));
+      const first = spawnSync(process.execPath, [script, "--platform", "macos", result], { encoding: "utf8", env: { ...process.env, GITHUB_STEP_SUMMARY: "", LATTICE_E2E_VERDICT_OUT: saved } });
+      expect(first.status).toBe(1);
+      expect(JSON.parse(readFileSync(saved, "utf8"))).toEqual({ fresh: ["new on this mac"], rest: true });
+      const again = (failing) => {
+        const baseline = path.join(dir, "baseline.json");
+        writeFileSync(baseline, JSON.stringify({ e2e: { failing } }));
+        return spawnSync(process.execPath, [script, "--rejudge", saved, "--baseline", baseline], { encoding: "utf8" });
+      };
+      expect(again(["new on this mac"]).status).toBe(0);
+      const still = again(["something else"]);
+      expect(still.status).toBe(1);
+      expect(still.stdout).toContain("still failing against baseline.json: new on this mac");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

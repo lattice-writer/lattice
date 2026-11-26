@@ -200,9 +200,15 @@ run `documents` and `find_in_file`). The string catalogs (lattice-i18n's
 check them, and the strings as shown are left to the nightly full gate,
 except that lattice-i18n's also run `settings` and `find_in_file`, which
 read zh-CN strings. Only the whole scenario records this Mac's main baseline for the
-merge base first, in a scratch worktree, when the machine has none (one more
-build and e2e, about 20 minutes, per merge base); a module run uses the
-baseline when it is already there and otherwise judges against the known
+merge base, in a scratch worktree, when the machine has none (one more build
+and e2e, about 20 minutes, per merge base), and only when it needs it: the
+e2e runs first, judged against the newest baseline this Mac has for an
+ancestor of the merge base (less the steps the known list dropped since), and
+`gpui-main` records the merge base's own only when a step outside that one
+fails, then judges those failures again against it
+(`gpui-e2e-verdict.mjs --rejudge`); a pass there clears the e2e's failure.
+A Mac with no baseline for any ancestor records it first. A module run uses
+the baseline when it is already there and otherwise judges against the known
 failures alone. Either way a step that fails is rerun once with its module on
 a fresh fixture. Add a row to the table when a crate or path has a clear
 owner in the scenario.

@@ -1,10 +1,12 @@
 // @vitest-environment node
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { docsStages, holderRunsE2e, holdingInappLock } from "./ci-local.mjs";
+import { docsStages, holderRunsE2e, holdingInappLock, localStages } from "./ci-local.mjs";
+import { ciTier } from "./ci-tier.mjs";
+import { runStages } from "./gate-changed.mjs";
 
 const repo = path.resolve(import.meta.dirname, "..");
 const lock = path.join(repo, "scripts", "inapp-lock");
@@ -43,6 +45,35 @@ describe.skipIf(process.platform === "win32")("ci:local", () => {
   it("marks the e2e stages as e2e holders and the WebKit benchmark as quiet", () => {
     const kind = (name) => { const args = holdingInappLock({ name, command: "true", timeout: 1 }).args; return args[args.indexOf("--kind") + 1]; };
     expect([kind("gpui-e2e"), kind("gpui-main"), kind("webkit-bench")]).toEqual(["e2e", "e2e", "quiet"]);
+  });
+
+  it("runs a rescue only after the stage it rescues failed, and clears that failure when it passes", async () => {
+    const stage = (name, ok, extra = {}) => ({ name, why: name, command: "sh", args: ["-c", ok ? "true" : "false"], timeout: 10_000, ...extra });
+    expect(await runStages([stage("e2e", true), stage("rescue", false, { rescues: "e2e" })])).toBe(0);
+    expect(await runStages([stage("e2e", false), stage("rescue", true, { rescues: "e2e" })])).toBe(0);
+    expect(await runStages([stage("e2e", false), stage("rescue", false, { rescues: "e2e" })])).toBe(2);
+  });
+
+  it("runs the whole e2e before the main baseline when an ancestor has one, and records it first when none has", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "ci-local-baseline-"));
+    const saved = process.env.LATTICE_GPUI_BUILD_DIR;
+    process.env.LATTICE_GPUI_BUILD_DIR = dir;
+    try {
+      const head = spawnSync("git", ["rev-parse", "HEAD"], { cwd: repo, encoding: "utf8" }).stdout.trim();
+      const parent = spawnSync("git", ["rev-parse", "HEAD~1"], { cwd: repo, encoding: "utf8" }).stdout.trim();
+      const files = ["gpui/crates/lattice-gpui/src/main.rs"];
+      const order = () => localStages(ciTier(files), files, head, { full: true, modules: [] }).filter((stage) => ["gpui-main", "gpui-e2e"].includes(stage.name));
+      expect(order().map((stage) => [stage.name, stage.rescues])).toEqual([["gpui-main", undefined], ["gpui-e2e", undefined]]);
+      spawnSync("mkdir", ["-p", path.join(dir, "main-baseline")]);
+      writeFileSync(path.join(dir, "main-baseline", `known-failures@${parent}.json`), JSON.stringify({ sha: parent, e2e: { failing: [] } }));
+      expect(order().map((stage) => [stage.name, stage.rescues])).toEqual([["gpui-e2e", undefined], ["gpui-main", "gpui-e2e"]]);
+      writeFileSync(path.join(dir, "main-baseline", `known-failures@${head}.json`), JSON.stringify({ sha: head, e2e: { failing: [] } }));
+      expect(order().map((stage) => [stage.name, stage.skip ? "skip" : stage.rescues])).toEqual([["gpui-main", "skip"], ["gpui-e2e", undefined]]);
+    } finally {
+      if (saved === undefined) delete process.env.LATTICE_GPUI_BUILD_DIR;
+      else process.env.LATTICE_GPUI_BUILD_DIR = saved;
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it("runs the docs-only profile without a stage that opens a window, and builds", () => {

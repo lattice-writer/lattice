@@ -30,7 +30,7 @@
  *   --out FILE     where to write the verdict
  */
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { changedFiles, modulesFor } from "./gpui-e2e-modules.mjs";
@@ -52,6 +52,44 @@ export function readBaseline(sha, dir = baselineDir()) {
     }
   }
   return null;
+}
+
+/**
+ * The e2e steps this Mac's newest baseline for a commit `sha` descends from
+ * saw fail, for judging a run before `sha` has a baseline of its own; null
+ * when there is none. Steps the known list (gpui-e2e-known-failures.json) has
+ * dropped between that commit and `sha` are left out: they were fixed on
+ * main, so a run that fails one has broken it again.
+ */
+export function ancestorBaseline(sha, dir = baselineDir(), cwd = repo) {
+  const git = (...args) => spawnSync("git", args, { cwd, encoding: "utf8" });
+  let names;
+  try {
+    names = readdirSync(dir);
+  } catch {
+    return null;
+  }
+  // Newest first, so a commit's index is how far back it is on a line of squash merges.
+  const back = new Map(git("rev-list", sha).stdout.split("\n").filter(Boolean).map((commit, index) => [commit, index]));
+  let best = null;
+  for (const name of names) {
+    const base = /^known-failures@([0-9a-f]{40})\.json$/.exec(name)?.[1];
+    const distance = back.get(base);
+    if (!distance) continue;
+    if (!best || distance < best.distance) best = { sha: base, file: path.join(dir, name), distance };
+  }
+  if (!best) return null;
+  const known = (ref) => {
+    try {
+      return JSON.parse(git("show", `${ref}:scripts/gpui-e2e-known-failures.json`).stdout).steps.filter((entry) => entry.platforms.includes("macos")).map((entry) => entry.step);
+    } catch {
+      return [];
+    }
+  };
+  const now = new Set(known(sha));
+  const dropped = new Set(known(best.sha).filter((step) => !now.has(step)));
+  const record = JSON.parse(readFileSync(best.file, "utf8"));
+  return { ...best, failing: (record.e2e?.failing ?? []).filter((step) => !dropped.has(step)) };
 }
 
 /**
