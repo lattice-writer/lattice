@@ -83,6 +83,11 @@ pub(super) struct Live {
     pub(super) silent: Vec<String>,
     /// The heartbeat timeout the handshake names, when not a minute.
     pub(super) heartbeat_timeout: Option<u64>,
+    /// No socket hears a heartbeat (`MockOverleaf::mute_heartbeats`); asks
+    /// are still answered.
+    pub(super) heartbeats_muted: bool,
+    /// How many times any socket asked for the roster.
+    pub(super) rosters_asked: usize,
 }
 
 /// How often every socket that is not silent hears a heartbeat.
@@ -162,7 +167,8 @@ pub(super) fn upgrade(
         .ok();
     let mut beat = Instant::now();
     loop {
-        let silent = store.with(|_, live| live.silent.contains(&public_id));
+        let (silent, muted) =
+            store.with(|_, live| (live.silent.contains(&public_id), live.heartbeats_muted));
         while let Ok(frame) = outgoing.try_recv() {
             // Lost on the way, as on a dead connection.
             if silent {
@@ -172,7 +178,7 @@ pub(super) fn upgrade(
                 return forget(&store, &public_id);
             }
         }
-        if !silent && beat.elapsed() >= HEARTBEAT_EVERY {
+        if !silent && !muted && beat.elapsed() >= HEARTBEAT_EVERY {
             beat = Instant::now();
             if socket.send(Message::text("2::")).is_err() {
                 return forget(&store, &public_id);
@@ -279,6 +285,7 @@ fn answer_frame(text: &str, public_id: &str, store: &Arc<impl Store>) -> Vec<Str
         ),
         "clientTracking.getConnectedUsers" => {
             let users = store.with(|_, live| {
+                live.rosters_asked += 1;
                 let mut users: Vec<Value> = live
                     .sockets
                     .iter()

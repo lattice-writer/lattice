@@ -189,6 +189,17 @@ impl MockOverleaf {
         self.project.lock().unwrap().live.heartbeat_timeout = Some(seconds);
     }
 
+    /// Whether the live sockets go without heartbeats from now on, still
+    /// answering what is asked: then only an answer is heard.
+    pub fn mute_heartbeats(&self, muted: bool) {
+        self.project.lock().unwrap().live.heartbeats_muted = muted;
+    }
+
+    /// How many times the app has asked for the roster.
+    pub fn rosters_asked(&self) -> usize {
+        self.project.lock().unwrap().live.rosters_asked
+    }
+
     /// The scripted collaborator suggests `ops` in `path` (tracked
     /// changes); false when they do not fit.
     pub fn peer_suggested(&self, path: &str, ops: Vec<lattice_core::overleaf_rt::OtOp>) -> bool {

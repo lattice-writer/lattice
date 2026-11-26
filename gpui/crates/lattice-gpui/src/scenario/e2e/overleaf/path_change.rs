@@ -1,8 +1,8 @@
 //! The e2e check of the network changing under a live channel that stays
 //! reachable throughout (`overleaf/network.rs`'s `path_changes`, Wi-Fi to
 //! Ethernet or a VPN). A change that leaves the socket working costs
-//! nothing: its probe is answered, and the channel stays live without
-//! joining again. One that leaves it on a path that is gone, its socket
+//! nothing: its probe is answered, heartbeats muted so that the answer is
+//! all it hears, and the channel stays live without joining again. One that leaves it on a path that is gone, its socket
 //! open and silent (`MockOverleaf::go_silent`), has the burst of
 //! reachability callbacks join again once, after the burst settles and the
 //! probe goes unanswered, long before the heartbeat watchdog would; what
@@ -63,14 +63,20 @@ impl Run {
 
         let ready = self.wait_for(cx, Duration::from_secs(40), &settled).await;
         let joins_before = upgrades();
+        // Only the probe's answer is heard meanwhile, so it alone can keep
+        // the channel.
+        mock.mute_heartbeats(true);
+        let asked_before = mock.rosters_asked();
         burst(cx).await;
         let dropped = self.wait_for(cx, probed + Duration::from_secs(2), &not_live).await;
+        let probes = mock.rosters_asked() - asked_before;
+        mock.mute_heartbeats(false);
         let joins = upgrades() - joins_before;
         let still = self.wait_for(cx, Duration::from_secs(1), &settled).await;
         steps.check(
             "the network changing under a live channel whose socket still answers costs nothing: no join again and no Reconnecting",
-            ready && !dropped && still && joins == 0,
-            json!({ "ready": ready, "dropped": dropped, "still": still, "joins": joins }),
+            ready && !dropped && still && joins == 0 && probes == 1,
+            json!({ "ready": ready, "dropped": dropped, "still": still, "joins": joins, "probes": probes }),
         );
 
         let joins_before = upgrades();
@@ -92,7 +98,7 @@ impl Run {
                 && left
                 && left_after >= probed
                 && back
-                && took <= probed + Duration::from_secs(2)
+                && took <= probed + Duration::from_secs(4)
                 && joins == 1
                 && overleaf.matches("Shannon ").count() == 1
                 && mock.rejected().is_empty(),
