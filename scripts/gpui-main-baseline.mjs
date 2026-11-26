@@ -194,7 +194,7 @@ async function runChunks(count, { sha, resultFile, logs }) {
       continue;
     }
     console.log(`gpui-main-baseline: e2e chunk ${index + 1}/${chunks.length}: ${chunk.join(", ")}`);
-    const chunkRun = await run(path.join(repo, "scripts", "inapp-lock"), ["--thread", label, "--wait", String(waitS), "--", path.join(repo, "gpui", "script", "e2e"), "--only", chunk.join(","), chunkFile], {
+    const chunkRun = await run(path.join(repo, "scripts", "inapp-lock"), ["--thread", label, "--wait", String(waitS), "--kind", "e2e", "--", path.join(repo, "gpui", "script", "e2e"), "--only", chunk.join(","), chunkFile], {
       log: path.join(logs, `e2e-${index + 1}.log`),
       timeoutMs: waitS * 1000 + CHUNK_RUN_MS,
       env: { ...process.env, LATTICE_E2E_QUIT_RESULT: quitFile },
