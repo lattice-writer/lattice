@@ -14,10 +14,19 @@
  *           judges main (scripts/gpui-e2e-known-failures.json, the flaky tier
  *           counted, one rerun of a new failure's module on a fresh fixture),
  *           and writes nightly@<sha>.json beside the baseline, with this
- *           run's id, or a record of why it stopped. The rerun takes the
- *           scratch HOME and lab switches gpui/script/e2e gives the
- *           scenario. The scenario and the rerun open windows: run it under
- *           scripts/inapp-lock.
+ *           run's id, or a record of why it stopped. The scenario runs in
+ *           chunks of modules (gpui-main-baseline.mjs --chunks), each under
+ *           scripts/inapp-lock, letting the lock go in between so a queued
+ *           gate or lab run gets in; the rerun takes the lock too (`rerun`),
+ *           with the scratch HOME and lab switches gpui/script/e2e gives the
+ *           scenario. Then the idle guard (gpui/script/idle-guard, lattice#1025):
+ *           its frame counts under the lock, and 30 minutes of idle memory
+ *           growth outside it (runIdleGuard). Then the whole Vitest suite,
+ *           headless (runVitest): a branch's gate runs only the tests within
+ *           two imports of its change (scripts/lib/import-graph.mjs), so the
+ *           suites that mount the whole app run here too. Run it outside the
+ *           lock.
+ *   rerun   (internal) MODULES OUT: the rerun of those modules, under the lock.
  *   report  reads that record and keeps one GitHub issue, labelled
  *           `nightly-e2e`, in step (planIssue): it opens one for the first
  *           failures, rewrites its body every night they persist and comments
@@ -43,6 +52,9 @@ const git = (...args) => execFileSync("git", args, { cwd: repo, encoding: "utf8"
 export const LABEL = "nightly-e2e";
 // The system disk floor release builds keep on the Mac mini (CREW.md).
 const MIN_FREE_GB = Number(process.env.LATTICE_NIGHTLY_MIN_FREE_GB ?? 20);
+// The whole scenario takes 16-26 min on the Mac mini; six chunks hold the
+// in-app lock about 3-5 min each.
+const CHUNKS = 6;
 
 /** What failed tonight, one line each: gate stages, the build, and the e2e steps the verdict counts. */
 export function failuresOf(record, verdict, quit = null) {
@@ -61,6 +73,17 @@ export function failuresOf(record, verdict, quit = null) {
   if (record.e2e?.after_quit || quit === "lost") failures.push("e2e: quitting did not save the typed text");
   else if (verdict && !verdict.error && quit !== "saved") failures.push("e2e: could not check that quitting saved the typed text");
   return failures;
+}
+
+/** What the idle guard (gpui/script/idle-guard) found, one line each: its failed checks, or why it has none to show. */
+export function idleFailures(result, status) {
+  if (!result) return [`idle guard: no result (exit ${status})`];
+  if (result.error) return [`idle guard did not finish: ${result.error}`];
+  const failed = (result.checks ?? []).filter((check) => check.passed !== true).map((check) => `idle guard: ${check.name}`);
+  if (!result.checks?.length) failed.push("idle guard: ran no checks");
+  // A result written before a crash or the quit watchdog's exit.
+  else if (!failed.length && status !== 0) failed.push(`idle guard: exited ${status}`);
+  return failed;
 }
 
 const MARKER = /<!-- nightly-failures (\[.*?\]) -->/s;
@@ -112,6 +135,72 @@ const recordFile = (sha) => path.join(baselineDir(), `nightly@${sha}.json`);
 // wrote none never reports an older night's record for the same commit.
 const runId = () => process.env.GITHUB_RUN_ID ?? "local";
 
+/**
+ * The idle guard on the release build the run left: its frame counts under
+ * the in-app lock (about a minute, 12 s of it in front), then 30 minutes of
+ * idle memory growth outside it. The growth run is a passive window, the
+ * CREW.md lock exception approved on 2026-11-26: it never activates, never
+ * takes the key window (GPUI_LAB_ASSUME_KEY) and sends no input, so it cannot
+ * disturb the runs that hold the lock, and holding it for half an hour would
+ * keep them out.
+ */
+function runIdleGuard(sha) {
+  const dir = mkdtempSync(path.join(tmpdir(), "gpui-nightly-idle-"));
+  const guard = path.join(repo, "gpui", "script", "idle-guard");
+  const run = (out, command) => {
+    const status = spawnSync(command[0], command.slice(1), { cwd: repo, stdio: "inherit" });
+    let result = null;
+    try {
+      result = JSON.parse(readFileSync(out, "utf8"));
+    } catch {
+      // idleFailures reports the missing result.
+    }
+    return idleFailures(result, status.status ?? status.signal);
+  };
+  try {
+    const frames = path.join(dir, "frames.json");
+    const growth = path.join(dir, "growth.json");
+    return [
+      ...run(frames, [path.join(repo, "scripts", "inapp-lock"), "--thread", `nightly-e2e ${sha.slice(0, 9)} idle`, "--wait", "1800", "--", guard, frames]),
+      ...run(growth, [guard, "--growth", "1800", growth]),
+    ];
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/** What the whole Vitest suite found, one line each: the files that failed, or why it has none to show. */
+export function vitestFailures(result, status) {
+  if (!result) return [`vitest: no result (exit ${status})`];
+  const failed = (result.testResults ?? []).filter((file) => file.status === "failed").map((file) => `vitest: ${path.relative(repo, file.name)}`);
+  if (!failed.length && (status !== 0 || result.success !== true)) failed.push(`vitest: failed (exit ${status}) without a failing file`);
+  return failed;
+}
+
+// The whole suite, one file at a time (vitest.config.ts's maxWorkers: 1;
+// about 13 minutes on the Mac mini). The workflow step's timeout grew by these
+// 90 minutes past the 465 gpui-main-baseline.mjs's CHUNKS_BUDGET_MS counts
+// from, so that budget stands.
+const VITEST_TIMEOUT_MS = 90 * 60_000;
+
+/** The whole Vitest suite, headless and outside the in-app lock, as CI's shards run it together. */
+function runVitest() {
+  const dir = mkdtempSync(path.join(tmpdir(), "gpui-nightly-vitest-"));
+  const out = path.join(dir, "vitest.json");
+  try {
+    const run = spawnSync("pnpm", ["exec", "vitest", "run", "--reporter=default", "--reporter=json", `--outputFile.json=${out}`], { cwd: repo, stdio: "inherit", timeout: VITEST_TIMEOUT_MS });
+    let result = null;
+    try {
+      result = JSON.parse(readFileSync(out, "utf8"));
+    } catch {
+      // vitestFailures reports the missing result.
+    }
+    return vitestFailures(result, run.status ?? run.signal);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 /** The nightly record `report` reads for this run, or a failure that says why there is none. */
 export function nightlyFor(saved, { sha, subject, run }) {
   if (saved?.sha === sha && saved.run === run) return saved;
@@ -139,7 +228,7 @@ function runNightly() {
   const quitFile = path.join(dir, `quit@${sha}.txt`);
   rmSync(resultFile, { force: true });
   rmSync(quitFile, { force: true });
-  const baseline = spawnSync("node", [path.join(repo, "scripts", "gpui-main-baseline.mjs")], { cwd: repo, stdio: "inherit", env: { ...process.env, LATTICE_E2E_QUIT_RESULT: quitFile } });
+  const baseline = spawnSync("node", [path.join(repo, "scripts", "gpui-main-baseline.mjs"), "--chunks", String(CHUNKS)], { cwd: repo, stdio: "inherit", env: { ...process.env, LATTICE_E2E_QUIT_RESULT: quitFile } });
   const baselineFile = path.join(dir, `known-failures@${sha}.json`);
   const record = existsSync(baselineFile) ? JSON.parse(readFileSync(baselineFile, "utf8")) : null;
   // gpui-main-baseline.mjs exits 0 whether or not main is green; anything
@@ -157,17 +246,28 @@ function runNightly() {
     verdict = judge(result, knownFailures(), "macos", { strict: true });
     const retry = [...verdict.fresh, ...verdict.quarantined];
     if (retry.length && !verdict.error) {
-      const home = mkdtempSync(path.join(tmpdir(), "gpui-nightly-home-"));
-      const env = { ...process.env, HOME: home, GPUI_LAB_IGNORE_OCCLUSION: "1", GPUI_LAB_ASSUME_KEY: "1", PATH: `${process.env.PATH}:/Library/TeX/texbin` };
-      try {
-        verdict = settle(verdict, rerun(path.join(repo, "gpui", "target", "release", "lattice-gpui"), path.join(repo, "gpui", "fixtures", "e2e"), rerunModules(result, retry), env));
-      } finally {
-        rmSync(home, { recursive: true, force: true });
-      }
+      const out = path.join(dir, `nightly-rerun@${sha}.json`);
+      rmSync(out, { force: true });
+      spawnSync(path.join(repo, "scripts", "inapp-lock"), ["--thread", `nightly-e2e ${sha.slice(0, 9)} rerun`, "--wait", "1800", "--kind", "e2e", "--", "node", fileURLToPath(import.meta.url), "rerun", rerunModules(result, retry).join(","), out], { cwd: repo, stdio: "inherit" });
+      verdict = settle(verdict, existsSync(out) ? JSON.parse(readFileSync(out, "utf8")) : null);
     }
   }
   const nightly = { sha, subject, run: runId(), finished: new Date().toISOString(), baseline: record ? path.basename(baselineFile) : null, failures: failuresOf(record, verdict, existsSync(quitFile) ? readFileSync(quitFile, "utf8").trim() : null), flaky: verdict?.flaky ?? [], fixed: verdict?.fixed ?? [] };
-  writeFileSync(recordFile(sha), `${JSON.stringify(nightly, null, 2)}\n`);
+  const write = () => writeFileSync(recordFile(sha), `${JSON.stringify(nightly, null, 2)}\n`);
+  if (record.build?.status === "ok") {
+    // Recorded first, so a step that times out during the guard's half hour
+    // still reports what the gate, the build and the e2e found.
+    const failures = nightly.failures;
+    nightly.failures = [...failures, "idle guard: did not finish"];
+    write();
+    nightly.failures = [...failures, ...runIdleGuard(sha)];
+  }
+  // Recorded first too, for a suite that outlives the step.
+  const judged = nightly.failures;
+  nightly.failures = [...judged, "vitest: did not finish"];
+  write();
+  nightly.failures = [...judged, ...runVitest()];
+  write();
   const lines = [`Nightly full gate at ${sha.slice(0, 9)}: ${nightly.failures.length ? `${nightly.failures.length} failure(s)` : "green"}`, ...nightly.failures.map((failure) => `- ${failure}`), ...nightly.flaky.map((step) => `- flaky: ${step}`), ...nightly.fixed.map((step) => `- known failure that passed: ${step}`)];
   console.log(lines.join("\n"));
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `## ${lines[0]}\n\n${lines.slice(1).join("\n")}\n`);
@@ -195,12 +295,25 @@ function report({ dryRun }) {
   }
 }
 
+/** The rerun of `modules`, run under the in-app lock by `run`: writes its result to `out`. */
+function rerunModulesInScratch(modules, out) {
+  const home = mkdtempSync(path.join(tmpdir(), "gpui-nightly-home-"));
+  const env = { ...process.env, HOME: home, GPUI_LAB_IGNORE_OCCLUSION: "1", GPUI_LAB_ASSUME_KEY: "1", PATH: `${process.env.PATH}:/Library/TeX/texbin` };
+  try {
+    const result = rerun(path.join(repo, "gpui", "target", "release", "lattice-gpui"), path.join(repo, "gpui", "fixtures", "e2e"), modules.split(","), env);
+    if (result) writeFileSync(out, JSON.stringify(result));
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+}
+
 if (isMain(import.meta.url)) {
   const [command, ...rest] = process.argv.slice(2);
   try {
     if (command === "run") runNightly();
+    else if (command === "rerun") rerunModulesInScratch(rest[0], rest[1]);
     else if (command === "report") report({ dryRun: rest.includes("--dry-run") });
-    else throw new Error("usage: gpui-nightly.mjs run | report [--dry-run]");
+    else throw new Error("usage: gpui-nightly.mjs run | report [--dry-run] | rerun MODULES OUT");
   } catch (error) {
     console.error(`gpui-nightly: ${error.message}`);
     process.exit(1);

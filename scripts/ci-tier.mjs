@@ -28,35 +28,43 @@
  *
  * Documentation alone (docs/, top-level and .github/ Markdown, gpui/docs/,
  * LICENSE) turns on nothing. A change to ci.yml turns on all of ci.yml's
- * jobs, one to gpui.yml all of gpui.yml's, and one to this file, to what
- * picks the local stages and the trailer's cover (ci-local.mjs,
- * ci-local-select.mjs, gpui-e2e-modules.mjs) or to .github/actions/
- * everything.
+ * jobs, one to gpui.yml all of gpui.yml's, and one to .github/actions/
+ * everything. A change to what picks the jobs, the local stages and the
+ * trailer's cover (CI_CONTROL: this file, ci-local.mjs, ci-local-select.mjs,
+ * gpui-e2e-modules.mjs and the Windows and Linux e2e tiers) runs their unit
+ * tests and the lint and build job when nothing else but their tests and
+ * documentation changed (selectorOnly): what can go wrong there is a wrong
+ * pick, which those tests check, while the apps' own jobs would only run
+ * main's code again. With any other file it runs everything, so a selector
+ * change is never judged by its own picks.
  *
- * `--github` is the workflows' `changes` step. It runs every job (full)
- * for a tag, the schedule, a dispatch on main or with `full`, a dispatch
- * whose branch changes nothing against its base (a baseline of main), a head
+ * `--github` is the workflows' `changes` step. ci.yml and gpui.yml run only
+ * for a release tag and by dispatch: pull requests and pushes to branches or
+ * main run nothing on GitHub, and `pnpm ci:local` is the gate. It runs every
+ * job (full) for a tag, a dispatch on main or with `full`, a dispatch whose
+ * branch changes nothing against its base (a baseline of main), a head
  * commit with a `CI: full` trailer, or an open pull request labelled
- * `ci:full`. A push to main is compared with the commit before it; any
- * other push or dispatch with its merge base with origin/main, or with the
- * dispatch's `base`. A head commit whose `CI-local: macos <tree> …` trailer
+ * `ci:full`. A dispatch with `platform` (macos, linux or windows) runs
+ * every job of that platform alone: the Rust and GPUI jobs there, nothing
+ * else. Any other dispatch is compared with its merge base with origin/main,
+ * or with its `base`. A head commit whose `CI-local: macos <tree> …` trailer
  * names its own tree (printed by `pnpm ci:local` after a green local pass)
  * skips each macOS job (Rust, GPUI, the WebKit benchmark) whose stages the
  * trailer records and whose needs they cover (scripts/ci-local-select.mjs):
  * a GPUI change that needs the whole e2e is covered only by `e2e=full`, one
  * that needs some modules by an e2e that ran them, and a release path only
- * by the full gate (`rust gpui e2e=full webkit`). A docs-only trailer
+ * by the full gate (`rust gpui e2e=full`). A docs-only trailer
  * (`docs from=<gate>`) stands for its gate's trailer when the gate is an
  * ancestor and everything since it is text (resolveCover): the gate's cover
  * must then cover the rest of the branch, release paths included, and the
  * text files are the docs-only pass's own. Linux and Windows always
- * run, and a push to main or a tag ignores the trailer. GPUI's Windows job runs the whole e2e
+ * run, and a tag or full run ignores the trailer. GPUI's Windows job runs the whole e2e
  * scenario only for a change that can behave differently on Windows, and
- * for every full run and push to main; otherwise the smoke flow
+ * for every full run; otherwise the smoke flow
  * (scripts/windows-e2e-tier.mjs, the `windows-e2e` output). Its Linux job
  * runs the whole scenario only for a change to what can behave differently
  * on Linux (the vendored GPUI crates, Linux-only code, the scenario's
- * harness), and for every full run and push to main; otherwise the smoke
+ * harness), and for every full run; otherwise the smoke
  * flow (scripts/linux-gpui-e2e-tier.mjs, the `linux-e2e` output).
  *
  * Usage:
@@ -64,7 +72,7 @@
  *   node scripts/ci-tier.mjs --github                 write $GITHUB_OUTPUT
  */
 import { execFileSync } from "node:child_process";
-import { appendFileSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { coveredJobs, macosNeeds, parseTrailer, resolveCover } from "./ci-local-select.mjs";
@@ -79,9 +87,13 @@ const git = (...args) => execFileSync("git", args, { cwd: repo, encoding: "utf8"
 
 export const JOBS = ["vitest", "lint-build", "perf-bench", "rust", "gpui", "literature-worker", "open-slide-runtime", "research-env", "synara-pin"];
 const CI_JOBS = JOBS.filter((job) => job !== "gpui");
-// What decides which jobs run and which a CI-local trailer may skip: a
-// change to any of them runs everything.
-const CI_CONTROL = new Set(["scripts/ci-tier.mjs", "scripts/ci-local-select.mjs", "scripts/gpui-e2e-modules.mjs", "scripts/ci-local.mjs", "scripts/windows-e2e-tier.mjs", "scripts/linux-gpui-e2e-tier.mjs"]);
+// What decides which jobs run and which a CI-local trailer may skip. A
+// change to them alone runs CI_CONTROL_TESTS, every test that imports one of
+// them (ci-tier.test.mjs checks the list); beside any other file, everything
+// (selectorOnly). A diff that edits these lists themselves runs everything
+// (github), so a change never widens the rule that judges it.
+export const CI_CONTROL_TESTS = ["scripts/ci-local-select.test.mjs", "scripts/ci-local.test.mjs", "scripts/ci-tier.test.mjs", "scripts/gpui-actions-e2e.test.mjs", "scripts/gpui-e2e-light.test.mjs", "scripts/gpui-e2e-modules.test.mjs", "scripts/gpui-e2e-verdict.test.mjs", "scripts/gpui-main-baseline-agent.test.mjs", "scripts/gpui-main-baseline.test.mjs", "scripts/gpui-nightly.test.mjs", "scripts/linux-gpui-e2e-tier.test.mjs", "scripts/windows-e2e-tier.test.mjs"];
+export const CI_CONTROL = new Set(["scripts/ci-tier.mjs", "scripts/ci-local-select.mjs", "scripts/gpui-e2e-modules.mjs", "scripts/gpui-actions-e2e.mjs", "scripts/ci-local.mjs", "scripts/windows-e2e-tier.mjs", "scripts/linux-gpui-e2e-tier.mjs"]);
 
 // What `pnpm build` reads besides the sources tsc already checked: a change
 // to any of them can move the bundle the budgets measure.
@@ -144,13 +156,58 @@ function gpuiIncludes() {
 }
 
 /**
+ * Whether the diff from `base` edits a line (not a comment) naming one of
+ * the lists that decide what counts as the selector's change alone. Such a
+ * diff takes every job (ciTier's `selector: false`), so a change never
+ * widens the rule that judges it; the lists stay one-line literals for this
+ * (ci-tier.test.mjs).
+ */
+export function selectorListsEdited(base, files) {
+  if (!base || !files.includes("scripts/ci-tier.mjs")) return false;
+  // Against the working tree, which is HEAD in CI and holds a local run's
+  // uncommitted edits too.
+  return git("diff", "-U0", base, "--", "scripts/ci-tier.mjs")
+    .split("\n")
+    .filter((line) => /^[-+](?![-+])/.test(line) && !/^[-+]\s*(\/\/|\*|\/\*)/.test(line))
+    .some((line) => /\b(CI_CONTROL|CI_CONTROL_TESTS|DOCS)\b/.test(line));
+}
+
+const KNOWN_FAILURES = "scripts/gpui-e2e-known-failures.json";
+
+/**
+ * Whether the diff from `base` to the working tree changes the known GPUI e2e
+ * failures only in ways no macOS run can show: it removes entries, or edits
+ * entries for other platforms, so the steps macOS excuses (each with its
+ * tier) are the same or fewer. Removing one makes the verdict stricter, which
+ * main's nightly checks; another platform's entries matter only to that
+ * platform's hosted job. Such an edit takes the verdict's tests and no GPUI
+ * build or e2e (ciTier's `inertKnown`). A file that cannot be read on either
+ * side is not inert.
+ */
+export function knownFailuresInert(base, files) {
+  if (!base || !files.includes(KNOWN_FAILURES)) return false;
+  try {
+    return macosExcusesKept(git("show", `${base}:${KNOWN_FAILURES}`), readFileSync(path.join(repo, KNOWN_FAILURES), "utf8"));
+  } catch {
+    return false;
+  }
+}
+
+/** Whether `after` (the known-failures file's text) excuses on macOS only steps `before` excused there, each in the same tier. */
+export function macosExcusesKept(before, after) {
+  const macos = (text) => new Map(JSON.parse(text).steps.filter((entry) => entry.platforms.includes("macos")).map((entry) => [entry.step, entry.tier ?? "failing"]));
+  const kept = macos(before);
+  return [...macos(after)].every(([step, tier]) => kept.get(step) === tier);
+}
+
+/**
  * The tier for these changed files: each job's flag, and the first files
  * that turned each on. When the only Vitest inputs that changed are files
  * tests name (a Rust source, a spec), `vitestFiles` lists just those tests
  * and the shards run them alone. `scan` carries what the git scans find;
  * tests pass their own.
  */
-export function ciTier(files, { full = false, scan = null } = {}) {
+export function ciTier(files, { full = false, scan = null, selector = true, inertKnown = false } = {}) {
   const jobs = Object.fromEntries(JOBS.map((job) => [job, full]));
   const why = Object.fromEntries(JOBS.map((job) => [job, full ? ["full run"] : []]));
   if (full) return { full, jobs, why, vitestFiles: [], gpuiFiles: [], docsOnly: false };
@@ -169,6 +226,26 @@ export function ciTier(files, { full = false, scan = null } = {}) {
     if (job === "gpui" && !gpuiFiles.includes(file)) gpuiFiles.push(file);
     if (why[job].length < 5 && !why[job].includes(file)) why[job].push(file);
   };
+  // Only the selector, its tests and documentation: their tests and the
+  // lint, not the apps' jobs on code main already ran.
+  // A deleted test of the list would match nothing and pass, so it runs
+  // everything.
+  const selectorOnly =
+    selector &&
+    files.some((file) => CI_CONTROL.has(file)) &&
+    files.every((file) => CI_CONTROL.has(file) || CI_CONTROL_TESTS.includes(file) || DOCS.test(file)) &&
+    CI_CONTROL_TESTS.every((test) => existsSync(path.join(repo, test)));
+  if (selectorOnly) {
+    for (const file of files.filter((file) => !DOCS.test(file))) {
+      on("vitest", file);
+      on("lint-build", file);
+    }
+    // A test that reads a changed doc runs, as it would without the selector.
+    for (const { read, test } of testReads) {
+      if (files.some((file) => DOCS.test(file) && (file === read || file.startsWith(`${read}/`)))) vitestFiles.add(test);
+    }
+    return { full, jobs, why, vitestFiles: [...new Set([...CI_CONTROL_TESTS, ...vitestFiles])].sort(), gpuiFiles, docsOnly: false };
+  }
   for (const file of files) {
     if (CI_CONTROL.has(file) || file.startsWith(".github/actions/")) {
       vitestAll = true;
@@ -182,6 +259,16 @@ export function ciTier(files, { full = false, scan = null } = {}) {
     }
     if (file === ".github/workflows/gpui.yml") {
       on("gpui", file);
+      continue;
+    }
+    // No GPUI job (knownFailuresInert); a dispatch for one platform still
+    // forces it on, and then the Windows and Linux e2e tiers read the file
+    // from gpuiFiles.
+    if (file === KNOWN_FAILURES && inertKnown) {
+      gpuiFiles.push(file);
+      vitestFiles.add("scripts/gpui-e2e-verdict.test.mjs");
+      for (const { read, test } of testReads) if (read === file) vitestFiles.add(test);
+      on("vitest", file);
       continue;
     }
     for (const { read, test } of testReads) {
@@ -219,12 +306,14 @@ export function localMacosPass(message, tree) {
 
 /**
  * Whether a CI-local trailer may stand for macOS jobs in this run. Never on a
- * push to main or a tag, where a regression is pinned to its commit, nor in a
- * full run: those run the hosted macOS jobs whatever the message carries.
+ * tag, which checks the release for real, nor in a full run: those run the
+ * hosted macOS jobs whatever the message carries.
  */
-export function trailerHonoured({ full, event, ref }) {
-  return !full && !(event === "push" && ref === "refs/heads/main") && !ref.startsWith("refs/tags/");
+export function trailerHonoured({ full, ref }) {
+  return !full && !ref.startsWith("refs/tags/");
 }
+
+export const PLATFORMS = ["macos", "linux", "windows"];
 
 /** Whether the head commit or the branch's open pull request asks for every job. */
 export function wantsFull(message, labels = []) {
@@ -250,41 +339,40 @@ function github() {
   const branch = ref.startsWith("refs/heads/") ? ref.slice("refs/heads/".length) : "";
   const message = git("log", "-1", "--format=%B", "HEAD");
   let reason = null;
+  const platform = process.env.INPUT_PLATFORM || "all";
+  if (platform !== "all" && !PLATFORMS.includes(platform)) throw new Error(`ci-tier: unknown platform ${platform}`);
   if (ref.startsWith("refs/tags/")) reason = "a tag";
-  else if (event === "schedule") reason = "the weekly run";
+  else if (platform !== "all") reason = `a dispatch for ${platform} alone`;
   else if (event === "workflow_dispatch" && process.env.INPUT_FULL === "true") reason = "a dispatch with full";
   else if (event === "workflow_dispatch" && branch === "main") reason = "a dispatch on main";
   else if (wantsFull(message, pullRequestLabels(branch))) reason = "a `CI: full` trailer or the `ci:full` label";
 
   let base = null;
   if (!reason && process.env.INPUT_BASE) base = git("rev-parse", "--verify", `${process.env.INPUT_BASE}^{commit}`);
-  else if (!reason && event === "push" && branch === "main") {
-    const before = process.env.BEFORE ?? "";
-    try {
-      if (!before || /^0+$/.test(before)) throw new Error("no previous commit");
-      git("merge-base", "--is-ancestor", before, "HEAD");
-      base = before;
-    } catch {
-      reason = "a push to main whose previous commit is unknown";
-    }
-  } else if (!reason) base = git("merge-base", "origin/main", "HEAD");
+  else if (!reason) base = git("merge-base", "origin/main", "HEAD");
 
   const files = base ? git("-c", "core.quotePath=false", "diff", "--no-renames", "--name-only", base, "HEAD").split("\n").filter(Boolean) : [];
   if (!reason && event === "workflow_dispatch" && files.length === 0) reason = "a dispatch of a branch that changes nothing (a baseline)";
-  const tier = ciTier(files, { full: Boolean(reason) });
-  const named = trailerHonoured({ full: tier.full, event, ref }) && localMacosPass(message, git("rev-parse", "HEAD^{tree}")) ? parseTrailer(message) : null;
+  const tier = ciTier(files, { full: Boolean(reason), selector: !selectorListsEdited(base, files), inertKnown: knownFailuresInert(base, files) });
+  if (platform !== "all") for (const job of JOBS) tier.jobs[job] = job === "rust" || job === "gpui";
+  const named = trailerHonoured({ full: tier.full, ref }) && localMacosPass(message, git("rev-parse", "HEAD^{tree}")) ? parseTrailer(message) : null;
   // A docs-only pass checked the text files since its gate; the gate's own
   // cover has to cover everything else the branch changes.
   const { cover, docsFiles, reason: docsRefused } = resolveCover(named, { cwd: repo });
   const gated = files.filter((file) => !docsFiles.includes(file));
-  const local = coveredJobs(cover, macosNeeds(docsFiles.length ? ciTier(gated) : tier, gated));
-  const windows = windowsE2e(tier.gpuiFiles, { full: tier.full || (event === "push" && branch === "main") });
-  const linux = linuxE2e(tier.gpuiFiles, { full: tier.full || (event === "push" && branch === "main") });
+  const local = coveredJobs(cover, macosNeeds(docsFiles.length ? ciTier(gated, { selector: !selectorListsEdited(base, gated), inertKnown: knownFailuresInert(base, gated) }) : tier, gated, base));
+  const windows = windowsE2e(tier.gpuiFiles, { full: tier.full });
+  const linux = linuxE2e(tier.gpuiFiles, { full: tier.full });
   const groups = { rust: "Rust", gpui: "GPUI", webkit: "WebKit benchmark" };
   const needed = Object.keys(groups).filter((group) => (group === "webkit" ? tier.jobs["perf-bench"] : tier.jobs[group]));
+  // The WebKit benchmark measures the classic app, frozen on macOS: a branch
+  // that does not touch its tooling skips it, trailer or not (macosNeeds).
+  // Tags and full runs, which honour no trailer, still run it.
+  const webkitSkipped = trailerHonoured({ full: tier.full, ref }) && (cover ? local.webkit.covered : !macosNeeds(tier, gated).webkit);
   const lines = [
     reason ? `Every job: ${reason}.` : `Compared with ${base.slice(0, 9)}: ${files.length} changed file(s).`,
     ...(docsRefused ? [`The head commit's docs-only trailer is not taken: ${docsRefused}.`] : []),
+    ...(tier.jobs["perf-bench"] && !cover && webkitSkipped ? ["macOS WebKit benchmark: skipped, the branch does not touch its tooling (touchesWebkitBench)."] : []),
     ...(cover
       ? [
           `The head commit's CI-local trailer names this tree (${cover.line.trim()}).`,
@@ -295,7 +383,7 @@ function github() {
     "",
     "| jobs | run | first inputs |",
     "| --- | --- | --- |",
-    ...(tier.vitestFiles.length ? [`Vitest runs only the tests that name a changed file: ${tier.vitestFiles.join(", ")}.`, ""] : []),
+    ...(tier.vitestFiles.length ? [`Vitest runs only these tests (those that name a changed file, or the CI-selection scripts' own): ${tier.vitestFiles.join(", ")}.`, ""] : []),
     ...JOBS.map((job) => `| ${job} | ${tier.jobs[job] ? "yes" : "no"} | ${tier.why[job].map((file) => `\`${file}\``).join(", ")} |`),
     ...(tier.jobs.gpui
       ? [
@@ -312,10 +400,12 @@ function github() {
     "vitest-files": tier.vitestFiles.join(" "),
     "macos-local-rust": Boolean(cover) && local.rust.covered,
     "macos-local-gpui": Boolean(cover) && local.gpui.covered,
-    "macos-local-webkit": Boolean(cover) && local.webkit.covered,
+    "macos-local-webkit": webkitSkipped,
     "windows-e2e": windows.e2e,
     "linux-e2e": linux.e2e,
     full: tier.full,
+    ...Object.fromEntries(PLATFORMS.map((name) => [name, platform === "all" || platform === name])),
+    "all-platforms": platform === "all",
   };
   if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, Object.entries(outputs).map(([key, value]) => `${key}=${value}\n`).join(""));
 }

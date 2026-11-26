@@ -110,6 +110,8 @@ type Target = {
   frame: () => Window | null;
   origin: string | null;
   projectRoot: string | null;
+  /** The frame's message as the project's (`agent-folder-view.ts`), when the Agent works in a folder above it. */
+  fromFrame: ((data: unknown) => unknown) | null;
   post: (message: object) => void;
 };
 
@@ -125,7 +127,7 @@ export function setDocumentToolTarget(next: Target | null) {
 window.addEventListener("message", (event) => {
   const current = target;
   if (!current?.origin || event.origin !== current.origin || event.source !== current.frame()) return;
-  const routed = documentToolRoute(event.data);
+  const routed = documentToolRoute(current.fromFrame ? current.fromFrame(event.data) : event.data);
   if (!routed) return;
   event.stopImmediatePropagation();
   void runDocumentTool(routed.route, routed.request, current.projectRoot).then((result) => {

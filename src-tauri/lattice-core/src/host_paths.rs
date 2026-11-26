@@ -73,6 +73,25 @@ pub(crate) fn tex_path(path: &std::path::Path) -> String {
     normal.replace('\\', "/")
 }
 
+/// `path` for a log line. On Windows `fs::canonicalize` spells every project
+/// root `\\?\C:\…`, which reads as noise in the log and does not paste into
+/// Explorer, so the prefix is dropped: `\\?\C:\…` becomes `C:\…` and
+/// `\\?\UNC\server\…` becomes `\\server\…`. Any other `\\?\` path, such as
+/// `\\?\Volume{…}\…`, keeps its prefix, which without a drive letter after
+/// it would read like a relative path.
+pub(crate) fn log_path(path: &std::path::Path) -> String {
+    let text = path.to_string_lossy();
+    if let Some(unc) = text.strip_prefix(r"\\?\UNC\") {
+        return format!(r"\\{unc}");
+    }
+    match text.strip_prefix(r"\\?\") {
+        Some(rest) if matches!(rest.as_bytes(), [drive, b':', ..] if drive.is_ascii_alphabetic()) => {
+            rest.to_string()
+        }
+        _ => text.into_owned(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -109,5 +128,18 @@ mod tests {
             "//server/share/paper"
         );
         assert_eq!(tex_path(std::path::Path::new(r"\\?\C:\Users\Ada\paper")), "C:/Users/Ada/paper");
+        assert_eq!(tex_path(std::path::Path::new(r"C:\x")), "C:/x");
+        assert_eq!(tex_path(std::path::Path::new(r"\\server\share")), "//server/share");
+        assert_eq!(tex_path(std::path::Path::new(r"\\.\COM1")), "//./COM1");
+    }
+    #[test]
+    fn log_paths_drop_the_extended_length_prefix_only() {
+        let log = |path: &str| log_path(std::path::Path::new(path));
+        assert_eq!(log(r"\\?\C:\Users\Ada\paper"), r"C:\Users\Ada\paper");
+        assert_eq!(log(r"\\?\UNC\server\share\paper"), r"\\server\share\paper");
+        assert_eq!(log(r"C:\Users\Ada\paper"), r"C:\Users\Ada\paper");
+        assert_eq!(log("/home/ada/paper"), "/home/ada/paper");
+        let volume = r"\\?\Volume{0b1c2d3e-0000-0000-0000-000000000000}\paper";
+        assert_eq!(log(volume), volume);
     }
 }

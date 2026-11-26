@@ -53,6 +53,7 @@ mod hidden_chips;
 mod panels_menu;
 mod project_group;
 mod project_menu;
+pub(crate) use project_menu::places;
 mod workspace_rename;
 mod workspace_switch;
 pub(crate) mod workspace_track;

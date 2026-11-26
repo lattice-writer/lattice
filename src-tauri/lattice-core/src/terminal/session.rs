@@ -114,7 +114,7 @@ impl Session {
                 (Arc::clone(&master), Arc::clone(&stop), Arc::clone(&unread), Arc::clone(&exit));
             std::thread::spawn(move || forward_output(&master, &*output, &stop, &unread, &exit));
         }
-        log::info!(target: "lattice::terminal", "Started {name} (pid {shell}) in {}", root.display());
+        log::info!(target: "lattice::terminal", "Started {name} (pid {shell}) in {}", crate::host_paths::log_path(&root));
         Ok(Self { window, root, shell, name, master, input, stop, unread, exit })
     }
 

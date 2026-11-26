@@ -122,6 +122,7 @@ const UNTRANSLATED: Record<string, string> = {
   "flashtex_preview/": "the developer-only FlashTeX preview never shows its errors; it falls back to the normal build",
   "ipc/flashtex_preview.rs": "the developer-only FlashTeX preview never shows its errors; it falls back to the normal build",
   "linux_release_notice.rs": "background release checks discard errors and retry silently",
+  "project/agent_folder.rs": "the native app offers only folders above the project it may give the Agent, so no person reaches these",
   "research_env.rs": "the research environment answers the agent, never the interface",
   "research_env/": "the research environment answers the agent, never the interface",
   // Until the shells expose the plugin host (the next layer of the plugin stack), no command returns these.

@@ -456,7 +456,7 @@ fn footprint_summary() -> Value {
 
 /// `footprint -p <this process>`, the tool Lattice's perf lab reads memory
 /// with: the total and the graphics categories, plus the raw report.
-fn footprint() -> Value {
+pub(super) fn footprint() -> Value {
     let output = std::process::Command::new("/usr/bin/footprint")
         .arg("-p")
         .arg(std::process::id().to_string())

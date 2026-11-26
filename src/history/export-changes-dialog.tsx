@@ -25,6 +25,7 @@ import { logAction, type ActionLog } from "../telemetry/app-notify";
 import type { GitFileDiff } from "../app-types";
 import { joinedPassage, prosePassages, type ProsePassage } from "./version-prose";
 import { useLatestLoad } from "./use-latest-load";
+import { showInFileManager } from "../platform/file-manager-label";
 
 export type ChangesPdfOptions = {
   colour: boolean;
@@ -138,7 +139,7 @@ export function ExportChangesDialog(props: {
         : undefined,
     primaryAction: props.onOpenFile ? { label: t`Open`, onClick: () => props.onOpenFile?.(result.path) } : undefined,
     secondaryAction: {
-      label: t`Show in Finder`,
+      label: t(showInFileManager()),
       onClick: () => revealItemInDir(projectItemPath(props.projectRoot, result.path)).catch(() => undefined),
     },
   });

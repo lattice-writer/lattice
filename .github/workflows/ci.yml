@@ -1,32 +1,30 @@
 name: CI
 
-# Every push to a branch of this repository runs the jobs its change needs
-# (scripts/ci-tier.mjs decides, and pnpm ci:local runs the same tier on a
-# Mac): a documentation-only branch runs none, a Rust-only one the Rust jobs
-# and the tests that read Rust sources, a GPUI-only one only gpui.yml. A newer
-# push to a branch cancels the older run. Everything runs for a release tag,
-# weekly on main, for a dispatch on main or with `full`, and for a head commit
-# with a `CI: full` trailer or a pull request labelled `ci:full`. A push to
-# main runs what that merge changed and is never cancelled.
-#
-# Pull requests still have no trigger of their own: a branch in this
-# repository already ran on its push, and code from a fork runs nothing here.
-# A dispatch (`gh workflow run ci.yml --ref <branch>`) takes `base` to compare
-# with another ref than origin/main, such as the branch below it in a stack.
+# CI runs on GitHub only for a release tag and by hand (Leo, 2026-11-26).
+# Pull requests and pushes to branches or main run nothing here: `pnpm
+# ci:local` on a Mac is the gate (docs/agent-validation.md), and the nightly
+# e2e (nightly-e2e.yml) runs the whole GPUI scenario on main. A tag runs every
+# job. A dispatch (`gh workflow run ci.yml --ref <ref>`) runs the jobs the
+# ref's change needs against its merge base with origin/main
+# (scripts/ci-tier.mjs decides), or every job on main or with `full`;
+# `base` compares with another ref, such as the branch below it in a stack,
+# and `platform` runs one platform's Rust job alone, in full (`-f
+# platform=windows` for the Windows port's pull requests).
 #
 # Only runs on main write the Rust and Vitest caches: Actions evicts a cache
 # untouched for 7 days, and one written from a branch or tag is visible only
-# to that ref, so only main's runs leave caches every later run restores.
+# to that ref, so only main's runs leave caches every later run restores. With
+# no weekly run left, a dispatch on main before a release warms them.
 on:
   push:
-    branches: ["**"]
     tags: ["v*"]
-  schedule:
-    # Monday 06:23 UTC, away from the top of the hour, when scheduled runs
-    # queue, and after release-cache.yml's 05:00 warm.
-    - cron: "23 6 * * 1"
   workflow_dispatch:
     inputs:
+      platform:
+        description: Run only this platform's Rust job, in full
+        type: choice
+        options: [all, macos, linux, windows]
+        default: all
       full:
         description: Run every job, whatever the branch changed
         type: boolean
@@ -36,11 +34,11 @@ on:
         type: string
         default: ""
 
-# One run per branch: a newer push or dispatch cancels the one in progress.
-# Main and tags group by commit instead, so every merge and release runs to
+# One run per branch and platform: a newer dispatch cancels the one in
+# progress. Main and tags group by commit instead, so every release runs to
 # its end, and a dispatch for a commit already running queues behind it.
 concurrency:
-  group: ci-${{ github.ref }}-${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && github.sha || 'branch' }}
+  group: ci-${{ github.ref }}-${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && github.sha || 'branch' }}-${{ inputs.platform || 'all' }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/') }}
 
 # The work is split so the wall clock is the slowest single job rather than the
@@ -54,7 +52,7 @@ jobs:
   # group's inputs). Jobs skip only on an explicit `false`, so a failure here
   # runs everything. They are skipped job by job rather than with a
   # workflow-level `paths:` filter so every check still reports under its own
-  # name, and so a tag, the schedule and a `full` dispatch can override it.
+  # name, and so a tag and a `full` dispatch can override it.
   changes:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -73,6 +71,9 @@ jobs:
       open-slide-runtime: ${{ steps.tier.outputs.open-slide-runtime }}
       research-env: ${{ steps.tier.outputs.research-env }}
       synara-pin: ${{ steps.tier.outputs.synara-pin }}
+      macos: ${{ steps.tier.outputs.macos }}
+      linux: ${{ steps.tier.outputs.linux }}
+      windows: ${{ steps.tier.outputs.windows }}
     steps:
       # The whole history without file contents, for the merge base with main.
       - uses: actions/checkout@v7
@@ -82,7 +83,7 @@ jobs:
       - id: tier
         env:
           GH_TOKEN: ${{ github.token }}
-          BEFORE: ${{ github.event.before }}
+          INPUT_PLATFORM: ${{ inputs.platform }}
           INPUT_FULL: ${{ inputs.full }}
           INPUT_BASE: ${{ inputs.base }}
         run: node scripts/ci-tier.mjs --github
@@ -90,8 +91,8 @@ jobs:
   # A Synara pin move must keep the fork's history linear: the pin reachable
   # from its declared branch, and the previous pin its ancestor, so a pin cut
   # from a side branch cannot drop another lane's Synara change. The previous
-  # pin is the base's (the prior commit on a push to main, the merge base with
-  # main on a branch). It fetches only the fork's commits and needs no
+  # pin is the base's (the prior commit on main, the merge base with main on a
+  # branch). It fetches only the fork's commits and needs no
   # install; the script exits at once when the pin did not move.
   synara-pin:
     needs: changes
@@ -409,7 +410,7 @@ jobs:
 
   rust:
     needs: changes
-    if: ${{ !cancelled() && needs.changes.outputs.rust != 'false' && needs.changes.outputs.macos-local-rust != 'true' }}
+    if: ${{ !cancelled() && needs.changes.outputs.rust != 'false' && needs.changes.outputs.macos != 'false' && needs.changes.outputs.macos-local-rust != 'true' }}
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
@@ -418,7 +419,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
-          # Only a run on main (the weekly schedule, or a dispatch there)
+          # Only a run on main (a dispatch there)
           # leaves a cache the next tag can restore. It is written even when
           # a test or clippy fails: what it holds is compiled dependencies,
           # which a red test does not make wrong, and saving only from green
@@ -450,7 +451,7 @@ jobs:
   # shards above already run them on ubuntu-latest.
   rust-linux:
     needs: changes
-    if: ${{ !cancelled() && needs.changes.outputs.rust != 'false' }}
+    if: ${{ !cancelled() && needs.changes.outputs.rust != 'false' && needs.changes.outputs.linux != 'false' }}
     # GNU ld linking the test binary with full debug info was killed for
     # memory in an 8 GB Linux VM. src-tauri/Cargo.toml's [profile.dev] now
     # keeps line tables for this crate and none for dependencies, so this job
@@ -503,7 +504,7 @@ jobs:
   # Experimental Windows host support. This does not package or publish an app.
   rust-windows:
     needs: changes
-    if: ${{ !cancelled() && needs.changes.outputs.rust != 'false' }}
+    if: ${{ !cancelled() && needs.changes.outputs.rust != 'false' && needs.changes.outputs.windows != 'false' }}
     runs-on: windows-latest
     env:
       # Keep native linking and cached artifacts small on the experimental runner.

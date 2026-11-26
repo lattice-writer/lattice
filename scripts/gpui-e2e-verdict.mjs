@@ -31,6 +31,15 @@
  * (scripts/gpui-main-baseline.mjs's known-failures@<sha>.json) to the known
  * ones, for a run on a developer's Mac rather than a hosted runner.
  *
+ * With $LATTICE_E2E_VERDICT_OUT set, the verdict is also saved there as
+ * `{ fresh, rest }`: the failures the checked-in list does not excuse (the
+ * new ones left after the rerun, and those only `--baseline` excused), and whether
+ * everything else passed (the run finished, no flaky-tier step counted, the
+ * quit saved). `--rejudge SAVED --baseline FILE` judges that saved verdict
+ * again with FILE's failing steps known too, without running anything: ci:local
+ * judges a branch's whole e2e against an older baseline first and records the
+ * merge base's own only when new failures are left (scripts/ci-local.mjs).
+ *
  * `--rerun-app BIN --fixture DIR` reruns, once, the modules of the steps that
  * failed and are not listed (`--only`, in a fresh copy of the fixture), and a
  * step that passes the second time is reported as flaky rather than new. The
@@ -44,7 +53,7 @@
  * $GITHUB_STEP_SUMMARY set, the verdict is written there too.
  */
 import { spawnSync } from "node:child_process";
-import { appendFileSync, cpSync, mkdtempSync, readFileSync } from "node:fs";
+import { appendFileSync, cpSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -112,11 +121,25 @@ export function rerun(app, fixture, modules, env = process.env) {
   }
 }
 
+/** A saved verdict (`{ fresh, rest }`) judged again with `failing` known too: whether it passes, and the new failures still left. */
+export function rejudge(saved, failing) {
+  const known = new Set(failing);
+  const fresh = saved.fresh.filter((step) => !known.has(step));
+  return { ok: saved.rest === true && fresh.length === 0, fresh };
+}
+
 function main() {
   const argv = process.argv.slice(2);
   const platform = argv.includes("--platform") ? argv[argv.indexOf("--platform") + 1] : null;
   const value = (flag) => (argv.includes(flag) ? argv[argv.indexOf(flag) + 1] : null);
   const baselineFile = value("--baseline");
+  if (argv.includes("--rejudge")) {
+    const baseline = JSON.parse(readFileSync(baselineFile, "utf8"));
+    const verdict = rejudge(JSON.parse(readFileSync(value("--rejudge"), "utf8")), baseline.e2e?.failing ?? []);
+    console.log(verdict.ok ? `gpui-e2e-verdict: every new failure also fails in ${path.basename(baselineFile)}` : `gpui-e2e-verdict: still failing against ${path.basename(baselineFile)}: ${verdict.fresh.join("; ") || "the run itself (it did not finish, a flaky-tier step counted, or the quit did not save)"}`);
+    process.exitCode = verdict.ok ? 0 : 1;
+    return;
+  }
   const app = value("--rerun-app");
   const fixture = value("--fixture");
   const file = argv.filter((arg, index) => !arg.startsWith("--") && !["--platform", "--baseline", "--rerun-app", "--fixture"].includes(argv[index - 1])).at(-1);
@@ -142,6 +165,7 @@ function main() {
   const twice = app ? "failed twice" : "failed, not rerun";
   const lines = [`${verdict.total} steps on ${platform}: ${verdict.fresh.length} new failure(s), ${verdict.flaky.length} flaky (passed on a rerun), ${verdict.quarantined.length} of the flaky tier ${twice}${verdict.strict ? " (counted on main)" : " (not counted on a branch)"}, ${verdict.known.length} known (scripts/gpui-e2e-known-failures.json), ${verdict.fixed.length} known that passed.`];
   if (verdict.error || !result) lines.push(`The scenario did not finish: ${verdict.error ?? "no result was written"}`);
+  let quitSaved = true;
   if (argv.includes("--check-quit")) {
     const quit = result?.after_quit;
     let saved = false;
@@ -152,10 +176,18 @@ function main() {
     }
     if (!saved) {
       verdict.ok = false;
+      quitSaved = false;
       lines.push(`Quitting did not save ${quit?.file ?? "the document"}.`);
     }
   }
   console.log(lines.join("\n"));
+  if (process.env.LATTICE_E2E_VERDICT_OUT) {
+    // A step only the baseline excused is judged again too: a rejudge against
+    // a newer baseline that passes it must not keep the older one's excuse.
+    const listed = new Set(knownFailures().filter((entry) => entry.platforms.includes(platform)).map((entry) => entry.step));
+    const fresh = [...verdict.fresh, ...verdict.known.filter((step) => !listed.has(step))];
+    writeFileSync(process.env.LATTICE_E2E_VERDICT_OUT, `${JSON.stringify({ fresh, rest: quitSaved && passes({ ...verdict, fresh: [] }) })}\n`);
+  }
   for (const step of verdict.fresh) console.log(`::error title=New e2e failure (${platform})::${step}`);
   for (const step of verdict.flaky) console.log(`::warning title=Flaky e2e step (${platform})::${step} (failed, then passed when its module ran again)`);
   for (const step of verdict.quarantined) {

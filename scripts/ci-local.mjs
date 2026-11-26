@@ -17,7 +17,10 @@
  *   rust                 rustfmt, clippy with warnings denied and `cargo test`
  *                        on the changed Tauri crates
  *   perf-bench           also the WebKit benchmark against its ceilings, as
- *                        CI's macOS perf-bench-webkit shards run it
+ *                        CI's macOS perf-bench-webkit shards run it, only
+ *                        when the benchmark's own tooling changed
+ *                        (touchesWebkitBench): it measures the classic app,
+ *                        frozen on macOS, and holds the in-app lock
  *   gpui                 rustfmt, the release build, the unit tests and the
  *                        e2e scenario, judged like CI's against
  *                        scripts/gpui-e2e-known-failures.json and against a
@@ -26,22 +29,28 @@
  *                        (scripts/ci-local-select.mjs, one table from paths
  *                        to modules), or the whole scenario when a changed
  *                        file maps to none; only the whole one records this
- *                        machine's main baseline for the merge base first
+ *                        machine's main baseline for the merge base
  *                        (scripts/gpui-main-baseline.mjs) when it has none,
- *                        in a scratch worktree of the merge base
+ *                        in a scratch worktree of the merge base, and then
+ *                        only when a step fails that the newest baseline of
+ *                        an ancestor does not (localStages)
  *
  * The literature Worker, the Open Slide runtime, the research environment, the
  * Chromium benchmark, Linux and Windows run only in CI.
  *
- * Every Rust and GPUI stage waits while a perf measurement holds
- * /tmp/lattice-inapp-test.lock, and compiles in the machine's shared build
- * tree under its build lock (scripts/gpui-build.mjs). The stages that open
- * windows (gpui-main, gpui-e2e, webkit-bench) hold that lock for their whole
- * run through scripts/inapp-lock, so no hand test or other run drives the
- * screen under them.
+ * Every Rust and GPUI build and unit-test stage waits while a perf
+ * measurement or a hand test holds /tmp/lattice-inapp-test.lock, but not
+ * while another run's GPUI e2e does (holderRunsE2e, --kind e2e): a waiting
+ * gate builds meanwhile and queues only for its own e2e. Each runs as an
+ * `inapp-lock build`, so a quiet holder queued behind that e2e waits for it
+ * to end before measuring. They compile in the machine's
+ * shared build tree under its build lock (scripts/gpui-build.mjs). Only the
+ * stages that open windows (gpui-main, gpui-e2e, webkit-bench) take that lock,
+ * holding it for their whole run through scripts/inapp-lock, so no hand test
+ * or other run drives the screen under them.
  *
  * When every stage passes and the change needed a macOS job, it prints a
- * `CI-local: macos <tree> rust gpui e2e=… webkit` trailer naming the stages
+ * `CI-local: macos <tree> rust gpui e2e=… [webkit]` trailer naming the stages
  * that ran. Pushed on a commit whose tree is that one, it lets CI skip each
  * macOS job (Rust, GPUI, the WebKit benchmark) those stages cover for the
  * diff; anything they do not cover still runs there, and Linux and Windows
@@ -64,13 +73,14 @@
  *
  * A change to a release path (RELEASE_PATHS: release workflows, bundle and
  * signing configuration, the updater) always runs every stage, with no quick
- * re-gate, and its trailer records the full gate (`rust gpui e2e=full
- * webkit`), the only one CI takes for a release path. The release itself is
+ * re-gate, and its trailer records the full gate (`rust gpui e2e=full`), the
+ * only one CI takes for a release path. The release itself is
  * still built and checked for real on GitHub when its tag is pushed.
  *
  * Options:
  *   --base REF   compare against REF instead of origin/main (its merge base)
- *   --full       every stage and the whole e2e, whatever changed, and no
+ *   --full       every stage (the WebKit benchmark only when the diff
+ *                changes it) and the whole e2e, whatever changed, and no
  *                quick re-gate
  *   --plan       print the plan only
  *   --headless   skip the stages that open windows (the GPUI e2e, its main
@@ -79,14 +89,14 @@
  *                may open windows before pushing
  */
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as sleep } from "node:timers/promises";
 import { FULL, RELEASE_PATHS, coveredJobs, docsGate, findGate, formatTrailer, macosNeeds, mainMergeRegate } from "./ci-local-select.mjs";
-import { JOBS, ciTier } from "./ci-tier.mjs";
+import { JOBS, ciTier, knownFailuresInert, selectorListsEdited } from "./ci-tier.mjs";
 import { changedFiles, gateStages, runStages } from "./gate-changed.mjs";
-import { readBaseline } from "./gpui-e2e-light.mjs";
+import { ancestorBaseline, readBaseline } from "./gpui-e2e-light.mjs";
 import { baselineDir } from "./gpui-main-baseline.mjs";
 import { isMain } from "./lib/util.mjs";
 import { extraStages } from "./signoff.mjs";
@@ -98,6 +108,11 @@ const PERF_LOCK = process.env.INAPP_LOCK_FILE ?? "/tmp/lattice-inapp-test.lock";
 const WINDOWED = new Set(["gpui-main", "gpui-e2e", "webkit-bench"]);
 // How long a windowed stage waits for the in-app lock before it gives up.
 const INAPP_WAIT_S = 3600;
+// How far back an ancestor's main baseline may be to judge the whole e2e by
+// (localStages). A step that fails only on this Mac, fixed on main since, stays
+// excused by it; the nightly records one a day, and a merge base further back
+// records its own first.
+const OLDER_BASELINE_MAX = 30;
 
 /**
  * Runs a windowed stage under the in-app lock. Waiting for the lock to be free
@@ -106,10 +121,13 @@ const INAPP_WAIT_S = 3600;
  */
 export function holdingInappLock(stage) {
   const branch = git("rev-parse", "--abbrev-ref", "HEAD");
+  // The e2e stages say so, and builds run beside them; the WebKit benchmark
+  // measures, so it is quiet and waits for the running builds first.
+  const kind = stage.name === "webkit-bench" ? "quiet" : "e2e";
   return {
     ...stage,
     command: path.join(repo, "scripts", "inapp-lock"),
-    args: ["--thread", `ci:local ${branch} ${stage.name}`, "--wait", String(INAPP_WAIT_S), "--", stage.command, ...(stage.args ?? [])],
+    args: ["--thread", `ci:local ${branch} ${stage.name}`, "--wait", String(INAPP_WAIT_S), "--kind", kind, "--", stage.command, ...(stage.args ?? [])],
     timeout: stage.timeout + INAPP_WAIT_S * 1000,
   };
 }
@@ -126,15 +144,60 @@ const LOCAL = {
   "synara-pin": "check-synara-pin",
 };
 
-/** Whether a perf measurement holds the lock: lockf takes it for an instant only when it is free. */
+/**
+ * Whether the in-app lock's holder (its record, as scripts/inapp-lock writes
+ * it) runs a GPUI e2e scenario: it said so (--kind e2e) and is the live
+ * process that holds the file. A record with no kind at all comes from a
+ * branch's scripts/inapp-lock from before --kind (lattice#1300); it counts as
+ * an e2e when its command is gpui/script/e2e, so gates stop waiting behind
+ * those branches' e2e runs. Such a run drives only its own windows, so a
+ * build beside it costs it some speed and nothing else, and a waiting gate
+ * builds meanwhile and queues for the lock only for its e2e. Any other holder
+ * (a perf measurement, a hand test, the WebKit benchmark, plain lockf) keeps
+ * the machine quiet, and so does a record left by a holder that was killed
+ * before it could clear it, or one that cannot be read.
+ */
+export function holderRunsE2e(record, holders = lockHolders) {
+  const e2e = record?.kind === "e2e" || (record?.kind === undefined && /^(\S*\/)?script\/e2e(\s|$)/.test(record?.command ?? ""));
+  if (!e2e || !Number.isInteger(record.pid)) return false;
+  try {
+    process.kill(record.pid, 0);
+  } catch (error) {
+    if (error.code !== "EPERM") return false;
+  }
+  return holders().includes(record.pid);
+}
+
+function lockHolders() {
+  const out = spawnSync("lsof", ["-t", PERF_LOCK], { encoding: "utf8" }).stdout ?? "";
+  return out.split(/\s+/).filter(Boolean).map(Number);
+}
+
+/**
+ * Whether a holder that wants a quiet machine has the lock: lockf takes it
+ * for an instant only when it is free. A quiet holder that took it through
+ * scripts/inapp-lock also waits for the builds already running
+ * (`inapp-lock build`, buildStage) before it starts, so a build let in beside
+ * an e2e never overlaps the measurement queued after it.
+ */
 function perfLockHeld() {
   if (process.platform !== "darwin" || !existsSync(PERF_LOCK)) return false;
-  return spawnSync("/usr/bin/lockf", ["-k", "-t", "0", PERF_LOCK, "true"], { stdio: "ignore" }).status !== 0;
+  if (spawnSync("/usr/bin/lockf", ["-k", "-t", "0", PERF_LOCK, "true"], { stdio: "ignore" }).status === 0) return false;
+  try {
+    return !holderRunsE2e(JSON.parse(readFileSync(PERF_LOCK, "utf8")));
+  } catch {
+    return true;
+  }
+}
+
+/** A heavy stage run as a build of scripts/inapp-lock, after no quiet holder has the lock. */
+export function buildStage(stage) {
+  return { ...stage, command: path.join(repo, "scripts", "inapp-lock"), args: ["build", "--", stage.command, ...(stage.args ?? [])], before: waitForPerfLock };
 }
 
 async function waitForPerfLock() {
   for (let checks = 0; perfLockHeld(); checks += 1) {
-    if (checks % 4 === 0) console.log(`  waiting: a perf measurement holds ${PERF_LOCK} (${checks / 4} min so far)`);
+    if (checks % 4 === 0) console.log(`  waiting: a perf measurement or hand test holds ${PERF_LOCK} (${checks / 4} min so far); a GPUI e2e there would not hold this build`);
     await sleep(15_000);
   }
 }
@@ -142,32 +205,56 @@ async function waitForPerfLock() {
 /**
  * Records the merge base's GPUI e2e on this Mac (scripts/gpui-main-baseline.mjs)
  * in a scratch worktree, unless the baseline directory already holds it.
+ *
+ * With `verdict` (the e2e's saved verdict, LATTICE_E2E_VERDICT_OUT) it is the
+ * lazy form that comes after the e2e: it runs only when that e2e failed
+ * (`rescues`), records the baseline unless another run has meanwhile, and
+ * passes when every new failure also fails there
+ * (scripts/gpui-e2e-verdict.mjs --rejudge), which clears the e2e's failure.
  */
-function mainBaselineStage(mergeBase) {
-  if (readBaseline(mergeBase)?.exact) return { name: "gpui-main", skip: `this Mac's main baseline has ${mergeBase.slice(0, 9)}` };
+function mainBaselineStage(mergeBase, verdict = null) {
+  if (!verdict && readBaseline(mergeBase)?.exact) return { name: "gpui-main", skip: `this Mac's main baseline has ${mergeBase.slice(0, 9)}` };
   // One per run: two threads' ci:local on the same Mac shared one path, and
   // the second's `git worktree remove` pulled the tree from under the first's
   // baseline (spawnSync git ENOENT once its e2e had finished).
   const worktree = path.join(baselineDir(), "..", `ci-local-main-${process.pid}`);
+  const record = 'git worktree remove --force "$1" 2>/dev/null; git worktree add --detach "$1" "$2" && (cd "$1" && node scripts/gpui-main-baseline.mjs --sha "$2"); status=$?; git worktree remove --force "$1"';
+  if (!verdict) {
+    return {
+      name: "gpui-main",
+      why: `the merge base's e2e on this Mac, for the baseline (${mergeBase.slice(0, 9)})`,
+      command: "sh",
+      args: ["-c", `${record}; exit $status`, "sh", worktree, mergeBase],
+      timeout: 3_600_000,
+    };
+  }
   return {
     name: "gpui-main",
-    why: `the merge base's e2e on this Mac, for the baseline (${mergeBase.slice(0, 9)})`,
+    why: `the e2e failed beyond the older baseline: the merge base's own (${mergeBase.slice(0, 9)}), and those failures judged against it`,
+    rescues: "gpui-e2e",
     command: "sh",
-    args: ["-c", 'git worktree remove --force "$1" 2>/dev/null; git worktree add --detach "$1" "$2" && (cd "$1" && node scripts/gpui-main-baseline.mjs --sha "$2"); status=$?; git worktree remove --force "$1"; exit $status', "sh", worktree, mergeBase],
+    args: ["-c", `[ -f "$3" ] || { echo "gpui-main: the e2e saved no verdict (it did not finish), so a baseline would not settle it"; exit 1; }; [ -f "$4" ] || { ${record}; [ $status = 0 ] || exit $status; }; exec node scripts/gpui-e2e-verdict.mjs --rejudge "$3" --baseline "$4"`, "sh", worktree, mergeBase, verdict, path.join(baselineDir(), `known-failures@${mergeBase}.json`)],
     timeout: 3_600_000,
-    before: waitForPerfLock,
   };
 }
 
 /**
  * The stages for this tier: the gate's, then signoff's, kept by the jobs they
- * stand for. The GPUI e2e is the whole scenario, after this Mac's main
- * baseline for the merge base, when `e2e` (macosNeeds in
+ * stand for. The GPUI e2e is the whole scenario when `e2e` (macosNeeds in
  * scripts/ci-local-select.mjs) needs it whole; otherwise the smoke flow and
  * the modules the diff picks, judged against the known failures and the
  * baseline when this Mac already has one for the merge base.
+ *
+ * The whole scenario is judged against this Mac's baseline for the merge base.
+ * Recording one takes a build and the whole e2e of main (about 20 minutes,
+ * with the in-app lock held), and most gates land on a merge base that has
+ * none yet, so without one it is judged against the newest baseline of an
+ * ancestor up to OLDER_BASELINE_MAX commits back (ancestorBaseline), and the
+ * merge base's own is recorded only when steps outside that one fail
+ * (mainBaselineStage's lazy form), which then judges every step only that
+ * older one excused again. A Mac with no such baseline records it first.
  */
-export function localStages(tier, files, mergeBase, e2eNeed = macosNeeds(tier, files).e2e) {
+export function localStages(tier, files, mergeBase, e2eNeed = macosNeeds(tier, files, mergeBase).e2e) {
   const { jobs, vitestFiles } = tier;
   const stages = [];
   if (jobs["lint-build"] || (jobs.vitest && !vitestFiles.length)) stages.push(...gateStages(files));
@@ -184,36 +271,49 @@ export function localStages(tier, files, mergeBase, e2eNeed = macosNeeds(tier, f
     clippy: jobs.rust,
     "cargo-test": jobs.rust,
   };
-  const heavy = new Set(["clippy", "cargo-test", "gpui-patch", "gpui-build", "gpui-test", "gpui-e2e"]);
+  const heavy = new Set(["clippy", "cargo-test", "gpui-patch", "gpui-build", "gpui-test"]);
   for (const stage of extraStages(files, mergeBase, { gpui: jobs.gpui, tauri: jobs.rust })) {
     if (stage.name.startsWith("gpui-") ? !jobs.gpui : !keep[stage.name]) continue;
     if (stage.name !== "gpui-e2e" || stage.skip) {
-      stages.push(heavy.has(stage.name) && !stage.skip ? { ...stage, before: waitForPerfLock } : stage);
+      stages.push(heavy.has(stage.name) && !stage.skip ? buildStage(stage) : stage);
       continue;
     }
     const only = e2eNeed.modules.length ? e2eNeed.modules.join(",") : "smoke";
-    if (e2eNeed.full) stages.push(mainBaselineStage(mergeBase));
+    const ancestor = e2eNeed.full && !readBaseline(mergeBase)?.exact ? ancestorBaseline(mergeBase) : null;
+    const older = ancestor?.distance <= OLDER_BASELINE_MAX ? ancestor : null;
+    const verdict = path.join(repo, ".tmp", "ci-local", "e2e-verdict.json");
+    if (e2eNeed.full && !older) stages.push(mainBaselineStage(mergeBase));
     const e2e = e2eNeed.full
       ? { ...stage, why: "the whole e2e scenario, failing only on steps main fails too" }
       : { ...stage, why: `the smoke flow${e2eNeed.modules.length ? ` and ${e2eNeed.modules.length} module(s) the diff picks` : ""}, failing only on steps main fails too`, args: ["--only", only] };
     e2e.env = { ...stage.env, LATTICE_E2E_VERDICT: "1" };
     // The baseline is read when the stage starts, after gpui-main wrote it.
+    // The stage waits for the in-app lock itself (holdingInappLock).
     e2e.before = async () => {
-      await waitForPerfLock();
       const baseline = readBaseline(mergeBase);
+      if (older) {
+        mkdirSync(path.dirname(verdict), { recursive: true });
+        rmSync(verdict, { force: true });
+        e2e.env.LATTICE_E2E_VERDICT_OUT = verdict;
+      }
       if (baseline?.exact) e2e.env.LATTICE_E2E_BASELINE = baseline.file;
-      else console.log("  gpui-e2e: no main baseline for the merge base; judging against the known failures alone");
+      else if (older) {
+        // The verdict reads only the record's e2e.failing.
+        e2e.env.LATTICE_E2E_BASELINE = path.join(path.dirname(verdict), `older-baseline@${older.sha}.json`);
+        writeFileSync(e2e.env.LATTICE_E2E_BASELINE, `${JSON.stringify({ sha: older.sha, e2e: { failing: older.failing } })}\n`);
+        console.log(`  gpui-e2e: no main baseline for ${mergeBase.slice(0, 9)} yet; judging against ${older.sha.slice(0, 9)}'s, ${older.distance} commit(s) back, and recording ${mergeBase.slice(0, 9)}'s only if a step outside it fails`);
+      } else console.log("  gpui-e2e: no main baseline for the merge base; judging against the known failures alone");
     };
     stages.push(e2e);
+    if (older) stages.push(mainBaselineStage(mergeBase, verdict));
   }
-  if (jobs["perf-bench"]) {
+  if (macosNeeds(tier, files).webkit) {
     stages.push({
       name: "webkit-bench",
       why: "the WebKit benchmark and layout checks against their ceilings, as CI's macOS shards",
       command: "sh",
       args: ["-c", "pnpm exec playwright-core install webkit >/dev/null && pnpm perf:bench --check --machine-allowance --layout --engine webkit"],
       timeout: 2_400_000,
-      before: waitForPerfLock,
     });
   }
   return stages;
@@ -224,7 +324,7 @@ export function localStages(tier, files, mergeBase, e2eNeed = macosNeeds(tier, f
  * first-parent line when everything since it is text and its trailer covers
  * the rest of the branch, or null with the reason printed.
  */
-export function docsOnlyPass(files, cwd = repo) {
+export function docsOnlyPass(files, cwd = repo, mergeBase = null) {
   const gate = findGate({ cwd });
   if (!gate) return null;
   const check = docsGate(gate, { cwd, worktree: true });
@@ -234,7 +334,7 @@ export function docsOnlyPass(files, cwd = repo) {
   }
   if (!check.files.length) return null;
   const rest = files.filter((file) => !check.files.includes(file));
-  const gap = Object.values(coveredJobs(check.cover, macosNeeds(ciTier(rest), rest))).find((group) => !group.covered);
+  const gap = Object.values(coveredJobs(check.cover, macosNeeds(ciTier(rest, { selector: !selectorListsEdited(mergeBase, rest), inertKnown: knownFailuresInert(mergeBase, rest) }), rest, mergeBase))).find((group) => !group.covered);
   if (gap) {
     console.log(`ci:local: no docs-only pass: the gate at ${gate.slice(0, 9)} does not cover the rest of the branch (${gap.reason})`);
     return null;
@@ -266,14 +366,14 @@ async function main() {
   }
   const started = Date.now();
   const { mergeBase, files } = changedFiles(options.base);
-  const docs = options.full ? null : docsOnlyPass(files);
+  const docs = options.full ? null : docsOnlyPass(files, repo, mergeBase);
   if (docs) {
     await docsOnlyMain({ docs, mergeBase, files, options, started });
     return;
   }
   const release = files.filter((file) => RELEASE_PATHS.test(file));
-  const tier = ciTier(files, { full: options.full || release.length > 0 });
-  const needs = macosNeeds(tier, files);
+  const tier = ciTier(files, { full: options.full || release.length > 0, selector: !selectorListsEdited(mergeBase, files), inertKnown: knownFailuresInert(mergeBase, files) });
+  const needs = macosNeeds(tier, files, mergeBase);
   console.log(`ci:local: ${files.length} changed file(s) against ${options.base} (${mergeBase.slice(0, 9)})`);
   if (release.length) console.log(`ci:local: release paths changed (${release.slice(0, 3).join(", ")}): the full gate runs, and only its full trailer lets GitHub skip the macOS jobs`);
   for (const job of JOBS) {
@@ -324,7 +424,10 @@ async function main() {
     return;
   }
   console.log(`ci:local: every stage passed in ${minutes} min`);
-  if (!tier.jobs.rust && !tier.jobs.gpui && !tier.jobs["perf-bench"]) return;
+  if (!tier.jobs.rust && !tier.jobs.gpui && !needs.webkit) {
+    console.log("ci:local: no macOS job to cover; push without a CI-local trailer");
+    return;
+  }
   if (stages.some((stage) => stage.skip === "opens windows; --headless")) {
     console.log("ci:local: --headless skipped the stages that open windows; run it whole on a Mac that may open windows for the CI-local trailer");
     return;
@@ -336,7 +439,7 @@ async function main() {
   const tree = git("rev-parse", "HEAD^{tree}").slice(0, 12);
   const cover = regate
     ? { ...regate.cover, regate: regate.gate.slice(0, 9) }
-    : { rust: tier.jobs.rust, gpui: tier.jobs.gpui, e2e: needs.e2e && (needs.e2e.full ? FULL : needs.e2e.modules), webkit: tier.jobs["perf-bench"] };
+    : { rust: tier.jobs.rust, gpui: tier.jobs.gpui, e2e: needs.e2e && (needs.e2e.full ? FULL : needs.e2e.modules), webkit: needs.webkit };
   const head = git("rev-parse", "HEAD").slice(0, 9);
   console.log(
     regate

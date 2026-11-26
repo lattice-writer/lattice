@@ -17,17 +17,13 @@ name: Flake hunt
 #   which widens races between tests such as two binding the same free port.
 # - The perf-bench layout checks once in Chromium: they flake too, and CI is
 #   the only other place they run.
-# - Weekly, the `#[ignore]`d LaTeX build and SyncTeX tests under a real TeX
+# - The `#[ignore]`d LaTeX build and SyncTeX tests under a real TeX
 #   (the `tex` job below); nothing else runs them.
 #
-# A manual dispatch runs every job.
+# It runs by hand only (`gh workflow run flake-hunt.yml`), and a dispatch runs
+# every job: GitHub runs no CI outside a release (Leo, 2026-11-26), so its
+# daily and Monday schedules are off.
 on:
-  schedule:
-    # 07:17 UTC: away from the hour, when scheduled runs queue, and from the
-    # working day's macOS runner demand. The second line is Monday's `tex`
-    # job alone; `github.event.schedule` tells the two apart.
-    - cron: "17 7 * * *"
-    - cron: "47 7 * * 1"
   workflow_dispatch:
 
 permissions:

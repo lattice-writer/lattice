@@ -15,7 +15,11 @@
  *   notices    `pnpm notices:check`, when a lockfile, manifest or the notices
  *              themselves changed
  *   rustfmt    `cargo fmt --check`, when a .rs file changed; it builds nothing
- *   vitest     the tests `vitest related` finds from the changed files, plus
+ *   vitest     the tests within two imports of the changed sources (their own
+ *              tests and their importers', scripts/lib/import-graph.mjs; the
+ *              suites further out, those that mount the whole app among them,
+ *              run in the nightly, scripts/gpui-nightly.mjs), the tests
+ *              `vitest related` finds from any other changed file, plus
  *              every test in src/platform/invariant-tests.json, which read
  *              stylesheets and fixtures, or run scripts, no import graph leads
  *              to (the React Compiler guard among them)
@@ -40,6 +44,7 @@ import { spawn, execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { importers, nearTests } from "./lib/import-graph.mjs";
 import { invariantTests } from "./test-invariants.mjs";
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -177,6 +182,9 @@ export function gateStages(files) {
   const sources = files.filter((file) => /^src\/.*\.tsx?$/.test(file) || file.startsWith("src/locales/"));
   // gpui/ is a Cargo workspace of its own, checked by `pnpm signoff`.
   const rust = files.filter((file) => file.startsWith("src-tauri/") && file.endsWith(".rs"));
+  // The changed sources' own tests and their importers' (scripts/lib/import-graph.mjs);
+  // a stylesheet, a JSON file or a deleted file keeps vitest related's whole closure.
+  const near = code.length ? nearTests(code, importers(repo)) : { tests: [], unknown: [] };
   return [
     { name: "lint", why: "oxlint, src and tools", command: "pnpm", args: ["lint"], timeout: 180_000 },
     { name: "knip", why: "unused files, exports and dependencies", command: "pnpm", args: ["knip"], timeout: 180_000 },
@@ -220,9 +228,10 @@ export function gateStages(files) {
       : { name: "rustfmt", skip: "no .rs file changed" },
     {
       name: "vitest",
-      why: `related to ${code.length} changed file(s), plus ${invariantTests().length} invariant tests`,
+      why: `${near.tests.length} test(s) within two imports of ${code.length - near.unknown.length} changed source(s)${near.unknown.length ? `, those related to ${near.unknown.length} other changed file(s)` : ""}, plus ${invariantTests().length} invariant tests`,
       command: "pnpm",
-      args: ["exec", "vitest", "related", "--run", "--passWithNoTests", ...code, ...invariantTests()],
+      // A test file given to `vitest related` runs itself.
+      args: ["exec", "vitest", "related", "--run", "--passWithNoTests", ...near.unknown, ...near.tests, ...invariantTests()],
       timeout: 900_000,
     },
   ];
@@ -232,16 +241,20 @@ export function gateStages(files) {
  * Runs the stages one after another, printing a line each, and returns how
  * many failed. A stage with `needs` is skipped when the stage it names failed;
  * one with `before`/`after` runs them around itself (signoff's machine-wide
- * lock), and `after` runs however the stage ended.
+ * lock), and `after` runs however the stage ended. One that `rescues` an
+ * earlier stage runs only when that one ran and failed (not when it was
+ * skipped), and its pass clears that failure (ci:local's lazy main baseline).
  */
 export async function runStages(stages) {
   mkdirSync(logDir, { recursive: true });
   const failedNames = new Set();
+  const ran = new Set();
   for (const stage of stages) {
-    const skip = stage.skip ?? (failedNames.has(stage.needs) && `${stage.needs} failed`);
+    const unneeded = stage.rescues && !(ran.has(stage.rescues) && failedNames.has(stage.rescues)) && `${stage.rescues} ${ran.has(stage.rescues) ? "passed" : "did not run"}`;
+    const skip = stage.skip ?? (unneeded || (failedNames.has(stage.needs) && `${stage.needs} failed`));
     if (skip) {
       console.log(`  ${stage.name.padEnd(10)} skipped  (${skip})`);
-      if (!stage.skip) failedNames.add(stage.name);
+      if (!stage.skip && !unneeded) failedNames.add(stage.name);
       continue;
     }
     await stage.before?.();
@@ -251,8 +264,13 @@ export async function runStages(stages) {
     } finally {
       stage.after?.();
     }
+    ran.add(stage.name);
     const verdict = result.ok ? "ok" : result.timedOut ? `TIMED OUT after ${stage.timeout / 1000} s` : "FAILED";
     console.log(`  ${stage.name.padEnd(10)} ${verdict.padEnd(8)} ${result.seconds.toFixed(1).padStart(6)} s  (${stage.why})`);
+    if (result.ok && stage.rescues) {
+      failedNames.delete(stage.rescues);
+      console.log(`  ${stage.rescues.padEnd(10)} passes after all (${stage.name})`);
+    }
     if (!result.ok) {
       failedNames.add(stage.name);
       console.log(excerpt(result.log).map((line) => `    | ${line}`).join("\n"));

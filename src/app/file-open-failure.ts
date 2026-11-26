@@ -5,6 +5,7 @@ import { i18n } from "../i18n";
 import { notifyError } from "../telemetry/app-notify";
 import { showError } from "./notify";
 import { baseName } from "../lib/base-name";
+import { showInFileManager } from "../platform/file-manager-label";
 
 // Matched in backend text: src-tauri/lattice-core/src/project/tree.rs `too_large`.
 const TOO_LARGE = /^This file is too large to open in the editor \((\d+) bytes; the limit is (\d+) bytes\)\.$/;
@@ -12,7 +13,7 @@ const TOO_LARGE = /^This file is too large to open in the editor \((\d+) bytes; 
 /**
  * Say why the project file `path` did not open. A text file past the
  * editor's size limit is not called binary: it gets both sizes, in the
- * interface language, and a way to it in Finder, where another app can open
+ * interface language, and a way to it in the file manager, where another app can open
  * it. Anything else shows as it came.
  */
 export function showFileOpenFailure(reason: unknown, root: string | undefined, path: string) {
@@ -27,10 +28,10 @@ export function showFileOpenFailure(reason: unknown, root: string | undefined, p
   const limit = formatSize(Number(tooLarge[2]));
   const reveal = (projectRoot: string) => revealItemInDir(projectItemPath(projectRoot, path)).catch((failure: unknown) => {
     const message = toMessage(failure);
-    showError(i18n._(msg`Could not show that item in Finder. ${message}`));
+    showError(i18n._(msg`Could not show that item. ${message}`));
   });
   notifyError(i18n._(msg`App`), i18n._(msg`${name} is too large to open in the editor`), {
     detail: i18n._(msg`It is ${size}; the editor opens files up to ${limit}. Open it in another app instead.`),
-    primaryAction: root ? { label: i18n._(msg`Show in Finder`), onClick: () => reveal(root) } : undefined,
+    primaryAction: root ? { label: i18n._(showInFileManager()), onClick: () => reveal(root) } : undefined,
   });
 }

@@ -171,6 +171,38 @@ impl Project {
         &self.manifest
     }
 
+    /// The folder the Agent works in: the project's own, or the folder above
+    /// it Settings › Agent or the parent folder's question gave the Agent
+    /// (lattice#1293). The history, the settings and the builds stay here.
+    pub fn agent_root(&self) -> PathBuf {
+        project::agent_folder(&self.root, &self.manifest)
+    }
+
+    /// Give the Agent the folder `above` the project to work in, or the
+    /// project's own again with `None`.
+    pub fn set_agent_folder(&mut self, above: Option<PathBuf>, cx: &mut Context<Self>) {
+        let root = self.root.clone();
+        let written =
+            cx.background_spawn(async move { project::set_agent_folder(&root, above.as_deref()) });
+        cx.spawn(async move |this, cx| {
+            let manifest = written.await;
+            this.update(cx, |this, cx| match manifest {
+                Ok(manifest) => {
+                    this.manifest = manifest;
+                    cx.emit(ProjectEvent::ManifestChanged);
+                    cx.notify();
+                }
+                Err(error) => crate::notices::error(
+                    lattice_i18n::t!("Could not change the Agent’s folder"),
+                    error,
+                    cx,
+                ),
+            })
+            .ok();
+        })
+        .detach();
+    }
+
     pub fn files(&self) -> &[FileNode] {
         &self.files
     }

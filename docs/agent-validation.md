@@ -20,8 +20,12 @@ typecheck, the i18n catalogs, and, when their inputs changed, `perf:evidence`,
 `notices:check`, the GPUI host error catalog
 (`scripts/gpui-host-errors.mjs --check`), the GPUI animated icons
 (`scripts/gpui-animated-icons.mjs --check`), the GPUI symbol palette glyphs
-(`scripts/gpui-symbol-glyphs.mjs --check`) and `cargo fmt --check`; then the tests `vitest related` finds
-from your changed files, and `pnpm test:invariants`, the tests that read
+(`scripts/gpui-symbol-glyphs.mjs --check`) and `cargo fmt --check`; then the tests within two imports
+of your changed sources (their own tests and their importers' tests,
+`scripts/lib/import-graph.mjs`; every test counts as importing the vitest
+setup file; a test three or more imports away, such as a suite that mounts the
+whole app, runs in the nightly and release CI), the tests `vitest related` finds
+from any other changed file (a stylesheet, a JSON file), and `pnpm test:invariants`, the tests that read
 stylesheets and fixtures, or run scripts, no import leads to. Do not assemble
 your own list of test files. The no-mistakes pipeline's test step runs this
 same gate (`.no-mistakes.yaml`).
@@ -89,11 +93,16 @@ A waiter takes it over from a holder that died, or that has held it past 30 minu
 
 ### CI tiers, and `pnpm ci:local`
 
-Every push to a branch of this repository runs `ci.yml` and `gpui.yml`, each with
-only the jobs its change needs against its merge base with `origin/main`.
-`scripts/ci-tier.mjs` decides, and its header lists each job group's inputs:
+GitHub runs `ci.yml` and `gpui.yml` only for a release tag and by hand
+(Leo, 2026-11-26). Pull requests and pushes to branches or main run nothing
+there: `pnpm ci:local` on a Mac is the gate, and the nightly e2e
+(`nightly-e2e.yml`, on the Mac mini) runs the whole GPUI scenario on main
+every night. A tag runs every job. A dispatch (`gh workflow run ci.yml --ref
+<ref>`) runs only the jobs its ref's change needs against its merge base with
+`origin/main`; `scripts/ci-tier.mjs` decides, `pnpm ci:local` picks its
+stages from the same tier, and the header lists each job group's inputs:
 
-| The branch changes | CI runs |
+| The branch changes | A dispatch runs |
 | --- | --- |
 | documentation only (`docs/`, top-level Markdown, `gpui/docs/`) | nothing past the `changes` job |
 | a document a test reads (a spec, `docs/performance*`) | those tests, or the perf-evidence check |
@@ -111,17 +120,20 @@ macOS-only (the `gpui_macos` and `gpui_apple` patches, files named for
 macOS, a source under `#![cfg(target_os = "macos")]`, the parity report) or
 a file no scenario step reads runs the smoke flow alone there. Island web code
 (`src/`, `gpui/islands/`) takes the whole scenario: it renders in WebView2 on
-Windows. Every push to main, tag and full run takes the whole
+Windows. Every tag and full run takes the whole
 scenario. `scripts/windows-e2e-tier.mjs` decides, and the `changes` job's
 summary says which and why; `node scripts/ci-tier.mjs` prints it for your
 branch as `windowsE2e`.
 
-A newer push to a branch cancels its older run. A push to main runs what that
-merge changed and is never cancelled. Everything runs for a release tag, the
-weekly schedule, a dispatch on main, `gh workflow run ci.yml --ref <branch> -f
+A newer dispatch for a branch cancels its older run. Everything runs for a
+release tag, a dispatch on main, `gh workflow run ci.yml --ref <branch> -f
 full=true`, a head commit with a `CI: full` trailer, or a pull request labelled
 `ci:full`. A dispatch's `-f base=<ref>` compares with another ref, such as the
-branch below yours in a stack.
+branch below yours in a stack. `-f platform=windows` (or `linux`, `macos`)
+runs that platform's job alone, in full: the Rust job for `ci.yml`, the GPUI
+job for `gpui.yml`, nothing else, for a port's pull request that needs a real
+Windows or Linux run. No weekly run warms main's Rust caches any more, so a
+dispatch on main before a release saves the tag's jobs a cold build.
 
 The GPUI e2e jobs fail only on a step that passes on main. The steps main
 fails on the hosted runners are in `scripts/gpui-e2e-known-failures.json`, each
@@ -155,9 +167,9 @@ that stand for them, chosen from the diff against the merge base
 | The branch changes | `ci:local` runs |
 | --- | --- |
 | documentation only | nothing |
-| `src-tauri/` or web code only | the gate (lint, knip, tsc, i18n, notices, the related Vitest tests); rustfmt, clippy `-D warnings` and `cargo test` for the Tauri crates; the bundle budgets and the WebKit benchmark when the bundle's inputs changed. No GPUI stage. |
+| `src-tauri/` or web code only | the gate (lint, knip, tsc, i18n, notices, the related Vitest tests); rustfmt, clippy `-D warnings` and `cargo test` for the Tauri crates; the bundle budgets when the bundle's inputs changed, and the WebKit benchmark only when the benchmark itself changed (`touchesWebkitBench`: `scripts/perf-bench/`, `scripts/perf-bench.mjs`, `tools/perf-bench/`, `tools/mock-backend/` and the files the bench imports, not a dependency bump). No GPUI stage. |
 | `gpui/` only | GPUI fmt, release build and unit tests, and the e2e below. No WebKit benchmark. |
-| a release path (`RELEASE_PATHS`: release workflows, `src-tauri/tauri*.conf.json`, `Info.plist`, `Entitlements.plist`, the icons, either app's updater, `fetch-pdfium`, the bundle, packaging, signing and release scripts) | everything, as `--full` does, and a trailer that records it (`rust gpui e2e=full webkit`) |
+| a release path (`RELEASE_PATHS`: release workflows, `src-tauri/tauri*.conf.json`, `Info.plist`, `Entitlements.plist`, the icons, either app's updater, `fetch-pdfium`, the bundle, packaging, signing and release scripts) | everything but the WebKit benchmark, as `--full` does, and a trailer that records it (`rust gpui e2e=full`) |
 | only text since a gated commit (below) | the docs-only profile: the build and the tests that read those files, no e2e and no WebKit benchmark, and a `docs from=<gate>` trailer |
 
 The GPUI e2e is the smoke flow (open, build, SyncTeX both ways, edits and ⌘S,
@@ -168,40 +180,86 @@ module. What every window is built from runs the whole scenario even where a
 module's `covers` names it: the scenario harness, `gpui/patches/`, the
 manifests, each crate's `main.rs`/`lib.rs` and the app's `app.rs`,
 the vendored crates under `gpui/compat/` (gpui-fast, which draws every
-window, gpui-pre and libsqlite3-sys), lattice-ui, lattice-i18n, lattice-core. Any other file picks the modules whose
-`covers` name it, else the table's row for it, and a file nothing maps (a
-shared file such as `shell.rs`) runs the whole scenario. Only the whole scenario records this Mac's main baseline for the
-merge base first, in a scratch worktree, when the machine has none (one more
-build and e2e, about 20 minutes, per merge base); a module run uses the
-baseline when it is already there and otherwise judges against the known
+window, gpui-pre and libsqlite3-sys), lattice-ui, lattice-i18n's code,
+lattice-core (but not its unit tests), and lattice-gpui's root view and native input (`shell.rs` and
+every file under `shell/` that no module's `covers` names, `native.rs` and
+`native/`, the private pasteboard among them). The exception is
+`shell/actions.rs`, the command bindings, which `ci:local` reads hunk by
+hunk (`scripts/gpui-actions-e2e.mjs`): a changed binding runs the modules that
+name its action, press its key or cover the method it calls, a change to
+`command_context` runs `palette`, `shell_lifecycle` and the modules that read
+it or cover a shell file building commands from it, a handler in the file runs
+what its bindings pick and the modules that call it, an import or a binding
+added whole that no step reaches runs the smoke flow, and anything else in the
+file runs the whole scenario. Any other file picks the modules whose `covers` name it, else
+the table's row for it, else the modules that exercise its directory
+(`dirModules`: those covering something under `x/` for `x.rs`, else under
+the nearest directory above it, short of the crate's `src/`, else the module
+named for the file or a directory of it), and only a file none of that
+reaches (a top-level file of lattice-gpui's `src/`, the terminal) runs the
+whole scenario. A module covering a sibling file is weak evidence for a hub
+file, so hubs get a FULL row or an explicit one (project find and replace
+run `documents` and `find_in_file`). The string catalogs (lattice-i18n's
+`locales/`, `src/locales/`) run the smoke flow: their build and unit tests
+check them, and the strings as shown are left to the nightly full gate,
+except that lattice-i18n's also run `settings` and `find_in_file`, which
+read zh-CN strings. Only the whole scenario records this Mac's main baseline for the
+merge base, in a scratch worktree, when the machine has none (one more build
+and e2e, about 20 minutes, per merge base), and only when it needs it: the
+e2e runs first, judged against the newest baseline this Mac has for an
+ancestor of the merge base at most 30 commits back (less the steps the known
+list dropped since), and `gpui-main` records the merge base's own only when
+a step outside that one fails, then judges those failures and every step only
+the older one excused again against it (`gpui-e2e-verdict.mjs --rejudge`); a
+pass there clears the e2e's failure. A Mac with no such baseline records it
+first. A module run uses
+the baseline when it is already there and otherwise judges against the known
 failures alone. Either way a step that fails is rerun once with its module on
 a fresh fixture. Add a row to the table when a crate or path has a clear
 owner in the scenario.
 
-A change to `scripts/ci-local.mjs`, `scripts/ci-local-select.mjs`, `scripts/gpui-e2e-modules.mjs` or `scripts/windows-e2e-tier.mjs`, like one to `scripts/ci-tier.mjs`, runs every job.
+A change to what picks the jobs (`CI_CONTROL` in `scripts/ci-tier.mjs`: `ci-tier.mjs`, `ci-local.mjs`, `ci-local-select.mjs`, `gpui-e2e-modules.mjs`, `windows-e2e-tier.mjs`, `linux-gpui-e2e-tier.mjs`) runs those scripts' unit tests and the lint and build job when nothing but them, their tests and documentation changed: a wrong pick is what can go wrong there, and those tests check it, while the apps' jobs would only run main's code again. With any other file in the diff, a GPUI input among them, it runs every job, so a selector change is never judged by its own picks.
 
-Rust, GPUI and benchmark stages wait while a perf measurement holds
-`/tmp/lattice-inapp-test.lock` (`$INAPP_LOCK_FILE` when set). The literature
+An edit to `scripts/gpui-e2e-known-failures.json` that only removes entries or only changes other platforms' entries, so macOS excuses the same steps in the same tiers or fewer (`knownFailuresInert` in `scripts/ci-tier.mjs`), runs `scripts/gpui-e2e-verdict.test.mjs` (and any test that names the file) alone: no GPUI build and no e2e, on macOS or, in a dispatch for every platform, on Windows and Linux; a dispatch with `platform` set runs that platform's job as usual. Removing an entry only makes the verdict stricter, and main's nightly runs it. Any edit that excuses a new step on macOS, or moves one to another tier, runs the GPUI job as before.
+
+Rust and GPUI build and unit-test stages wait while a perf measurement or a
+hand test holds `/tmp/lattice-inapp-test.lock` (`$INAPP_LOCK_FILE` when set),
+but not while another run's GPUI e2e holds it (a live holder whose record
+says `--kind e2e`): a waiting gate builds meanwhile and queues for the lock
+only for its own windowed stages (the e2e, its main baseline and the WebKit
+benchmark). Those builds run as `scripts/inapp-lock build`, and a quiet
+holder (anything not `--kind e2e`) that takes the lock after that e2e waits
+for them to end before its command starts, so a measurement never runs
+beside a build. The main baseline builds main while it holds the lock, so a
+gate's build beside it can stretch its hold. The literature
 Worker, the Open Slide runtime, the research environment, the Chromium
 benchmark, Linux and Windows run in CI only.
 
 When it passes on a clean tree and the change needed a macOS job, it prints
 "local macOS gate passed at <sha>" and a trailer naming the commit's tree and
 the stages that ran, such as `CI-local: macos 1a2b3c4d5e6f gpui e2e=smoke+pdf+pdf_notes`
-or `CI-local: macos 1a2b3c4d5e6f rust gpui e2e=full webkit`. On a pushed head
+or `CI-local: macos 1a2b3c4d5e6f rust gpui e2e=full`. The trailer is the
+record that the gate passed on that tree. On a dispatched head
 commit whose tree it names, CI skips each macOS job (Rust, GPUI, the WebKit
 benchmark) whose needs those stages cover for the diff; a job they do not
 cover, such as GPUI after a change that needs a module the trailer's e2e did
 not run, still runs on GitHub, and its `changes` summary says why. A trailer
 with only a tree, from before the stages were recorded, still stands for every
-macOS job. For a release path only the full gate's trailer
-(`rust gpui e2e=full webkit`, which `ci:local` prints for such a diff) stands
+macOS job.
+
+The WebKit benchmark measures the classic app in WKWebView, and classic
+macOS is frozen (no Mac user runs it since 0.20.0), so neither `ci:local`
+nor a branch's CI runs it unless the change touches its tooling; it then
+appears in the trailer as `webkit`. A tag and a full dispatch still run it
+on GitHub.
+
+For a release path only the full gate's trailer
+(`rust gpui e2e=full`, which `ci:local` prints for such a diff) stands
 for the macOS jobs; a tree-only or partial trailer does not, and those jobs run
 on GitHub. A release is still built and checked for real on GitHub when its
-tag is pushed: a tag runs every job and ignores any trailer (so does every
-push to main), and
+tag is pushed: a tag runs every job and ignores any trailer, and
 `release.yml` and `gpui-package.yml` take no trailer at all.
-`pnpm ci:local --full` runs every stage and the whole e2e.
+`pnpm ci:local --full` runs every stage and the whole e2e, except the WebKit benchmark unless the diff changes it.
 
 **Docs-only commits on a gated branch.** When everything since the newest
 commit on HEAD's first-parent line whose trailer names its own tree and
@@ -245,12 +303,22 @@ pushing.
 
 ### The nightly full gate on main
 
-Branch gates run the smoke flow and the modules their diff picks, so the
-whole scenario runs on main once a night instead:
+Branch gates run the smoke flow and the modules their diff picks, and only
+the tests within two imports of their change, so the whole scenario and the
+whole Vitest suite (last, headless, outside the lock; a failed test file is a
+failure of the night) run on main once a night instead:
 `.github/workflows/nightly-e2e.yml`, at 18:37 UTC (02:37 in Taipei), on the
 Mac mini through runner-up's `lattice-mac` pool
-([`release-process.md`](release-process.md)), under the in-app lock (it
-waits up to 90 minutes for crew gates to free it). `scripts/gpui-nightly.mjs
+([`release-process.md`](release-process.md)). It runs the e2e as six chunks
+of modules (`gpui-main-baseline.mjs --chunks`, each with the smoke flow), each
+under the in-app lock and letting it go in between, so a queued gate or lab
+run waits for one chunk (a few minutes), not the whole scenario. The chunks
+share 220 minutes, lock waits included (the step's 555 less the gate, the
+build, the rerun's 30-minute lock wait and run, the idle guard's lock wait
+and runs, about an hour, and the whole Vitest suite's 90 minutes), and each waits for the lock only as
+long as that leaves 25 minutes for its run; a chunk that gave up on the lock,
+ran out of that time or wrote no result fails the night (a chunk's files from
+an earlier run of the same commit are removed first). `scripts/gpui-nightly.mjs
 run` records main with `scripts/gpui-main-baseline.mjs` (the gate, the
 release build and the whole e2e, which also leaves the Mac's main baseline
 for that commit), judges the e2e as gpui.yml judges main (the known failures
@@ -307,7 +375,7 @@ for the test's name before you investigate it. When CI fails on `main`,
 passes records what failed the attempt before. `synara-pin` is never recorded:
 it checks the published Synara fork, so it rightly passes on a re-run once the
 fork branch is pushed. `flake-hunt.yml` records what
-fails in its nightly stress passes. The issue also holds the quarantine policy.
+fails in its stress passes, which run by hand now. The issue also holds the quarantine policy.
 To see how flaky a test is, run its file many times under load with
 `node scripts/burn-in.mjs --runs 20 --burn 4 <file> -- -t "<test name>"`; CI's
 `new-tests` job runs a pull request's added and modified test files five times

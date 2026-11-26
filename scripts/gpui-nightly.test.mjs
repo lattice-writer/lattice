@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { failuresOf, issueBody, listedFailures, nightlyFor, planIssue } from "./gpui-nightly.mjs";
+import { failuresOf, idleFailures, issueBody, listedFailures, nightlyFor, planIssue, vitestFailures } from "./gpui-nightly.mjs";
 
 const green = { gate: { status: "ok", failing: [] }, build: { status: "ok" }, e2e: { status: "ok", result: "e2e@x.json" } };
 const clean = { error: null, fresh: [], quarantined: [], flaky: [], fixed: [] };
@@ -47,6 +47,31 @@ describe("gpui-nightly: what failed", () => {
   });
 });
 
+describe("gpui-nightly: the idle guard", () => {
+  it("is nothing when every check passed, and names each check that failed", () => {
+    const checks = [{ name: "idle with the editor focused, only the caret draws", passed: true }, { name: "idle in the background, the window draws nothing", passed: false }];
+    expect(idleFailures({ passed: true, checks: [checks[0]] }, 0)).toEqual([]);
+    expect(idleFailures({ passed: false, checks }, 1)).toEqual(["idle guard: idle in the background, the window draws nothing"]);
+  });
+
+  it("fails closed: no result, a scenario that did not finish, or no checks", () => {
+    expect(idleFailures(null, 1)).toEqual(["idle guard: no result (exit 1)"]);
+    expect(idleFailures({ error: "the editor has not been laid out" }, 1)).toEqual(["idle guard did not finish: the editor has not been laid out"]);
+    expect(idleFailures({ passed: true, checks: [] }, 0)).toEqual(["idle guard: ran no checks"]);
+    expect(idleFailures({ passed: true, checks: [{ name: "x", passed: true }] }, 3)).toEqual(["idle guard: exited 3"]);
+  });
+});
+
+describe("gpui-nightly: the whole Vitest suite", () => {
+  it("is nothing when it passed, names each file that failed, and fails closed without a result or with a bare failure", () => {
+    const file = (name, status) => ({ name: new URL(`../${name}`, import.meta.url).pathname, status });
+    expect(vitestFailures({ success: true, testResults: [file("src/a.test.ts", "passed"), file("src/b.test.ts", "skipped")] }, 0)).toEqual([]);
+    expect(vitestFailures({ success: false, testResults: [file("src/a.test.ts", "failed"), file("src/b.test.ts", "passed")] }, 1)).toEqual(["vitest: src/a.test.ts"]);
+    expect(vitestFailures(null, "SIGTERM")).toEqual(["vitest: no result (exit SIGTERM)"]);
+    expect(vitestFailures({ success: false, testResults: [] }, 1)).toEqual(["vitest: failed (exit 1) without a failing file"]);
+  });
+});
+
 describe("gpui-nightly: the issue", () => {
   const body = issueBody({ sha, subject: "x", failures: ["e2e step a", "gate stage knip"] });
 
@@ -82,16 +107,18 @@ describe("gpui-nightly: the issue", () => {
 describe("gpui-nightly: the workflow", () => {
   const workflow = readFileSync(new URL("../.github/workflows/nightly-e2e.yml", import.meta.url), "utf8");
 
-  it("runs on main every night on the Mac mini, under the in-app lock, and reports even when the run failed", () => {
+  it("runs on main every night on the Mac mini, a chunk at a time under the in-app lock, and reports even when the run failed", () => {
     expect(workflow).toMatch(/schedule:\n\s+#.*\n\s+- cron: "\d+ \d+ \* \* \*"/);
     expect(workflow).toMatch(/runs-on: \$\{\{ vars\.LATTICE_MACOS_RUNNER \|\| 'lattice-mac' \}\}\n/);
     expect(workflow).toMatch(/fetch-depth: 0\n/);
     expect(workflow).toMatch(/ref: main\n/);
-    expect(workflow).toMatch(/scripts\/inapp-lock --thread .* -- node scripts\/gpui-nightly\.mjs run/);
+    // It takes the in-app lock per chunk (gpui-main-baseline.mjs --chunks), never for the whole run.
+    expect(workflow).toMatch(/\n\s+run: node scripts\/gpui-nightly\.mjs run\n/);
+    expect(workflow).not.toMatch(/run: .*inapp-lock/);
+    expect(readFileSync(new URL("./gpui-nightly.mjs", import.meta.url), "utf8")).toMatch(/"--chunks", String\(CHUNKS\)/);
     expect(workflow).toMatch(/if: \$\{\{ !cancelled\(\) \}\}\n(.*\n){0,3}\s+run: node scripts\/gpui-nightly\.mjs report/);
     expect(workflow).toMatch(/issues: write/);
     // The build tree check runs before the lock, with a short timeout of its own.
-    expect(workflow.indexOf("Reach the shared build tree")).toBeLessThan(workflow.indexOf("scripts/inapp-lock"));
     expect(workflow).toMatch(/- name: Reach the shared build tree\n\s+timeout-minutes: 2\n/);
   });
 });

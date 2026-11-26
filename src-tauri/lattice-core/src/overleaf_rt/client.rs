@@ -3,12 +3,15 @@
 
 use super::codec::*;
 use super::events::*;
+use super::handshake::handshake_blocking;
 use super::tree::{parse_project, NodeKind, ProjectTree, Tree};
-use super::{NOT_CONNECTED, SESSION_EXPIRED, USER_AGENT};
+use super::{NOT_CONNECTED, USER_AGENT};
 use crate::runtime as rt;
 use crate::util::url_encode;
 use futures_util::sink::{Sink, SinkExt};
 use futures_util::stream::{Stream, StreamExt};
+pub(super) use heartbeat::awake_or_asleep;
+use heartbeat::{heard_nothing_since, watch_heartbeat, SILENT_SINCE};
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -24,8 +27,6 @@ const ACK_TIMEOUT: Duration = Duration::from_secs(10);
 /// Granularity of the ack timeout helper thread; also how fast it notices that
 /// the waiter is gone and exits early.
 const ACK_TIMER_TICK: Duration = Duration::from_millis(100);
-/// How often the heartbeat watchdog looks at the clock.
-const WATCHDOG_TICK: Duration = Duration::from_millis(500);
 /// Outgoing frame queue depth. Deep enough that `try_send` from non-async
 /// contexts (heartbeat echo, shutdown) never realistically fails.
 const OUT_QUEUE: usize = 256;
@@ -40,6 +41,7 @@ const READ_ONLY: &str =
     "You have read-only access to this Overleaf project, so edits stay on this machine.";
 const CLOSED_BEFORE_ANSWER: &str =
     "The Overleaf realtime connection closed before the server answered.";
+const SLEPT: &str = "The computer slept, so the connection is joined again.";
 
 pub struct RealtimeConfig {
     /// Our own Overleaf account id, when the app knows it. Only used to read
@@ -50,80 +52,11 @@ pub struct RealtimeConfig {
     pub project_id: String,
 }
 
-fn now_millis() -> u128 {
+pub(super) fn now_millis() -> u128 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0)
 }
 
-// ---- Handshake ------------------------------------------------------------
-
-/// What the handshake settled: the session id, the heartbeat timeout in
-/// seconds (0 = none), and the cookies to carry into the websocket upgrade. Runs on a blocking thread because the crate only has
-/// `reqwest`'s blocking client.
-fn handshake_blocking(
-    origin: &str, cookie: &str, project_id: &str,
-) -> Result<(String, u64, String), String> {
-    let url =
-        format!("{origin}/socket.io/1/?projectId={}&t={}", url_encode(project_id), now_millis());
-    let client = crate::http::blocking_as(USER_AGENT, Duration::from_secs(20))
-        .build()
-        .map_err(|e| format!("Could not build the HTTP client: {e}"))?;
-    let response = client
-        .get(&url)
-        .header("Cookie", cookie)
-        .header("Origin", origin)
-        .send()
-        .map_err(|e| format!("Could not reach Overleaf ({e})."))?;
-    let status = response.status();
-    let final_url = response.url().to_string();
-    let handed_back: Vec<String> = (response.headers().get_all(reqwest::header::SET_COOKIE).iter())
-        .filter_map(|value| value.to_str().ok())
-        .map(str::to_string)
-        .collect();
-    let body = response
-        .text()
-        .map_err(|e| format!("Could not read the Overleaf handshake response: {e}"))?;
-
-    if status.as_u16() == 401 || status.as_u16() == 403 || final_url.contains("/login") {
-        return Err(SESSION_EXPIRED.to_string());
-    }
-    if !status.is_success() {
-        return Err(format!("Overleaf refused the realtime handshake (HTTP {}).", status.as_u16()));
-    }
-    let login_page = body.trim_start().starts_with('<');
-    let (sid, heartbeat) =
-        parse_handshake(&body)
-            .map_err(|e| if login_page { SESSION_EXPIRED.to_string() } else { e })?;
-    Ok((sid, heartbeat, merge_cookies(cookie, &handed_back)))
-}
-
-/// Fold any cookies the handshake set into the ones we already had.
-///
-/// Overleaf runs several realtime instances behind a load balancer, and the
-/// handshake answers with a cookie that pins the session to the instance
-/// holding it. Leaving that cookie behind means the websocket upgrade reaches
-/// a different instance, which has never heard of the id we were just given
-/// and answers 502 — a failure that looks like the server being down.
-///
-/// Later values win, but a cookie keeps the position it first appeared in, so
-/// the header stays stable and readable across reconnects.
-pub(super) fn merge_cookies(base: &str, set_cookies: &[String]) -> String {
-    let mut order: Vec<String> = Vec::new();
-    let mut values: HashMap<String, String> = HashMap::new();
-    let handed_back = set_cookies.iter().filter_map(|header| header.split(';').next());
-    for pair in base.split(';').chain(handed_back).map(str::trim) {
-        let Some(name) = pair.split_once('=').map(|(name, _)| name.trim()) else {
-            continue;
-        };
-        if name.is_empty() {
-            continue;
-        }
-        if !values.contains_key(name) {
-            order.push(name.to_string());
-        }
-        values.insert(name.to_string(), pair.to_string());
-    }
-    order.iter().filter_map(|name| values.get(name)).cloned().collect::<Vec<_>>().join("; ")
-}
+mod heartbeat;
 
 // ---- Shared connection state ----------------------------------------------
 
@@ -153,8 +86,9 @@ struct Shared {
     pending: Mutex<HashMap<u32, rt::Sender<Ack>>>,
     next_ack: AtomicU32,
     public_id: Mutex<String>,
-    /// When the server last sent anything at all; see `watch_heartbeat`.
-    last_heard: Mutex<Instant>,
+    /// When the server last sent anything at all, on [`awake_or_asleep`]'s
+    /// clock; see `watch_heartbeat`.
+    last_heard: Mutex<Duration>,
     finished: AtomicBool,
     on_event: Box<dyn Fn(RealtimeEvent) + Send + Sync + 'static>,
 }
@@ -216,11 +150,14 @@ struct AckSlot {
 /// Registers an ack waiter and arms its timeout. The timer lives on a parked
 /// helper thread (this crate cannot reach `tokio::time`) and exits early — well
 /// before the full timeout — as soon as the waiter goes away.
-fn open_slot(shared: &Arc<Shared>, id: u32, label: &str) -> AckSlot {
+///
+/// `drop_if_silent`: a timeout on a silent socket ends the connection.
+fn open_slot(shared: &Arc<Shared>, id: u32, label: &str, drop_if_silent: bool) -> AckSlot {
     let (tx, rx) = rt::channel::<Ack>(2);
     let timer_tx = tx.clone();
     lock(&shared.pending).insert(id, tx);
     let timed_out = format!("{label} timed out after {}s.", ACK_TIMEOUT.as_secs());
+    let (shared, opened) = (shared.clone(), awake_or_asleep());
     std::thread::spawn(move || {
         let deadline = Instant::now() + ACK_TIMEOUT;
         while Instant::now() < deadline {
@@ -228,6 +165,9 @@ fn open_slot(shared: &Arc<Shared>, id: u32, label: &str) -> AckSlot {
                 return;
             }
             std::thread::sleep(ACK_TIMER_TICK);
+        }
+        if drop_if_silent && heard_nothing_since(&shared, opened) {
+            return shared.finish(format!("{timed_out} {SILENT_SINCE}"));
         }
         let _ = timer_tx.try_send(Err(timed_out));
     });
@@ -241,10 +181,12 @@ async fn await_slot(shared: &Arc<Shared>, mut slot: AckSlot) -> Ack {
 }
 
 /// Emits `5:{id}+::{"name":…,"args":…}` and waits for the matching ack.
-async fn emit_with_ack<A: Serialize>(shared: &Arc<Shared>, name: &str, args: A) -> Ack {
+async fn emit_with_ack<A: Serialize>(
+    shared: &Arc<Shared>, name: &str, args: A, drop_if_silent: bool,
+) -> Ack {
     let payload = encode_event(name, args)?;
     let id = shared.next_ack.fetch_add(1, Ordering::SeqCst);
-    let slot = open_slot(shared, id, &format!("Overleaf's answer to {name}"));
+    let slot = open_slot(shared, id, &format!("Overleaf's answer to {name}"), drop_if_silent);
     let frame = encode_frame(FRAME_EVENT, &format!("{id}+"), "", &payload);
     if let Err(e) = shared.send_frame(frame).await {
         lock(&shared.pending).remove(&id);
@@ -273,7 +215,7 @@ where
 {
     let mut reason = "The Overleaf realtime connection closed.".to_string();
     while let Some(next) = source.next().await {
-        *lock(&shared.last_heard) = Instant::now();
+        *lock(&shared.last_heard) = awake_or_asleep();
         let handled = match next {
             Ok(Message::Text(text)) => handle_frame(&shared, text.as_str()),
             Ok(Message::Binary(bytes)) => {
@@ -292,33 +234,6 @@ where
         }
     }
     shared.finish(reason);
-}
-
-/// Ends a connection the server has gone quiet on.
-///
-/// A socket can stay open after the network under it is gone — the laptop
-/// slept, the Wi-Fi changed — and then nothing arrives and nothing fails:
-/// collaborators' edits stop, ours time out one by one, and no reconnect is
-/// ever asked for, because no disconnect was ever seen. Overleaf sends a
-/// heartbeat well inside the timeout it names in the handshake, and the
-/// Socket.IO 0.9 client its editor uses closes the connection when that much
-/// time passes without hearing anything; so does this. Finishing reports
-/// `Disconnected`, which is what sets the app reconnecting.
-fn watch_heartbeat(shared: Arc<Shared>, timeout: Duration) {
-    std::thread::spawn(move || loop {
-        std::thread::sleep(WATCHDOG_TICK);
-        if shared.finished.load(Ordering::SeqCst) {
-            return;
-        }
-        let silent = lock(&shared.last_heard).elapsed();
-        if silent > timeout {
-            shared.finish(format!(
-                "Overleaf has sent nothing for {}s, so the connection is presumed lost.",
-                silent.as_secs()
-            ));
-            return;
-        }
-    });
 }
 
 /// `Err` carries why the read loop should stop.
@@ -573,7 +488,7 @@ impl RealtimeClient {
             pending: Mutex::new(HashMap::new()),
             next_ack: AtomicU32::new(1),
             public_id: Mutex::new(String::new()),
-            last_heard: Mutex::new(Instant::now()),
+            last_heard: Mutex::new(awake_or_asleep()),
             finished: AtomicBool::new(false),
             on_event: Box::new(on_event),
         });
@@ -584,8 +499,8 @@ impl RealtimeClient {
         // `joinProjectResponse` immediately after accepting the connection,
         // and an answer that arrives before anyone is waiting is simply lost.
         let connect_slot =
-            open_slot(&shared, CONNECT_SLOT, "Overleaf's realtime connect handshake");
-        let join_slot = open_slot(&shared, JOIN_SLOT, "Overleaf's project join");
+            open_slot(&shared, CONNECT_SLOT, "Overleaf's realtime connect handshake", false);
+        let join_slot = open_slot(&shared, JOIN_SLOT, "Overleaf's project join", false);
         rt::spawn(read_loop(source, shared.clone()));
         // Zero is the handshake saying it sends no heartbeats at all.
         if heartbeat > 0 {
@@ -602,7 +517,8 @@ impl RealtimeClient {
         let asker = shared.clone();
         rt::spawn(async move {
             let args = (JoinProjectArg { project_id: &project_id },);
-            let asked = emit_with_ack(&asker, "joinProject", args).await;
+            // Servers that push the join never answer this: no drop.
+            let asked = emit_with_ack(&asker, "joinProject", args, false).await;
             asker.resolve(JOIN_SLOT, asked);
         });
         let ack = await_slot(&shared, join_slot).await?;
@@ -622,7 +538,7 @@ impl RealtimeClient {
     /// Emit `name` and wait for Overleaf's answer; its error slot becomes an
     /// `Err`, and what follows it is returned.
     async fn call<A: Serialize>(&self, name: &str, args: A) -> Ack {
-        let ack = emit_with_ack(&self.shared, name, args).await?;
+        let ack = emit_with_ack(&self.shared, name, args, true).await?;
         Ok(ack_body(&ack, name)?.to_vec())
     }
 
@@ -793,6 +709,14 @@ impl RealtimeClient {
             return None;
         }
         Some(lock(&self.shared.tree).entities())
+    }
+
+    /// The computer woke from sleep: end the connection now and report it
+    /// `Disconnected`, so it is joined again at once. The socket it slept on
+    /// may be dead without knowing it, and a polite `shutdown` would wait
+    /// on that socket for a close that never comes.
+    pub fn rejoin_after_sleep(&self) {
+        self.shared.finish(SLEPT.to_string());
     }
 
     /// Closes the socket; the read loop exits and reports `Disconnected`.

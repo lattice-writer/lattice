@@ -239,6 +239,14 @@ pub fn entries(has_project: bool, known_author: Option<&str>) -> Vec<Entry> {
         Entry::row(AgentDisplay, display, "agent-font-size", t!("Agent font size"))
             .terms(t!("text size zoom larger smaller chat"))
             .description(t!("The Agent’s conversation and composer, in the panel and in its own window. The editors keep their own size.")),
+    ]);
+    if has_project {
+        out.push(
+            Entry::row(AgentDisplay, display, "agent-folder", t!("Agent’s folder"))
+                .terms(t!("working folder parent study analysis scripts access")),
+        );
+    }
+    out.extend([
         Entry::page(Mcp, t!("MCP"), agent),
         Entry::page(Api, t!("Skills"), agent),
         Entry::page(Usage, t!("Usage & limits"), agent)

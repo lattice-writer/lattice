@@ -174,6 +174,12 @@ impl OverleafBridge {
         }
     }
 
+    /// A flush held by a 429's cool-down: its whole files go with the
+    /// poll's retry once the cool-down is over.
+    pub(super) fn hold_whole_files_for_retry(&mut self, paths: BTreeSet<String>) {
+        self.whole_files.boundary.extend(paths);
+    }
+
     fn arm_boundary_flush(&mut self, cx: &mut Context<Self>) {
         self.whole_files.boundary_task = Some(cx.spawn(async move |this, cx| {
             cx.background_executor().timer(WHOLE_FILE_SETTLE).await;
@@ -389,9 +395,15 @@ impl OverleafBridge {
         } else {
             MIN_SYNC_GAP
         };
-        self.last_auto_sync
+        let gap = self
+            .last_auto_sync
             .map(|last| gap.saturating_sub(last.elapsed()))
-            .unwrap_or_default()
+            .unwrap_or_default();
+        let cooling = self
+            .rate_limited_until
+            .map(|until| until.saturating_duration_since(Instant::now()))
+            .unwrap_or_default();
+        gap.max(cooling)
     }
 
     /// The poll's cadence while probes answer with a version.
@@ -517,13 +529,20 @@ impl OverleafBridge {
         let owed = self.transport_retry || self.local_pending;
         let since_last = self.last_auto_sync.map(|last| last.elapsed());
         if owed && gap_elapsed {
+            let held = std::mem::take(&mut self.whole_files.boundary);
             self.sync(
                 SyncOptions {
                     automatic: true,
+                    include_whole_files: held.clone(),
                     ..Default::default()
                 },
                 cx,
             );
+            // Not started (a sync began since the probe): they wait for the
+            // next retry rather than being dropped.
+            if !self.syncing {
+                self.whole_files.boundary.extend(held);
+            }
         } else if !version_known {
             // No change signal: sync on a slow clock instead.
             if since_last.is_none_or(|since| since >= BLIND_POLL) {

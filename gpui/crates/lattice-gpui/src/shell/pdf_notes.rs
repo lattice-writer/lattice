@@ -160,7 +160,7 @@ impl Shell {
         let from = live[..range.start].encode_utf16().count() as i64;
         let (path, quote, body) = (path.to_string(), quote.to_string(), body.to_string());
         self.overleaf.update(cx, |bridge, cx| {
-            bridge.add_comment(&path, from, quote, body, |_| {}, cx)
+            bridge.add_comment(&path, from, quote, body, |_, _| {}, cx)
         });
         answer(Ok(()), cx)
     }

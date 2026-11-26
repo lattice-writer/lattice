@@ -70,7 +70,7 @@ impl Default for AgentState {
 }
 
 impl Shell {
-    pub(super) fn agent_surface(&self, cx: &gpui::App) -> Entity<SynaraSurface> {
+    pub(crate) fn agent_surface(&self, cx: &gpui::App) -> Entity<SynaraSurface> {
         self.agent.panel.read(cx).surface().clone()
     }
 
@@ -92,9 +92,10 @@ impl Shell {
             panel.update(cx, |panel, cx| panel.leave_project(cx));
         }
         let settings = self.agent.settings.clone();
+        let agent_root = self.agent_folder(cx);
         for surface in [self.agent_surface(cx), self.git_surface(cx), settings] {
-            let root = root.clone();
-            surface.update(cx, |surface, cx| surface.set_project(root, cx));
+            let (root, agent_root) = (root.clone(), agent_root.clone());
+            surface.update(cx, |surface, cx| surface.set_project(root, agent_root, cx));
         }
         if switched {
             panel.update(cx, |panel, cx| panel.restore_window(cx));
@@ -123,6 +124,27 @@ impl Shell {
             })
             .detach();
         }
+    }
+
+    /// The folder the Agent works in for the project shown
+    /// (`lattice_core::project::agent_folder`).
+    pub(crate) fn agent_folder(&self, cx: &gpui::App) -> Option<std::path::PathBuf> {
+        self.project
+            .as_ref()
+            .map(|project| project.read(cx).agent_root())
+    }
+
+    /// The project's manifest changed: a new folder for the Agent (Settings ›
+    /// Agent, or the parent folder's question) moves its page there.
+    pub(crate) fn agent_folder_changed(&mut self, cx: &mut Context<Self>) {
+        let surface = self.agent_surface(cx);
+        let (root, agent_root) = (self.root(cx), self.agent_folder(cx));
+        if surface.read(cx).agent_root() == agent_root.as_deref() {
+            return;
+        }
+        surface.update(cx, |surface, cx| surface.set_project(root, agent_root, cx));
+        self.push_agent_workspace(cx);
+        self.push_agent_checkpoints(cx);
     }
 
     /// The project's files changed on disk: the Agent's paper library reads

@@ -15,8 +15,9 @@
 //!   editor's face, then Try again and Save a copy…;
 //! - offline: "Working offline", when it last synced, and Try now;
 //! - otherwise: "On this Mac" and when it saved, and with a link, Overleaf's
-//!   state, with Sync now when edits go on the writer's word, and how to
-//!   resume when the link is paused.
+//!   state, with Sync now when edits go on the writer's word, and Pause
+//!   syncing; a paused link says so in the slot itself ("Saved, sync
+//!   paused") and offers Resume syncing here.
 
 use gpui::{
     Anchor, AnyElement, App, IntoElement, ParentElement as _, SharedString, Styled as _,
@@ -35,7 +36,7 @@ use lattice_ui::{
 use crate::{
     editor_panel::{EditorPanel, SaveStatus},
     overleaf::bridge::OverleafSaveState as Overleaf,
-    shell::overleaf_flow::SyncOverleaf,
+    shell::overleaf_flow::{PauseOverleafSync, ResumeOverleafSync, SyncOverleaf},
 };
 
 /// What the slot and its popover say, read from the editor once a frame.
@@ -111,6 +112,9 @@ impl SaveSlot {
             (SaveStatus::Saved, Some(Overleaf::Syncing | Overleaf::Sending)) => {
                 (Icon::LOADER, t!("Saved, syncing…"))
             }
+            (SaveStatus::Saved, Some(Overleaf::Paused)) => {
+                (Icon::CLOUD_OFF, t!("Saved, sync paused"))
+            }
             (SaveStatus::Saved, _) => (Icon::HARD_DRIVE, t!("Saved")),
         };
         (icon, label.into())
@@ -119,10 +123,7 @@ impl SaveSlot {
     /// The age after the label, only where it is the disk's alone: a label
     /// that speaks of Overleaf keeps it off.
     pub fn shown_age(&self) -> Option<&str> {
-        let quiet_link = matches!(
-            self.overleaf,
-            None | Some(Overleaf::Manual | Overleaf::Paused)
-        );
+        let quiet_link = matches!(self.overleaf, None | Some(Overleaf::Manual));
         (self.status == SaveStatus::Saved && quiet_link)
             .then_some(self.age.as_deref())
             .flatten()
@@ -176,19 +177,19 @@ impl SaveSlot {
                     None => t!("Not synced yet").into(),
                 },
             };
-            // Paused has no action here, so it alone says how to resume.
             let note = (state == Overleaf::Paused)
-                .then(|| t!("Resume the link in Overleaf settings to sync again").into());
+                .then(|| t!("Edits on both sides merge when you resume").into());
             rows.push(Row {
                 term: t!("Overleaf").into(),
                 value,
                 note,
             });
         }
-        let actions = if self.overleaf == Some(Overleaf::Manual) {
-            vec![SlotAction::SyncNow]
-        } else {
-            Vec::new()
+        let actions = match self.overleaf {
+            None => Vec::new(),
+            Some(Overleaf::Paused) => vec![SlotAction::Resume],
+            Some(Overleaf::Manual) => vec![SlotAction::SyncNow, SlotAction::Pause],
+            Some(_) => vec![SlotAction::Pause],
         };
         Details {
             title: None,
@@ -221,6 +222,8 @@ pub enum SlotAction {
     SaveCopy,
     TryNow,
     SyncNow,
+    Pause,
+    Resume,
 }
 
 impl SlotAction {
@@ -230,6 +233,8 @@ impl SlotAction {
             Self::SaveCopy => t!("Save a copy…"),
             Self::TryNow => t!("Try now"),
             Self::SyncNow => t!("Sync now"),
+            Self::Pause => t!("Pause syncing"),
+            Self::Resume => t!("Resume syncing"),
         }
         .into()
     }
@@ -243,6 +248,8 @@ impl SlotAction {
                 panel.update(cx, |panel, cx| panel.save_copy(cx)).ok();
             }
             Self::TryNow | Self::SyncNow => window.dispatch_action(Box::new(SyncOverleaf), cx),
+            Self::Pause => window.dispatch_action(Box::new(PauseOverleafSync), cx),
+            Self::Resume => window.dispatch_action(Box::new(ResumeOverleafSync), cx),
         }
     }
 }
@@ -354,6 +361,8 @@ fn details(details: &Details, panel: &WeakEntity<EditorPanel>, cx: &App) -> AnyE
                     SlotAction::Retry => button,
                     SlotAction::SaveCopy => button.ghost(),
                     SlotAction::TryNow | SlotAction::SyncNow => button.ghost().icon(Icon::REFRESH),
+                    SlotAction::Pause => button.ghost().icon(Icon::CLOUD_OFF),
+                    SlotAction::Resume => button.ghost().icon(Icon::CLOUD),
                 };
                 button.on_click(move |_, window, cx| action.run(&panel, window, cx))
             }))
@@ -451,11 +460,16 @@ mod tests {
         let manual = slot(SaveStatus::Saved, Some(Overleaf::Manual)).details();
         assert_eq!(manual.rows[0].value.as_ref(), "Saved 2m ago");
         assert_eq!(manual.rows[1].value.as_ref(), "Synced 4m ago");
-        assert_eq!(manual.actions, [SlotAction::SyncNow]);
-        let paused = slot(SaveStatus::Saved, Some(Overleaf::Paused)).details();
+        assert_eq!(manual.actions, [SlotAction::SyncNow, SlotAction::Pause]);
+        let live = slot(SaveStatus::Saved, Some(Overleaf::Live)).details();
+        assert_eq!(live.actions, [SlotAction::Pause]);
+        let paused_slot = slot(SaveStatus::Saved, Some(Overleaf::Paused));
+        assert_eq!(paused_slot.label().1.as_ref(), "Saved, sync paused");
+        assert_eq!(paused_slot.shown_age(), None);
+        let paused = paused_slot.details();
         assert_eq!(paused.rows[1].value.as_ref(), "Sync paused");
         assert!(paused.rows[1].note.is_some());
-        assert!(paused.actions.is_empty());
+        assert_eq!(paused.actions, [SlotAction::Resume]);
         let unlinked = slot(SaveStatus::Saved, None).details();
         assert_eq!(unlinked.rows.len(), 1);
     }

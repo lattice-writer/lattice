@@ -109,7 +109,7 @@ pub async fn themes_reveal_folder<R: Runtime>(
     let folder = run_blocking("Themes folder", move || store.folder()).await?;
     app.opener()
         .reveal_item_in_dir(&folder)
-        .map_err(|error| format!("Could not show the themes folder in Finder: {error}"))
+        .map_err(|error| format!("Could not show the themes folder: {error}"))
 }
 
 /// The writer's accent as the page stores it: a preset's name (with its

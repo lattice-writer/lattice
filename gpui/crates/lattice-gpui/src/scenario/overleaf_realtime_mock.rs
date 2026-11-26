@@ -19,6 +19,12 @@
 //!   that update arriving again: acknowledged, not applied.
 //! - `MockOverleaf::sever` drops the socket at the next update, either
 //!   after it landed (its acknowledgement lost) or before.
+//! - Every socket hears a heartbeat each second, well inside the timeout
+//!   the handshake names (a minute, or what `MockOverleaf::heartbeat_timeout`
+//!   set). `MockOverleaf::go_silent` makes the sockets open now go quiet
+//!   while staying open, as one the computer slept on or whose network went
+//!   away does: no heartbeats, no answers, no frames, and what the app
+//!   sends on them is lost. Sockets opened afterwards are not silent.
 //! - `clientTracking.getConnectedUsers` lists the other sockets and the
 //!   scripted collaborators; `clientTracking.updatePosition` is broadcast as
 //!   `clientUpdated`.
@@ -31,7 +37,7 @@ use std::{
     io::ErrorKind,
     net::TcpStream,
     sync::{Arc, mpsc},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use lattice_core::overleaf_rt::{OtOp, ot};
@@ -73,7 +79,14 @@ pub(super) struct Live {
     pub(super) sever: Option<bool>,
     /// Sockets cut off that way, to close.
     severed: Vec<String>,
+    /// Sockets gone quiet (`MockOverleaf::go_silent`), by public id.
+    pub(super) silent: Vec<String>,
+    /// The heartbeat timeout the handshake names, when not a minute.
+    pub(super) heartbeat_timeout: Option<u64>,
 }
+
+/// How often every socket that is not silent hears a heartbeat.
+const HEARTBEAT_EVERY: Duration = Duration::from_secs(1);
 
 /// The id a project path's document goes by.
 pub fn doc_id(path: &str) -> String {
@@ -102,8 +115,15 @@ pub(super) fn packed(line: &str) -> String {
 
 /// The handshake's answer: a session id, the heartbeat and close timeouts,
 /// and the transports.
-pub(super) fn handshake() -> Vec<u8> {
-    b"mock-sid:60:60:websocket".to_vec()
+pub(super) fn handshake(live: &Live) -> Vec<u8> {
+    let heartbeat = live.heartbeat_timeout.unwrap_or(60);
+    format!("mock-sid:{heartbeat}:60:websocket").into_bytes()
+}
+
+/// The sockets open now go quiet, staying open.
+pub(super) fn go_silent(live: &mut Live) {
+    let open: Vec<String> = live.sockets.iter().map(|(id, _)| id.clone()).collect();
+    live.silent.extend(open);
 }
 
 /// What the stand-in's realtime side shares with its REST side: the
@@ -140,13 +160,28 @@ pub(super) fn upgrade(
     sender
         .send(event("connectionAccepted", json!([null, public_id])))
         .ok();
+    let mut beat = Instant::now();
     loop {
+        let silent = store.with(|_, live| live.silent.contains(&public_id));
         while let Ok(frame) = outgoing.try_recv() {
+            // Lost on the way, as on a dead connection.
+            if silent {
+                continue;
+            }
             if socket.send(Message::text(frame)).is_err() {
                 return forget(&store, &public_id);
             }
         }
+        if !silent && beat.elapsed() >= HEARTBEAT_EVERY {
+            beat = Instant::now();
+            if socket.send(Message::text("2::")).is_err() {
+                return forget(&store, &public_id);
+            }
+        }
         match socket.read() {
+            // What the app sends on a silent socket never arrives. A close
+            // ends it all the same: the app has given the socket up.
+            Ok(Message::Text(_)) if silent => {}
             Ok(Message::Text(text)) => {
                 for reply in answer_frame(text.as_str(), &public_id, &store) {
                     sender.send(reply).ok();
@@ -166,7 +201,10 @@ pub(super) fn upgrade(
 }
 
 fn forget(store: &Arc<impl Store>, public_id: &str) -> std::io::Result<()> {
-    store.with(|_, live| live.sockets.retain(|(id, _)| id != public_id));
+    store.with(|_, live| {
+        live.sockets.retain(|(id, _)| id != public_id);
+        live.silent.retain(|id| id != public_id);
+    });
     Ok(())
 }
 

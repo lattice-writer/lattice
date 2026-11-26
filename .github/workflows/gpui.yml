@@ -2,13 +2,14 @@ name: GPUI
 
 # The GPUI preview app in gpui/ is a Cargo workspace of its own, built from
 # Zed's crates (about 1,200 of them), and nothing in the Tauri app depends on
-# it. Its builds take 30-60 minutes a run, so a push runs it only when the
-# change reaches what the app builds from (scripts/ci-tier.mjs, `gpui`; the
-# list follows), and a newer push to the branch cancels the older run. It runs
-# in full for a release tag, weekly on main (which keeps its Rust caches
-# warm), for a dispatch on main or with `full`, and for a `CI: full`
-# trailer or the `ci:full` label; ci.yml's header has the rest. `pnpm
-# ci:local` runs the same jobs on a Mac (docs/agent-validation.md).
+# it. Its builds take 30-60 minutes a run. Like ci.yml it runs on GitHub only
+# for a release tag (every job) and by hand: pull requests and pushes run
+# nothing here, `pnpm ci:local` runs the same jobs on a Mac
+# (docs/agent-validation.md), and the nightly e2e runs the whole scenario on
+# main. A dispatch runs the jobs its ref's change needs (scripts/ci-tier.mjs,
+# `gpui`; the list follows), or every job on main, with `full`, a `CI: full`
+# trailer or the `ci:full` label; `-f platform=windows` (or linux, macos)
+# runs that platform's job alone, in full, for the ports' pull requests.
 #
 # The app builds on the backend crate it shares with the Tauri app
 # (src-tauri/lattice-core). The other files outside gpui/ it reads are the
@@ -26,13 +27,14 @@ name: GPUI
 # src/editor/latex/latex-text.ts, and the app's styles, i18n and utilities.
 on:
   push:
-    branches: ["**"]
     tags: ["v*"]
-  schedule:
-    # Monday 06:41 UTC, away from the hour and from ci.yml's weekly run.
-    - cron: "41 6 * * 1"
   workflow_dispatch:
     inputs:
+      platform:
+        description: Run only this platform's job, in full
+        type: choice
+        options: [all, macos, linux, windows]
+        default: all
       full:
         description: Run every job, whatever the branch changed
         type: boolean
@@ -42,9 +44,10 @@ on:
         type: string
         default: ""
 
-# As in ci.yml: one run per branch, the newest; main and tags by commit.
+# As in ci.yml: one run per branch and platform, the newest; main and tags by
+# commit.
 concurrency:
-  group: gpui-${{ github.ref }}-${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && github.sha || 'branch' }}
+  group: gpui-${{ github.ref }}-${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && github.sha || 'branch' }}-${{ inputs.platform || 'all' }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/') }}
 
 permissions:
@@ -67,8 +70,8 @@ env:
 # build took 31 minutes on macOS and 28 on Windows (2026-11-11); everything
 # after it takes about two.
 #
-# The Rust caches are written from main only (the weekly run, or a dispatch
-# there), and only when their key (the lockfile, the toolchain, this job)
+# The Rust caches are written from main only (a dispatch there, which is
+# worth running before a release, since nothing else refreshes them), and only when their key (the lockfile, the toolchain, this job)
 # changes, because the repository's 10 GB Actions cache also holds the Tauri
 # release cache that tag builds restore. A tag run reads main's cache and
 # writes none, since a cache written from a tag is visible to that tag alone.
@@ -92,6 +95,10 @@ jobs:
       macos-local-gpui: ${{ steps.tier.outputs.macos-local-gpui }}
       windows-e2e: ${{ steps.tier.outputs.windows-e2e }}
       linux-e2e: ${{ steps.tier.outputs.linux-e2e }}
+      macos: ${{ steps.tier.outputs.macos }}
+      linux: ${{ steps.tier.outputs.linux }}
+      windows: ${{ steps.tier.outputs.windows }}
+      all-platforms: ${{ steps.tier.outputs.all-platforms }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -100,7 +107,7 @@ jobs:
       - id: tier
         env:
           GH_TOKEN: ${{ github.token }}
-          BEFORE: ${{ github.event.before }}
+          INPUT_PLATFORM: ${{ inputs.platform }}
           INPUT_FULL: ${{ inputs.full }}
           INPUT_BASE: ${{ inputs.base }}
         run: node scripts/ci-tier.mjs --github
@@ -109,7 +116,7 @@ jobs:
   # at run time, so Node alone runs it: no pnpm install.
   code-themes:
     needs: changes
-    if: ${{ !cancelled() && needs.changes.outputs.gpui != 'false' }}
+    if: ${{ !cancelled() && needs.changes.outputs.gpui != 'false' && needs.changes.outputs.all-platforms != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     defaults:
@@ -127,7 +134,7 @@ jobs:
   # them from upstream at their pins and fails unless they match.
   patches:
     needs: changes
-    if: ${{ !cancelled() && needs.changes.outputs.gpui != 'false' }}
+    if: ${{ !cancelled() && needs.changes.outputs.gpui != 'false' && needs.changes.outputs.all-platforms != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -141,7 +148,7 @@ jobs:
   # 65-minute e2e step (the scenario, then one rerun of failed modules).
   macos:
     needs: changes
-    if: ${{ !cancelled() && needs.changes.outputs.gpui != 'false' && needs.changes.outputs.macos-local-gpui != 'true' }}
+    if: ${{ !cancelled() && needs.changes.outputs.gpui != 'false' && needs.changes.outputs.macos != 'false' && needs.changes.outputs.macos-local-gpui != 'true' }}
     runs-on: macos-latest
     timeout-minutes: 140
     steps:
@@ -160,6 +167,8 @@ jobs:
       # no `synctex` binary (its own package, as in lattice-core's TeX Live
       # install), and the e2e scenario's SyncTeX steps run it. mylatexformat
       # makes the preamble format, whose entry check lattice-core tests below.
+      # chemnum, with the chemgreek, translations and psfrag it loads, is
+      # for the pdf_compounds module's chem-check.tex.
       - name: Install TeX Live
         uses: TeX-Live/setup-texlive-action@v4
         with:
@@ -169,6 +178,10 @@ jobs:
             latexmk
             mylatexformat
             synctex
+            chemnum
+            chemgreek
+            translations
+            psfrag
       # TexLab, for the editor's diagnostics, which the e2e scenario checks
       # (the Windows job has none and skips that step).
       - name: Install TexLab
@@ -237,13 +250,13 @@ jobs:
       # page, region by region and pixel by pixel. A report for now, not a
       # gate: these steps never fail the job. The runner's screen shrinks the
       # window (about 1015 px wide), and the reference is drawn at whatever
-      # size and scale the GPUI window got. Since it gates nothing, only the
-      # weekly run and a dispatch write it: every screen in both themes is
+      # size and scale the GPUI window got. Since it gates nothing, only a
+      # dispatch writes it: every screen in both themes is
       # about 25 minutes of Chromium and both renders on the runner, which a
       # push would wait for. run.mjs writes the report after each screen, so
       # a run cut short still leaves what it measured.
       - name: Parity report
-        if: ${{ !cancelled() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && !startsWith(github.ref, 'refs/tags/') }}
+        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/') }}
         continue-on-error: true
         timeout-minutes: 35
         working-directory: .
@@ -252,7 +265,7 @@ jobs:
           node --test gpui/parity/*.test.mjs
           node gpui/parity/run.mjs --out "$RUNNER_TEMP/parity" --app gpui/target/release/lattice-gpui
           sed '/^!\[/d' "$RUNNER_TEMP/parity/report.md" >> "$GITHUB_STEP_SUMMARY"
-      - if: ${{ !cancelled() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && !startsWith(github.ref, 'refs/tags/') }}
+      - if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/') }}
         uses: actions/upload-artifact@v7
         with:
           name: gpui-parity-macos
@@ -265,7 +278,7 @@ jobs:
 
   windows:
     needs: changes
-    if: ${{ !cancelled() && needs.changes.outputs.gpui != 'false' }}
+    if: ${{ !cancelled() && needs.changes.outputs.gpui != 'false' && needs.changes.outputs.windows != 'false' }}
     runs-on: windows-latest
     timeout-minutes: 140
     defaults:
@@ -425,7 +438,7 @@ jobs:
       # rather than by the runner.
       #
       # The whole scenario runs only for a change that can behave
-      # differently on Windows, and for every tag, full run and push to main;
+      # differently on Windows, and for every tag and full run;
       # a change to macOS-only code or files no step reads
       # runs the smoke flow alone (scripts/windows-e2e-tier.mjs). The macOS
       # job, or the CI-local trailer that stands for it, still runs what the
@@ -519,7 +532,7 @@ jobs:
   # X11 child window (gpui-webview's README), which Xvfb is.
   linux:
     needs: changes
-    if: ${{ !cancelled() && needs.changes.outputs.gpui != 'false' }}
+    if: ${{ !cancelled() && needs.changes.outputs.gpui != 'false' && needs.changes.outputs.linux != 'false' }}
     runs-on: ubuntu-22.04
     timeout-minutes: 220
     steps:
@@ -650,12 +663,14 @@ jobs:
       # After the unit tests, so the ignored latexmk build test stays ignored
       # there. Ubuntu's TeX Live: latexmk, pdfTeX and SyncTeX
       # (texlive-binaries), and the recommended set for the fixture's xcolor
-      # and hyperref. No TexLab, as on Windows: the scenario skips its step.
+      # and hyperref, and texlive-science and texlive-latex-extra for chemnum
+      # and the translations package it loads (the pdf_compounds module's
+      # chem-check.tex). No TexLab, as on Windows: the scenario skips its step.
       # Mesa's EGL and GL drivers, for the scenario's GL renderer (below).
       - name: Install TeX Live
         timeout-minutes: 15
         working-directory: .
-        run: .github/scripts/apt-install.sh texlive-latex-base texlive-latex-recommended latexmk libegl1 libegl-mesa0 libgl1-mesa-dri
+        run: .github/scripts/apt-install.sh texlive-latex-base texlive-latex-recommended texlive-science texlive-latex-extra latexmk libegl1 libegl-mesa0 libgl1-mesa-dri
       # As on Windows: the whole scenario, judged against the steps main
       # fails on Linux (scripts/gpui-e2e-known-failures.json), a new failure's
       # module rerun once first, and the text typed before the quit saved.

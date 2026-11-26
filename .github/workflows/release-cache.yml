@@ -14,23 +14,8 @@ name: Release cache
 # This is a cache warmer, not a gate. It fails open — a miss only costs the
 # next release the work it was already paying.
 on:
-  push:
-    branches: [main]
-    # Frontend-only pushes cannot change what this builds. The restore key
-    # ignores the lockfile hash, so releases still restore a cache warmed
-    # several commits ago; it only has to be refreshed when the Rust inputs
-    # actually move.
-    paths:
-      - "src-tauri/Cargo.toml"
-      - "src-tauri/lattice-core/Cargo.toml"
-      - "src-tauri/Cargo.lock"
-      - "rust-toolchain.toml"
-      - "scripts/synara-runtime.json"
-      - "scripts/synara-runtime-inputs.mjs"
-      - "scripts/prepare-synara-sidecar.mjs"
-      - "scripts/synara-codex-host.mjs"
-      - "scripts/lib/*.mjs"
-      - ".github/workflows/release-cache.yml"
+  # Pushes to main run nothing on GitHub (ci.yml's header), so the schedule and
+  # a manual run are what warm these caches.
   # Actions evicts caches untouched for 7 days. Releases are less frequent than
   # that, so refresh it on a schedule to keep releases off the cold path.
   schedule:
@@ -41,49 +26,7 @@ permissions:
   contents: read
 
 jobs:
-  # The two caches have different inputs, and the push filter above is their
-  # union. A Synara pin bump moves only the runtime's: it was 8 of this
-  # workflow's 10 runs in one busy round, and each also rebuilt the Rust
-  # dependency graph on macOS (2.5–11 min), competing with CI's `rust` and
-  # WebKit jobs for the five macOS runners the account gets, for a cache
-  # whose inputs had not moved. So `warm` runs only when a Rust input changed
-  # in this push. The schedule, a manual run, and anything this cannot
-  # classify still run both.
-  changes:
-    runs-on: ubuntu-latest
-    outputs:
-      rust: ${{ steps.classify.outputs.rust }}
-    steps:
-      - if: github.event_name == 'push'
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 2
-      - id: classify
-        env:
-          EVENT: ${{ github.event_name }}
-          BEFORE: ${{ github.event.before }}
-        run: |
-          rust=true
-          # A new branch's BEFORE is all zeros and fetches nothing: warm.
-          if [ "$EVENT" = push ] && { git cat-file -e "$BEFORE^{commit}" 2>/dev/null \
-            || git fetch --quiet --depth=1 origin "$BEFORE"; }; then
-            if changed=$(git -c core.quotePath=false diff --no-renames --name-only "$BEFORE" HEAD); then
-              rust=false
-              while IFS= read -r path; do
-                case "$path" in
-                  src-tauri/Cargo.toml | src-tauri/lattice-core/Cargo.toml | src-tauri/Cargo.lock | rust-toolchain.toml | .github/workflows/release-cache.yml)
-                    echo "rust input: $path"
-                    rust=true ;;
-                esac
-              done <<< "$changed"
-            fi
-          fi
-          echo "rust=$rust" | tee -a "$GITHUB_OUTPUT"
-
   warm:
-    needs: changes
-    # Fails open: a broken classification warms anyway.
-    if: ${{ !cancelled() && needs.changes.outputs.rust != 'false' }}
     runs-on: macos-latest
     # One warm build at a time; a newer commit's cache supersedes an older
     # one. Per job, so a pin bump's runtime build never cancels a dependency

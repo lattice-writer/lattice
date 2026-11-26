@@ -6,6 +6,22 @@ use super::*;
 use lattice_editor::proofread::Ask;
 
 impl EditorPanel {
+    /// Comment on Overleaf, recording where it is drawn.
+    fn recorded_overleaf_button(&self, button: AnyElement) -> AnyElement {
+        let drawn = self.toolbar.overleaf_button.clone();
+        div()
+            .relative()
+            .child(button)
+            .child(
+                canvas(move |bounds, _, _| drawn.set(Some(bounds)), |_, _, _, _| {})
+                    .absolute()
+                    .top_0()
+                    .left_0()
+                    .size_full(),
+            )
+            .into_any_element()
+    }
+
     /// The LaTeX toolbar's buttons.
     pub(super) fn latex_tools(
         &mut self,
@@ -70,6 +86,22 @@ impl EditorPanel {
             }),
             cx,
         ));
+        // In a linked project the note can go to Overleaf instead, as the
+        // PDF's Comment on Overleaf does.
+        if self.toolbar_offers_overleaf_comment() {
+            let button = tool(
+                "latex-comment-overleaf",
+                Icon::LEAF,
+                t!("Comment on Overleaf"),
+                None,
+                false,
+                cx.listener(|this, _, window, cx| {
+                    this.toolbar_action(ToolbarAction::CommentOnOverleaf, window, cx)
+                }),
+                cx,
+            );
+            bar = bar.child(self.recorded_overleaf_button(button));
+        }
         // The agent's Proofread and Polish, and Rewrite by an instruction.
         if self.can_proofread(cx) {
             let proofread_keys = if cfg!(target_os = "macos") {
@@ -315,6 +347,18 @@ impl EditorPanel {
             }),
             cx,
         ))
+        .when(self.toolbar_offers_overleaf_comment(), |bar| {
+            bar.child(self.recorded_overleaf_button(md_tool(
+                "markdown-comment-overleaf",
+                Icon::LEAF,
+                t!("Comment on Overleaf"),
+                None,
+                cx.listener(|this, _, window, cx| {
+                    this.toolbar_action(ToolbarAction::CommentOnOverleaf, window, cx)
+                }),
+                cx,
+            )))
+        })
         .into_any_element()
     }
 }

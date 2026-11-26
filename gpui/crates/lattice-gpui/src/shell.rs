@@ -63,6 +63,7 @@ pub(crate) mod palette_commands;
 mod palette_entries;
 mod palette_groups;
 mod papers;
+mod parent_folder;
 mod parts;
 mod pdf_citations;
 mod pdf_figure;

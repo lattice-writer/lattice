@@ -61,6 +61,10 @@ msgstr "Git 在 {files} 里留下了冲突标记。"
 msgid "Go to the matching \\begin or \\end"
 msgstr "跳到配对的 \\begin 或 \\end"
 
+#: lattice-gpui/src/shell/parent_folder.rs
+msgid "Lattice opened it as a project of its own, with a history of its own. To keep working in a manuscript’s history, open the manuscript’s folder instead."
+msgstr "Lattice 已把它作为独立项目打开，它有自己的历史记录。若要继续使用某篇稿件的历史记录，请改为打开该稿件的文件夹。"
+
 #: lattice-gpui/src/shell/commands.rs
 msgid "Leave the Bibliography layout"
 msgstr "退出参考文献布局"
@@ -72,6 +76,10 @@ msgstr "退出阅读布局"
 #: lattice-gpui/src/shell/commands.rs
 msgid "Leave the Writing layout"
 msgstr "退出写作布局"
+
+#: lattice-gpui/src/shell/parent_folder.rs
+msgid "Make this folder its own project"
+msgstr "将此文件夹设为独立项目"
 
 #: lattice-gpui/src/shell/commands.rs
 msgid "New window"
@@ -96,6 +104,14 @@ msgstr "打开项目"
 #: lattice-gpui/src/shell/commands.rs
 msgid "Open this project in a new window"
 msgstr "在新窗口中打开此项目"
+
+#: lattice-gpui/src/shell/parent_folder.rs
+msgid "Open {project}"
+msgstr "打开 {project}"
+
+#: lattice-gpui/src/shell/parent_folder.rs
+msgid "Open {project} with the whole folder available to the Agent?"
+msgstr "打开 {project}，并让 AI 助手可以使用整个文件夹？"
 
 #: lattice-gpui/src/shell/commands.rs
 msgid "Reading layout"
@@ -137,9 +153,17 @@ msgstr "显示或隐藏终端"
 msgid "Show or hide the build log"
 msgstr "显示或隐藏编译日志"
 
+#: lattice-gpui/src/shell/parent_folder.rs
+msgid "This folder holds several Lattice projects"
+msgstr "此文件夹包含多个 Lattice 项目"
+
 #: lattice-gpui/src/shell/commands.rs
 msgid "Writing layout"
 msgstr "写作布局"
+
+#: lattice-gpui/src/shell/parent_folder.rs
+msgid "{folder} has no Lattice history of its own, and {project} inside it is a Lattice project. Opening {project} keeps its history, settings and builds in {project}/.research, and lets the Agent work in all of {folder}. You can change the Agent’s folder in Settings › Agent › Display."
+msgstr "{folder} 没有自己的 Lattice 历史记录，而其中的 {project} 是一个 Lattice 项目。打开 {project} 会把历史记录、设置和构建保留在 {project}/.research 中，并让 AI 助手可以在整个 {folder} 中工作。你可以在“设置 › AI 助手 › 显示”中更改 AI 助手的文件夹。"
 
 #: lattice-gpui/src/shell/pdf_notes.rs
 msgid "{name} is opening live with Overleaf beside the PDF. Comment again once it has opened."

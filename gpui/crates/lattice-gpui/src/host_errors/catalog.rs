@@ -982,8 +982,8 @@ pub(super) static ENTRIES: &[Entry] = &[
     },
     Entry {
         file: "ipc/diagnostics.rs",
-        literal: "Could not show the diagnostic log in Finder: {error}",
-        text: Text::Message("Could not show the diagnostic log in Finder: {error}", &[("error", Arg::Param(0))]),
+        literal: "Could not show the diagnostic log: {error}",
+        text: Text::Message("Could not show the diagnostic log: {error}", &[("error", Arg::Param(0))]),
     },
     Entry {
         file: "save_before_close.rs",
@@ -1616,12 +1616,12 @@ pub(super) static ENTRIES: &[Entry] = &[
         text: Text::Message("The Overleaf realtime connection closed before the server answered.", &[]),
     },
     Entry {
-        file: "overleaf_rt/client.rs",
+        file: "overleaf_rt/handshake.rs",
         literal: "Could not reach Overleaf ({e}).",
         text: Text::Message("Could not reach Overleaf ({error}).", &[("error", Arg::Param(0))]),
     },
     Entry {
-        file: "overleaf_rt/client.rs",
+        file: "overleaf_rt/handshake.rs",
         literal: "Overleaf refused the realtime handshake (HTTP {}).",
         text: Text::Message("Overleaf refused the realtime handshake (HTTP {status}).", &[("status", Arg::Param(0))]),
     },
@@ -1651,9 +1651,14 @@ pub(super) static ENTRIES: &[Entry] = &[
         text: Text::Message("The Overleaf realtime connection failed: {error}", &[("error", Arg::Param(0))]),
     },
     Entry {
-        file: "overleaf_rt/client.rs",
+        file: "overleaf_rt/client/heartbeat.rs",
         literal: "Overleaf has sent nothing for {}s, so the connection is presumed lost.",
         text: Text::Message("Overleaf has sent nothing for {seconds}s, so the connection is presumed lost.", &[("seconds", Arg::Param(0))]),
+    },
+    Entry {
+        file: "overleaf_rt/client.rs",
+        literal: "The computer slept, so the connection is joined again.",
+        text: Text::Message("The computer slept, so the connection is joined again.", &[]),
     },
     Entry {
         file: "overleaf_rt/client.rs",
@@ -2801,8 +2806,8 @@ pub(super) static ENTRIES: &[Entry] = &[
     },
     Entry {
         file: "ipc/themes.rs",
-        literal: "Could not show the themes folder in Finder: {error}",
-        text: Text::Message("Could not show the themes folder in Finder: {error}", &[("error", Arg::Param(0))]),
+        literal: "Could not show the themes folder: {error}",
+        text: Text::Message("Could not show the themes folder: {error}", &[("error", Arg::Param(0))]),
     },
     Entry {
         file: "ipc/themes.rs",

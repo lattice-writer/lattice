@@ -34,6 +34,6 @@ export const THEMES_HOST_ERRORS: readonly HostErrorEntry[] = [
   ["registry.rs", "{url} is not an https address.", ([url]) => t`${url} is not an https address.`],
   ["registry.rs", "{url} is larger than expected.", ([url]) => t`${url} is larger than expected.`],
   ["registry.rs", "Could not save the theme list: {err}", ([error]) => t`Could not save the theme list: ${error}`],
-  ["ipc/themes.rs", "Could not show the themes folder in Finder: {error}", ([error]) => t`Could not show the themes folder in Finder: ${error}`],
+  ["ipc/themes.rs", "Could not show the themes folder: {error}", ([error]) => t`Could not show the themes folder: ${error}`],
   ["ipc/themes.rs", "Themes can only be installed from a Lattice window.", () => t`Themes can only be installed from a Lattice window.`],
 ];

@@ -1,6 +1,6 @@
 // Help ▸ Report a Problem… (and the palette's "Report a problem"): save the
 // log export Settings › Logs › Export makes by default — redacted, operation
-// metadata and counts only — show it in Finder, and open a new bug report
+// metadata and counts only — show it in the file manager, and open a new bug report
 // with the Lattice and macOS versions filled in.
 //
 // The issue page is public and its address travels through the browser's
@@ -14,12 +14,21 @@
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { msg } from "@lingui/core/macro";
+import type { MessageDescriptor } from "@lingui/core";
 import { version } from "../../package.json";
+import { hostPlatform, type HostPlatform } from "../platform/host-platform";
 import { toMessage } from "../app-utils";
 import { i18n } from "../i18n";
 import { addAppLog, getAppLogEntries } from "../telemetry/app-log-store";
 import { createAppLogExport } from "../telemetry/app-log-export";
 import { getKnownUpdate } from "../telemetry/outdated-version";
+
+/** Where the saved log is shown: Finder names itself; other hosts' file managers vary. */
+const ATTACH_SAVED_LOG: Record<HostPlatform, MessageDescriptor> = {
+  mac: msg`Attach the file shown in Finder to the bug report.`,
+  windows: msg`Attach the file shown in its folder to the bug report.`,
+  linux: msg`Attach the file shown in its folder to the bug report.`,
+};
 
 /** What `save_problem_report` (diagnostic_logs.rs) answers. */
 type ProblemReport = { osVersion: string | null; arch: string };
@@ -66,7 +75,7 @@ async function fileReport(): Promise<void> {
     level: "info",
     source: i18n._(msg`Report a problem`),
     title: i18n._(msg`Diagnostic log saved`),
-    detail: i18n._(msg`Attach the file shown in Finder to the bug report.`),
+    detail: i18n._(ATTACH_SAVED_LOG[hostPlatform()]),
   });
   await openUrl(newIssueUrl(report));
 }

@@ -26,7 +26,8 @@
  *   - the GPUI manifests and toolchain, the workspace's and each crate's
  *     (a crate's Linux-only dependency table moves no line in Cargo.lock);
  *   - the Linux job and what it runs or judges with: gpui.yml, ci-tier.mjs,
- *     this file and windows-e2e-tier.mjs it builds on, the verdict script
+ *     this file and windows-e2e-tier.mjs it builds on (beside a GPUI input;
+ *     alone they run their own tests, ci-tier's selectorOnly), the verdict script
  *     and its main baseline, the known-failure list, the e2e module map and
  *     the stand-in Typst release.
  *
@@ -37,9 +38,8 @@
  *
  * Anything else, platform-neutral app code included, takes the smoke flow on
  * a branch: the macOS job (or the CI-local trailer that stands for it) and
- * Windows run what the diff picks there. Every push to main, tag, schedule
- * and full run takes the whole Linux scenario, so a Linux-only break shows
- * on main the same day.
+ * Windows run what the diff picks there. Every tag and full run takes the
+ * whole Linux scenario.
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";

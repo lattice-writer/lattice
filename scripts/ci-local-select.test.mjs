@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { FULL, TEXT_ONLY, coveredJobs, docsGate, e2eNeeds, findGate, formatTrailer, fullCover, macosNeeds, mainMergeRegate, parseTrailer, resolveCover } from "./ci-local-select.mjs";
+import { FULL, TEXT_ONLY, coveredJobs, dirModules, docsGate, e2eNeeds, findGate, formatTrailer, fullCover, macosNeeds, touchesWebkitBench, mainMergeRegate, parseTrailer, resolveCover } from "./ci-local-select.mjs";
 import { ciTier } from "./ci-tier.mjs";
 
 const covers = new Map([
@@ -26,9 +26,79 @@ describe("ci-local-select: the e2e a change needs", () => {
     expect(e2eNeeds(["gpui/README.md", "gpui/crates/lattice-editor/tests/motion.rs", "gpui/crates/lattice-gpui/src/pdf/tests.rs"], new Map())).toMatchObject({ full: false, modules: [] });
   });
 
+  it("takes the shell's command bindings hunk by hunk when their diff could be read, and the whole scenario otherwise", () => {
+    const file = "gpui/crates/lattice-gpui/src/shell/actions.rs";
+    expect(e2eNeeds([file], covers)).toMatchObject({ full: true, fullBecause: [file] });
+    expect(e2eNeeds([file], covers, { full: true, why: "x" })).toMatchObject({ full: true, fullBecause: [file] });
+    expect(e2eNeeds([file], covers, { full: false, modules: ["pdf"], why: [] })).toMatchObject({ full: false, modules: ["pdf"], why: { pdf: [file] } });
+    expect(e2eNeeds([file], covers, { full: false, modules: [], why: [] })).toMatchObject({ full: false, modules: [] });
+  });
+
+  it("runs the overleaf module for its mock servers, and the smoke flow for the host error catalog and lattice-core's tests", () => {
+    for (const mock of ["overleaf_mock", "overleaf_realtime_mock", "overleaf_review_mock", "overleaf_history_mock"]) expect(e2eNeeds([`gpui/crates/lattice-gpui/src/scenario/${mock}.rs`]), mock).toMatchObject({ full: false, modules: ["overleaf"] });
+    for (const file of ["gpui/crates/lattice-gpui/src/host_errors/catalog.rs", "src-tauri/lattice-core/src/latex/build/tests.rs", "src-tauri/lattice-core/src/latex/synctex/highlighted/tests.rs", "src-tauri/lattice-core/tests/build.rs", "src-tauri/lattice-theme/src/tests.rs"]) expect(e2eNeeds([file]), file).toMatchObject({ full: false, modules: [] });
+    for (const file of ["gpui/crates/lattice-gpui/src/scenario/e2e.rs", "gpui/crates/lattice-gpui/src/scenario/drag.rs", "gpui/crates/lattice-gpui/src/host_errors.rs", "src-tauri/lattice-core/src/latex.rs", "src-tauri/lattice-core/src/testsupport.rs"]) expect(e2eNeeds([file]), file).toMatchObject({ full: true });
+  });
+
+  it("runs what the island config picks for the script that builds the island pages", () => {
+    expect(e2eNeeds(["gpui/script/build-islands"]).modules).toEqual(e2eNeeds(["gpui/islands/vite.config.ts"]).modules);
+    expect(e2eNeeds(["gpui/script/build-islands"])).toMatchObject({ full: false, modules: ["islands", "markdown", "structured"] });
+  });
+
   it("runs the whole scenario for its harness, shared code and anything the table does not map", () => {
     for (const file of ["gpui/crates/lattice-gpui/src/scenario/e2e/registry.rs", "gpui/patches/gpui-fast/crates/gpui/src/window.rs", "gpui/Cargo.lock", "src-tauri/lattice-core/src/lib.rs", "gpui/crates/lattice-gpui/src/shell.rs"]) {
       expect(e2eNeeds([file], covers), file).toMatchObject({ full: true, fullBecause: [file] });
+    }
+  });
+
+  it("maps a file no covers names to the modules that exercise its directory, not the whole scenario", () => {
+    const dirCovers = new Map([
+      ["margin", ["gpui/crates/lattice-gpui/src/editor_panel/margin.rs"]],
+      ["outline", ["gpui/crates/lattice-gpui/src/editor_panel/outline"]],
+      ["card_previews", ["gpui/crates/lattice-gpui/src/card_previews.rs"]],
+      ["pdf", ["gpui/crates/lattice-gpui/src/pdf"]],
+    ]);
+    // Its own module directory (editor_panel/ for editor_panel.rs), else its directory, walking up short of src/.
+    expect(dirModules("gpui/crates/lattice-gpui/src/editor_panel.rs", dirCovers)).toEqual(["margin", "outline"]);
+    expect(dirModules("gpui/crates/lattice-gpui/src/editor_panel/views.rs", dirCovers)).toEqual(["margin", "outline"]);
+    expect(dirModules("gpui/crates/lattice-gpui/src/editor_panel/margin_review/cards.rs", dirCovers)).toEqual(["margin", "outline"]);
+    // A module named for its directory.
+    expect(dirModules("gpui/crates/lattice-gpui/src/card_previews/math_page.rs", dirCovers)).toEqual(["card_previews"]);
+    // Nothing near it: the whole scenario. Never src/ itself, which every module is under.
+    expect(dirModules("gpui/crates/lattice-gpui/src/terminal/panel.rs", dirCovers)).toEqual([]);
+    expect(dirModules("gpui/crates/lattice-gpui/src/flavor.rs", dirCovers)).toEqual([]);
+    expect(e2eNeeds(["gpui/crates/lattice-gpui/src/terminal/panel.rs"], dirCovers)).toMatchObject({ full: true });
+    expect(e2eNeeds(["gpui/crates/lattice-gpui/src/editor_panel.rs"], dirCovers)).toMatchObject({ full: false, modules: ["margin", "outline"] });
+    // The real table: editor_panel.rs (LATA-96) picks modules, not the whole scenario.
+    expect(e2eNeeds(["gpui/crates/lattice-gpui/src/editor_panel.rs"]).full).toBe(false);
+  });
+
+  it("keeps the root view, the native input and pasteboard and lattice-i18n's code whole, and runs the smoke flow for the string catalogs", () => {
+    const shell = ["actions", "views", "parts", "workspaces", "entries", "ground", "editor_events"].map((name) => `gpui/crates/lattice-gpui/src/shell/${name}.rs`);
+    for (const file of ["gpui/crates/lattice-gpui/src/shell.rs", ...shell, "gpui/crates/lattice-gpui/src/native.rs", "gpui/crates/lattice-gpui/src/native/pasteboard.rs", "gpui/crates/lattice-gpui/src/native/input_source.rs", "gpui/crates/lattice-i18n/src/lib.rs", "gpui/crates/lattice-i18n/build.rs"]) {
+      expect(e2eNeeds([file], covers), file).toMatchObject({ full: true });
+    }
+    // unlocalized.txt is the coverage test's list of strings left in English.
+    for (const file of ["src/locales/zh-CN/messages.po", "src/locales/en/messages.json", "gpui/crates/lattice-gpui/src/native_windows.rs"]) {
+      expect(e2eNeeds([file], covers), file).toMatchObject({ full: false, modules: [] });
+    }
+    // settings and find_in_file read the zh-CN catalog.
+    for (const file of ["gpui/crates/lattice-i18n/locales/zh-CN/app.po", "gpui/crates/lattice-i18n/locales/unlocalized.txt"]) {
+      expect(e2eNeeds([file], covers).modules.toSorted(), file).toEqual(["find_in_file", "settings"]);
+    }
+  });
+
+  it("runs every module that types into the shared search field", () => {
+    expect(e2eNeeds(["gpui/crates/lattice-gpui/src/search/field.rs"], covers).modules.toSorted()).toEqual(["documents", "find_in_file", "focus_trap", "insert_pickers", "shortcut_sheet"]);
+  });
+
+  it("runs the whole scenario for a shell/ flow no module covers", () => {
+    expect(dirModules("gpui/crates/lattice-gpui/src/shell/settings_flow.rs", covers)).toEqual([]);
+  });
+
+  it("runs the documents and find_in_file modules for project find and replace", () => {
+    for (const file of ["gpui/crates/lattice-gpui/src/search/find.rs", "gpui/crates/lattice-gpui/src/search/replace.rs"]) {
+      expect(e2eNeeds([file], covers), file).toMatchObject({ full: false, modules: ["documents", "find_in_file"] });
     }
   });
 
@@ -65,7 +135,11 @@ describe("ci-local-select: the e2e a change needs", () => {
 describe("ci-local-select: stages by diff", () => {
   it("leaves the GPUI stages out of a Tauri or web change, and the WebKit benchmark out of a GPUI one", () => {
     expect(needsFor(["src-tauri/src/lib.rs"])).toMatchObject({ rust: true, gpui: false, e2e: null, webkit: false });
-    expect(needsFor(["src/App.tsx"])).toMatchObject({ rust: false, gpui: false, webkit: true });
+    expect(needsFor(["src/App.tsx"])).toMatchObject({ rust: false, gpui: false, webkit: false });
+    expect(needsFor(["scripts/perf-bench/scenarios.mjs"])).toMatchObject({ webkit: true });
+    expect(needsFor(["scripts/perf-bench.mjs", "src/App.tsx"])).toMatchObject({ webkit: true });
+    for (const file of ["tools/perf-bench/bench-page.ts", "tools/mock-backend/server.ts", "scripts/lib/util.mjs", "vite.config.ts"]) expect(touchesWebkitBench([file]), file).toBe(true);
+    for (const file of ["package.json", "pnpm-lock.yaml", "src/App.tsx", "scripts/ci-tier.mjs"]) expect(touchesWebkitBench([file]), file).toBe(false);
     expect(needsFor(["gpui/crates/lattice-gpui/src/pdf/view/notes.rs"])).toMatchObject({ rust: false, gpui: true, webkit: false, e2e: { full: false } });
   });
 
@@ -116,7 +190,10 @@ describe("ci-local-select: the trailer", () => {
   it("takes only the full gate's trailer for a release path", () => {
     const release = needsFor(["gpui/crates/lattice-gpui/src/updater/install.rs", "src-tauri/tauri.conf.json"]);
     expect(coveredJobs(parseTrailer("CI-local: macos 0123456789ab"), release).gpui.reason).toMatch(/release paths .* full gate/);
-    expect(coveredJobs(parseTrailer("CI-local: macos 0123456789ab rust gpui e2e=full"), release).rust.reason).toMatch(/release paths/);
+    // The full gate has no WebKit benchmark unless its tooling changed.
+    expect(coveredJobs(parseTrailer("CI-local: macos 0123456789ab rust gpui e2e=full"), release)).toEqual({ rust: { covered: true }, gpui: { covered: true }, webkit: { covered: true } });
+    expect(coveredJobs(parseTrailer("CI-local: macos 0123456789ab rust e2e=full"), release).rust.reason).toMatch(/release paths/);
+    expect(coveredJobs(parseTrailer("CI-local: macos 0123456789ab rust gpui e2e=full"), needsFor(["src-tauri/tauri.conf.json", "scripts/perf-bench/budgets-webkit.json"])).webkit.reason).toMatch(/no webkit stage/);
     expect(coveredJobs(parseTrailer("CI-local: macos 0123456789ab rust gpui e2e=smoke+pdf webkit"), release).gpui.reason).toMatch(/release paths/);
     const full = parseTrailer(formatTrailer("0123456789ab", { rust: true, gpui: true, e2e: FULL, webkit: true }));
     expect(fullCover(full)).toBe(true);

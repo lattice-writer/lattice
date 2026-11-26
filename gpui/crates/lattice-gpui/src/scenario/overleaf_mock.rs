@@ -59,6 +59,8 @@ pub(super) struct Project {
     pub(super) history_requests: Vec<String>,
     /// The live channel is served.
     realtime: bool,
+    /// Uploads still to answer 429, as Overleaf's rate limit does.
+    rate_limited_uploads: u32,
     pub(super) live: Live,
 }
 
@@ -162,10 +164,29 @@ impl MockOverleaf {
         typed
     }
 
+    /// Answer the next `count` uploads 429 Too Many Requests, with a
+    /// Retry-After past what a request waits out on its own.
+    pub fn rate_limit_uploads(&self, count: u32) {
+        self.project.lock().unwrap().rate_limited_uploads = count;
+    }
+
     /// Drop the live socket at the app's next update, after it lands
     /// (`landed`, its acknowledgement lost) or before it does.
     pub fn sever(&self, landed: bool) {
         self.project.lock().unwrap().live.sever = Some(landed);
+    }
+
+    /// The live sockets open now go quiet while staying open, as one the
+    /// computer slept on does: no heartbeats, no answers, and what the app
+    /// sends on them is lost (`overleaf_realtime_mock`).
+    pub fn go_silent(&self) {
+        realtime::go_silent(&mut self.project.lock().unwrap().live);
+    }
+
+    /// The heartbeat timeout the handshake names from now on, in seconds
+    /// (a minute until this).
+    pub fn heartbeat_timeout(&self, seconds: u64) {
+        self.project.lock().unwrap().live.heartbeat_timeout = Some(seconds);
     }
 
     /// The scripted collaborator suggests `ops` in `path` (tracked
@@ -513,7 +534,7 @@ fn answer(stream: TcpStream, project: Arc<Mutex<Project>>) -> std::io::Result<()
             return realtime::upgrade(stream, &key, project);
         }
         let mut stream = stream;
-        let body = realtime::handshake();
+        let body = realtime::handshake(&project.lock().unwrap().live);
         write!(
             stream,
             "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
@@ -593,6 +614,17 @@ fn answer(stream: TcpStream, project: Arc<Mutex<Project>>) -> std::io::Result<()
             ("GET", p) if p == format!("{project_path}/download/zip") => {
                 (200, "application/zip", None, zip(&project.files))
             }
+            ("POST", p)
+                if p == format!("{project_path}/upload") && project.rate_limited_uploads > 0 =>
+            {
+                project.rate_limited_uploads -= 1;
+                (
+                    429,
+                    "text/plain",
+                    Some("Retry-After: 30".into()),
+                    b"Too Many Requests".to_vec(),
+                )
+            }
             ("POST", p) if p == format!("{project_path}/upload") => {
                 let content_type = headers.get("content-type").cloned().unwrap_or_default();
                 match multipart(&body, &content_type) {
@@ -634,6 +666,7 @@ fn answer(stream: TcpStream, project: Arc<Mutex<Project>>) -> std::io::Result<()
         200 => "OK",
         302 => "Found",
         400 => "Bad Request",
+        429 => "Too Many Requests",
         _ => "Not Found",
     };
     let mut stream = stream;

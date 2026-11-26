@@ -222,15 +222,15 @@ pnpm gate:changed
 ```
 
 `pnpm gate:changed` (`scripts/gate-changed.mjs`) runs lint, typecheck, the i18n
-catalogs, and the tests that `vitest related` finds from what your branch
-changed against `origin/main`, plus the invariant tests no import leads to. It
+catalogs, and the tests of what your branch changed against `origin/main`
+and of the files that import it (two import steps; `vitest related` for a
+stylesheet or JSON file), plus the invariant tests no import leads to. It
 builds no Rust.
 
-A pull request has no required check, local or remote. A push to a branch of
-this repository runs the CI jobs its change needs (`ci.yml`, `gpui.yml`;
-`scripts/ci-tier.mjs` decides), and everything runs for a release tag, weekly
-on main, and on a dispatch with `full`. `pnpm ci:local` runs the same tier on
-your Mac first (docs/agent-validation.md).
+A pull request has no required check, local or remote. GitHub runs CI
+(`ci.yml`, `gpui.yml`) only for a release tag and by hand: `pnpm ci:local`
+on your Mac is the gate, running the tier `scripts/ci-tier.mjs` picks for
+your change (docs/agent-validation.md).
 `pnpm signoff` (`scripts/signoff.mjs`) is an optional, slower local check you
 may run when a change reaches further: the same stages, plus the bundle
 budgets, clippy and the tests of the changed Rust crates, and the GPUI app

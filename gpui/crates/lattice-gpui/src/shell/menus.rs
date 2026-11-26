@@ -14,7 +14,7 @@
 //! attribution Trellis's license asks a shipped app to show, and the
 //! project's website and repository (`about_links.rs`, `macos_about.rs`).
 
-use gpui::{App, Global, Menu, MenuItem, OsAction, SystemMenuType, actions};
+use gpui::{App, AppContext, Global, Menu, MenuItem, OsAction, SystemMenuType, actions};
 use lattice_i18n::tc;
 
 use super::{commands::*, windows};
@@ -37,6 +37,71 @@ fn user_guide_url(locale: lattice_i18n::Locale) -> &'static str {
     } else {
         "https://lattice-writer.github.io/lattice/guide/"
     }
+}
+
+/// How long Help ▸ User Guide waits for the website before it opens the
+/// bundled copy: a network that is off fails at once, a slow one gets this.
+const USER_GUIDE_CHECK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(4);
+
+/// The bundled copy's first page in the interface language.
+fn offline_user_guide(guide: &std::path::Path, locale: lattice_i18n::Locale) -> std::path::PathBuf {
+    if locale.is_chinese() {
+        guide.join("zh-CN/index.html")
+    } else {
+        guide.join("index.html")
+    }
+}
+
+/// Whether the guide's page answers. A real request rather than the
+/// system's reachability flags, which only say a route exists: they read
+/// "reachable" for a host that doesn't resolve, or one a network blocks.
+fn user_guide_answers(url: &str) -> bool {
+    lattice_core::http::blocking_as(
+        concat!("Lattice/", env!("CARGO_PKG_VERSION"), " (GPUI)"),
+        USER_GUIDE_CHECK_TIMEOUT,
+    )
+    .build()
+    .is_ok_and(|client| {
+        client
+            .head(url)
+            .send()
+            .is_ok_and(|response| response.status().is_success())
+    })
+}
+
+/// Help ▸ User Guide: the website's pages, or the copy the bundle carries
+/// (`structured::resources::user_guide_dir`, rendered by
+/// `script/build-islands`) when the website doesn't answer, in the
+/// interface language either way. Without a copy (island pages never
+/// built) the website opens straight away.
+fn open_user_guide(cx: &mut App) {
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    // A second click while the website is still being asked opens nothing:
+    // the first click's page is on its way.
+    static CHECKING: AtomicBool = AtomicBool::new(false);
+    let locale = lattice_i18n::locale();
+    let url = user_guide_url(locale);
+    let Some(guide) = crate::structured::resources::user_guide_dir() else {
+        cx.open_url(url);
+        return;
+    };
+    if CHECKING.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let online = cx.background_spawn(async move { user_guide_answers(url) });
+    cx.spawn(async move |cx| {
+        let online = online.await;
+        CHECKING.store(false, Ordering::SeqCst);
+        cx.update(|cx| {
+            if online {
+                cx.open_url(url);
+            } else {
+                cx.open_with_system(&offline_user_guide(&guide, locale));
+            }
+        });
+    })
+    .detach();
 }
 
 /// The attribution Trellis's license asks a shipped app to show (NOTICE).
@@ -95,7 +160,7 @@ pub fn install(cx: &mut App) {
     cx.on_action(|_: &ShowAll, cx| cx.unhide_other_apps());
     cx.on_action(|_: &NewWindow, cx| windows::new_window(None, None, cx));
     cx.on_action(|_: &About, cx| show_about(cx));
-    cx.on_action(|_: &OpenUserGuide, cx| cx.open_url(user_guide_url(lattice_i18n::locale())));
+    cx.on_action(|_: &OpenUserGuide, cx| open_user_guide(cx));
     cx.on_action(|_: &OpenWebsite, cx| cx.open_url(WEBSITE_URL));
     cx.on_action(|_: &OpenRepository, cx| cx.open_url(REPOSITORY_URL));
     // View ▸ Enter Full Screen (Exit Full Screen in full screen): AppKit's
@@ -383,6 +448,16 @@ mod tests {
         assert_eq!(
             user_guide_url(lattice_i18n::Locale::ZhCn),
             "https://lattice-writer.github.io/lattice/guide/zh-CN/"
+        );
+        let guide =
+            std::path::Path::new("/Applications/Lattice.app/Contents/Resources/islands/guide");
+        assert_eq!(
+            offline_user_guide(guide, lattice_i18n::Locale::En),
+            guide.join("index.html")
+        );
+        assert_eq!(
+            offline_user_guide(guide, lattice_i18n::Locale::ZhCn),
+            guide.join("zh-CN/index.html")
         );
     }
 }

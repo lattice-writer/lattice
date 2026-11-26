@@ -131,15 +131,14 @@ impl Run {
             }),
         );
 
-        // Backing off between joins: coming forward joins now.
+        // Backing off between joins: coming forward joins now. The wait is
+        // spread a fifth either way, so a third join or later says 4–20 s.
         let waiting = self
             .wait_for(cx, Duration::from_secs(30), |shell, cx| {
                 let bridge = shell.read(cx).overleaf.read(cx);
                 bridge.channel() == ChannelStatus::Connecting
                     && bridge.channel_detail().is_some_and(|detail| {
-                        ["in 4 s", "in 8 s", "in 16 s"]
-                            .iter()
-                            .any(|wait| detail.contains(wait))
+                        (4..=20).any(|seconds| detail.contains(&format!("in {seconds} s")))
                     })
             })
             .await;

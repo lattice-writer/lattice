@@ -42,6 +42,11 @@ type BaselineEntry = {
 export type OpenOptions = {
   /** Paper reading mode: infer merged cells in converted tables (R-BLK-11). */
   paperSpans?: boolean;
+  /**
+   * Read `<span style="color: …">` runs as colour marks (inline-color.ts).
+   * Only the native app's editor asks for it; elsewhere they stay raw HTML.
+   */
+  textColors?: boolean;
 };
 
 /** What the last accepted Markdown looked like, block by block. */
@@ -131,6 +136,7 @@ function parseRanges(text: string, schema: Schema, context: string, options: Ope
   collectLabels(tree, labels);
   const parseOptions: ParseOptions = {
     paperSpans: Boolean(options.paperSpans),
+    textColors: Boolean(options.textColors),
     // A component's body is read like a document of its own, against the same definitions.
     parseBody: (inner) => parseRanges(inner, schema, context, options, labels).map((range) => range.json),
     cellKey: (paragraph) => {
@@ -188,8 +194,8 @@ function emptyDocument(schema: Schema): PmNode {
 const OPENED_CACHE_ENTRIES = 4;
 const OPENED_CACHE_CHARS = ENGINE_TEXT_LIMIT;
 const OPENED_CACHE_MIN_CHARS = 20_000;
-// `paperSpans` is the whole of OpenOptions; a new option belongs in the key.
-const openedCache: { text: string; paperSpans: boolean; opened: OpenedMarkdown }[] = [];
+// `paperSpans` and `textColors` are the whole of OpenOptions; a new option belongs in the key.
+const openedCache: { text: string; paperSpans: boolean; textColors: boolean; opened: OpenedMarkdown }[] = [];
 
 /** `node` built again from `schema`'s types, which ProseMirror needs: a document holds only its own schema's nodes. */
 function rebuildNode(node: PmNode, schema: Schema): PmNode {
@@ -216,7 +222,8 @@ function rebuildOpened(opened: OpenedMarkdown, schema: Schema): OpenedMarkdown |
 /** Open Markdown for visual editing, or say why the engine declines it. */
 export function openMarkdown(text: string, schema: Schema, options: OpenOptions = {}): OpenedMarkdown | { unavailable: UnavailableReason } {
   const paperSpans = Boolean(options.paperSpans);
-  const index = openedCache.findIndex((entry) => entry.text === text && entry.paperSpans === paperSpans);
+  const textColors = Boolean(options.textColors);
+  const index = openedCache.findIndex((entry) => entry.text === text && entry.paperSpans === paperSpans && entry.textColors === textColors);
   if (index >= 0) {
     const entry = openedCache.splice(index, 1)[0]!;
     openedCache.unshift(entry);
@@ -225,7 +232,7 @@ export function openMarkdown(text: string, schema: Schema, options: OpenOptions 
   }
   const opened = readMarkdown(text, schema, options);
   if (!("unavailable" in opened) && text.length >= OPENED_CACHE_MIN_CHARS && index < 0) {
-    openedCache.unshift({ text, paperSpans, opened });
+    openedCache.unshift({ text, paperSpans, textColors, opened });
     let chars = 0;
     const kept = openedCache.findIndex((entry, position) => (chars += entry.text.length) > OPENED_CACHE_CHARS || position >= OPENED_CACHE_ENTRIES);
     if (kept > 0) openedCache.length = kept;

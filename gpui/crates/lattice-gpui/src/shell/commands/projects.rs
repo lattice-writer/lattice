@@ -6,7 +6,9 @@
 
 use super::*;
 use crate::shell::history_flow::{OpenHistory, ResolveConflicts};
-use crate::shell::overleaf_flow::{OpenOnOverleaf, OpenOverleafProject, SyncOverleaf};
+use crate::shell::overleaf_flow::{
+    OpenOnOverleaf, OpenOverleafProject, PauseOverleafSync, ResumeOverleafSync, SyncOverleaf,
+};
 
 pub(super) fn project_commands(context: &CommandContext, out: &mut Vec<Command>) {
     out.push(Command::new(
@@ -100,6 +102,30 @@ pub(super) fn project_commands(context: &CommandContext, out: &mut Vec<Command>)
             Section::Overleaf,
             SyncOverleaf,
         ));
+    }
+    // A paused link is not `overleaf_linked` (it may not sync), so Resume
+    // is offered on the pause alone.
+    if context.in_project && context.overleaf_linked {
+        out.push(
+            Command::new(
+                "overleaf-pause",
+                t!("Pause Overleaf sync"),
+                Section::Overleaf,
+                PauseOverleafSync,
+            )
+            .keywords("stop offline hold"),
+        );
+    }
+    if context.in_project && context.overleaf_paused {
+        out.push(
+            Command::new(
+                "overleaf-resume",
+                t!("Resume Overleaf sync"),
+                Section::Overleaf,
+                ResumeOverleafSync,
+            )
+            .keywords("start continue unpause"),
+        );
     }
     if context.in_project && context.overleaf_linked {
         out.push(Command::new(

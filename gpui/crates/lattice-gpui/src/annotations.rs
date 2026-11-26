@@ -39,4 +39,10 @@ pub enum AnnotationRequest {
     /// Ask the agent about the note alone (the composer's Save and revise
     /// now).
     Revise(String),
+    /// Start an Overleaf comment on the selection (the selection toolbar's
+    /// Comment on Overleaf, in a project linked to it).
+    CommentOnOverleaf,
+    /// Post the note as an Overleaf comment on its passage (its card's
+    /// Share to Overleaf).
+    ShareToOverleaf(String),
 }

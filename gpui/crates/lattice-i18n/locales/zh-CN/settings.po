@@ -2,6 +2,10 @@
 msgid "Agent font size"
 msgstr "AI 助手字号"
 
+#: lattice-gpui/src/settings/agent_display_pane.rs
+msgid "Agent’s folder"
+msgstr "AI 助手的文件夹"
+
 #: lattice-gpui/src/settings/editor_pane.rs
 msgid "Beta updates"
 msgstr "Beta 版更新"
@@ -35,6 +39,18 @@ msgid "Not installed. The first Typst build asks to download it."
 msgstr "未安装。首次编译 Typst 时会询问是否下载。"
 
 #: lattice-gpui/src/settings/agent_display_pane.rs
+msgid "Project folder ({name}/)"
+msgstr "项目文件夹（{name}/）"
+
+#: lattice-gpui/src/settings/agent_display_pane.rs
+msgid "The Agent reads and edits files in all of {folder}/. This project’s history, settings and builds stay in {project}/.research."
+msgstr "AI 助手读取和编辑整个 {folder}/ 中的文件。此项目的历史记录、设置和构建仍保留在 {project}/.research 中。"
+
+#: lattice-gpui/src/settings/agent_display_pane.rs
+msgid "The Agent reads and edits files in this project’s folder."
+msgstr "AI 助手读取和编辑此项目文件夹中的文件。"
+
+#: lattice-gpui/src/settings/agent_display_pane.rs
 msgid "The Agent’s conversation and composer, in the panel and in its own window. The editors keep their own size."
 msgstr "AI 助手面板及其独立窗口中的对话和输入框。编辑器保持各自的字号。"
 
@@ -49,3 +65,7 @@ msgstr "Typst 支持"
 #: lattice-gpui/src/settings/agent_display_pane.rs
 msgid "text size zoom larger smaller chat"
 msgstr "文字大小 字体 缩放 放大 缩小 对话"
+
+#: lattice-gpui/src/settings/search.rs
+msgid "working folder parent study analysis scripts access"
+msgstr "工作文件夹 上级 研究 分析 脚本 访问"

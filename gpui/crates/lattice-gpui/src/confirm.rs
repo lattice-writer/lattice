@@ -163,6 +163,15 @@ pub fn ask(question: Confirm, cx: &mut App) {
 }
 
 impl ConfirmHost {
+    /// The question goes unanswered, if it is still the one asked as
+    /// `serial`: a dialog's exit runs its answer after the exit animation,
+    /// and a question asked meanwhile must not be the one it closes.
+    fn close_asked(&mut self, serial: usize, cx: &mut Context<Self>) {
+        if self.serial == serial {
+            self.close(cx);
+        }
+    }
+
     /// The question goes unanswered.
     fn close(&mut self, cx: &mut Context<Self>) {
         let cancel = self.pending.take().and_then(|question| question.on_cancel);
@@ -181,6 +190,23 @@ impl ConfirmHost {
         };
         cx.notify();
         (question.on_confirm)(window, cx);
+        true
+    }
+
+    /// Answer the open question with its second answer, for a scenario.
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+    pub fn choose_alternative(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        let Some(answer) = self
+            .pending
+            .as_ref()
+            .and_then(|question| question.alternative.as_ref())
+            .map(|(_, answer)| answer.clone())
+        else {
+            return false;
+        };
+        self.pending = None;
+        cx.notify();
+        answer(window, cx);
         true
     }
 
@@ -234,6 +260,7 @@ impl Render for ConfirmHost {
             return div().into_any_element();
         };
         let palette = cx.palette().clone();
+        let serial = self.serial;
         let answer = question.on_confirm.clone();
         let mut confirm = Button::new(
             ("confirm-answer", self.serial),
@@ -246,6 +273,9 @@ impl Render for ConfirmHost {
             ("confirm", self.serial),
             cx,
             move |this, window, cx| {
+                if this.serial != serial || this.pending.is_none() {
+                    return;
+                }
                 // Answered: the question goes without its cancel.
                 this.pending = None;
                 cx.notify();
@@ -297,12 +327,15 @@ impl Render for ConfirmHost {
             .on_click(ModalLayer::closing(
                 ("confirm", self.serial),
                 cx,
-                |this, _, cx| this.close(cx),
+                move |this, _, cx| this.close_asked(serial, cx),
             )),
         );
         if let Some((label, answer)) = question.alternative.clone() {
             let button = Button::new(("confirm-alternative", self.serial), label).on_click(
                 ModalLayer::closing(("confirm", self.serial), cx, move |this, window, cx| {
+                    if this.serial != serial || this.pending.is_none() {
+                        return;
+                    }
                     this.pending = None;
                     cx.notify();
                     answer(window, cx);
@@ -325,8 +358,10 @@ impl Render for ConfirmHost {
                 }
                 cx.stop_propagation();
                 let view = cx.entity().downgrade();
-                ModalLayer::leave(("confirm", this.serial), window, cx, move |_, cx| {
-                    view.update(cx, |this, cx| this.close(cx)).ok();
+                let serial = this.serial;
+                ModalLayer::leave(("confirm", serial), window, cx, move |_, cx| {
+                    view.update(cx, |this, cx| this.close_asked(serial, cx))
+                        .ok();
                 });
             }))
             .child(card);
@@ -336,7 +371,8 @@ impl Render for ConfirmHost {
             LayerPlacement::Center,
             keys,
             move |_, cx| {
-                view.update(cx, |this, cx| this.close(cx)).ok();
+                view.update(cx, |this, cx| this.close_asked(serial, cx))
+                    .ok();
             },
         )
         .initial_focus(self.focus.clone())

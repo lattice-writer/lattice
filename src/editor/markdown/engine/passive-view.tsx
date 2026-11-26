@@ -27,7 +27,9 @@ import { localPaperFragment, openMarkdownLink } from "../markdown-link-routing";
 import { useNearViewport } from "../use-near-viewport";
 import type { VisualMarkdownEditorProps } from "../visual-editor-props";
 import { HeadingAnchors, anchorMarks, documentHeadings, type AnchorMark } from "./heading-anchors";
-import type { MarkdownBaseline } from "./markdown-document";
+import { engineSchema } from "./engine-schema";
+import { openMarkdown, type MarkdownBaseline } from "./markdown-document";
+import { openOptions } from "./open-options";
 import { placements } from "./source-map";
 
 /** A read-only document of at least this many blocks (or this much text) opens passive. */
@@ -57,7 +59,7 @@ type PassiveChunk = {
 export type PassiveModel = { chunks: PassiveChunk[]; headings: DocumentHeadingItem[] };
 
 /** The passive layout of a document, or null when it is small enough (or shaped so) to draw whole. */
-export function passiveModel(doc: PmNode, baseline: MarkdownBaseline, textLength: number, paper: boolean): PassiveModel | null {
+function passiveModel(doc: PmNode, baseline: MarkdownBaseline, textLength: number, paper: boolean): PassiveModel | null {
   const { entries } = baseline;
   if (entries.length < 2 || doc.childCount !== entries.length) return null;
   if (entries.length < PASSIVE_MIN_BLOCKS && textLength < PASSIVE_MIN_LENGTH) return null;
@@ -244,4 +246,27 @@ function ChunkEditor({ chunk, labels, reading, onLink, onPage }: {
     },
   }, [extensions]);
   return <EditorContent editor={editor} />;
+}
+
+/** The passive layout for a large read-only document (R-PERF-1), or null to draw it whole. */
+export function passiveFor(text: string, activePath: string, reading = false, textColors = false): PassiveModel | null {
+  const opened = openMarkdown(text, engineSchema(), openOptions({ activePath, optimizeForReading: reading, textColors }));
+  return "unavailable" in opened ? null : passiveModel(opened.doc, opened.baseline, text.length, reading);
+}
+
+/**
+ * The passive view's jump: center the last block starting at or before `line`.
+ * Its chunk may not be drawn yet; then the chunk is brought into view, which
+ * draws it, and the jump is not landed until the block itself is centered.
+ */
+export function revealPassiveLine(layer: HTMLElement | null, model: PassiveModel, line: number): boolean {
+  const chunk = model.chunks.filter((candidate) => candidate.labels[0]!.line <= line).at(-1) ?? model.chunks[0]!;
+  const label = chunk.labels.filter((candidate) => candidate.line <= line).at(-1) ?? chunk.labels[0]!;
+  const block = layer?.querySelector<HTMLElement>(`[data-source-line="${label.line}"]`);
+  if (block) {
+    block.scrollIntoView({ block: "center" });
+    return true;
+  }
+  layer?.querySelector<HTMLElement>(`[data-visual-chunk-id="${chunk.id}"]`)?.scrollIntoView({ block: "center" });
+  return false;
 }

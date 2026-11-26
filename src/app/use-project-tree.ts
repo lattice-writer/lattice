@@ -621,7 +621,7 @@ export function useProjectTree(deps: ProjectTreeDeps) {
     if (!project) return;
     await revealItemInDir(projectItemPath(project.root, relativePath)).catch((reason: unknown) => {
       const message = toMessage(reason);
-      showError(t`Could not show that item in Finder. ${message}`);
+      showError(t`Could not show that item. ${message}`);
     });
   }, [project, t]);
 

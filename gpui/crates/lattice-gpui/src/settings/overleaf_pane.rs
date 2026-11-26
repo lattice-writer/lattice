@@ -504,18 +504,27 @@ fn connection_group(
             )
             .compact()
             .on_click(move |_, _, cx| {
+                // Through the window, as its other controls pause: the
+                // editors are saved and live typing settles first.
                 shell
                     .update(cx, |shell, cx| {
-                        shell
-                            .overleaf
-                            .update(cx, |bridge, cx| bridge.set_paused(!paused, cx));
+                        if paused {
+                            shell.resume_overleaf_sync(cx)
+                        } else {
+                            shell.pause_overleaf_sync(cx)
+                        }
                     })
                     .ok();
-                // The bridge writes the link; read it back once it has.
+                // The bridge writes the link; read it back once it has, and
+                // again after a pause that waited for live typing.
                 let reload = reload.clone();
                 cx.spawn(async move |cx| {
                     cx.background_executor()
                         .timer(std::time::Duration::from_millis(300))
+                        .await;
+                    reload.update(cx, |connection, cx| connection.load(cx));
+                    cx.background_executor()
+                        .timer(std::time::Duration::from_secs(6))
                         .await;
                     reload.update(cx, |connection, cx| connection.load(cx));
                 })

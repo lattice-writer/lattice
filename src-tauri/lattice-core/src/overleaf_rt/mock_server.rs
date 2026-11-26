@@ -61,6 +61,16 @@ pub(crate) struct MockState {
     /// Every update is refused once queued, as a document updater that
     /// failed to apply it would.
     refuse_updates: bool,
+    /// Updates go unanswered from now on: on a socket still heard from (a
+    /// heartbeat follows each), or on one gone silent.
+    unanswered: Option<Heard>,
+}
+
+/// What a socket that leaves updates unanswered still sends.
+#[derive(Clone, Copy, PartialEq)]
+pub(crate) enum Heard {
+    Heartbeats,
+    Nothing,
 }
 
 /// A mock serving `project`, where every document starts out reading
@@ -123,6 +133,11 @@ pub(crate) fn doc_texts(state: &Arc<Mutex<MockState>>) -> Vec<(String, String)> 
 /// Refuse every update from now on, after acknowledging it was queued.
 pub(crate) fn refuse_updates(state: &Arc<Mutex<MockState>>) {
     lock(state).refuse_updates = true;
+}
+
+/// Leave every update unanswered from now on.
+pub(crate) fn leave_updates_unanswered(state: &Arc<Mutex<MockState>>, heard: Heard) {
+    lock(state).unanswered = Some(heard);
 }
 
 /// A collaborator makes `ops` to document `id` right after we next join it.
@@ -245,6 +260,10 @@ fn serve_websocket<S: Read + Write>(mut ws: WebSocket<S>, state: Arc<Mutex<MockS
             // which is exactly the case the client has to survive.
             "joinProject" if push_join => Ok(()),
             "joinProject" => send(&mut ws, ack_frame(&id, json!([null, project, "owner", 2]))),
+            "applyOtUpdate" if lock(&state).unanswered == Some(Heard::Heartbeats) => {
+                send(&mut ws, encode_frame(FRAME_HEARTBEAT, "", "", ""))
+            }
+            "applyOtUpdate" if lock(&state).unanswered == Some(Heard::Nothing) => Ok(()),
             "joinDoc" if !lock(&state).docs.is_empty() => {
                 join_kept_doc(&mut ws, &state, &id, &frame.data)
             }

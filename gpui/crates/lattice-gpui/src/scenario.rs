@@ -20,6 +20,8 @@ use crate::{editor_panel::EditorPanel, native, shell::Shell};
 mod capture;
 mod drag;
 mod e2e;
+#[cfg(all(target_os = "macos", feature = "offscreen-shots"))]
+mod idle;
 mod input_lock;
 #[cfg(target_os = "macos")]
 mod measure;
@@ -120,6 +122,8 @@ pub fn start(shell: Entity<Shell>, window: AnyWindowHandle, args: ScenarioArgs, 
             "ime" => run.ime(cx).await,
             #[cfg(target_os = "macos")]
             "memory" => run.memory(cx).await,
+            #[cfg(all(target_os = "macos", feature = "offscreen-shots"))]
+            "idle" => run.idle(cx).await,
             #[cfg(target_os = "macos")]
             "ime-protocol" => run.ime_protocol(cx).await,
             #[cfg(any(target_os = "macos", target_os = "linux"))]

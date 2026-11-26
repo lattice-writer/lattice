@@ -342,7 +342,7 @@ impl Flow<'_> {
             target: "lattice::tex-setup",
             "Installed TeX Live {} in {}",
             windows_pins::TEX_LIVE_YEAR,
-            location.texdir.display()
+            crate::host_paths::log_path(&location.texdir)
         );
         Ok(())
     }
@@ -513,7 +513,7 @@ impl Flow<'_> {
             target: "lattice::tex-setup",
             "Installed managed uv {} in {}",
             crate::commands::MANAGED_UV_VERSION,
-            destination.display()
+            crate::host_paths::log_path(&destination)
         );
         self.send("installing-tools", end);
         self.verify_uv()

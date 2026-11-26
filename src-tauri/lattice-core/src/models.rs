@@ -64,6 +64,12 @@ pub struct ProjectManifest {
     pub grammar_ignored_sentences: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub submission_items: Vec<SubmissionItem>,
+    /// The folder the Agent works in when it is a folder above the project,
+    /// as the levels up from the project's root (`..`, `../..`), so the
+    /// setting moves with the folders (`project/agent_folder.rs`). Unset, the
+    /// Agent works in the project's own folder.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_folder: Option<String>,
     /// Keys this build does not read, written back as they were: a newer
     /// Lattice's settings, or the term rules and English variant an earlier
     /// one's Terms panel kept here.

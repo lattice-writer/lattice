@@ -14,6 +14,10 @@
 //!   the editor with Keep mine / Keep theirs / Keep both on the spot;
 //! - manual mode badges new work on Overleaf, and Review changes lists it
 //!   and applies it;
+//! - pausing sync holds each side's edits, and resuming merges them
+//!   (`pause_resume`);
+//! - a sync Overleaf rate-limits is owed quietly and goes up after the
+//!   cool-down (`rate_limit`);
 //! - Settings › Overleaf says who is signed in and which project syncs;
 //! - a project the Tauri app linked somewhere else opens from that folder,
 //!   and syncs there, instead of downloading again (`local_copy`).
@@ -21,6 +25,7 @@
 #![cfg(target_os = "macos")]
 
 mod chat;
+mod editor_comments;
 mod live;
 mod local_copy;
 mod margin;
@@ -29,14 +34,17 @@ mod margin_visual;
 mod margin_walk;
 mod markdown_review;
 mod network_return;
+mod pause_resume;
 mod pdf_note;
 mod polish;
 mod presence;
 mod project_history;
+mod rate_limit;
 mod reconnect;
 mod review;
 mod review_marks;
 mod review_panel;
+mod sleep;
 
 use std::{path::Path, time::Duration};
 
@@ -473,6 +481,7 @@ impl Run {
         linked.overleaf_live(cx, steps, &mock).await?;
         linked.overleaf_reconnect(cx, steps, &mock).await?;
         linked.overleaf_network_return(cx, steps, &mock).await?;
+        linked.overleaf_sleep(cx, steps, &mock).await?;
         linked.overleaf_review(cx, steps, &mock).await?;
         linked.overleaf_markdown_review(cx, steps, &mock).await?;
         linked.overleaf_chat(cx, steps, &mock).await?;
@@ -481,6 +490,8 @@ impl Run {
         let root = linked.root(cx).await?;
         linked.overleaf_margin_walk(cx, steps, &mock, &root)
             .await?;
+        linked.overleaf_pause_resume(cx, steps, &mock).await?;
+        linked.overleaf_rate_limit(cx, steps, &mock).await?;
 
         // Settings › Overleaf.
         linked.with_window(cx, |shell, window, cx| {
@@ -544,6 +555,7 @@ pub(super) const MODULE: super::registry::Module = super::registry::Module {
     covers: &[
         "gpui/crates/lattice-gpui/src/overleaf",
         "gpui/crates/lattice-gpui/src/shell/overleaf_flow.rs",
+        "gpui/crates/lattice-gpui/src/shell/overleaf_collab.rs",
     ],
     run: |run, cx, steps, fixture| Box::pin(run.overleaf(cx, steps, &fixture.root)),
 };

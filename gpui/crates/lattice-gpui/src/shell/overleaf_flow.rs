@@ -46,7 +46,19 @@ use crate::{
     },
 };
 
-actions!(lattice, [OpenOverleafProject, SyncOverleaf, OpenOnOverleaf]);
+/// The longest a pause waits for live typing to be answered.
+const PAUSE_SETTLE: std::time::Duration = std::time::Duration::from_secs(5);
+
+actions!(
+    lattice,
+    [
+        OpenOverleafProject,
+        SyncOverleaf,
+        OpenOnOverleaf,
+        PauseOverleafSync,
+        ResumeOverleafSync
+    ]
+);
 
 /// The window's Overleaf dialogs, while they are open.
 #[derive(Default)]
@@ -55,6 +67,8 @@ pub(crate) struct OverleafLayers {
     review: Option<(Entity<OverleafReview>, Subscription)>,
     /// Saving the window's editors before a sync or an upload.
     pending: Option<Task<()>>,
+    /// Saving and settling the live document before a pause.
+    pausing: Option<Task<()>>,
     /// The control's icon as last drawn, and how many times it changed:
     /// each change fades the new one in.
     swap: Cell<Option<(&'static str, u32)>>,
@@ -81,6 +95,20 @@ impl Shell {
             use futures::StreamExt as _;
             while returns.next().await.is_some() {
                 let heard = listening.update(cx, |bridge, _| bridge.network_came_back());
+                if heard.is_err() {
+                    break;
+                }
+            }
+        })
+        .detach();
+        // So does the system waking from sleep, and a live channel joins
+        // again: its socket may have died meanwhile.
+        let mut wakes = crate::overleaf::network::wakes();
+        let listening = bridge.downgrade();
+        cx.spawn(async move |_, cx| {
+            use futures::StreamExt as _;
+            while wakes.next().await.is_some() {
+                let heard = listening.update(cx, |bridge, _| bridge.system_woke());
                 if heard.is_err() {
                     break;
                 }
@@ -157,6 +185,21 @@ impl Shell {
                 self.open_settings(Some(SettingsTab::Overleaf), window, cx)
             }
             OverleafBridgeEvent::PresenceChanged => self.show_overleaf_carets(cx),
+            // What was edited while paused was kept on disk here and
+            // against the last sync's copy there, so this sync merges both
+            // sides line by line and leaves a clash marked up, as any sync.
+            // Resumed from Settings in manual mode: Review changes comes to
+            // the front rather than opening behind Settings.
+            OverleafBridgeEvent::Resumed => {
+                let bridge = self.overleaf.read(cx);
+                let opens_review = bridge.mode() == OverleafSyncMode::Manual
+                    && bridge.link().is_some()
+                    && !bridge.syncing();
+                if opens_review && self.settings.is_some() {
+                    self.close_settings(cx);
+                }
+                self.sync_overleaf(window, cx)
+            }
         }
     }
 
@@ -309,6 +352,61 @@ impl Shell {
         } else {
             self.run_overleaf_sync(cx);
         }
+    }
+
+    /// Pause syncing this project (the status bar's slot, the project
+    /// menu, the palette): the link and the last sync's copy stay, and
+    /// edits stay on this Mac until it resumes.
+    pub(crate) fn pause_overleaf_sync(&mut self, cx: &mut Context<Self>) {
+        let bridge = self.overleaf.read(cx);
+        if bridge.link().is_none() || bridge.paused() {
+            return;
+        }
+        let Some(root) = self.root(cx) else { return };
+        // What is typed but not yet on disk is part of what resuming
+        // merges, so it is saved first.
+        let saved = self.save_before_leaving(cx);
+        self.overleaf_layers.pausing = Some(cx.spawn(async move |this, cx| {
+            if let Some(saved) = saved {
+                saved.await;
+            }
+            // Typing still going out, or an answer Overleaf still owes, is
+            // waited for, so the live document leaves the channel with an
+            // agreed copy: closed with an update in flight, its outcome is
+            // unknown, and resuming could mark up a clash on text only this
+            // Mac edited. A channel that never answers is waited on no
+            // longer than PAUSE_SETTLE.
+            let deadline = std::time::Instant::now() + PAUSE_SETTLE;
+            while std::time::Instant::now() < deadline {
+                let sending = this
+                    .update(cx, |this, cx| this.overleaf.read(cx).live_sending())
+                    .unwrap_or(false);
+                if !sending {
+                    break;
+                }
+                cx.background_executor()
+                    .timer(std::time::Duration::from_millis(100))
+                    .await;
+            }
+            this.update(cx, |this, cx| {
+                // Switched to another project meanwhile: the pause was
+                // asked of this one, not the one shown now.
+                if this.root(cx).as_deref() != Some(root.as_path()) {
+                    return;
+                }
+                this.overleaf
+                    .update(cx, |bridge, cx| bridge.set_paused(true, cx));
+            })
+            .ok();
+        }));
+    }
+
+    pub(crate) fn resume_overleaf_sync(&mut self, cx: &mut Context<Self>) {
+        self.overleaf.update(cx, |bridge, cx| {
+            if bridge.paused() {
+                bridge.set_paused(false, cx);
+            }
+        });
     }
 
     /// Save the window's editors, then sync.

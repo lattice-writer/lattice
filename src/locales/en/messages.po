@@ -2674,6 +2674,10 @@ msgstr "At the limit"
 msgid "Attach the file shown in Finder to the bug report."
 msgstr "Attach the file shown in Finder to the bug report."
 
+#: src/app/report-problem.ts
+msgid "Attach the file shown in its folder to the bug report."
+msgstr "Attach the file shown in its folder to the bug report."
+
 #: src/papers/literature-discovery-panel.tsx
 msgid "Attention Is All You Need, diffusion, …"
 msgstr "Attention Is All You Need, diffusion, …"
@@ -5243,16 +5247,16 @@ msgstr "Could not search the TeX Live repository: {error}"
 
 #: src/app/file-open-failure.ts
 #: src/app/use-project-tree.ts
-msgid "Could not show that item in Finder. {message}"
-msgstr "Could not show that item in Finder. {message}"
+msgid "Could not show that item. {message}"
+msgstr "Could not show that item. {message}"
 
 #: src/platform/host-errors-workspace.ts
-msgid "Could not show the diagnostic log in Finder: {error}"
-msgstr "Could not show the diagnostic log in Finder: {error}"
+msgid "Could not show the diagnostic log: {error}"
+msgstr "Could not show the diagnostic log: {error}"
 
 #: src/platform/host-errors-themes.ts
-msgid "Could not show the themes folder in Finder: {error}"
-msgstr "Could not show the themes folder in Finder: {error}"
+msgid "Could not show the themes folder: {error}"
+msgstr "Could not show the themes folder: {error}"
 
 #: src/platform/host-errors-setup.ts
 msgid "Could not start {program}: {error}"
@@ -15390,12 +15394,15 @@ msgstr "Show document outline"
 msgid "Show hidden files"
 msgstr "Show hidden files"
 
-#: src/app/file-open-failure.ts
-#: src/history/export-changes-dialog.tsx
-#: src/project/arxiv-export-dialog.tsx
-#: src/project/journal-export.ts
-#: src/project/paper-row.tsx
-#: src/project/project-file-tree.tsx
+#: src/platform/file-manager-label.ts
+msgid "Show in File Explorer"
+msgstr "Show in File Explorer"
+
+#: src/platform/file-manager-label.ts
+msgid "Show in File Manager"
+msgstr "Show in File Manager"
+
+#: src/platform/file-manager-label.ts
 msgid "Show in Finder"
 msgstr "Show in Finder"
 
@@ -16893,6 +16900,10 @@ msgstr "The commented file is no longer open live with Overleaf. Try again."
 #: src/platform/host-errors-workspace.ts
 msgid "The compiled output is not a valid PDF."
 msgstr "The compiled output is not a valid PDF."
+
+#: src/platform/host-errors-overleaf.ts
+msgid "The computer slept, so the connection is joined again."
+msgstr "The computer slept, so the connection is joined again."
 
 #. placeholder {0}: result.disagreements.map(fieldText).join(", ")
 #: src/papers/bibliography-audit.tsx

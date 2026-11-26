@@ -142,8 +142,17 @@ const synaraSettingsTarget = (value: unknown): SynaraSettingsTarget | undefined 
  * source control), the host context and paper library it reads, and the
  * message protocol it speaks with the host.
  */
-export function useSynaraHost({ project, projectRef, agentVisible, bridge, appearance }: {
+/** What the agent frame's messages pass through at its edge, both ways. */
+export type SynaraFrameEdge = { toFrame: (message: object) => object; fromFrame: (data: unknown) => unknown };
+
+export function useSynaraHost({ project, projectRef, agentVisible, bridge, appearance, frameEdge = null }: {
   project: ProjectSnapshot | null;
+  /**
+   * The native app's translation for an agent frame working in a folder
+   * above the project (lattice#1293, agent-folder-view.ts): everything here
+   * stays the project's, and only the frame sees its own folder.
+   */
+  frameEdge?: SynaraFrameEdge | null;
   projectRef: { readonly current: ProjectSnapshot | null };
   agentVisible: boolean;
   bridge: SynaraHostBridge;
@@ -188,6 +197,7 @@ export function useSynaraHost({ project, projectRef, agentVisible, bridge, appea
   const frameReady = frameKey !== null && readyFrame?.key === frameKey && readyFrame.load === frameLoad;
   const frameLoading = useCallback(() => setFrameLoad((load) => load + 1), []);
   const projectRootRef = useLatestRef(project?.root ?? null);
+  const frameEdgeRef = useLatestRef(frameEdge);
   const latest = useRef({
     bridge,
     agentVisible,
@@ -230,8 +240,8 @@ export function useSynaraHost({ project, projectRef, agentVisible, bridge, appea
         };
       }
     }
-    frameRef.current?.contentWindow?.postMessage(message, origin);
-  }, [origin, projectRootRef]);
+    frameRef.current?.contentWindow?.postMessage(frameEdgeRef.current?.toFrame(message) ?? message, origin);
+  }, [frameEdgeRef, origin, projectRootRef]);
   // A prompt waits for the frame to say it is ready, so a panel opened by the
   // request that carries it still gets it. Only the latest one is kept.
   const pendingComposerPromptRef = useRef<AgentComposerPromptMessage | null>(null);
@@ -448,7 +458,8 @@ export function useSynaraHost({ project, projectRef, agentVisible, bridge, appea
     };
     const receive = (event: MessageEvent) => {
       if (event.source !== frameRef.current?.contentWindow || event.origin !== origin) return;
-      const data = event.data as MessageData | null;
+      const edge = frameEdgeRef.current;
+      const data = (edge ? edge.fromFrame(event.data) : event.data) as MessageData | null;
       const host = latest.current;
       const handler = typeof data?.type === "string" ? handlers[data.type] : undefined;
       if (data && handler) {
@@ -467,7 +478,7 @@ export function useSynaraHost({ project, projectRef, agentVisible, bridge, appea
     };
     window.addEventListener("message", receive);
     return () => window.removeEventListener("message", receive);
-  }, [origin, postMessage, projectRef, projectRootRef]);
+  }, [frameEdgeRef, origin, postMessage, projectRef, projectRootRef]);
 
   // The theme travels over the bridge rather than the frame URL, so a tint or
   // an accent dragged in the color picker repaints the agent without

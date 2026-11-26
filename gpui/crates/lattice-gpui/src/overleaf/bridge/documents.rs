@@ -143,6 +143,14 @@ impl OverleafBridge {
             .is_some_and(|doc| doc.send.is_some() || !doc.ot.settled())
     }
 
+    /// Some document's last send has no proven outcome, so regular sync is
+    /// paused on it (`uncertain`), for a scenario that checks a drop was
+    /// taken as one.
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+    pub fn unconfirmed(&self) -> bool {
+        !self.documents.uncertain.is_empty()
+    }
+
     /// `path` is live with typing still coalescing: its buffer is ahead of
     /// the positions review has for it until the typing is handed over.
     pub fn typing_unsent(&self, path: &str) -> bool {
@@ -234,12 +242,7 @@ impl OverleafBridge {
     /// leaving any other.
     pub(super) fn reconsider_live(&mut self, cx: &mut Context<Self>) {
         let wanted = self.wanted_live(cx);
-        let current = self.documents.live.as_ref().map(|doc| &doc.editor).or(self
-            .documents
-            .joining
-            .as_ref()
-            .map(|joining| &joining.editor));
-        if wanted.as_ref().map(|(editor, _, _)| editor) == current {
+        if wanted.as_ref().map(|(editor, _, _)| editor) == self.live_editor() {
             return;
         }
         // A join still out is left once Overleaf answers it.
@@ -287,6 +290,16 @@ impl OverleafBridge {
     }
 
     /// The editor, path and document id to be live now, if any.
+    /// The editor of the document live, or being joined.
+    fn live_editor(&self) -> Option<&WeakEntity<EditorPanel>> {
+        let live = self.documents.live.as_ref().map(|doc| &doc.editor);
+        live.or(self
+            .documents
+            .joining
+            .as_ref()
+            .map(|joining| &joining.editor))
+    }
+
     fn wanted_live(&self, cx: &App) -> Option<(WeakEntity<EditorPanel>, String, String)> {
         if self.staged
             || self.documents.switching
@@ -298,6 +311,11 @@ impl OverleafBridge {
             return None;
         }
         let weak = self.documents.shown.clone()?;
+        // A running sync may be reconciling this file: a fresh join waits
+        // (`after_sync_documents` asks again); one live or joining stays.
+        if self.syncing && self.live_editor() != Some(&weak) {
+            return None;
+        }
         let editor = weak.upgrade()?;
         let path = editor.read(cx).relative().to_string();
         let held = self.documents.held.iter().any(|doc| doc.path == path);

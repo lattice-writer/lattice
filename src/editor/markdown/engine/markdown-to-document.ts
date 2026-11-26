@@ -24,6 +24,7 @@ import {
 } from "./mdx-components";
 import { parseMarkdownTree, UPPERCASE_CHECK } from "./markdown-syntax";
 import { extendPhrasing, PAPER_HREF, type Phrasing } from "./inline-syntax";
+import { spanColor } from "./inline-color";
 import { inferPaperSpans, looksLikeLayoutMarker, readLayoutMarker, spansFit, type Span } from "./table-spans";
 
 /** Thrown inside a block the engine cannot model; the block is kept raw. */
@@ -34,6 +35,8 @@ type Mark = NonNullable<JSONContent["marks"]>[number];
 export type ParseOptions = {
   /** Infer merged cells from repeated labels (paper reading mode, R-BLK-11). */
   paperSpans: boolean;
+  /** Read colour spans as colour marks (OpenOptions.textColors). */
+  textColors: boolean;
   /** Parse a component's body, a nested run of blocks, into node JSON. */
   parseBody: (body: string) => JSONContent[];
   /** The meaning of a table cell's content, to compare cells for spans. */
@@ -153,6 +156,7 @@ function componentRange(children: RootContent[], index: number, context: Context
   if (!/^<[A-Z]/.test(context.source.slice(from, from + 2))) return null;
   const open = readOpenTag(context.source, from);
   if (!open) return null;
+  if (context.textColors && child.type === "paragraph" && spanColor(context.source.slice(from, open.end))) return null;
   let to: number;
   let last = index;
   let inner: string | null = null;
@@ -459,7 +463,7 @@ function tableNode(node: Table, context: Context, layout: Span[] | null): JSONCo
 // --- Inline -----------------------------------------------------------------
 
 function inline(children: PhrasingContent[], marks: Mark[], context: Context): JSONContent[] {
-  return extendPhrasing(children, context.source).flatMap((child) => phrasing(child, marks, context));
+  return extendPhrasing(children, context.source, context.textColors).flatMap((child) => phrasing(child, marks, context));
 }
 
 const marked = (node: JSONContent, marks: Mark[]): JSONContent => (marks.length ? { ...node, marks } : node);
@@ -523,6 +527,11 @@ function extended(node: Phrasing, marks: Mark[], context: Context): JSONContent[
       return inline((node.children ?? []) as unknown as PhrasingContent[], [...marks, { type: "highlight" }], context);
     case "latticeUnderline":
       return inline((node.children ?? []) as unknown as PhrasingContent[], [...marks, { type: "underline" }], context);
+    case "latticeColor": {
+      const { color, openTag, closeTag } = node;
+      const outerMarks = marks.map((mark) => mark.type).join(" ") || null;
+      return inline((node.children ?? []) as unknown as PhrasingContent[], [...marks, { type: "latticeColor", attrs: { color, openTag, closeTag, outerMarks } }], context);
+    }
     case "latticeWiki": {
       const target = String(node.target);
       return [marked({ type: "latticeWikiLink", attrs: { target, source: node.value, sourceKey: target } }, marks)];

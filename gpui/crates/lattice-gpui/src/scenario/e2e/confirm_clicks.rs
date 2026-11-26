@@ -28,7 +28,10 @@ enum Outcome {
 }
 
 impl Run {
-    /// Ask a question over Settings and give back what becomes of it.
+    /// Ask a question over Settings, wait until its buttons are drawn, and
+    /// give back what becomes of it. A fixed pause was too short on a slow
+    /// runner (llvmpipe on Linux, WARP on Windows): the dialog was not drawn
+    /// yet, so a click found no button and Return reached Settings.
     async fn ask_over_settings(&self, cx: &mut AsyncApp) -> Rc<Cell<Outcome>> {
         lattice_ui::parity::forget("confirm/");
         let outcome = Rc::new(Cell::new(Outcome::Open));
@@ -44,12 +47,25 @@ impl Run {
                 cx,
             )
         });
-        self.pause(cx, Duration::from_millis(600)).await;
+        self.wait_for(cx, Duration::from_secs(5), |_, _| {
+            ["cancel", "answer"].iter().all(|name| Self::drawn_button(name).is_some())
+        })
+        .await;
+        // The dialog's entry, so the press lands on where the button rests.
+        self.pause(cx, Duration::from_millis(300)).await;
         outcome
     }
 
+    /// Wait until the question is answered, or give up after a while.
+    async fn wait_answered(&self, cx: &mut AsyncApp, outcome: &Rc<Cell<Outcome>>) {
+        self.wait_for(cx, Duration::from_secs(5), |_, cx| {
+            outcome.get() != Outcome::Open && !confirm::is_pending(cx)
+        })
+        .await;
+    }
+
     /// The centre of the dialog's button drawn as `confirm/<name>`.
-    fn confirm_button(&self, name: &str) -> Option<gpui::Point<gpui::Pixels>> {
+    fn drawn_button(name: &str) -> Option<gpui::Point<gpui::Pixels>> {
         lattice_ui::parity::regions()
             .get(format!("confirm/{name}").as_str())
             .and_then(|region| region.bounds)
@@ -85,11 +101,11 @@ impl Run {
             ("answer", Outcome::Confirmed),
         ] {
             let outcome = self.ask_over_settings(cx).await;
-            let at = self.confirm_button(name);
+            let at = Self::drawn_button(name);
             if let Some(at) = at {
                 self.click_at(cx, at)?;
+                self.wait_answered(cx, &outcome).await;
             }
-            self.pause(cx, Duration::from_millis(600)).await;
             let (asking, settings) = self.confirm_state(cx);
             steps.check(
                 &format!(
@@ -110,7 +126,7 @@ impl Run {
 
         let outcome = self.ask_over_settings(cx).await;
         self.dispatch_keys(cx, "enter")?;
-        self.pause(cx, Duration::from_millis(600)).await;
+        self.wait_answered(cx, &outcome).await;
         let (asking, settings) = self.confirm_state(cx);
         steps.check(
             "Return on a question asked over Settings answers as Cancel does, as the dialog starts on Cancel",
@@ -159,7 +175,11 @@ impl Run {
                 cx,
             )
         });
-        self.pause(cx, Duration::from_millis(600)).await;
+        self.wait_for(cx, Duration::from_secs(5), |_, _| {
+            ["cancel", "answer"].iter().all(|name| Self::drawn_button(name).is_some())
+        })
+        .await;
+        self.pause(cx, Duration::from_millis(300)).await;
 
         let viewport_height =
             self.with_window(cx, |_, window, _| f32::from(window.viewport_size().height))?;
@@ -197,7 +217,7 @@ impl Run {
 
         if let Some(rect) = cancel_bounds {
             self.click_at(cx, rect.center())?;
-            self.pause(cx, Duration::from_millis(600)).await;
+            self.wait_answered(cx, &outcome).await;
         }
         let still_asking = cx.update(|cx| confirm::is_pending(cx));
         steps.check(

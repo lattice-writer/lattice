@@ -5,6 +5,13 @@
 //! watched (`SCNetworkReachability`, on a thread running its own run loop),
 //! and each time it turns reachable every window's bridge hears it; the
 //! window coming forward stays the other prompt, as it is there.
+//!
+//! The system waking from sleep is told the same way (`wakes`,
+//! `NSWorkspaceDidWakeNotification` on macOS): the socket the channel slept
+//! on may be dead without knowing it, so a live channel joins again rather
+//! than wait for its heartbeat watchdog, and one waiting out its backoff
+//! joins now. The Tauri app has no such prompt; there the watchdog alone
+//! finds the dead socket.
 
 use std::sync::{Mutex, OnceLock};
 
@@ -79,3 +86,53 @@ fn watch() {
 
 #[cfg(not(target_os = "macos"))]
 fn watch() {}
+
+static WAKE_LISTENERS: Mutex<Vec<mpsc::UnboundedSender<()>>> = Mutex::new(Vec::new());
+
+/// A stream of the system waking from sleep, from now on. Called on the
+/// main thread, where AppKit posts the notification.
+pub fn wakes() -> mpsc::UnboundedReceiver<()> {
+    static WATCHING: OnceLock<()> = OnceLock::new();
+    WATCHING.get_or_init(watch_wake);
+    let (sender, receiver) = mpsc::unbounded();
+    if let Ok(mut listeners) = WAKE_LISTENERS.lock() {
+        listeners.push(sender);
+    }
+    receiver
+}
+
+/// The system woke: every listener hears it (also what a scenario calls,
+/// as the system would).
+pub fn announce_wake() {
+    if let Ok(mut listeners) = WAKE_LISTENERS.lock() {
+        listeners.retain(|listener| listener.unbounded_send(()).is_ok());
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn watch_wake() {
+    use block2::RcBlock;
+    use objc2::{class, msg_send, rc::Retained, runtime::AnyObject};
+    use objc2_foundation::NSString;
+
+    let woke = RcBlock::new(|_: *mut AnyObject| announce_wake());
+    let name = NSString::from_str("NSWorkspaceDidWakeNotification");
+    // SAFETY: NSWorkspace's own notification centre, which posts its wake
+    // on the main thread; with no queue the block runs right there, and
+    // only sends on channels. The observer is kept for the app's lifetime.
+    unsafe {
+        let workspace: Retained<AnyObject> = msg_send![class!(NSWorkspace), sharedWorkspace];
+        let center: Retained<AnyObject> = msg_send![&*workspace, notificationCenter];
+        let observer: Option<Retained<AnyObject>> = msg_send![
+            &*center,
+            addObserverForName: &*name,
+            object: std::ptr::null::<AnyObject>(),
+            queue: std::ptr::null::<AnyObject>(),
+            usingBlock: &*woke
+        ];
+        std::mem::forget(observer);
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn watch_wake() {}

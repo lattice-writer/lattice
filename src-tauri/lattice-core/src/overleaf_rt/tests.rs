@@ -1,4 +1,4 @@
-use super::client::{lock, merge_cookies};
+use super::client::lock;
 use super::codec::*;
 use super::events::*;
 use super::mock_server::*;
@@ -34,7 +34,7 @@ fn wait_until(secs: u64, mut ready: impl FnMut() -> bool) -> bool {
 }
 
 /// The first recorded event `pick` accepts, waiting up to `secs` for one.
-fn wait_for<T>(
+pub(super) fn wait_for<T>(
     events: &Events, secs: u64, mut pick: impl FnMut(&RealtimeEvent) -> Option<T>,
 ) -> Option<T> {
     let mut found = None;
@@ -203,18 +203,6 @@ fn origins_switch_scheme_for_websockets() {
     assert_eq!(ws_origin("http://127.0.0.1:8080"), "ws://127.0.0.1:8080");
     assert!(normalize_origin("overleaf.com").is_err());
     assert!(normalize_origin("  ").is_err());
-}
-
-#[test]
-fn cookies_from_the_handshake_join_the_ones_we_had() {
-    // A new cookie is appended, an existing one is replaced in place, and
-    // anything without a name is ignored.
-    let handed_back = ["ol-affinity=instance-7; Path=/; HttpOnly", "other=2; Path=/", "; Path=/"];
-    assert_eq!(
-        merge_cookies("overleaf_session2=abc; other=1", &handed_back.map(String::from)),
-        "overleaf_session2=abc; other=2; ol-affinity=instance-7"
-    );
-    assert_eq!(merge_cookies("session=x", &[]), "session=x");
 }
 
 // -- payload shapes ---------------------------------------------------------
@@ -550,18 +538,6 @@ fn comment_operations_never_reach_the_text_stream() {
 }
 
 // -- end to end against a mock socket.io 0.9 server -------------------------
-
-#[test]
-fn a_server_that_goes_quiet_past_its_heartbeat_timeout_is_reported_lost() {
-    // The mock never sends a heartbeat after joining: a half-open socket.
-    let (host, _state) = start_mock_with(false, 1);
-    let (_client, events) = connect(mock_config(&host, "overleaf_session2=test-cookie"));
-    let lost = wait_for(&events, 5, |event| match event {
-        RealtimeEvent::Disconnected { reason } => Some(reason.clone()),
-        _ => None,
-    });
-    assert!(lost.is_some_and(|reason| reason.contains("sent nothing")), "{:?}", lock(&events));
-}
 
 #[test]
 fn joins_a_project_the_server_pushes_without_being_asked() {

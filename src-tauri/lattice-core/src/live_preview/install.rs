@@ -266,7 +266,7 @@ pub fn install(on_progress: &dyn Sink<InstallProgress>) -> Result<InstallStatus,
     log::info!(
         target: "lattice::live-preview",
         "Installed rtex {RTEX_VERSION} in {}",
-        destination.display()
+        crate::host_paths::log_path(&destination)
     );
     send("complete", 1.0);
     Ok(status())
