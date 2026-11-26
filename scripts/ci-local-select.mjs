@@ -63,6 +63,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ACTIONS_FILE, actionsDiff, actionsNeeds } from "./gpui-actions-e2e.mjs";
 import { readModules } from "./gpui-e2e-modules.mjs";
+import { codeStream, streamable } from "./lib/token-stream.mjs";
 import { harnessInputs } from "./perf-bench/harness-inputs.mjs";
 
 export const FULL = "full";
@@ -75,90 +76,41 @@ const WEBKIT_BENCH_TOOLING = /^(scripts\/perf-bench(\.mjs|\/)|tools\/(mock-backe
 const NOT_BENCH_TOOLING = /^(src\/|package\.json$|pnpm-lock\.yaml$|\.github\/actions\/setup-pnpm\/)/;
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-// Where a line comment is `//` and a block comment `/* … */`, and where a
-// run of spaces never changes the meaning outside a string.
-const SLASH_COMMENTS = /\.(rs|[cm]?[jt]sx?|css)$/;
-// Where it is `#`, and indentation can matter: shell, Python, TOML, and the
-// extensionless scripts that start with a #! line. Not YAML, whose block
-// scalars hold `#` lines as data.
-const HASH_COMMENTS = /\.(sh|py|toml)$/;
 // Comments a tool reads: a type checker's, a linter's or formatter's, a
-// bundler's or the test runner's directive.
-const DIRECTIVE = /@(ts-|vitest-|jest-|jsx|vite-ignore|__PURE__)|#__PURE__|eslint|oxlint|prettier|biome|webpack|rustfmt|clippy|noqa|type:\s*ignore|shellcheck|cspell/;
+// bundler's or the test runner's directive, clippy's SAFETY note.
+const DIRECTIVE = /@(ts-|vitest-|jest-|jsx|vite-ignore|__PURE__)|#__PURE__|<reference|eslint|oxlint|prettier|biome|webpack|rustfmt|clippy|SAFETY:|noqa|pragma|cspell/;
+// A diff this wide is not a comment fix; reading every file would only slow the plan.
+const COMMENT_SCAN_MAX = 200;
+// Each base's text of a file, read once per run (macosNeeds and the gate ask more than once).
+const baseTexts = new Map();
 
 /**
  * Whether the change to `file` from `base` to the working tree is only
- * comments and whitespace, so building and linting it is the whole check: a
- * full-line comment added, edited or removed (`//`, a `/* … *\/` block whose
- * inner lines start with `*`, or `#`), a blank line, or, where a run of
- * spaces never matters (SLASH_COMMENTS), a change in the amount of space
- * (`git diff -b`). A new, deleted or unreadable file, a directive comment
- * (DIRECTIVE), a #! line, or any other line is not. Conservative: a trailing
- * comment after code counts as code.
+ * comments and the spacing between tokens, so building and linting it is the
+ * whole check: its code streams (scripts/lib/token-stream.mjs, for
+ * JavaScript, TypeScript, Rust and CSS) are the same before and after, and so
+ * are its directive comments (DIRECTIVE). A new, deleted or unreadable file,
+ * or any other language, is not.
  */
 export function commentOnlyEdit(base, file, cwd = repoRoot) {
-  const git = gitIn(cwd);
-  let before;
-  let after;
+  if (!streamable(file)) return false;
+  const key = `${cwd}\0${base}\0${file}`;
   try {
-    before = git("show", `${base}:${file}`);
-    after = readFileSync(path.join(cwd, file), "utf8");
+    if (!baseTexts.has(key)) baseTexts.set(key, execFileSync("git", ["show", `${base}:${file}`], { cwd, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"] }));
+    const before = baseTexts.get(key);
+    const after = readFileSync(path.join(cwd, file), "utf8");
+    const directives = (text) => text.split("\n").filter((line) => DIRECTIVE.test(line)).map((line) => line.trim()).join("\n");
+    return codeStream(file, before) === codeStream(file, after) && directives(before) === directives(after);
   } catch {
+    // A file new since base, or unreadable: code.
     return false;
   }
-  const slash = SLASH_COMMENTS.test(file);
-  const hash = HASH_COMMENTS.test(file) || (!path.basename(file).includes(".") && after.startsWith("#!"));
-  if (!slash && !hash) return false;
-  const diff = git("diff", "-U0", "--no-color", "--no-ext-diff", ...(slash ? ["-b", "--ignore-blank-lines"] : []), base, "--", file);
-  const lines = { "-": before.split("\n"), "+": after.split("\n") };
-  let at = { "-": 0, "+": 0 };
-  for (const line of diff.split("\n")) {
-    const hunk = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
-    if (hunk) {
-      at = { "-": Number(hunk[1]), "+": Number(hunk[2]) };
-      continue;
-    }
-    const sign = line[0];
-    if ((sign !== "-" && sign !== "+") || line.startsWith("---") || line.startsWith("+++")) continue;
-    // -U0 hunks name the first changed line; a pure removal or addition names the line before it.
-    const side = lines[sign];
-    const index = (at[sign] || 1) - 1;
-    at[sign] += 1;
-    const text = line.slice(1).trim();
-    if (text === "") continue;
-    if (DIRECTIVE.test(text)) return false;
-    if (hash ? !(text.startsWith("#") && !text.startsWith("#!")) : !(text.startsWith("//") || inBlockComment(side, index))) return false;
-  }
-  return true;
 }
 
-/**
- * Whether line `index` of `lines` lies in a block comment written the usual
- * way: a line that is a whole `/* … *\/`, or within an opener line that starts
- * with `/*` and does not close, inner lines that start with `*`, and a closer
- * that starts with `*` and ends the comment. A line like `*ptr = 1;` after
- * a closed comment is code.
- */
-function inBlockComment(lines, index) {
-  const text = (i) => (lines[i] ?? "").trim();
-  if (/^\/\*.*\*\/$/.test(text(index)) && !text(index).slice(2, -2).includes("*/")) return true;
-  if (!text(index).startsWith("/*") && !text(index).startsWith("*")) return false;
-  let open = index;
-  while (open >= 0 && !text(open).startsWith("/*")) {
-    if (!text(open).startsWith("*") || (open < index && text(open).includes("*/"))) return false;
-    open -= 1;
-  }
-  if (open < 0 || text(open).includes("*/")) return false;
-  for (let close = Math.max(index, open + 1); close < lines.length; close += 1) {
-    if (!text(close).startsWith("*")) return false;
-    if (text(close).includes("*/")) return text(close).endsWith("*/") && text(close).indexOf("*/") === text(close).length - 2;
-  }
-  return false;
-}
-
-/** The changed files whose change is only comments and whitespace (commentOnlyEdit). */
+/** The changed files whose change is only comments and spacing (commentOnlyEdit); none for a diff over COMMENT_SCAN_MAX files. */
 export function commentOnlyEdits(base, files, cwd = repoRoot) {
-  return new Set(base ? files.filter((file) => existsSync(path.join(cwd, file)) && commentOnlyEdit(base, file, cwd)) : []);
+  if (!base || files.length > COMMENT_SCAN_MAX) return new Set();
+  return new Set(files.filter((file) => streamable(file) && existsSync(path.join(cwd, file)) && commentOnlyEdit(base, file, cwd)));
 }
 
 /** Whether these files change the WebKit benchmark itself. */

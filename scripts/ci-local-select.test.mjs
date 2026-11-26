@@ -411,17 +411,12 @@ describe.skipIf(process.platform === "win32")("ci-local-select: the docs-only pa
 });
 
 describe("ci-local-select: a change of comments and whitespace only", () => {
-  it("is only full-line comments, blank lines and, outside the #-languages, spacing; never code, a directive or a #! line", () => {
+  it("is only comments and the spacing between tokens; never text in a string, a directive, a new file or another language", () => {
     const dir = mkdtempSync(path.join(tmpdir(), "comment-only-"));
     const git = (...args) => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd: dir, encoding: "utf8" });
-    const rust = ["/// Adds one.", "fn add(x: i32) -> i32 {", "    x + 1", "}", "/**", " * The pointer.", " */", "fn set(p: &mut i32) {", "    *p = 1;", "}", ""].join("\n");
-    const files = {
-      "a.rs": rust,
-      "b.ts": "export const x = 1;\n",
-      "e2e": "#!/bin/sh\n# Runs it.\necho hi\n",
-      "c.py": "if True:\n    x = 1\n",
-      "d.yml": "a: 1\n",
-    };
+    const rust = ["/// Adds one.", "fn add(x: i32) -> i32 {", "    x + 1", "}", "/**", " * The pointer.", " */", "fn set(p: &mut i32) {", "    *p = 1;", "}", 'const JS: &str = r#"', "// one", '"#;', "fn life<'a>(s: &'a str) -> char { let _ = s; 'x' }", ""].join("\n");
+    const script = ["/** Doc. */", "export function f() {", "  return 1;", "}", "export const s = `", "// one", "/* two */", "`;", 'export const t = "a b";', ""].join("\n");
+    const files = { "a.rs": rust, "b.ts": script, "c.css": ".a { color: blue; }\n", "e2e": "#!/bin/sh\n# Runs it.\necho hi\n", "d.yml": "a: 1\n" };
     try {
       for (const [file, text] of Object.entries(files)) writeFileSync(path.join(dir, file), text);
       git("init", "-q");
@@ -435,16 +430,22 @@ describe("ci-local-select: a change of comments and whitespace only", () => {
       };
       expect(edit("a.rs", rust.replace("/// Adds one.", "/// Adds one to x.\n// Kept small."))).toBe(true);
       expect(edit("a.rs", rust.replace(" * The pointer.", " * The pointer\n * it writes."))).toBe(true);
-      expect(edit("a.rs", rust.replace("    x + 1", "        x + 1\n\n"))).toBe(true);
+      expect(edit("a.rs", rust.replace("    x + 1", "        x + 1 // one more\n\n"))).toBe(true);
       expect(edit("a.rs", rust.replace("    x + 1", "    x + 2"))).toBe(false);
       expect(edit("a.rs", rust.replace("    *p = 1;", "    *p = 2;"))).toBe(false);
-      expect(edit("a.rs", rust.replace("    x + 1", "    x + 1 // one"))).toBe(false);
-      expect(edit("a.rs", rust.replace("    x + 1", "    x+1"))).toBe(false);
-      expect(edit("b.ts", "// @ts-expect-error\nexport const x = 1;\n")).toBe(false);
-      expect(edit("b.ts", "// The answer.\nexport const x = 1;\n")).toBe(true);
-      expect(edit("e2e", "#!/bin/sh\n# Runs it, then says so.\necho hi\n")).toBe(true);
-      expect(edit("e2e", "#!/bin/bash\n# Runs it.\necho hi\n")).toBe(false);
-      expect(edit("c.py", "if True:\n  x = 1\n")).toBe(false);
+      expect(edit("a.rs", rust.replace("\n// one\n", "\n// one, edited\n"))).toBe(false);
+      expect(edit("a.rs", rust.replace("'x'", "'y'"))).toBe(false);
+      expect(edit("a.rs", rust.replace("fn set", "// SAFETY: none needed.\nfn set"))).toBe(false);
+      expect(edit("b.ts", script.replace("/** Doc. */", "/** Doc, longer. */\n// Note."))).toBe(true);
+      expect(edit("b.ts", script.replace("  return 1;", "  return (\n    1\n  );"))).toBe(false);
+      expect(edit("b.ts", script.replace("  return 1;", "  return\n  1;"))).toBe(false);
+      expect(edit("b.ts", script.replace("// one", "// one, edited"))).toBe(false);
+      expect(edit("b.ts", script.replace("/* two */", "/*  two */"))).toBe(false);
+      expect(edit("b.ts", script.replace('"a b"', '"a  b"'))).toBe(false);
+      expect(edit("b.ts", "// @ts-expect-error\n" + script)).toBe(false);
+      expect(edit("c.css", "/* Blue. */\n.a  {\n  color: blue;\n}\n")).toBe(true);
+      expect(edit("c.css", "// note\n.a { color: blue; }\n")).toBe(false);
+      expect(edit("e2e", "#!/bin/sh\n# Runs it, then says so.\necho hi\n")).toBe(false);
       expect(edit("d.yml", "# A.\na: 1\n")).toBe(false);
       writeFileSync(path.join(dir, "new.rs"), "// New.\n");
       expect(commentOnlyEdit("HEAD", "new.rs", dir)).toBe(false);
@@ -453,8 +454,8 @@ describe("ci-local-select: a change of comments and whitespace only", () => {
     }
   });
 
-  it("runs no e2e and no WebKit benchmark when every GPUI file changed only that way, and the e2e for the rest", () => {
-    // Against HEAD, an untouched file has an empty diff: a change of nothing but spacing.
+  it("runs no e2e and no WebKit benchmark when every GPUI file is unchanged in code, and the e2e for the rest", () => {
+    // Against HEAD, a file this checkout has not touched has the same code stream.
     const file = "gpui/crates/lattice-gpui/src/main.rs";
     const other = "gpui/crates/lattice-gpui/src/pdf/new_file_not_in_head.rs";
     expect(macosNeeds(ciTier([file], { scan }), [file], "HEAD")).toMatchObject({ gpui: true, e2e: null });
