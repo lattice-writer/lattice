@@ -26,6 +26,12 @@ notes or updater metadata. Authenticode and Windows updater work remain separate
 
 ## Cut a release
 
+Before tagging, warm main's Rust caches: pushes to main run no CI on GitHub,
+so nothing else refreshes them, and the tag's `ci.yml` and `gpui.yml` jobs
+otherwise build cold. Run `gh workflow run ci.yml --ref main` (and
+`gh workflow run gpui.yml --ref main` for a release that ships the GPUI app)
+and let it finish before you push the tag.
+
 ```bash
 node scripts/bump-version.mjs patch     # or: minor | major | 0.3.0
 ```
