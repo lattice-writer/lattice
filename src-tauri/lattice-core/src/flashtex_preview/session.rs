@@ -158,7 +158,7 @@ impl Session {
         log::info!(
             target: "lattice::flashtex-preview",
             "Copied {} for FlashTeX in {} ms",
-            crate::host_paths::log_path(&root),
+            crate::host_paths::log_path(root),
             started.elapsed().as_millis()
         );
 
@@ -215,7 +215,7 @@ impl Session {
         log::info!(
             target: "lattice::flashtex-preview",
             "Started FlashTeX session {id} for {} ({})",
-            crate::host_paths::log_path(&root),
+            crate::host_paths::log_path(root),
             engine.format()
         );
         let connection = Connection {
