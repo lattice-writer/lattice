@@ -23,6 +23,9 @@
  *              every test in src/platform/invariant-tests.json, which read
  *              stylesheets and fixtures, or run scripts, no import graph leads
  *              to (the React Compiler guard among them)
+ *   shallow    those tests that are under scripts/ again, in a one-commit
+ *              copy with no origin/main, as CI's test job checks out a tag
+ *              (scripts/shallow-tests.mjs)
  *
  * Without it, agents assembled their own lists of test files, took 9–20
  * minutes a run, and still missed both real CI failures of a round: each was
@@ -185,6 +188,7 @@ export function gateStages(files) {
   // The changed sources' own tests and their importers' (scripts/lib/import-graph.mjs);
   // a stylesheet, a JSON file or a deleted file keeps vitest related's whole closure.
   const near = code.length ? nearTests(code, importers(repo)) : { tests: [], unknown: [] };
+  const scriptsTests = near.tests.filter((file) => file.startsWith("scripts/"));
   return [
     { name: "lint", why: "oxlint, src and tools", command: "pnpm", args: ["lint"], timeout: 180_000 },
     { name: "knip", why: "unused files, exports and dependencies", command: "pnpm", args: ["knip"], timeout: 180_000 },
@@ -234,6 +238,9 @@ export function gateStages(files) {
       args: ["exec", "vitest", "related", "--run", "--passWithNoTests", ...near.unknown, ...near.tests, ...invariantTests()],
       timeout: 900_000,
     },
+    scriptsTests.length
+      ? { name: "shallow", why: `${scriptsTests.length} scripts test(s) in a one-commit copy with no origin/main, as CI's test job`, command: "node", args: ["scripts/shallow-tests.mjs", ...scriptsTests], timeout: 600_000 }
+      : { name: "shallow", skip: "no scripts test near the change" },
   ];
 }
 

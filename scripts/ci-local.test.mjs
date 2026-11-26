@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { CHUNKED_BUILD, docsStages, holderRunsE2e, holdingInappLock, localStages } from "./ci-local.mjs";
 import { CHUNKS } from "./gpui-main-baseline.mjs";
 import { ciTier } from "./ci-tier.mjs";
-import { runStages } from "./gate-changed.mjs";
+import { gateStages, runStages } from "./gate-changed.mjs";
 
 const repo = path.resolve(import.meta.dirname, "..");
 const lock = path.join(repo, "scripts", "inapp-lock");
@@ -102,6 +102,15 @@ describe.skipIf(process.platform === "win32")("ci:local", () => {
       else process.env.GIT_ALTERNATE_OBJECT_DIRECTORIES = savedAlternates;
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  it("reruns the scripts tests near a change in a one-commit copy, as CI's test job checks out a tag", () => {
+    const shallow = (files) => gateStages(files).find((stage) => stage.name === "shallow");
+    const scripts = shallow(["scripts/ci-tier.mjs"]);
+    expect(scripts.args.slice(0, 1)).toEqual(["scripts/shallow-tests.mjs"]);
+    expect(scripts.args).toContain("scripts/ci-tier.test.mjs");
+    expect(scripts.args.slice(1).every((file) => file.startsWith("scripts/"))).toBe(true);
+    expect(shallow(["src/components/ui/popup-motion.ts"]).skip).toBeTruthy();
   });
 
   it("runs the docs-only profile without a stage that opens a window, and builds", () => {
