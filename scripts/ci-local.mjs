@@ -17,7 +17,10 @@
  *   rust                 rustfmt, clippy with warnings denied and `cargo test`
  *                        on the changed Tauri crates
  *   perf-bench           also the WebKit benchmark against its ceilings, as
- *                        CI's macOS perf-bench-webkit shards run it
+ *                        CI's macOS perf-bench-webkit shards run it, only
+ *                        when the benchmark's own tooling changed
+ *                        (WEBKIT_BENCH_TOOLING): it measures the classic app,
+ *                        frozen on macOS, and holds the in-app lock
  *   gpui                 rustfmt, the release build, the unit tests and the
  *                        e2e scenario, judged like CI's against
  *                        scripts/gpui-e2e-known-failures.json and against a
@@ -41,7 +44,7 @@
  * screen under them.
  *
  * When every stage passes and the change needed a macOS job, it prints a
- * `CI-local: macos <tree> rust gpui e2e=… webkit` trailer naming the stages
+ * `CI-local: macos <tree> rust gpui e2e=… [webkit]` trailer naming the stages
  * that ran. Pushed on a commit whose tree is that one, it lets CI skip each
  * macOS job (Rust, GPUI, the WebKit benchmark) those stages cover for the
  * diff; anything they do not cover still runs there, and Linux and Windows
@@ -64,8 +67,8 @@
  *
  * A change to a release path (RELEASE_PATHS: release workflows, bundle and
  * signing configuration, the updater) always runs every stage, with no quick
- * re-gate, and its trailer records the full gate (`rust gpui e2e=full
- * webkit`), the only one CI takes for a release path. The release itself is
+ * re-gate, and its trailer records the full gate (`rust gpui e2e=full`), the
+ * only one CI takes for a release path. The release itself is
  * still built and checked for real on GitHub when its tag is pushed.
  *
  * Options:
@@ -206,7 +209,7 @@ export function localStages(tier, files, mergeBase, e2eNeed = macosNeeds(tier, f
     };
     stages.push(e2e);
   }
-  if (jobs["perf-bench"]) {
+  if (macosNeeds(tier, files).webkit) {
     stages.push({
       name: "webkit-bench",
       why: "the WebKit benchmark and layout checks against their ceilings, as CI's macOS shards",
@@ -324,7 +327,7 @@ async function main() {
     return;
   }
   console.log(`ci:local: every stage passed in ${minutes} min`);
-  if (!tier.jobs.rust && !tier.jobs.gpui && !tier.jobs["perf-bench"]) return;
+  if (!tier.jobs.rust && !tier.jobs.gpui && !needs.webkit) return;
   if (stages.some((stage) => stage.skip === "opens windows; --headless")) {
     console.log("ci:local: --headless skipped the stages that open windows; run it whole on a Mac that may open windows for the CI-local trailer");
     return;
@@ -336,7 +339,7 @@ async function main() {
   const tree = git("rev-parse", "HEAD^{tree}").slice(0, 12);
   const cover = regate
     ? { ...regate.cover, regate: regate.gate.slice(0, 9) }
-    : { rust: tier.jobs.rust, gpui: tier.jobs.gpui, e2e: needs.e2e && (needs.e2e.full ? FULL : needs.e2e.modules), webkit: tier.jobs["perf-bench"] };
+    : { rust: tier.jobs.rust, gpui: tier.jobs.gpui, e2e: needs.e2e && (needs.e2e.full ? FULL : needs.e2e.modules), webkit: needs.webkit };
   const head = git("rev-parse", "HEAD").slice(0, 9);
   console.log(
     regate
