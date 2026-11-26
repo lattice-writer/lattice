@@ -177,6 +177,27 @@ export function readableColor(hex: string, dark: boolean): string {
   return `#${rgb.map((c) => Math.round(Math.min(1, Math.max(0, gam(c))) * 255).toString(16).padStart(2, "0")).join("").toUpperCase()}`;
 }
 
+const luminance = (hex: string) => {
+  const [r, g, b] = [1, 3, 5].map((at) => lin(parseInt(hex.slice(at, at + 2), 16) / 255));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const contrast = (a: string, b: string) => {
+  const [x, y] = [luminance(a), luminance(b)];
+  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+};
+
+/** The paper's ink, which a light editor draws a highlight's text in. */
+const PAPER_INK = "#242426";
+
+/**
+ * The ink for text on a fill of `hex` in a light editor: the paper's black
+ * ink, or white where white has the higher WCAG contrast with the fill (a
+ * `\colorbox{blue}`), so the text on any fill reads at least as well as either.
+ */
+export function inkOn(hex: string): string {
+  return contrast(hex, "#FFFFFF") > contrast(hex, PAPER_INK) ? "#FFFFFF" : PAPER_INK;
+}
+
 /** Only what is on screen is read, with this margin either side. */
 const MARGIN = 2000;
 

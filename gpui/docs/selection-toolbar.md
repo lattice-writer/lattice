@@ -23,11 +23,11 @@ The draft is held in HSV, so dragging to black and back keeps the hue.
 Inside a highlight, Remove highlight takes it off.
 The meanings, the pen's colour and the custom colours belong to the writer, not to a project, and are kept in `highlighters.json` in the app's state folder.
 
-A highlight is written as `\colorbox[HTML]{…}{…}`, and the editor paints its passage in its colour, with the wrapper receding behind a swatch of its colour, as the Tauri app's source does.
-Only `#RRGGBB` highlights are painted; a hand-typed `\colorbox{yellow}{…}` or soul's `\hl{…}` keeps the source's own colours.
+A highlight is written as `\colorbox[HTML]{…}{…}`, and the editor paints its passage in its colour, with the wrapper receding behind a swatch of its colour, as the Tauri app's source paints a toolbar highlight.
+An `[HTML]` colour and one of xcolor's base names (a hand-typed `\colorbox{yellow}{…}`, the names `\color` takes in [the source editor](editor.md)) are painted; another colour and soul's `\hl{…}` keep the source's own colours.
 A `\colorbox` is a box TeX never breaks across lines, so the source paints its passage only while it stands on one row: once the editor's soft wrap breaks it, it keeps its swatch and receding wrapper and loses the paint, and it is painted again when a wider window puts it back on one row (lattice#1327).
 In a `.tex` file's Visual view each `\colorbox` is drawn as that box: the whole command stays on one line, running past it as an overfull box would when it is longer, with its passage filled square in its colour and 3pt (`\fboxsep`) either side; soul's `\hl` is left inline.
-In the light theme the passage takes the highlight's tint under dark ink; in the dark theme it takes an 18% wash of the colour with a 2px underline at 75%, since a pastel block would put light ink on a light ground.
+In the light theme the passage takes the highlight's tint under the paper's dark ink, or under white where white reads better on the fill (a `\colorbox{blue}`, in the source and on the Visual page alike); in the dark theme it takes an 18% wash of the colour with a 2px underline at 75%, since a pastel block would put light ink on a light ground.
 The paint reads only the lines in view and 2,000 characters either side, as the Tauri app's does, and reads again once the lines in view go past them, whether the view scrolled, grew or folded.
 
 ## In the e2e scenario

@@ -29,11 +29,22 @@ describe("highlightPaint", () => {
     const fill = boxes[0].querySelectorAll(".cm-hl-paint.cm-hl-box-fill");
     expect(fill).toHaveLength(1);
     expect(fill[0].textContent).toBe(String.raw`a long boxed passage \textbf{with bold}`);
-    // A colour by name is a box too, without a paint of its own.
-    expect(boxes[1].querySelector(".cm-hl-paint")).toBeNull();
+    // A colour by name is a box filled in it too (lattice#1327).
+    const named = boxes[1].querySelector<HTMLElement>(".cm-hl-paint.cm-hl-box-fill");
+    expect(named?.textContent).toBe("named box");
+    expect(named?.style.getPropertyValue("--hl")).toBe("#FFFF00");
+    expect(named?.style.getPropertyValue("--hl-ink")).toBe("#242426");
     // Soul's \hl breaks across lines in TeX, so it is no box.
     expect(view.contentDOM.textContent).toContain(SOUL);
     expect(boxes.some((box) => box.textContent?.includes(String.raw`\hl`))).toBe(false);
+  });
+
+  it("fills a dark named box with white ink and leaves an unknown colour unfilled", () => {
+    const view = mount(String.raw`\colorbox{blue}{on blue} \colorbox{myaccent}{unknown}`, true);
+    const fills = [...view.contentDOM.querySelectorAll<HTMLElement>(".cm-hl-box-fill")];
+    expect(fills.map((fill) => fill.textContent)).toEqual(["on blue"]);
+    expect(fills[0].style.getPropertyValue("--hl-ink")).toBe("#FFFFFF");
+    expect(view.contentDOM.querySelectorAll(".cm-hl-box")).toHaveLength(2);
   });
 
   it("keeps the source's wrapping highlighter without boxes", () => {

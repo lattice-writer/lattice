@@ -70,7 +70,7 @@ As argued before~\\cite{e2e-key}.
 
 Visual citations~\\cite{e2evisual2024}, and its fifth page~\\cite[p.~5]{e2evisual2024}.
 
-A box set as TeX sets it, after enough prose to reach the end of a line, \\colorbox[HTML]{FFF1A6}{a highlighted passage kept on one line}, and soul's \\hl{highlighter}.
+A box set as TeX sets it, after enough prose to reach the end of a line, \\colorbox[HTML]{FFF1A6}{a highlighted passage kept on one line}, and soul's \\hl{highlighter}. Named boxes \\colorbox{yellow}{in yellow} and \\colorbox{blue}{in blue}.
 
 Revisions in {\\color{blue} blue for the \\emph{editor}} and \\textcolor{red}{red for the reviewer}, unknown \\textcolor{myaccent}{left alone}.
 
@@ -94,12 +94,14 @@ const DRAWN: &str = "JSON.stringify({ \
 /// soul's `\\hl`.
 const BOXES: &str = "JSON.stringify((() => { \
     const boxes = [...document.querySelectorAll('.cm-latex-visual .cm-hl-box')]; \
-    const fill = boxes[0]?.querySelector('.cm-hl-box-fill'); \
+    const fill = (box) => box.querySelector('.cm-hl-box-fill'); \
     return { \
       boxes: boxes.map((box) => box.textContent), \
       lines: boxes[0] ? boxes[0].getClientRects().length : 0, \
       white_space: boxes[0] ? getComputedStyle(boxes[0]).whiteSpace : null, \
-      fill: fill ? getComputedStyle(fill).backgroundColor : null }; })())";
+      dark: document.documentElement.dataset.codeThemeKind === 'dark', \
+      fills: boxes.map((box) => fill(box) ? getComputedStyle(fill(box)).backgroundColor : null), \
+      inks: boxes.map((box) => fill(box) ? getComputedStyle(fill(box)).color : null) }; })())";
 
 /// The page's inline colours (lattice#1328): each `\\color` and
 /// `\\textcolor` passage, drawn in the colour the theme's ground takes
@@ -298,14 +300,24 @@ impl Run {
         );
         let boxes = self.evaluate(cx, &island, BOXES).await;
         steps.check(
-            "a \\colorbox on the page is one box that never breaks across lines, filled in its colour, as TeX sets it; soul's \\hl is no box",
+            "a \\colorbox on the page is one box that never breaks across lines, filled in its colour (an HTML one or an xcolor name) with ink that reads on it, as TeX sets it; soul's \\hl is no box",
             boxes["boxes"]
-                == json!([r"\colorbox[HTML]{FFF1A6}{a highlighted passage kept on one line}"])
+                == json!([
+                    r"\colorbox[HTML]{FFF1A6}{a highlighted passage kept on one line}",
+                    r"\colorbox{yellow}{in yellow}",
+                    r"\colorbox{blue}{in blue}"
+                ])
                 && boxes["lines"] == 1
                 && boxes["white_space"] == "pre"
-                && boxes["fill"]
-                    .as_str()
-                    .is_some_and(|fill| fill != "rgba(0, 0, 0, 0)" && fill != "transparent"),
+                && boxes["fills"].as_array().is_some_and(|fills| {
+                    fills.len() == 3
+                        && fills.iter().all(|fill| {
+                            fill.as_str()
+                                .is_some_and(|fill| fill != "rgba(0, 0, 0, 0)" && fill != "transparent")
+                        })
+                })
+                && (boxes["dark"] == true
+                    || (boxes["inks"][1] == "rgb(36, 36, 38)" && boxes["inks"][2] == "rgb(255, 255, 255)")),
             json!({ "boxes": boxes }),
         );
         let colors = self.evaluate(cx, &island, COLORS).await;

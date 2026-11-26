@@ -261,8 +261,10 @@ pub fn highlight_edit(doc: &str, range: Range<usize>, color: Option<&str>) -> Op
 /// editor, as it prints; in a dark one a wash at 18% and a 2px underline at
 /// 75% in its colour, since a pastel block would put light ink on a light
 /// ground; and the `\colorbox[HTML]{…}{` wrapper and closing brace receding
-/// at 45% behind a swatch of its colour. Only `#RRGGBB` highlights are
-/// painted; a colour by name and soul's `\hl` are the document's to say.
+/// at 45% behind a swatch of its colour. An `[HTML]` colour and xcolor's
+/// base names are painted, the light editor's ink turning white on a fill
+/// it would not read on (`inline_colors::ink_on`); another colour and soul's
+/// `\hl` are the document's to say.
 /// `text` is the document from `offset` on, the stretch around what the
 /// editor shows.
 ///
@@ -292,14 +294,20 @@ pub fn paint(
         highlight.content_from += offset;
         highlight.content_to += offset;
         highlight.to += offset;
-        let Some(hex) = highlight.color.as_deref().filter(|color| {
-            color.len() == 7
-                && color.starts_with('#')
-                && color[1..].bytes().all(|b| b.is_ascii_hexdigit())
-        }) else {
-            continue;
-        };
-        let Ok(value) = u32::from_str_radix(&hex[1..], 16) else {
+        // An HTML colour, or one of xcolor's base names (`\colorbox{yellow}`),
+        // as the Visual page fills it.
+        let Some(value) =
+            highlight
+                .color
+                .as_deref()
+                .and_then(|color| match color.strip_prefix('#') {
+                    Some(hex) if hex.len() == 6 && hex.bytes().all(|b| b.is_ascii_hexdigit()) => {
+                        u32::from_str_radix(hex, 16).ok()
+                    }
+                    Some(_) => None,
+                    None => crate::latex::inline_colors::base_color(color),
+                })
+        else {
             continue;
         };
         let tint: gpui::Hsla = gpui::rgb(value).into();
@@ -352,7 +360,7 @@ pub fn paint(
             marks.push(Mark {
                 range,
                 style: MarkStyle {
-                    color: Some(gpui::rgb(0x242426).into()),
+                    color: Some(gpui::rgb(crate::latex::inline_colors::ink_on(value)).into()),
                     ..MarkStyle::default()
                 },
             });
@@ -446,6 +454,29 @@ mod tests {
             swatches[0].look,
             crate::inline_texts::InlineLook::Swatch(gpui::rgb(0xFFF1A6).into())
         );
+    }
+
+    #[test]
+    fn a_named_colorbox_is_painted_with_ink_that_reads_on_it() {
+        let text = r"\colorbox{yellow}{sun} \colorbox{blue}{sea} \colorbox{myaccent}{mine}";
+        let paint = paint(text, 0, false, |_| false);
+        let painted: Vec<&str> = paint
+            .washes
+            .iter()
+            .map(|wash| &text[wash.range.clone()])
+            .collect();
+        assert_eq!(painted, vec!["sun", "sea"]);
+        assert_eq!(paint.swatches.len(), 2);
+        let ink = |word: &str| {
+            let at = text.find(word).unwrap();
+            paint
+                .marks
+                .iter()
+                .find(|mark| mark.range == (at..at + word.len()))
+                .and_then(|mark| mark.style.color)
+        };
+        assert_eq!(ink("sun"), Some(gpui::rgb(0x242426).into()));
+        assert_eq!(ink("sea"), Some(gpui::rgb(0xFFFFFF).into()));
     }
 
     #[test]

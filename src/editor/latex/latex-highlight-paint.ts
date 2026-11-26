@@ -1,6 +1,7 @@
 import { RangeSetBuilder } from "@codemirror/state";
 import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from "@codemirror/view";
 import { latexHighlights } from "./latex-highlights";
+import { inkOn, resolveColor } from "./latex-inline-colors";
 
 /**
  * A highlight looks like one in the source, not only in the PDF: its argument
@@ -17,7 +18,9 @@ import { latexHighlights } from "./latex-highlights";
  * sets it, one box that never breaks across lines (lattice#1327): the whole
  * command is one outer mark the line cannot wrap inside, so a box too long for
  * the line runs past it as an overfull box does, and its argument is filled
- * square with `\fboxsep` either side. Soul's `\hl` is left as it is.
+ * square with `\fboxsep` either side, in an xcolor base colour as well as an
+ * HTML one, its text in the ink that reads on the fill (`inkOn`). Soul's
+ * `\hl` is left as it is.
  */
 const MARGIN = 2000;
 
@@ -64,9 +67,12 @@ function build(view: EditorView, boxes: boolean): Built {
       seen.add(start);
       const isBox = boxes && highlight.color !== null;
       if (isBox) units.push([start, from + highlight.to, BOX]);
-      const hex = highlight.color && /^#[0-9A-F]{6}$/i.test(highlight.color) ? highlight.color : null;
+      const written = highlight.color && /^#[0-9A-F]{6}$/i.test(highlight.color) ? highlight.color : null;
+      // A box on the page fills an xcolor base name too (`\colorbox{yellow}`),
+      // its text in the ink that reads on that fill.
+      const hex = written ?? (isBox && highlight.color ? resolveColor("", highlight.color) : null);
       if (!hex) continue;
-      const style = `--hl: ${hex}`;
+      const style = isBox ? `--hl: ${hex}; --hl-ink: ${inkOn(hex)}` : `--hl: ${hex}`;
       marks.push([start, start, Decoration.widget({ widget: new Swatch(hex), side: -1 })]);
       marks.push([start, from + highlight.contentFrom, Decoration.mark({ class: "cm-hl-wrap" })]);
       if (highlight.contentTo > highlight.contentFrom) {

@@ -19,6 +19,12 @@
   border-radius: 0;
   padding-inline: 3pt;
 }
+/* On a light page the box's text takes the ink that reads on its fill
+   (`inkOn`): the paper's black, or white on a dark fill such as blue. */
+:root:not([data-code-theme-kind="dark"]) .cm-hl-paint.cm-hl-box-fill,
+:root:not([data-code-theme-kind="dark"]) .cm-hl-paint.cm-hl-box-fill * {
+  color: var(--hl-ink, #242426) !important;
+}
 
 /* `\color` and `\textcolor` text in its colour (lattice#1328), made
    readable for the editor's ground by `readableColor`

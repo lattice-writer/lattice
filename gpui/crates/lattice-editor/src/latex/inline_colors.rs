@@ -43,6 +43,14 @@ pub struct InlineColor {
     pub rgb: u32,
 }
 
+/// One of xcolor's base colours by name.
+pub fn base_color(name: &str) -> Option<u32> {
+    XCOLOR_BASE
+        .iter()
+        .find(|(base, _)| *base == name.trim())
+        .map(|&(_, rgb)| rgb)
+}
+
 /// The colour a `[model]{spec}` names, if this paints it.
 fn resolve(model: &str, spec: &str) -> Option<u32> {
     let spec = spec.trim();
@@ -54,10 +62,7 @@ fn resolve(model: &str, spec: &str) -> Option<u32> {
     if !model.trim().is_empty() {
         return None;
     }
-    XCOLOR_BASE
-        .iter()
-        .find(|(name, _)| *name == spec)
-        .map(|&(_, rgb)| rgb)
+    base_color(spec)
 }
 
 fn skip_comment(text: &[u8], index: usize) -> usize {
@@ -240,6 +245,30 @@ pub fn inline_colors(text: &str) -> Vec<InlineColor> {
     flat
 }
 
+fn luminance(rgb: u32) -> f32 {
+    let channel = |shift: u32| linear(((rgb >> shift) & 0xFF) as f32 / 255.);
+    0.2126 * channel(16) + 0.7152 * channel(8) + 0.0722 * channel(0)
+}
+
+fn contrast(a: u32, b: u32) -> f32 {
+    let (x, y) = (luminance(a), luminance(b));
+    (x.max(y) + 0.05) / (x.min(y) + 0.05)
+}
+
+/// The paper's ink, which a light editor draws a highlight's text in.
+const PAPER_INK: u32 = 0x242426;
+
+/// The ink for text on a fill of `rgb` in a light editor: the paper's black
+/// ink, or white where white has the higher WCAG contrast with the fill (a
+/// `\colorbox{blue}`), as the Visual page's `inkOn` chooses.
+pub fn ink_on(rgb: u32) -> u32 {
+    if contrast(rgb, 0xFFFFFF) > contrast(rgb, PAPER_INK) {
+        0xFFFFFF
+    } else {
+        PAPER_INK
+    }
+}
+
 /// The most a colour's OKLab lightness may be in a light editor, and the
 /// least in a dark one.
 const LIGHT_MAX: f32 = 0.5;
@@ -348,15 +377,6 @@ mod tests {
             .collect()
     }
 
-    fn contrast(a: u32, b: u32) -> f32 {
-        let luminance = |rgb: u32| {
-            let channel = |shift: u32| linear(((rgb >> shift) & 0xFF) as f32 / 255.);
-            0.2126 * channel(16) + 0.7152 * channel(8) + 0.0722 * channel(0)
-        };
-        let (x, y) = (luminance(a), luminance(b));
-        (x.max(y) + 0.05) / (x.min(y) + 0.05)
-    }
-
     #[test]
     fn textcolor_and_a_declaration_to_the_end_of_its_group() {
         assert_eq!(
@@ -428,6 +448,11 @@ mod tests {
             );
         }
         assert_eq!(readable(0x0000FF, false), 0x0000FF);
+        // Text on a box: black ink on a light fill, white on a dark one.
+        assert_eq!(ink_on(0xFFFF00), PAPER_INK);
+        assert_eq!(ink_on(0xFFF1A6), PAPER_INK);
+        assert_eq!(ink_on(0x0000FF), 0xFFFFFF);
+        assert_eq!(base_color("teal"), Some(0x008080));
         assert_eq!(readable(0xFFFF00, true), 0xFFFF00);
     }
 
