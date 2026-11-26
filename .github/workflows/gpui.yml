@@ -43,6 +43,10 @@ on:
         description: Compare with this ref instead of the merge base with origin/main
         type: string
         default: ""
+      only:
+        description: Linux and Windows e2e run only these modules and the smoke flow (comma-separated, as script/e2e --only takes them)
+        type: string
+        default: ""
 
 # As in ci.yml: one run per branch and platform, the newest; main and tags by
 # commit.
@@ -447,6 +451,7 @@ jobs:
         timeout-minutes: 65
         env:
           WINDOWS_E2E: ${{ needs.changes.outputs.windows-e2e }}
+          E2E_ONLY: ${{ inputs.only }}
           STRICT_FLAKY: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && '--strict-flaky' || '' }}
         run: |
           $project = Join-Path $env:RUNNER_TEMP "e2e-project"
@@ -466,7 +471,13 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "could not make the stand-in Typst release" }
           $env:LATTICE_E2E_TYPST_RELEASE = $typst
           $scenario = @($project, "--scenario", "e2e", "--out", $out)
-          if ($env:WINDOWS_E2E -eq "smoke") {
+          # A run started by hand may name its modules (the only input), for
+          # a diagnostic loop on one module rather than the whole scenario.
+          if ($env:E2E_ONLY) {
+            if ($env:E2E_ONLY -notmatch '^[a-z0-9_,]+$') { throw "only takes module names separated by commas" }
+            Write-Output "The smoke flow and $env:E2E_ONLY, as the run asked."
+            $scenario += @("--only", $env:E2E_ONLY)
+          } elseif ($env:WINDOWS_E2E -eq "smoke") {
             Write-Output "The smoke flow alone: nothing this change touches behaves differently on Windows."
             $scenario += @("--only", "smoke")
           }
@@ -693,6 +704,7 @@ jobs:
         timeout-minutes: 110
         env:
           LINUX_E2E: ${{ needs.changes.outputs.linux-e2e }}
+          E2E_ONLY: ${{ inputs.only }}
           VK_ICD_FILENAMES: /dev/null
           VK_DRIVER_FILES: /dev/null
           STRICT_FLAKY: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && '--strict-flaky' || '' }}
@@ -708,7 +720,16 @@ jobs:
           export LATTICE_E2E_TYPST_RELEASE="$RUNNER_TEMP/typst-release"
           export LATTICE_E2E_SHOTS="$shots" LATTICE_GPUI_LOG=info RUST_BACKTRACE=1
           only=""
-          if [ "$LINUX_E2E" = smoke ]; then
+          # A run started by hand may name its modules (the only input), for
+          # a diagnostic loop on one module rather than the whole scenario.
+          if [ -n "$E2E_ONLY" ]; then
+            if ! [[ "$E2E_ONLY" =~ ^[a-z0-9_,]+$ ]]; then
+              echo "only takes module names separated by commas"
+              exit 1
+            fi
+            echo "The smoke flow and $E2E_ONLY, as the run asked."
+            only="--only $E2E_ONLY"
+          elif [ "$LINUX_E2E" = smoke ]; then
             echo "The smoke flow alone: nothing this change touches behaves differently on Linux."
             only="--only smoke"
           fi
