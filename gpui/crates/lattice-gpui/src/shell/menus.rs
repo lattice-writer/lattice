@@ -39,10 +39,9 @@ fn user_guide_url(locale: lattice_i18n::Locale) -> &'static str {
     }
 }
 
-/// The host serving the guide, whose reachability picks the website or the
-/// bundled copy.
-#[cfg(target_os = "macos")]
-const USER_GUIDE_HOST: &std::ffi::CStr = c"lattice-writer.github.io";
+/// How long Help ▸ User Guide waits for the website before it opens the
+/// bundled copy: a network that is off fails at once, a slow one gets this.
+const USER_GUIDE_CHECK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(4);
 
 /// The bundled copy's first page in the interface language.
 fn offline_user_guide(guide: &std::path::Path, locale: lattice_i18n::Locale) -> std::path::PathBuf {
@@ -53,39 +52,44 @@ fn offline_user_guide(guide: &std::path::Path, locale: lattice_i18n::Locale) -> 
     }
 }
 
-/// Whether the system can route to the guide's host, as the system judges
-/// it (`SCNetworkReachability`, as `overleaf/network.rs` watches the
-/// internet): no Wi-Fi or Ethernet, or a connection still to be dialled,
-/// is offline. It may resolve the name, so it runs off the main thread.
-#[cfg(target_os = "macos")]
-fn user_guide_host_reachable() -> bool {
-    use system_configuration::network_reachability::{ReachabilityFlags, SCNetworkReachability};
-
-    SCNetworkReachability::from_host(USER_GUIDE_HOST).is_none_or(|host| {
-        host.reachability().is_ok_and(|flags| {
-            flags.contains(ReachabilityFlags::REACHABLE)
-                && !flags.contains(ReachabilityFlags::CONNECTION_REQUIRED)
-        })
+/// Whether the guide's page answers. A real request rather than the
+/// system's reachability flags, which only say a route exists: they read
+/// "reachable" for a host that doesn't resolve, or one a network blocks.
+fn user_guide_answers(url: &str) -> bool {
+    lattice_core::http::blocking_as(
+        concat!("Lattice/", env!("CARGO_PKG_VERSION"), " (GPUI)"),
+        USER_GUIDE_CHECK_TIMEOUT,
+    )
+    .build()
+    .is_ok_and(|client| {
+        client
+            .head(url)
+            .send()
+            .is_ok_and(|response| response.status().is_success())
     })
 }
 
-#[cfg(not(target_os = "macos"))]
-fn user_guide_host_reachable() -> bool {
-    true
-}
-
-/// Help ▸ User Guide: the website's pages, or offline the copy the bundle
-/// carries (`structured::resources::user_guide_dir`), in the same language.
-/// Without a bundled copy (a build run from the checkout) the website opens
-/// whatever the network says, and the browser tells the writer it is offline.
+/// Help ▸ User Guide: the website's pages, or the copy the bundle carries
+/// (`structured::resources::user_guide_dir`, rendered by
+/// `scripts/gpui-bundle.mjs`) when the website doesn't answer, in the
+/// interface language either way. Without a bundled copy (a binary run from
+/// the checkout) the website opens straight away.
 fn open_user_guide(cx: &mut App) {
     let locale = lattice_i18n::locale();
-    let reachable = cx.background_spawn(async { user_guide_host_reachable() });
+    let url = user_guide_url(locale);
+    let Some(guide) = crate::structured::resources::user_guide_dir() else {
+        cx.open_url(url);
+        return;
+    };
+    let online = cx.background_spawn(async move { user_guide_answers(url) });
     cx.spawn(async move |cx| {
-        let online = reachable.await;
-        cx.update(|cx| match crate::structured::resources::user_guide_dir() {
-            Some(guide) if !online => cx.open_with_system(&offline_user_guide(&guide, locale)),
-            _ => cx.open_url(user_guide_url(locale)),
+        let online = online.await;
+        cx.update(|cx| {
+            if online {
+                cx.open_url(url);
+            } else {
+                cx.open_with_system(&offline_user_guide(&guide, locale));
+            }
         });
     })
     .detach();
