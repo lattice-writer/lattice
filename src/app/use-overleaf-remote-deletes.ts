@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { OverleafRemoteDelete } from "../settings/app-settings";
 import { confirmAction, hostErrorMessage } from "../app-utils";
 import { showError, showNotice } from "./notify";
+import { MAX_INLINE_PATHS, summarizeOverleafPaths } from "./overleaf-path-summary";
 
 /** The host's answer to a removal (`RemoteDelete` in overleaf/sync/remote_delete.rs). */
 type RemoteDelete = "deleted" | "changedOnOverleaf" | "backHere";
@@ -38,14 +39,21 @@ export function useOverleafRemoteDeletes(
     });
     if (!known.length) return;
     if (asking) {
-      const names = known.map((entry) => entry.path).join(", ");
+      const deletedPaths = known.map((entry) => entry.path);
+      // Never hide paths behind a count in an irreversible remote-delete
+      // confirmation: for small batches keep the inline sentence; for larger
+      // batches list every file on its own line inside the scrollable body.
+      const names = deletedPaths.join(", ");
+      const message = known.length === 1
+        ? t({ message: `${names} was deleted from the local project, but is still on Overleaf. Even if you remove it now, Overleaf's history will keep it.` })
+        : known.length <= MAX_INLINE_PATHS
+          ? t({ message: `${names} were deleted from the local project, but are still on Overleaf. Even if you remove them now, Overleaf's history will keep them.` })
+          : `${t`These files were deleted from the local project, but are still on Overleaf. Even if you remove them now, Overleaf's history will keep them.`}\n\n${deletedPaths.join("\n")}`;
       const removeThem = await confirmAction({
         title: known.length === 1
           ? t`Remove one file from the Overleaf project?`
           : t({ message: `Remove ${known.length} files from the Overleaf project?` }),
-        message: known.length === 1
-          ? t({ message: `${names} was deleted from the local project, but is still on Overleaf. Even if you remove it now, Overleaf's history will keep it.` })
-          : t({ message: `${names} were deleted from the local project, but are still on Overleaf. Even if you remove them now, Overleaf's history will keep them.` }),
+        message,
         confirmLabel: t`Delete on Overleaf too`,
         destructive: true,
       });
@@ -76,7 +84,7 @@ export function useOverleafRemoteDeletes(
     }
     if (!stillCurrent() || automatic) return;
     if (kept.length) {
-      const names = kept.join(", ");
+      const names = summarizeOverleafPaths(kept);
       const single = kept.length === 1;
       showNotice(asking
         ? single

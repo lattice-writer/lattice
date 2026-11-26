@@ -206,7 +206,7 @@ impl Shell {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let files = marked.join(", ");
+        let files = crate::overleaf::outcome::summarize_paths(marked);
         notices::show(
             Notice::new(ToastLevel::Warning, t!("Agent")).detail(t!(
                 "Undo kept newer edits in {files} where they overlap the agent's change. Choose \

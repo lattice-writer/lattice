@@ -939,6 +939,10 @@ msgstr "{names} 及另 {more} 人"
 msgid "{names} and {count} more"
 msgstr "{names} 等 {count} 人"
 
+#: src/app/overleaf-path-summary.ts
+msgid "{names} and {count} more files"
+msgstr "{names} 及另外 {count} 个文件"
+
 #: src/app/use-overleaf-remote-deletes.ts
 msgid "{names} changed on Overleaf after you were asked, so it was not removed there. The next sync brings the newer version back here."
 msgstr "{names} 在询问之后被人在 Overleaf 上改过，所以没有在 Overleaf 上删除。下次同步会把新版本拉回本地。"
@@ -17902,6 +17906,10 @@ msgstr "磁盘空间不足，无法安装此组件。请释放一些空间后重
 #: src/platform/host-errors-overleaf.ts
 msgid "These files are too large for Overleaf: {files}."
 msgstr "这些文件太大，Overleaf 无法接收：{files}"
+
+#: src/app/use-overleaf-remote-deletes.ts
+msgid "These files were deleted from the local project, but are still on Overleaf. Even if you remove them now, Overleaf's history will keep them."
+msgstr "这些文件本地已删，Overleaf 上还在。现在删除，它的历史里也会留着"
 
 #: src/build/build-log-messages.ts
 msgid "These table errors come from loading arydshln after colortbl, which LaTeX 2026-11 broke: the tables are fine. Load arydshln before colortbl, or remove {command} if no table draws dashed rules."

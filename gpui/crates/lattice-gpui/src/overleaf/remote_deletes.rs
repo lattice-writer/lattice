@@ -49,23 +49,8 @@ pub(super) fn settle(
         remove(root.to_path_buf(), known, automatic, false, cx);
         return;
     }
-    let names = known
-        .iter()
-        .map(|(path, ..)| path.as_str())
-        .collect::<Vec<_>>()
-        .join(", ");
-    let count = known.len();
-    let (title, body) = if count == 1 {
-        (
-            t!("Remove one file from the Overleaf project?").to_string(),
-            t!("{names} was deleted from the local project, but is still on Overleaf. Even if you remove it now, Overleaf's history will keep it.", names = &names).to_string(),
-        )
-    } else {
-        (
-            t!("Remove {0} files from the Overleaf project?", count).to_string(),
-            t!("{names} were deleted from the local project, but are still on Overleaf. Even if you remove them now, Overleaf's history will keep them.", names = &names).to_string(),
-        )
-    };
+    let path_list: Vec<&str> = known.iter().map(|(path, ..)| path.as_str()).collect();
+    let (title, body) = confirm_prompt(&path_list);
     let this = cx.entity().downgrade();
     let declined = this.clone();
     let declined_root = root.to_path_buf();
@@ -152,7 +137,7 @@ fn remove(
                 return;
             }
             if !kept.is_empty() {
-                let names = kept.join(", ");
+                let names = super::outcome::summarize_paths(&kept);
                 let single = kept.len() == 1;
                 let message: String = match (asked, single) {
                     (true, true) => t!("{names} changed on Overleaf after you were asked, so it was not removed there. The next sync brings the newer version back here.", names = &names),
@@ -174,4 +159,64 @@ fn remove(
         .ok();
     })
     .detach();
+}
+
+fn confirm_prompt(path_list: &[&str]) -> (String, String) {
+    let count = path_list.len();
+    if count == 1 {
+        let names = path_list[0];
+        (
+            t!("Remove one file from the Overleaf project?").to_string(),
+            t!("{names} was deleted from the local project, but is still on Overleaf. Even if you remove it now, Overleaf's history will keep it.", names = names).to_string(),
+        )
+    } else if count <= super::outcome::MAX_INLINE_PATHS {
+        let names = path_list.join(", ");
+        (
+            t!("Remove {0} files from the Overleaf project?", count).to_string(),
+            t!("{names} were deleted from the local project, but are still on Overleaf. Even if you remove them now, Overleaf's history will keep them.", names = &names).to_string(),
+        )
+    } else {
+        // Never hide paths behind a count in an irreversible remote-delete
+        // confirmation: list every file one per line in the scrollable body.
+        (
+            t!("Remove {0} files from the Overleaf project?", count).to_string(),
+            format!(
+                "{}\n\n{}",
+                t!(
+                    "These files were deleted from the local project, but are still on Overleaf. Even if you remove them now, Overleaf's history will keep them."
+                ),
+                path_list.join("\n"),
+            ),
+        )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn confirm_prompt_lists_every_path_when_over_inline_limit() {
+        let paths: Vec<String> = (1..=10).map(|i| format!("f_{i}.tex")).collect();
+        let refs: Vec<&str> = paths.iter().map(String::as_str).collect();
+        let (title, body) = confirm_prompt(&refs);
+        assert_eq!(title, "Remove 10 files from the Overleaf project?");
+        assert!(body.starts_with("These files were deleted from the local project"));
+        assert!(body.ends_with(&refs.join("\n")));
+        for path in &refs {
+            assert!(body.contains(path));
+        }
+        assert!(!body.contains("more files"));
+    }
+
+    #[test]
+    fn confirm_prompt_keeps_inline_wording_for_small_batches() {
+        let (single_title, single_body) = confirm_prompt(&["main.tex"]);
+        assert_eq!(single_title, "Remove one file from the Overleaf project?");
+        assert!(single_body.starts_with("main.tex was deleted"));
+
+        let (small_title, small_body) = confirm_prompt(&["a.tex", "b.tex"]);
+        assert_eq!(small_title, "Remove 2 files from the Overleaf project?");
+        assert!(small_body.starts_with("a.tex, b.tex were deleted"));
+    }
 }

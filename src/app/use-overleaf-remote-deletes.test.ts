@@ -68,4 +68,21 @@ describe("settling files deleted here but still on Overleaf", () => {
     expect(showNotice).toHaveBeenCalledWith(expect.stringMatching(/^dropped\.tex changed on Overleaf since the last sync, so it was not removed there\./), "Overleaf");
     expect(vi.mocked(showNotice).mock.calls[0][0]).not.toMatch(/asked/);
   });
+
+  it("lists every deleted file one per line in the scrollable confirmation body for large batches", async () => {
+    const paths = Array.from({ length: 12 }, (_, i) => `figures/data/plot_${i + 1}.csv`);
+    const entities = {
+      current: new Map(paths.map((path, i) => [path, { id: `file-${i}`, kind: "file" }])),
+    };
+    vi.mocked(confirmAction).mockResolvedValue(false);
+    const view = renderHook(() => useOverleafRemoteDeletes({ current: "ask" }, entities, () => () => true));
+    await view.result.current(paths, "/paper", 1);
+
+    expect(confirmAction).toHaveBeenCalledOnce();
+    const request = vi.mocked(confirmAction).mock.calls[0][0] as { title: string; message: string };
+    expect(request.title).toBe("Remove 12 files from the Overleaf project?");
+    expect(request.message).toContain("These files were deleted from the local project, but are still on Overleaf.");
+    for (const path of paths) expect(request.message).toContain(path);
+    expect(request.message).toContain(paths.join("\n"));
+  });
 });
