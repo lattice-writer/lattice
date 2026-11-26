@@ -26,6 +26,14 @@ describe("ci-local-select: the e2e a change needs", () => {
     expect(e2eNeeds(["gpui/README.md", "gpui/crates/lattice-editor/tests/motion.rs", "gpui/crates/lattice-gpui/src/pdf/tests.rs"], new Map())).toMatchObject({ full: false, modules: [] });
   });
 
+  it("takes the shell's command bindings hunk by hunk when their diff could be read, and the whole scenario otherwise", () => {
+    const file = "gpui/crates/lattice-gpui/src/shell/actions.rs";
+    expect(e2eNeeds([file], covers)).toMatchObject({ full: true, fullBecause: [file] });
+    expect(e2eNeeds([file], covers, { full: true, why: "x" })).toMatchObject({ full: true, fullBecause: [file] });
+    expect(e2eNeeds([file], covers, { full: false, modules: ["pdf"], why: [] })).toMatchObject({ full: false, modules: ["pdf"], why: { pdf: [file] } });
+    expect(e2eNeeds([file], covers, { full: false, modules: [], why: [] })).toMatchObject({ full: false, modules: [] });
+  });
+
   it("runs what the island config picks for the script that builds the island pages", () => {
     expect(e2eNeeds(["gpui/script/build-islands"]).modules).toEqual(e2eNeeds(["gpui/islands/vite.config.ts"]).modules);
     expect(e2eNeeds(["gpui/script/build-islands"])).toMatchObject({ full: false, modules: ["islands", "markdown", "structured"] });

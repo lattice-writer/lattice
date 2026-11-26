@@ -92,8 +92,8 @@ const CI_JOBS = JOBS.filter((job) => job !== "gpui");
 // them (ci-tier.test.mjs checks the list); beside any other file, everything
 // (selectorOnly). A diff that edits these lists themselves runs everything
 // (github), so a change never widens the rule that judges it.
-export const CI_CONTROL_TESTS = ["scripts/ci-local-select.test.mjs", "scripts/ci-local.test.mjs", "scripts/ci-tier.test.mjs", "scripts/gpui-e2e-light.test.mjs", "scripts/gpui-e2e-modules.test.mjs", "scripts/gpui-e2e-verdict.test.mjs", "scripts/gpui-main-baseline-agent.test.mjs", "scripts/gpui-main-baseline.test.mjs", "scripts/gpui-nightly.test.mjs", "scripts/linux-gpui-e2e-tier.test.mjs", "scripts/windows-e2e-tier.test.mjs"];
-export const CI_CONTROL = new Set(["scripts/ci-tier.mjs", "scripts/ci-local-select.mjs", "scripts/gpui-e2e-modules.mjs", "scripts/ci-local.mjs", "scripts/windows-e2e-tier.mjs", "scripts/linux-gpui-e2e-tier.mjs"]);
+export const CI_CONTROL_TESTS = ["scripts/ci-local-select.test.mjs", "scripts/ci-local.test.mjs", "scripts/ci-tier.test.mjs", "scripts/gpui-actions-e2e.test.mjs", "scripts/gpui-e2e-light.test.mjs", "scripts/gpui-e2e-modules.test.mjs", "scripts/gpui-e2e-verdict.test.mjs", "scripts/gpui-main-baseline-agent.test.mjs", "scripts/gpui-main-baseline.test.mjs", "scripts/gpui-nightly.test.mjs", "scripts/linux-gpui-e2e-tier.test.mjs", "scripts/windows-e2e-tier.test.mjs"];
+export const CI_CONTROL = new Set(["scripts/ci-tier.mjs", "scripts/ci-local-select.mjs", "scripts/gpui-e2e-modules.mjs", "scripts/gpui-actions-e2e.mjs", "scripts/ci-local.mjs", "scripts/windows-e2e-tier.mjs", "scripts/linux-gpui-e2e-tier.mjs"]);
 
 // What `pnpm build` reads besides the sources tsc already checked: a change
 // to any of them can move the bundle the budgets measure.
@@ -322,7 +322,7 @@ function github() {
   // cover has to cover everything else the branch changes.
   const { cover, docsFiles, reason: docsRefused } = resolveCover(named, { cwd: repo });
   const gated = files.filter((file) => !docsFiles.includes(file));
-  const local = coveredJobs(cover, macosNeeds(docsFiles.length ? ciTier(gated, { selector: !selectorListsEdited(base, gated) }) : tier, gated));
+  const local = coveredJobs(cover, macosNeeds(docsFiles.length ? ciTier(gated, { selector: !selectorListsEdited(base, gated) }) : tier, gated, base));
   const windows = windowsE2e(tier.gpuiFiles, { full: tier.full });
   const linux = linuxE2e(tier.gpuiFiles, { full: tier.full });
   const groups = { rust: "Rust", gpui: "GPUI", webkit: "WebKit benchmark" };

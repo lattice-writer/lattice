@@ -222,7 +222,7 @@ function mainBaselineStage(mergeBase) {
  * the modules the diff picks, judged against the known failures and the
  * baseline when this Mac already has one for the merge base.
  */
-export function localStages(tier, files, mergeBase, e2eNeed = macosNeeds(tier, files).e2e) {
+export function localStages(tier, files, mergeBase, e2eNeed = macosNeeds(tier, files, mergeBase).e2e) {
   const { jobs, vitestFiles } = tier;
   const stages = [];
   if (jobs["lint-build"] || (jobs.vitest && !vitestFiles.length)) stages.push(...gateStages(files));
@@ -288,7 +288,7 @@ export function docsOnlyPass(files, cwd = repo, mergeBase = null) {
   }
   if (!check.files.length) return null;
   const rest = files.filter((file) => !check.files.includes(file));
-  const gap = Object.values(coveredJobs(check.cover, macosNeeds(ciTier(rest, { selector: !selectorListsEdited(mergeBase, rest) }), rest))).find((group) => !group.covered);
+  const gap = Object.values(coveredJobs(check.cover, macosNeeds(ciTier(rest, { selector: !selectorListsEdited(mergeBase, rest) }), rest, mergeBase))).find((group) => !group.covered);
   if (gap) {
     console.log(`ci:local: no docs-only pass: the gate at ${gate.slice(0, 9)} does not cover the rest of the branch (${gap.reason})`);
     return null;
@@ -327,7 +327,7 @@ async function main() {
   }
   const release = files.filter((file) => RELEASE_PATHS.test(file));
   const tier = ciTier(files, { full: options.full || release.length > 0, selector: !selectorListsEdited(mergeBase, files) });
-  const needs = macosNeeds(tier, files);
+  const needs = macosNeeds(tier, files, mergeBase);
   console.log(`ci:local: ${files.length} changed file(s) against ${options.base} (${mergeBase.slice(0, 9)})`);
   if (release.length) console.log(`ci:local: release paths changed (${release.slice(0, 3).join(", ")}): the full gate runs, and only its full trailer lets GitHub skip the macOS jobs`);
   for (const job of JOBS) {

@@ -58,6 +58,7 @@
  * built and published.
  */
 import { execFileSync } from "node:child_process";
+import { ACTIONS_FILE, actionsDiff, actionsNeeds } from "./gpui-actions-e2e.mjs";
 import { readModules } from "./gpui-e2e-modules.mjs";
 import { harnessInputs } from "./perf-bench/harness-inputs.mjs";
 
@@ -130,7 +131,9 @@ export const E2E_TABLE = [
   // command's handler, every panel's drawing, the part registry) and the
   // native input and private pasteboard every module's clicks, keys and
   // pastes go through. A module covering some other file of shell/ is no
-  // evidence these are exercised (dirModules).
+  // evidence these are exercised (dirModules). shell/actions.rs, the command
+  // bindings, is read hunk by hunk instead when its diff can be
+  // (scripts/gpui-actions-e2e.mjs); this row is for when it cannot.
   [/^gpui\/crates\/lattice-gpui\/src\/(shell\.rs|shell\/(actions|views|parts|workspaces|entries|ground|editor_events)\.rs|native\.rs)$|^gpui\/crates\/lattice-gpui\/src\/native\//, FULL],
   [/^src-tauri\/lattice-(core|theme)\//, FULL],
   [/^design-system\//, FULL],
@@ -185,14 +188,20 @@ export function dirModules(file, covers = MODULE_COVERS) {
 
 /**
  * The e2e these GPUI inputs need: `full`, or the modules beyond the smoke
- * flow, with the files behind each choice.
+ * flow, with the files behind each choice. `actions` is what the diff of the
+ * shell's command bindings needs (actionsNeeds in scripts/gpui-actions-e2e.mjs),
+ * which stands in for that file's FULL row when it could be read.
  */
-export function e2eNeeds(gpuiFiles, covers = MODULE_COVERS) {
+export function e2eNeeds(gpuiFiles, covers = MODULE_COVERS, actions = null) {
   const scenario = "gpui/crates/lattice-gpui/src/scenario/e2e/";
   const why = {};
   const fullBecause = [];
   for (const file of gpuiFiles) {
     const picked = new Set();
+    if (file === ACTIONS_FILE && actions && !actions.full) {
+      for (const module of actions.modules) (why[module] ??= []).push(file);
+      continue;
+    }
     const stem = file.startsWith(scenario) ? file.slice(scenario.length).split("/")[0].replace(/\.rs$/, "") : null;
     if (stem && covers.has(stem)) picked.add(stem);
     else if (E2E_TABLE.some(([pattern, need]) => need === FULL && pattern.test(file))) {
@@ -218,12 +227,17 @@ export function e2eNeeds(gpuiFiles, covers = MODULE_COVERS) {
   return { full: fullBecause.length > 0, modules: Object.keys(why).sort(), why, fullBecause };
 }
 
-/** What each macOS job group needs for this tier (`ciTier` in scripts/ci-tier.mjs) and its files. */
-export function macosNeeds(tier, files) {
+/**
+ * What each macOS job group needs for this tier (`ciTier` in
+ * scripts/ci-tier.mjs) and its files. With `base`, a change to the shell's
+ * command bindings is read hunk by hunk against it (scripts/gpui-actions-e2e.mjs).
+ */
+export function macosNeeds(tier, files, base = null) {
+  const diff = base && tier.gpuiFiles.includes(ACTIONS_FILE) ? actionsDiff(base) : null;
   return {
     rust: tier.jobs.rust,
     gpui: tier.jobs.gpui,
-    e2e: !tier.jobs.gpui ? null : tier.full ? { full: true, modules: [], why: {}, fullBecause: ["full run"] } : e2eNeeds(tier.gpuiFiles),
+    e2e: !tier.jobs.gpui ? null : tier.full ? { full: true, modules: [], why: {}, fullBecause: ["full run"] } : e2eNeeds(tier.gpuiFiles, MODULE_COVERS, diff && actionsNeeds(diff, MODULE_COVERS)),
     webkit: tier.jobs["perf-bench"] && touchesWebkitBench(files),
     release: files.filter((file) => RELEASE_PATHS.test(file)),
   };

@@ -179,7 +179,13 @@ the vendored crates under `gpui/compat/` (gpui-fast, which draws every
 window, gpui-pre and libsqlite3-sys), lattice-ui, lattice-i18n's code,
 lattice-core, and lattice-gpui's root view and native input (`shell.rs` and
 every file under `shell/` that no module's `covers` names, `native.rs` and
-`native/`, the private pasteboard among them). Any other file picks the modules whose `covers` name it, else
+`native/`, the private pasteboard among them). The exception is
+`shell/actions.rs`, the command bindings, which `ci:local` reads hunk by
+hunk (`scripts/gpui-actions-e2e.mjs`): a changed binding runs the modules that
+name its action, press its key or cover the method it calls, a change to
+`command_context` runs `palette` and `shell_lifecycle`, an import or a new
+binding no step reaches runs the smoke flow, and anything else in the file
+runs the whole scenario. Any other file picks the modules whose `covers` name it, else
 the table's row for it, else the modules that exercise its directory
 (`dirModules`: those covering something under `x/` for `x.rs`, else under
 the nearest directory above it, short of the crate's `src/`, else the module
