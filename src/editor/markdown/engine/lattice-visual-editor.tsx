@@ -32,7 +32,7 @@ import { blockAnchors } from "./block-anchors";
 import { blockWindow, mayDrawInWindow, revealPosition, scrollToTarget } from "./block-window";
 import { HeadingAnchors, REFRESH_ANCHORS, plannedHeadings } from "./heading-anchors";
 import { NO_HEADINGS, railHeadings, sameHeadings } from "./rail-headings";
-import { PassiveView, passiveModel, type PassiveModel } from "./passive-view";
+import { PassiveView, passiveFor, type PassiveModel } from "./passive-view";
 import type { ImeGuard } from "./engine-keymap";
 import { MathMacrosContext, engineNodeViews } from "./engine-node-views";
 import { engineSchema, engineSchemaExtensions, type RawBlockKind } from "./engine-schema";
@@ -526,12 +526,6 @@ function readingExtensions(labels: Partial<Record<RawBlockKind, string>>, ime: I
   const views = engineNodeViews({ ime });
   const viewNames = new Set(views.map((view) => view.name));
   return [...engineSchemaExtensions({ rawBlockLabels: labels }).filter((extension) => !viewNames.has(extension.name)), ...views];
-}
-
-/** The passive layout for a large read-only document (R-PERF-1), or null to draw it whole. */
-function passiveFor(text: string, activePath: string, reading: boolean): PassiveModel | null {
-  const opened = openMarkdown(text, engineSchema(), openOptions({ activePath, optimizeForReading: reading }));
-  return "unavailable" in opened ? null : passiveModel(opened.doc, opened.baseline, text.length, reading);
 }
 
 /** The complete editor: a long document is drawn only near the viewport (R-PERF-3). */

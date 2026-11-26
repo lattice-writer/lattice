@@ -27,7 +27,9 @@ import { localPaperFragment, openMarkdownLink } from "../markdown-link-routing";
 import { useNearViewport } from "../use-near-viewport";
 import type { VisualMarkdownEditorProps } from "../visual-editor-props";
 import { HeadingAnchors, anchorMarks, documentHeadings, type AnchorMark } from "./heading-anchors";
-import type { MarkdownBaseline } from "./markdown-document";
+import { engineSchema } from "./engine-schema";
+import { openMarkdown, type MarkdownBaseline } from "./markdown-document";
+import { openOptions } from "./open-options";
 import { placements } from "./source-map";
 
 /** A read-only document of at least this many blocks (or this much text) opens passive. */
@@ -244,4 +246,10 @@ function ChunkEditor({ chunk, labels, reading, onLink, onPage }: {
     },
   }, [extensions]);
   return <EditorContent editor={editor} />;
+}
+
+/** The passive layout for a large read-only document (R-PERF-1), or null to draw it whole. */
+export function passiveFor(text: string, activePath: string, reading: boolean): PassiveModel | null {
+  const opened = openMarkdown(text, engineSchema(), openOptions({ activePath, optimizeForReading: reading }));
+  return "unavailable" in opened ? null : passiveModel(opened.doc, opened.baseline, text.length, reading);
 }
