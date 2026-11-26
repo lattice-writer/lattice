@@ -23,7 +23,7 @@ const IMPORT = /^(?!\s*(?:import|export)\s+type\b).*?(?:from\s+|import\s*\(\s*|i
 const ENDINGS = ["", ".ts", ".tsx", ".mts", ".js", ".jsx", ".mjs", "/index.ts", "/index.tsx", "/index.js"];
 
 /** The vitest setupFiles (vitest.config.ts), which every test loads without importing them. */
-export function setupFilesOf(cwd) {
+function setupFilesOf(cwd) {
   try {
     const list = /setupFiles:\s*\[([^\]]*)\]/.exec(readFileSync(path.join(cwd, "vitest.config.ts"), "utf8"))?.[1] ?? "";
     return [...list.matchAll(/["']\.?\/?([^"']+)["']/g)].map((match) => match[1]);

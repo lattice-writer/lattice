@@ -46,4 +46,11 @@ describe("import-graph", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it("reads this repository's setup file from vitest.config.ts, so a change to it runs every test", () => {
+    const repo = path.resolve(import.meta.dirname, "../..");
+    const graph = importers(repo);
+    const tests = [...graph.keys()].filter((file) => /\.test\./.test(file));
+    expect(nearTests(["src/platform/test-setup.ts"], graph).tests).toEqual(tests.sort());
+  });
 });
