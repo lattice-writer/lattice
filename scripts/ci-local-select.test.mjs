@@ -26,8 +26,9 @@ describe("ci-local-select: the e2e a change needs", () => {
     expect(e2eNeeds(["gpui/README.md", "gpui/crates/lattice-editor/tests/motion.rs", "gpui/crates/lattice-gpui/src/pdf/tests.rs"], new Map())).toMatchObject({ full: false, modules: [] });
   });
 
-  it("runs the islands module for the script that builds the island pages", () => {
-    expect(e2eNeeds(["gpui/script/build-islands"], new Map())).toMatchObject({ full: false, modules: ["islands"] });
+  it("runs what the island config picks for the script that builds the island pages", () => {
+    expect(e2eNeeds(["gpui/script/build-islands"]).modules).toEqual(e2eNeeds(["gpui/islands/vite.config.ts"]).modules);
+    expect(e2eNeeds(["gpui/script/build-islands"])).toMatchObject({ full: false, modules: ["islands", "markdown", "structured"] });
   });
 
   it("runs the whole scenario for its harness, shared code and anything the table does not map", () => {
