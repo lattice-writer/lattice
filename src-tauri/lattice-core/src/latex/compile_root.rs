@@ -287,4 +287,29 @@ mod tests {
         );
         assert_eq!(refused.unwrap_err(), super::super::TYPST_NATIVE_ONLY);
     }
+
+    #[test]
+    fn a_file_is_credited_to_the_root_that_typesets_it_and_never_to_the_bare_default() {
+        let root = TempDir::new("typesetting-root");
+        project::write_manifest(&root, &project::default_manifest("paper")).unwrap();
+        root.write(
+            "main.tex",
+            "\\documentclass{article}\n\\begin{document}\\input{sections/method}\\end{document}\n",
+        );
+        root.write("sections/method.tex", "\\section{Method}\n");
+        root.write("sections/stray.tex", "\\section{Stray}\n");
+        root.write("book.typ", "#include \"chapters/one.typ\"\n");
+        root.write("chapters/one.typ", "= One\n");
+        root.write("notes.md", "# Notes\n");
+        let of = |file: &str| super::super::typesetting_root(&root, file);
+        assert_eq!(of("main.tex").as_deref(), Some("main.tex"));
+        assert_eq!(of("sections/method.tex").as_deref(), Some("main.tex"));
+        // A Typst part goes to the document that includes it.
+        assert_eq!(of("chapters/one.typ").as_deref(), Some("book.typ"));
+        assert_eq!(of("book.typ").as_deref(), Some("book.typ"));
+        // Read by no root, gone, or not a source: none.
+        assert_eq!(of("sections/stray.tex"), None);
+        assert_eq!(of("sections/gone.tex"), None);
+        assert_eq!(of("notes.md"), None);
+    }
 }

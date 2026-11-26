@@ -8,13 +8,14 @@
 use std::{path::Path, time::Duration};
 
 use anyhow::Result;
-use gpui::AsyncApp;
+use gpui::{AsyncApp, Entity};
 use lopdf::{Document, Object};
 use serde_json::json;
 
 use super::Steps;
 use crate::{
     annotations::{model, store},
+    pdf::review_sheet::ReviewSheet,
     scenario::Run,
 };
 
@@ -217,6 +218,128 @@ impl Run {
             cx.update(|cx| sheet.update(cx, |sheet, cx| sheet.close_for_scenario(cx)));
         }
         cx.update(|cx| store.update(cx, |store, cx| store.delete(&project, &id, cx)));
+        self.pdf_review_elsewhere(cx, steps, root, &text, start).await
+    }
+
+    /// With another root's PDF live, the sheet says which root typesets the
+    /// note and builds it on request, after which the note is placed.
+    async fn pdf_review_elsewhere(
+        &self,
+        cx: &mut AsyncApp,
+        steps: &mut Steps,
+        root: &Path,
+        text: &str,
+        start: usize,
+    ) -> Result<()> {
+        const STEP: &str = "PDF: on another document's PDF, Export review PDF names the document a note is in, and its Build places the note there";
+        let other = root.join("review-other.tex");
+        // The build adds the document to the manifest's roots; put it back.
+        let manifest = root.join(".research/project.json");
+        let manifest_before = std::fs::read(&manifest)?;
+        std::fs::write(
+            &other,
+            "\\documentclass{article}\n\\begin{document}\nAnother document.\n\\end{document}\n",
+        )?;
+        let editor = self.open(cx, &other, Some(3))?;
+        self.pause(cx, Duration::from_millis(300)).await;
+        self.build(cx).await?;
+        let other_live = self
+            .wait_for(cx, Duration::from_secs(20), |shell, cx| {
+                shell.read(cx).live_document() == Some("review-other.tex")
+            })
+            .await;
+        let Some(project) = cx.update(|cx| self.shell.read(cx).root(cx)) else {
+            steps.check(STEP, false, json!({ "project": false }));
+            return Ok(());
+        };
+        let store = cx.update(store::store);
+        let id = cx
+            .update(|cx| {
+                let author = store::author(&project, cx);
+                let note = model::new_note(
+                    "chapters/intro.tex",
+                    text,
+                    start,
+                    start + WORDS.len(),
+                    "Name what it introduces.",
+                    None,
+                    &author,
+                )?;
+                store.update(cx, |store, cx| store.add(&project, note, cx))
+            })
+            .unwrap_or_default();
+        self.with_window(cx, |shell, window, cx| {
+            shell.update(cx, |shell, cx| shell.open_review_sheet(None, window, cx))
+        })?;
+        let sheet = cx.update(|cx| self.shell.read(cx).review_sheet_entity());
+        let kind = |sheet: &Entity<ReviewSheet>, cx: &mut AsyncApp| {
+            cx.update(|cx| {
+                sheet.read(cx).placed().and_then(|placed| {
+                    placed
+                        .into_iter()
+                        .find(|(placed, _)| *placed == id)
+                        .map(|(_, kind)| kind)
+                })
+            })
+        };
+        let (mut before, mut elsewhere, mut after) = (None, Vec::new(), None);
+        if let Some(sheet) = &sheet {
+            self.wait_for(cx, Duration::from_secs(20), |_, cx| {
+                sheet.read(cx).placed().is_some()
+            })
+            .await;
+            before = kind(sheet, cx);
+            elsewhere = cx.update(|cx| sheet.read(cx).elsewhere().to_vec());
+            self.snapshot(cx, "pdf-review-elsewhere").await;
+            if elsewhere.iter().any(|(document, _)| document == "main.tex") {
+                cx.update(|cx| {
+                    sheet.update(cx, |sheet, cx| sheet.build_for_scenario("main.tex", cx))
+                });
+                self.wait_for(cx, Duration::from_secs(60), |_, cx| {
+                    sheet.read(cx).placed().is_some_and(|placed| {
+                        placed
+                            .iter()
+                            .any(|(placed, kind)| *placed == id && *kind == "highlight")
+                    })
+                })
+                .await;
+                after = kind(sheet, cx);
+            }
+            cx.update(|cx| sheet.update(cx, |sheet, cx| sheet.close_for_scenario(cx)));
+        }
+        let live = cx.update(|cx| self.shell.read(cx).live_document().map(str::to_string));
+        steps.check(
+            STEP,
+            other_live
+                && before == Some("unplaced")
+                && elsewhere == vec![("main.tex".to_string(), 1)]
+                && after == Some("highlight")
+                && live.as_deref() == Some("main.tex"),
+            json!({
+                "other_live": other_live, "before": before, "elsewhere": elsewhere,
+                "after": after, "live": live,
+            }),
+        );
+        // Leave no document of this step to take the live PDF later, as an
+        // open root whose editor is in front would (LEO-134).
+        cx.update(|cx| store.update(cx, |store, cx| store.delete(&project, &id, cx)));
+        self.close_panel(cx, &editor).await?;
+        cx.update(|cx| {
+            let workspace = self.shell.read(cx).workspace().clone();
+            workspace.update(cx, |workspace, cx| {
+                workspace.close(&[crate::shell::views::root_pdf_id("review-other.tex")], cx)
+            });
+        });
+        for extension in ["tex", "pdf", "aux", "log", "synctex.gz", "fls", "fdb_latexmk"] {
+            std::fs::remove_file(other.with_extension(extension)).ok();
+        }
+        std::fs::write(&manifest, &manifest_before)?;
+        cx.update(|cx| {
+            if let Some(project) = self.shell.read(cx).project().cloned() {
+                project.update(cx, |project, cx| project.reload_manifest(cx));
+            }
+        });
+        self.pause(cx, Duration::from_millis(300)).await;
         Ok(())
     }
 }

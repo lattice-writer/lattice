@@ -1,5 +1,5 @@
 {
-  "//": "GPUI e2e steps that fail far more often than the rest (data/gpui-dev-speed-research/report.md §2.5 in the firstmate home: 8 steps, 207 of 274 failures over 265 runs). scripts/gpui-e2e-light.mjs retries a run once when only these fail, and counts one that fails again as pre-existing when the main baseline fails it too. Each needs an owner who fixes or deletes it; take a step off the list once it is fixed.",
+  "//": "GPUI e2e steps that fail far more often than the rest (data/gpui-dev-speed-research/report.md §2.5 in the firstmate home: 8 steps, 207 of 274 failures over 265 runs). scripts/gpui-e2e-light.mjs retries a run once when only these fail, and counts one that fails again as pre-existing when the main baseline fails it too. Each needs an owner who fixes or deletes it; take a step off the list once it is fixed. LEO-152 (2026-11-26) adds pdf_review's export step and the first 7 Terminal steps after it. When a review export loses its race with a rebuild, the Terminal steps after it fail in that run, yet each passes alone and in full main runs.",
   "steps": [
     "PDF: Open in separate window shows the PDF in a window of its own at the same page, and Return to workspace brings it back",
     "the island's protocol serves the granted image, the document is sandboxed and its relative link disabled",
@@ -8,6 +8,14 @@
     "⌘, opens Settings, on the page it was left on",
     "a missing package's Install offers its providers, installs the pick and builds (stand-in installer)",
     "closing the focused document's tab leaves the keyboard in the window",
-    "the page built again after its hibernation gets the app's shortcuts when it takes the keyboard"
+    "the page built again after its hibernation gets the app's shortcuts when it takes the keyboard",
+    "PDF: Export review PDF places a note on its words as a highlight, ticked, and the copy carries it as a Highlight with its id and number, with the cover note on page 1, leaving the compiled PDF as it was",
+    "⌃` opens the Terminal across the foot of the workspace, running the login shell, focused",
+    "typing runs a command in the shell, in the project folder",
+    "Tab completes in the shell and ⇧Tab reaches it, the keyboard staying in the terminal",
+    "the shell names Lattice as its terminal, and none of Zed's variables",
+    "a program's colours draw in the design system's: ANSI red is the danger colour",
+    "⌘F finds in the scrollback, counting the matches; Escape closes it and the keyboard returns",
+    "New terminal opens a second tab in front; a tab renames in place, and ← → move along the tabs"
   ]
 }

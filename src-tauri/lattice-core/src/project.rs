@@ -157,6 +157,7 @@ pub use symbols::{
 pub use symbols::{RenameSymbolResult, UnusedSymbols};
 pub use tree::{project_tree_path_visible, scan_tree, tree_files, TreeView};
 pub use tree::{read_file, stat_file, ProjectFileStat};
+pub(crate) use typst_root::including_typst_root;
 pub use typst_root::is_typst_path;
 // Fixtures for other modules' tests.
 #[cfg(test)]

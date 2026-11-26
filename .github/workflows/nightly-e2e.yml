@@ -23,9 +23,15 @@ on:
   schedule:
     # 18:37 UTC, 02:37 in Taipei: after the day's merges, off the hour.
     - cron: "37 18 * * *"
+    # Backups: GitHub delays scheduled runs and sometimes drops them (none
+    # fired on 2026-11-26). A backup runs the night only when no run of this
+    # workflow has started since 18:00 UTC (the due job).
+    - cron: "47 19 * * *"
+    - cron: "17 21 * * *"
   workflow_dispatch:
 
 permissions:
+  actions: read
   contents: read
   issues: write
 
@@ -34,8 +40,36 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  e2e:
+  # A scheduled run goes ahead only if it is the night's first: a run of this
+  # workflow started since 18:00 UTC (scheduled or by hand, and not cancelled)
+  # already covers the night. A run by hand always goes ahead, and so does one
+  # whose check fails: a duplicate night costs Mac time, a lost one a day.
+  due:
     if: github.repository == 'lattice-writer/lattice' || github.repository == 'leo1oel/lattice'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.due.outputs.run }}
+    steps:
+      - id: due
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          if [ "$EVENT" != schedule ]; then echo run=true >> "$GITHUB_OUTPUT"; exit 0; fi
+          since=$(date -u -d "$(date -u +%F) 18:00" +%s)
+          if [ "$since" -gt "$(date -u +%s)" ]; then since=$((since - 86400)); fi
+          started=$(gh api "repos/$REPO/actions/workflows/nightly-e2e.yml/runs?per_page=20" \
+            --jq "[.workflow_runs[] | select(.id != $RUN_ID and .conclusion != \"cancelled\" and (.created_at | fromdateiso8601) >= $since)] | length") \
+            || { echo "could not list the night's runs; running"; started=0; }
+          echo "night's runs so far: $started"
+          if [ "$started" = 0 ]; then echo run=true >> "$GITHUB_OUTPUT"; else echo run=false >> "$GITHUB_OUTPUT"; fi
+
+  e2e:
+    needs: due
+    if: needs.due.outputs.run == 'true'
     runs-on: ${{ vars.LATTICE_MACOS_RUNNER || 'lattice-mac' }}
     timeout-minutes: 580
     steps:

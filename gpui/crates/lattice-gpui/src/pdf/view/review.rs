@@ -54,6 +54,72 @@ impl ReviewSource {
             .collect()
     }
 
+    /// The root document this PDF is the build of, project-relative.
+    fn shown_document(&self) -> Option<String> {
+        if let Some(document) = &self.document {
+            return Some(document.clone());
+        }
+        // The viewer may hold the PDF by its canonical path (/private/var).
+        let canonical = |path: &PathBuf| path.canonicalize().unwrap_or_else(|_| path.clone());
+        let root = canonical(&self.root);
+        let relative = canonical(&self.path)
+            .strip_prefix(&root)
+            .ok()?
+            .to_path_buf();
+        let typst = relative.with_extension("typ");
+        let document = if root.join(&typst).is_file() {
+            typst
+        } else {
+            relative.with_extension("tex")
+        };
+        Some(document.to_string_lossy().replace('\\', "/"))
+    }
+
+    /// The root documents other than this PDF's that typeset the notes
+    /// `placements` leave unplaced (lattice-core's `typesetting_root`), each
+    /// with how many, in the notes' order: built, their notes would have a
+    /// place. A note on a file no root reads names none.
+    pub fn elsewhere(
+        &self,
+        notes: &[EditorComment],
+        placements: &[ReviewPlacement],
+    ) -> Vec<(String, usize)> {
+        let shown = self.shown_document();
+        let mut found: Vec<(String, usize)> = Vec::new();
+        for (note, _) in notes
+            .iter()
+            .zip(placements)
+            .filter(|(_, placement)| placement.page().is_none())
+        {
+            let Some(owner) = lattice_core::latex::typesetting_root(&self.root, &note.path) else {
+                continue;
+            };
+            if shown.as_ref() == Some(&owner) {
+                continue;
+            }
+            match found.iter_mut().find(|(document, _)| *document == owner) {
+                Some((_, count)) => *count += 1,
+                None => found.push((owner, 1)),
+            }
+        }
+        found
+    }
+
+    /// Which load of the viewer's document this is; a later load is higher.
+    pub fn generation(&self) -> u64 {
+        self.generation
+    }
+
+    /// Whether this PDF is the build of `document`.
+    pub fn shows(&self, document: &str) -> bool {
+        self.shown_document().as_deref() == Some(document)
+    }
+
+    /// Whether this is the live PDF, which a build of another root replaces.
+    pub fn is_live(&self) -> bool {
+        self.document.is_none()
+    }
+
     /// The shown PDF's file name (`paper.pdf`).
     pub fn file_name(&self) -> String {
         self.path

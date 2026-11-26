@@ -503,6 +503,7 @@ fn connection_group(
                 },
             )
             .compact()
+            .parity("overleaf/settings/pause")
             .on_click(move |_, _, cx| {
                 // Through the window, as its other controls pause: the
                 // editors are saved and live typing settles first.

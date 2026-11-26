@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { execFileSync, spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -34,10 +34,57 @@ describe.skipIf(process.platform === "win32")("inapp-lock", () => {
     expect(lines[3]).toBe(lines[2].replace("start", "end"));
   });
 
+  it("serves waiters in the order they came, and skips one that died waiting", async () => {
+    const log = path.join(dir, "log");
+    expect(lock("--thread", "A", "hold", "30").status).toBe(0);
+    const queued = () => (existsSync(`${env.INAPP_LOCK_FILE}.queue`) ? readdirSync(`${env.INAPP_LOCK_FILE}.queue`).filter((name) => !name.startsWith(".")).length : 0);
+    const waiter = (name) => {
+      const child = spawn(script, ["--thread", name, "--wait", "30", "--", "sh", "-c", `echo ${name} >> "$1"`, "sh", log], { env });
+      return { child, done: new Promise((resolve) => child.on("exit", resolve)) };
+    };
+    // Each joins the line once the one before it is in it.
+    const waiting = [];
+    for (const name of ["B", "C", "D", "E"]) {
+      waiting.push(waiter(name));
+      const deadline = Date.now() + 10_000;
+      while (queued() < waiting.length) {
+        if (Date.now() > deadline) throw new Error(`${name} never queued`);
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+    }
+    waiting[1].child.kill("SIGKILL");
+    expect(lock("--thread", "A", "release").status).toBe(0);
+    expect(await Promise.all(waiting.map(({ done }) => done))).toEqual([0, null, 0, 0]);
+    expect(readFileSync(log, "utf8").trim().split("\n")).toEqual(["B", "D", "E"]);
+    expect(queued()).toBe(0);
+  });
+
+  it("passes over a waiter that stopped polling", async () => {
+    const log = path.join(dir, "log");
+    expect(lock("--thread", "A", "hold", "30").status).toBe(0);
+    const queue = `${env.INAPP_LOCK_FILE}.queue`;
+    const stopped = spawn(script, ["--thread", "S", "--wait", "60", "--", "sh", "-c", 'echo S >> "$1"', "sh", log], { env });
+    const deadline = Date.now() + 10_000;
+    while (!(existsSync(queue) && readdirSync(queue).some((name) => !name.startsWith(".")))) {
+      if (Date.now() > deadline) throw new Error("S never queued");
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    stopped.kill("SIGSTOP");
+    const ticket = path.join(queue, readdirSync(queue).find((name) => !name.startsWith(".")));
+    utimesSync(ticket, new Date(Date.now() - 60_000), new Date(Date.now() - 60_000));
+    expect(lock("--thread", "A", "release").status).toBe(0);
+    expect(lock("--thread", "B", "--wait", "5", "--", "sh", "-c", 'echo B >> "$1"', "sh", log).status).toBe(0);
+    stopped.kill("SIGCONT");
+    expect(await new Promise((resolve) => stopped.on("exit", resolve))).toBe(0);
+    expect(readFileSync(log, "utf8").trim().split("\n")).toEqual(["B", "S"]);
+  });
+
   it("keeps a hold after the process group that started it is killed", () => {
     const starter = spawn("sh", ["-c", `"${script}" --thread A hold 30; sleep 30`], { env, detached: true });
     const deadline = Date.now() + 10_000;
-    while (lock("--wait", "0", "--", "true").status !== 75) {
+    // `status`, not a try with --wait 0: that gives up while the hold is
+    // still in line ahead of it, before the hold has the lock.
+    while (lock("status").status !== 1) {
       if (Date.now() > deadline) throw new Error("the hold never took the lock");
     }
     process.kill(-starter.pid, "SIGKILL");

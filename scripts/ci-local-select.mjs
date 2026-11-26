@@ -286,11 +286,13 @@ export function e2eNeeds(gpuiFiles, covers = MODULE_COVERS, actions = null) {
  * command bindings is read hunk by hunk against it (scripts/gpui-actions-e2e.mjs),
  * and a file whose change is only comments and whitespace (commentOnlyEdit)
  * picks no e2e and no WebKit benchmark: its build and lint stages check it,
- * and the nightly runs the whole scenario. When that leaves no GPUI file, the
- * GPUI job runs no e2e (`e2e` null).
+ * and the nightly runs the whole scenario; so does an input no macOS run can
+ * show (the tier's `macosInert`). When that leaves no GPUI file, the GPUI job
+ * runs no e2e (`e2e` null).
  */
 export function macosNeeds(tier, files, base = null) {
   const inert = commentOnlyEdits(base, [...new Set([...tier.gpuiFiles, ...files])]);
+  for (const file of tier.macosInert) inert.add(file);
   const gpuiFiles = tier.gpuiFiles.filter((file) => !inert.has(file));
   const diff = base && gpuiFiles.includes(ACTIONS_FILE) ? actionsDiff(base) : null;
   const e2e = tier.full ? { full: true, modules: [], why: {}, fullBecause: ["full run"] } : gpuiFiles.length || !tier.gpuiFiles.length ? e2eNeeds(gpuiFiles, MODULE_COVERS, diff && actionsNeeds(diff, MODULE_COVERS)) : null;

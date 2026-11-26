@@ -527,3 +527,13 @@ Transcripts past the cap now keep their samples packed at 24 bytes each, up to a
 - The first read after launch is unchanged, at about 3 s once.
 
 `providerUsageSnapshot.test.ts` covers both changes. "Keeps transcripts past the sample cap packed instead of reopening them" checks that a packed transcript isn't reopened, and "packs an unfinished final record and counts it once its newline arrives" checks a packed transcript whose last record has no newline yet. The staged server's `dist/index.mjs` grows by 1,865 bytes over the 0.20.0 bundle, so the staged runtime stays at about 179.1 MB.
+
+### Plain provider errors and no stale status at startup (fork PR 48)
+
+The pin moved from `d2a631b19` to `29c3621cf` on `amp/lattice-v1.6.2-sync`, through the merge commit of [fork PR 48](https://github.com/leo1oel/synara/pull/48) (LEO-58). Lattice #1348 already keeps `FORCE_COLOR` out of the sidecar's environment; this covers the fork's side.
+
+- **Escape codes:** a provider CLI that colours its stderr no longer puts escape codes in the chat's provider banner ("Could not verify Claude authentication status. \u001b[31m…"). `detailFromResult` (`providerCliOutput.ts`) strips CSI and OSC sequences from probe output for every provider, through a `stripAnsi` helper that `claudeStderrReason` shares.
+- **Stale status:** before this run's first probe, `ProviderHealth` serves only the saved statuses that are `ready` (`userdata/provider-status/*.json`). A warning or error saved by an earlier run, or by another process whose working directory has since been deleted, no longer shows as a current banner for the few seconds until the probe lands. The provider is absent until then, as on a first launch, so cached ready statuses still make startup instant.
+- **Tests:** `providerCliOutput.test.ts`, `claudeAuthStatus.malformedJson.test.ts` and `ProviderHealth.test.ts` ("serves only cached ready statuses before the first fresh probe").
+
+`pnpm prepare:synara` reports 183.1 MB on the Mac mini for both this pin and `d2a631b19`, so the change adds nothing measurable; the 179.1 MB above was measured with an earlier dependency install.

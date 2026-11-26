@@ -339,7 +339,10 @@ green night. A run that wrote no record of its own (the lock never came
 free, the disk was under its floor, a crash) counts as a failure. A nightly failure is fixed the next day; a
 step that fails there and is pre-existing joins
 `scripts/gpui-e2e-known-failures.json` as below. `gh workflow run
-nightly-e2e.yml` runs it by hand.
+nightly-e2e.yml` runs it by hand. GitHub delays scheduled runs and sometimes
+drops them, so backup crons fire at 19:47 and 21:17 UTC; their `due` job lets
+one run only when no run of the workflow (scheduled or by hand, not
+cancelled) has started since 18:00 UTC.
 
 ### A review round's GPUI e2e, and the main baseline
 
