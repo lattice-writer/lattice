@@ -159,7 +159,8 @@ jobs:
       # no `synctex` binary (its own package, as in lattice-core's TeX Live
       # install), and the e2e scenario's SyncTeX steps run it. mylatexformat
       # makes the preamble format, whose entry check lattice-core tests below.
-      # chemnum is for the pdf_compounds module's chem-check.tex.
+      # chemnum, with the chemgreek, translations and psfrag it loads, is
+      # for the pdf_compounds module's chem-check.tex.
       - name: Install TeX Live
         uses: TeX-Live/setup-texlive-action@v4
         with:
@@ -170,6 +171,9 @@ jobs:
             mylatexformat
             synctex
             chemnum
+            chemgreek
+            translations
+            psfrag
       # TexLab, for the editor's diagnostics, which the e2e scenario checks
       # (the Windows job has none and skips that step).
       - name: Install TexLab
@@ -651,13 +655,14 @@ jobs:
       # After the unit tests, so the ignored latexmk build test stays ignored
       # there. Ubuntu's TeX Live: latexmk, pdfTeX and SyncTeX
       # (texlive-binaries), and the recommended set for the fixture's xcolor
-      # and hyperref, and texlive-science for chemnum (the pdf_compounds
-      # module's chem-check.tex). No TexLab, as on Windows: the scenario skips its step.
+      # and hyperref, and texlive-science and texlive-latex-extra for chemnum
+      # and the translations package it loads (the pdf_compounds module's
+      # chem-check.tex). No TexLab, as on Windows: the scenario skips its step.
       # Mesa's EGL and GL drivers, for the scenario's GL renderer (below).
       - name: Install TeX Live
         timeout-minutes: 15
         working-directory: .
-        run: .github/scripts/apt-install.sh texlive-latex-base texlive-latex-recommended texlive-science latexmk libegl1 libegl-mesa0 libgl1-mesa-dri
+        run: .github/scripts/apt-install.sh texlive-latex-base texlive-latex-recommended texlive-science texlive-latex-extra latexmk libegl1 libegl-mesa0 libgl1-mesa-dri
       # As on Windows: the whole scenario, judged against the steps main
       # fails on Linux (scripts/gpui-e2e-known-failures.json), a new failure's
       # module rerun once first, and the text typed before the quit saved.

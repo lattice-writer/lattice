@@ -240,7 +240,7 @@ impl Render for ConfirmHost {
             ("confirm", self.serial),
             cx,
             move |this, window, cx| {
-                if this.serial != serial {
+                if this.serial != serial || this.pending.is_none() {
                     return;
                 }
                 // Answered: the question goes without its cancel.
@@ -298,7 +298,7 @@ impl Render for ConfirmHost {
         if let Some((label, answer)) = question.alternative.clone() {
             let button = Button::new(("confirm-alternative", self.serial), label).on_click(
                 ModalLayer::closing(("confirm", self.serial), cx, move |this, window, cx| {
-                    if this.serial != serial {
+                    if this.serial != serial || this.pending.is_none() {
                         return;
                     }
                     this.pending = None;
