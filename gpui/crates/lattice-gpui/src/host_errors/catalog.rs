@@ -982,8 +982,8 @@ pub(super) static ENTRIES: &[Entry] = &[
     },
     Entry {
         file: "ipc/diagnostics.rs",
-        literal: "Could not show the diagnostic log in Finder: {error}",
-        text: Text::Message("Could not show the diagnostic log in Finder: {error}", &[("error", Arg::Param(0))]),
+        literal: "Could not show the diagnostic log: {error}",
+        text: Text::Message("Could not show the diagnostic log: {error}", &[("error", Arg::Param(0))]),
     },
     Entry {
         file: "save_before_close.rs",
@@ -2801,8 +2801,8 @@ pub(super) static ENTRIES: &[Entry] = &[
     },
     Entry {
         file: "ipc/themes.rs",
-        literal: "Could not show the themes folder in Finder: {error}",
-        text: Text::Message("Could not show the themes folder in Finder: {error}", &[("error", Arg::Param(0))]),
+        literal: "Could not show the themes folder: {error}",
+        text: Text::Message("Could not show the themes folder: {error}", &[("error", Arg::Param(0))]),
     },
     Entry {
         file: "ipc/themes.rs",

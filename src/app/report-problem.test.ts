@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { addAppLog, clearAppLogs } from "../telemetry/app-log-store";
+import { addAppLog, clearAppLogs, getAppLogEntries } from "../telemetry/app-log-store";
 import { createAppLogExport } from "../telemetry/app-log-export";
 import { newIssueUrl, reportProblem } from "./report-problem";
 
@@ -43,5 +43,23 @@ describe("Help ▸ Report a Problem…", () => {
     tauri.invoke.mockRejectedValue(new Error("Could not create the report folder: permission denied"));
     await reportProblem();
     expect(tauri.openUrl).not.toHaveBeenCalled();
+  });
+
+  it("names Finder only on a Mac when it says where the saved log is", async () => {
+    const userAgent = vi.spyOn(navigator, "userAgent", "get");
+    tauri.invoke.mockResolvedValue({ osVersion: "15.1", arch: "aarch64" });
+    const savedDetail = async (agent: string) => {
+      userAgent.mockReturnValue(agent);
+      clearAppLogs();
+      await reportProblem();
+      return getAppLogEntries().find((entry) => entry.title === "Diagnostic log saved")?.detail;
+    };
+    expect(await savedDetail("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15"))
+      .toBe("Attach the file shown in Finder to the bug report.");
+    expect(await savedDetail("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Edg/157.0"))
+      .toBe("Attach the file shown in its folder to the bug report.");
+    expect(await savedDetail("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15"))
+      .toBe("Attach the file shown in its folder to the bug report.");
+    userAgent.mockRestore();
   });
 });

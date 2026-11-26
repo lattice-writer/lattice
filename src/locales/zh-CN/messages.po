@@ -2667,8 +2667,12 @@ msgid "At the limit"
 msgstr "刚好到上限"
 
 #: src/app/report-problem.ts
+msgid "Attach the file shown in Finder to the bug report."
+msgstr "请将访达中显示的文件附加到问题报告。"
+
+#: src/app/report-problem.ts
 msgid "Attach the file shown in its folder to the bug report."
-msgstr "请将在文件夹中显示的文件附加到问题报告。"
+msgstr "请将文件夹中选中的文件附加到问题报告。"
 
 #: src/papers/literature-discovery-panel.tsx
 msgid "Attention Is All You Need, diffusion, …"
@@ -5240,7 +5244,7 @@ msgstr "无法搜索 TeX Live 组件仓库：{error}"
 #: src/app/file-open-failure.ts
 #: src/app/use-project-tree.ts
 msgid "Could not show that item. {message}"
-msgstr "无法显示该项目。{message}"
+msgstr "无法显示该项。{message}"
 
 #: src/platform/host-errors-workspace.ts
 msgid "Could not show the diagnostic log: {error}"

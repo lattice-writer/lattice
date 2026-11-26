@@ -2667,6 +2667,10 @@ msgid "At the limit"
 msgstr "At the limit"
 
 #: src/app/report-problem.ts
+msgid "Attach the file shown in Finder to the bug report."
+msgstr "Attach the file shown in Finder to the bug report."
+
+#: src/app/report-problem.ts
 msgid "Attach the file shown in its folder to the bug report."
 msgstr "Attach the file shown in its folder to the bug report."
 
