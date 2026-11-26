@@ -138,7 +138,7 @@ describe("ci-tier", () => {
 
     it("finds nothing, so every job runs, when no run qualifies", () => {
       expect(base([])).toBe(null);
-      expect(base([{ id: 8, head_sha: "c3", status: "completed", conclusion: "cancelled" }])).toBe(null);
+      for (const conclusion of ["cancelled", "startup_failure", "skipped", "action_required"]) expect(base([{ id: 8, head_sha: "c3", status: "completed", conclusion }])).toBe(null);
     });
   });
 
@@ -146,7 +146,7 @@ describe("ci-tier", () => {
     for (const [file, prefix] of [["ci.yml", "ci"], ["gpui.yml", "gpui"]]) {
       const text = readFileSync(path.join(repo, ".github/workflows", file), "utf8");
       const block = text.slice(text.indexOf("\nconcurrency:"), text.indexOf("\n\n", text.indexOf("\nconcurrency:")));
-      expect(block).toContain(`group: ${prefix}-${"${{ github.ref }}"}-${"${{"} (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'push' || (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && github.sha || 'branch' }}`);
+      expect(block).toContain(`group: ${prefix}-${"${{ github.ref }}"}-${"${{"} (github.event_name == 'push' && github.ref == 'refs/heads/main' && github.run_attempt == '1') && 'push' || (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && github.sha || 'branch' }}`);
       expect(block).toContain("cancel-in-progress: ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/') }}");
       expect(text).toMatch(/\n {2}changes:\n[\s\S]*?permissions:\n(?: {6}.*\n)*? {6}actions: read\n/);
     }

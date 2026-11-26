@@ -238,10 +238,10 @@ export function wantsFull(message, labels = []) {
 /**
  * The run a push to main is compared with: the newest run of this workflow
  * on main, other than this one and not at HEAD, that holds or held the
- * concurrency group (queued, in progress, or completed without being
- * cancelled) and whose commit is an ancestor of HEAD. A pending run may still
- * be replaced, and a cancelled one may not have run its jobs, so neither
- * counts: skipping a run only widens the diff. `runs` come newest first, as
+ * concurrency group (queued or in progress) or finished as a success or a
+ * failure, and whose commit is an ancestor of HEAD. A pending run may still
+ * be replaced, and a cancelled, skipped or startup_failure one may not have
+ * run its jobs, so none of those counts: skipping a run only widens the diff. `runs` come newest first, as
  * GitHub lists them; null means no run qualifies and every job runs.
  */
 export function mainPushBase(runs, { runId, head, isAncestor }) {
@@ -250,7 +250,7 @@ export function mainPushBase(runs, { runId, head, isAncestor }) {
       (run) =>
         String(run.id) !== String(runId) &&
         run.head_sha !== head &&
-        (run.status === "queued" || run.status === "in_progress" || (run.status === "completed" && run.conclusion !== "cancelled")) &&
+        (run.status === "queued" || run.status === "in_progress" || (run.status === "completed" && (run.conclusion === "success" || run.conclusion === "failure"))) &&
         isAncestor(run.head_sha),
     ) ?? null
   );

@@ -42,10 +42,11 @@ on:
 # Pushes to main share one group that never cancels a started run: GitHub
 # keeps the running one and only the newest waiting one, which compares with
 # the last main commit this workflow ran for (ci-tier's mainPushBase) to cover
-# the merges it replaced. Tags, the schedule and dispatches on main group by
-# commit, so every release and every requested full run goes to its end.
+# the merges it replaced. Tags, the schedule, dispatches on main and re-runs
+# (flake-rerun.yml's included) group by commit, so every release, requested
+# full run and re-run goes to its end and never replaces a waiting push.
 concurrency:
-  group: ci-${{ github.ref }}-${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'push' || (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && github.sha || 'branch' }}
+  group: ci-${{ github.ref }}-${{ (github.event_name == 'push' && github.ref == 'refs/heads/main' && github.run_attempt == '1') && 'push' || (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && github.sha || 'branch' }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/') }}
 
 # The work is split so the wall clock is the slowest single job rather than the

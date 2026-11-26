@@ -43,10 +43,10 @@ on:
         default: ""
 
 # As in ci.yml: one run per branch, the newest; main's pushes one group that
-# keeps the running run and the newest waiting one; tags and dispatches by
-# commit.
+# keeps the running run and the newest waiting one; tags, dispatches and
+# re-runs by commit.
 concurrency:
-  group: gpui-${{ github.ref }}-${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'push' || (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && github.sha || 'branch' }}
+  group: gpui-${{ github.ref }}-${{ (github.event_name == 'push' && github.ref == 'refs/heads/main' && github.run_attempt == '1') && 'push' || (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && github.sha || 'branch' }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/') }}
 
 permissions:
