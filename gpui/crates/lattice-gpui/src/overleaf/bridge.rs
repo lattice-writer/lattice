@@ -412,6 +412,7 @@ impl OverleafBridge {
         self.poll_wake = None;
         self.push_task = None;
         self.push_waiting = false;
+        self.cooldown_task = None;
         self.badge_task = None;
         self.channel_task = None;
         self.channel_retry = None;
@@ -543,6 +544,7 @@ impl OverleafBridge {
                 self.poll_wake = None;
                 self.push_task = None;
                 self.push_waiting = false;
+                self.cooldown_task = None;
                 self.whole_files.stop_timers();
                 if self.badge_task.is_none() {
                     self.badge_task = Some(self.badge_poll(root, cx));

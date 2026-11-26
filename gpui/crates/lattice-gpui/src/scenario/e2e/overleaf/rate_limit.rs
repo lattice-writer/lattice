@@ -49,6 +49,7 @@ impl Run {
         };
         let failures_before = failures(cx);
         let uploads_before = mock.requests(&upload);
+        let upload_times_before = mock.upload_times().len();
         mock.rate_limit_uploads(1, RETRY_AFTER.as_secs());
         std::fs::create_dir_all(root.join("notes"))?;
         std::fs::write(root.join(PATH), TEXT)?;
@@ -59,7 +60,6 @@ impl Run {
                 shell.read(cx).overleaf.read(cx).sync_owed()
             })
             .await;
-        let limited = Instant::now();
         // Held for its Retry-After, less the moment since it came back; the
         // doubling would have left 30 s at most.
         let cooling = cx.update(|cx| {
@@ -73,7 +73,9 @@ impl Run {
         let honoured = cooling > RETRY_AFTER - Duration::from_secs(5) && cooling <= RETRY_AFTER;
         // No failure shown that wasn't up before (one expiring is fine).
         let quiet_owed = failures(cx).is_subset(&failures_before);
-        // The toolbar says it is waiting, and counts the seconds down.
+        // The toolbar says it is waiting, and counts the seconds down: read
+        // twice, 3 s apart, as a tooltip opened at each moment would, with
+        // no redraw in between.
         let seconds_left = |cx: &mut AsyncApp| {
             let label = cx.update(|cx| self.shell.read(cx).overleaf_sync_label(cx));
             let seconds = label
@@ -89,14 +91,18 @@ impl Run {
             (waiting, later),
             (Some(first), Some(then)) if first <= RETRY_AFTER.as_secs() && then + 2 <= first
         );
-        // Sent as the cool-down ends: the 45 s poll would leave it as late as
-        // 85 s after the 429.
         let landed = self
             .wait_for(cx, Duration::from_secs(100), |_, _| mock.file(PATH).is_some())
             .await;
         let took = started.elapsed();
-        let after_limit = limited.elapsed();
-        let prompt = after_limit <= RETRY_AFTER + Duration::from_secs(5);
+        // Sent as the cool-down ends, by the mock's own clock: the 45 s poll
+        // would leave it anywhere up to 85 s after the 429.
+        let upload_times = mock.upload_times();
+        let retry_gap = match &upload_times[upload_times_before..] {
+            [limited, retried] => Some(retried.saturating_duration_since(*limited)),
+            _ => None,
+        };
+        let prompt = retry_gap.is_some_and(|gap| gap <= RETRY_AFTER + Duration::from_secs(2));
         let text = mock.file(PATH).as_deref() == Some(TEXT);
         // One answered 429, then the one that went up after the cool-down.
         let uploads = mock.requests(&upload) - uploads_before;
@@ -117,7 +123,7 @@ impl Run {
             json!({
                 "settled": settled, "owed": owed, "landed": landed, "text": text,
                 "cooling_ms": cooling.as_millis(),
-                "after_429_ms": after_limit.as_millis(),
+                "retry_after_429_ms": retry_gap.map(|gap| gap.as_millis()),
                 "uploads": uploads, "took_ms": took.as_millis(), "quiet": quiet,
                 "overleaf": mock.file(PATH),
             }),

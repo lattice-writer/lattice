@@ -71,8 +71,12 @@ impl OverleafBridge {
     }
 
     /// The sync status while a 429's cool-down holds live mode's syncs:
-    /// waiting, and for how long, rather than idle.
+    /// waiting, and for how long, rather than idle. Outside live mode
+    /// nothing retries on its own, so it says nothing.
     pub fn cooldown_status(&self) -> Option<String> {
+        if self.mode != OverleafSyncMode::Live {
+            return None;
+        }
         cooldown_status_at(self.rate_limited_until, Instant::now())
     }
 }

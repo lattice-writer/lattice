@@ -581,6 +581,11 @@ impl OverleafBridge {
 
     /// Send the sync that is owed, with the whole-file documents held for it.
     fn retry_owed(&mut self, cx: &mut Context<Self>) {
+        // A sync still running would turn this one away: the documents held
+        // for it stay held for the next retry.
+        if self.syncing {
+            return;
+        }
         let held = std::mem::take(&mut self.whole_files.boundary);
         self.sync(
             SyncOptions {
@@ -597,32 +602,27 @@ impl OverleafBridge {
         }
     }
 
-    /// Redraw the cool-down's countdown each time its seconds change, and
-    /// send what it holds the moment it is over: left to the poll, it went
-    /// at the poll's next turn, up to 45 s later with the channel up.
+    /// Send what a 429's cool-down holds the moment it is over: left to the
+    /// poll, it went at the poll's next turn, up to 45 s later with the
+    /// channel up. Only its start and end redraw: the status is a tooltip,
+    /// built when it shows, so it reads the seconds left then, and a redraw
+    /// each second would run every observer of the bridge for nothing.
     pub(super) fn wait_out_cooldown(&mut self, cx: &mut Context<Self>) -> Task<()> {
+        cx.notify();
         cx.spawn(async move |this, cx| {
             loop {
                 let left = this
-                    .update(cx, |this, cx| {
-                        cx.notify();
-                        this.rate_limit_left()
-                    })
+                    .update(cx, |this, _| this.rate_limit_left())
                     .ok()
                     .flatten()
                     .unwrap_or_default();
                 if left.is_zero() {
                     break;
                 }
-                let fraction = Duration::from_nanos(u64::from(left.subsec_nanos()));
-                let step = if fraction.is_zero() {
-                    Duration::from_secs(1)
-                } else {
-                    fraction
-                };
-                cx.background_executor().timer(step.min(left)).await;
+                cx.background_executor().timer(left).await;
             }
             this.update(cx, |this, cx| {
+                cx.notify();
                 let owed = this.transport_retry || this.local_pending;
                 if this.mode == OverleafSyncMode::Live && owed && this.gap_left().is_zero() {
                     this.retry_owed(cx);
