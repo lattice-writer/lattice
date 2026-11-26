@@ -180,8 +180,11 @@ owner in the scenario.
 
 A change to `scripts/ci-local.mjs`, `scripts/ci-local-select.mjs`, `scripts/gpui-e2e-modules.mjs` or `scripts/windows-e2e-tier.mjs`, like one to `scripts/ci-tier.mjs`, runs every job.
 
-Rust, GPUI and benchmark stages wait while a perf measurement holds
-`/tmp/lattice-inapp-test.lock` (`$INAPP_LOCK_FILE` when set). The literature
+Rust and GPUI build and unit-test stages wait while a perf measurement or a
+hand test holds `/tmp/lattice-inapp-test.lock` (`$INAPP_LOCK_FILE` when set),
+but not while another run's GPUI e2e holds it: a waiting gate builds
+meanwhile and queues for the lock only for its own windowed stages (the e2e,
+its main baseline and the WebKit benchmark). The literature
 Worker, the Open Slide runtime, the research environment, the Chromium
 benchmark, Linux and Windows run in CI only.
 

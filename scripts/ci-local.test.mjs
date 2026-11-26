@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { docsStages, holdingInappLock } from "./ci-local.mjs";
+import { docsStages, holderRunsE2e, holdingInappLock } from "./ci-local.mjs";
 
 const repo = path.resolve(import.meta.dirname, "..");
 const lock = path.join(repo, "scripts", "inapp-lock");
@@ -23,6 +23,16 @@ describe.skipIf(process.platform === "win32")("ci:local", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  it("builds beside another run's e2e, and waits for a perf measurement, a hand test or an unreadable holder", () => {
+    for (const command of ["script/e2e --only annotations,overleaf /Volumes/LatticeBuild/work/lata-96/e2e.json", "/Users/leo/w/gpui/script/e2e --only smoke out.json", "sh -c git worktree add --detach x y && (cd x && node scripts/gpui-main-baseline.mjs --sha y)", "node scripts/gpui-e2e-light.mjs"]) {
+      expect(holderRunsE2e({ command }), command).toBe(true);
+    }
+    for (const command of ["/Volumes/LatticeBuild/work/LATA-99/measure/run.sh sanity", "sh -c pnpm exec playwright-core install webkit >/dev/null && pnpm perf:bench --check", "hold 3600", "script/e2e-notes.sh", ""]) {
+      expect(holderRunsE2e({ command }), command).toBe(false);
+    }
+    expect(holderRunsE2e(null)).toBe(false);
   });
 
   it("runs the docs-only profile without a stage that opens a window, and builds", () => {
