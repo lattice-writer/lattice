@@ -2,6 +2,9 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { GPUI_INPUTS, JOBS, ciTier, localMacosPass, trailerHonoured, wantsFull } from "./ci-tier.mjs";
 
 const repo = path.resolve(import.meta.dirname, "..");
@@ -97,11 +100,34 @@ describe("ci-tier", () => {
     expect(localMacosPass("fix: x", tree)).toBe(false);
   });
 
-  it("honours a CI-local trailer on a branch only, never on main, a tag or a full run", () => {
-    expect(trailerHonoured({ full: false, event: "push", ref: "refs/heads/capy/topic" })).toBe(true);
-    expect(trailerHonoured({ full: false, event: "workflow_dispatch", ref: "refs/heads/capy/topic" })).toBe(true);
-    expect(trailerHonoured({ full: false, event: "push", ref: "refs/heads/main" })).toBe(false);
-    expect(trailerHonoured({ full: false, event: "push", ref: "refs/tags/v0.19.3" })).toBe(false);
-    expect(trailerHonoured({ full: true, event: "push", ref: "refs/heads/capy/topic" })).toBe(false);
+  it("honours a CI-local trailer on a branch's dispatch only, never on a tag or a full run", () => {
+    expect(trailerHonoured({ full: false, ref: "refs/heads/capy/topic" })).toBe(true);
+    expect(trailerHonoured({ full: false, ref: "refs/tags/v0.19.3" })).toBe(false);
+    expect(trailerHonoured({ full: true, ref: "refs/heads/capy/topic" })).toBe(false);
+  });
+
+  it("runs only one platform's Rust and GPUI jobs, in full, for a platform dispatch", () => {
+    const outputs = (platform) => {
+      const file = path.join(mkdtempSync(path.join(tmpdir(), "ci-tier-")), "out");
+      const env = { PATH: process.env.PATH, HOME: process.env.HOME, GITHUB_EVENT_NAME: "workflow_dispatch", GITHUB_REF: "refs/heads/capy/topic", GITHUB_OUTPUT: file, INPUT_PLATFORM: platform };
+      execFileSync(process.execPath, [path.join(repo, "scripts/ci-tier.mjs"), "--github"], { cwd: repo, env, stdio: "ignore" });
+      return Object.fromEntries(readFileSync(file, "utf8").trim().split("\n").map((line) => line.split(/=(.*)/s).slice(0, 2)));
+    };
+    const windows = outputs("windows");
+    expect(JOBS.filter((job) => windows[job] === "true")).toEqual(["rust", "gpui"]);
+    expect(windows).toMatchObject({ full: "true", macos: "false", linux: "false", windows: "true", "all-platforms": "false", "windows-e2e": "full", "macos-local-rust": "false", "macos-local-gpui": "false" });
+    expect(outputs("")).toMatchObject({ macos: "true", linux: "true", windows: "true", "all-platforms": "true" });
+  });
+
+  it("runs ci.yml and gpui.yml for tags and dispatches only", () => {
+    for (const file of ["ci.yml", "gpui.yml"]) {
+      const text = readFileSync(path.join(repo, ".github/workflows", file), "utf8");
+      const lines = text.slice(text.indexOf("\non:\n") + 5).split("\n");
+      const on = lines.slice(0, lines.findIndex((line) => /^\S/.test(line)));
+      expect(on.filter((line) => /^ {2}\S/.test(line)), file).toEqual(["  push:", "  workflow_dispatch:"]);
+      expect(on.filter((line) => /^ {4}\S/.test(line))[0], file).toBe('    tags: ["v*"]');
+      expect(text, file).toMatch(/\non:\n {2}push:\n {4}tags: \["v\*"\]\n {2}workflow_dispatch:/);
+      expect(text, file).toMatch(/\n {6}platform:\n[\s\S]*?options: \[all, macos, linux, windows\]/);
+    }
   });
 });

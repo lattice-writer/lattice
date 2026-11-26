@@ -33,13 +33,16 @@
  * ci-local-select.mjs, gpui-e2e-modules.mjs) or to .github/actions/
  * everything.
  *
- * `--github` is the workflows' `changes` step. It runs every job (full)
- * for a tag, the schedule, a dispatch on main or with `full`, a dispatch
- * whose branch changes nothing against its base (a baseline of main), a head
+ * `--github` is the workflows' `changes` step. ci.yml and gpui.yml run only
+ * for a release tag and by dispatch: pull requests and pushes to branches or
+ * main run nothing on GitHub, and `pnpm ci:local` is the gate. It runs every
+ * job (full) for a tag, a dispatch on main or with `full`, a dispatch whose
+ * branch changes nothing against its base (a baseline of main), a head
  * commit with a `CI: full` trailer, or an open pull request labelled
- * `ci:full`. A push to main is compared with the commit before it; any
- * other push or dispatch with its merge base with origin/main, or with the
- * dispatch's `base`. A head commit whose `CI-local: macos <tree> …` trailer
+ * `ci:full`. A dispatch with `platform` (macos, linux or windows) runs
+ * every job of that platform alone: the Rust and GPUI jobs there, nothing
+ * else. Any other dispatch is compared with its merge base with origin/main,
+ * or with its `base`. A head commit whose `CI-local: macos <tree> …` trailer
  * names its own tree (printed by `pnpm ci:local` after a green local pass)
  * skips each macOS job (Rust, GPUI, the WebKit benchmark) whose stages the
  * trailer records and whose needs they cover (scripts/ci-local-select.mjs):
@@ -50,13 +53,13 @@
  * ancestor and everything since it is text (resolveCover): the gate's cover
  * must then cover the rest of the branch, release paths included, and the
  * text files are the docs-only pass's own. Linux and Windows always
- * run, and a push to main or a tag ignores the trailer. GPUI's Windows job runs the whole e2e
+ * run, and a tag or full run ignores the trailer. GPUI's Windows job runs the whole e2e
  * scenario only for a change that can behave differently on Windows, and
- * for every full run and push to main; otherwise the smoke flow
+ * for every full run; otherwise the smoke flow
  * (scripts/windows-e2e-tier.mjs, the `windows-e2e` output). Its Linux job
  * runs the whole scenario only for a change to what can behave differently
  * on Linux (the vendored GPUI crates, Linux-only code, the scenario's
- * harness), and for every full run and push to main; otherwise the smoke
+ * harness), and for every full run; otherwise the smoke
  * flow (scripts/linux-gpui-e2e-tier.mjs, the `linux-e2e` output).
  *
  * Usage:
@@ -219,12 +222,14 @@ export function localMacosPass(message, tree) {
 
 /**
  * Whether a CI-local trailer may stand for macOS jobs in this run. Never on a
- * push to main or a tag, where a regression is pinned to its commit, nor in a
- * full run: those run the hosted macOS jobs whatever the message carries.
+ * tag, which checks the release for real, nor in a full run: those run the
+ * hosted macOS jobs whatever the message carries.
  */
-export function trailerHonoured({ full, event, ref }) {
-  return !full && !(event === "push" && ref === "refs/heads/main") && !ref.startsWith("refs/tags/");
+export function trailerHonoured({ full, ref }) {
+  return !full && !ref.startsWith("refs/tags/");
 }
+
+export const PLATFORMS = ["macos", "linux", "windows"];
 
 /** Whether the head commit or the branch's open pull request asks for every job. */
 export function wantsFull(message, labels = []) {
@@ -250,42 +255,36 @@ function github() {
   const branch = ref.startsWith("refs/heads/") ? ref.slice("refs/heads/".length) : "";
   const message = git("log", "-1", "--format=%B", "HEAD");
   let reason = null;
+  const platform = process.env.INPUT_PLATFORM || "all";
+  if (platform !== "all" && !PLATFORMS.includes(platform)) throw new Error(`ci-tier: unknown platform ${platform}`);
   if (ref.startsWith("refs/tags/")) reason = "a tag";
-  else if (event === "schedule") reason = "the weekly run";
+  else if (platform !== "all") reason = `a dispatch for ${platform} alone`;
   else if (event === "workflow_dispatch" && process.env.INPUT_FULL === "true") reason = "a dispatch with full";
   else if (event === "workflow_dispatch" && branch === "main") reason = "a dispatch on main";
   else if (wantsFull(message, pullRequestLabels(branch))) reason = "a `CI: full` trailer or the `ci:full` label";
 
   let base = null;
   if (!reason && process.env.INPUT_BASE) base = git("rev-parse", "--verify", `${process.env.INPUT_BASE}^{commit}`);
-  else if (!reason && event === "push" && branch === "main") {
-    const before = process.env.BEFORE ?? "";
-    try {
-      if (!before || /^0+$/.test(before)) throw new Error("no previous commit");
-      git("merge-base", "--is-ancestor", before, "HEAD");
-      base = before;
-    } catch {
-      reason = "a push to main whose previous commit is unknown";
-    }
-  } else if (!reason) base = git("merge-base", "origin/main", "HEAD");
+  else if (!reason) base = git("merge-base", "origin/main", "HEAD");
 
   const files = base ? git("-c", "core.quotePath=false", "diff", "--no-renames", "--name-only", base, "HEAD").split("\n").filter(Boolean) : [];
   if (!reason && event === "workflow_dispatch" && files.length === 0) reason = "a dispatch of a branch that changes nothing (a baseline)";
   const tier = ciTier(files, { full: Boolean(reason) });
-  const named = trailerHonoured({ full: tier.full, event, ref }) && localMacosPass(message, git("rev-parse", "HEAD^{tree}")) ? parseTrailer(message) : null;
+  if (platform !== "all") for (const job of JOBS) tier.jobs[job] = job === "rust" || job === "gpui";
+  const named = trailerHonoured({ full: tier.full, ref }) && localMacosPass(message, git("rev-parse", "HEAD^{tree}")) ? parseTrailer(message) : null;
   // A docs-only pass checked the text files since its gate; the gate's own
   // cover has to cover everything else the branch changes.
   const { cover, docsFiles, reason: docsRefused } = resolveCover(named, { cwd: repo });
   const gated = files.filter((file) => !docsFiles.includes(file));
   const local = coveredJobs(cover, macosNeeds(docsFiles.length ? ciTier(gated) : tier, gated));
-  const windows = windowsE2e(tier.gpuiFiles, { full: tier.full || (event === "push" && branch === "main") });
-  const linux = linuxE2e(tier.gpuiFiles, { full: tier.full || (event === "push" && branch === "main") });
+  const windows = windowsE2e(tier.gpuiFiles, { full: tier.full });
+  const linux = linuxE2e(tier.gpuiFiles, { full: tier.full });
   const groups = { rust: "Rust", gpui: "GPUI", webkit: "WebKit benchmark" };
   const needed = Object.keys(groups).filter((group) => (group === "webkit" ? tier.jobs["perf-bench"] : tier.jobs[group]));
   // The WebKit benchmark measures the classic app, frozen on macOS: a branch
   // that does not touch its tooling skips it, trailer or not (macosNeeds).
-  // Main and tags, which honour no trailer, still run it.
-  const webkitSkipped = trailerHonoured({ full: tier.full, event, ref }) && (cover ? local.webkit.covered : !macosNeeds(tier, gated).webkit);
+  // Tags and full runs, which honour no trailer, still run it.
+  const webkitSkipped = trailerHonoured({ full: tier.full, ref }) && (cover ? local.webkit.covered : !macosNeeds(tier, gated).webkit);
   const lines = [
     reason ? `Every job: ${reason}.` : `Compared with ${base.slice(0, 9)}: ${files.length} changed file(s).`,
     ...(docsRefused ? [`The head commit's docs-only trailer is not taken: ${docsRefused}.`] : []),
@@ -321,6 +320,8 @@ function github() {
     "windows-e2e": windows.e2e,
     "linux-e2e": linux.e2e,
     full: tier.full,
+    ...Object.fromEntries(PLATFORMS.map((name) => [name, platform === "all" || platform === name])),
+    "all-platforms": platform === "all",
   };
   if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, Object.entries(outputs).map(([key, value]) => `${key}=${value}\n`).join(""));
 }

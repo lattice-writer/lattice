@@ -37,9 +37,8 @@
  *
  * Anything else, platform-neutral app code included, takes the smoke flow on
  * a branch: the macOS job (or the CI-local trailer that stands for it) and
- * Windows run what the diff picks there. Every push to main, tag, schedule
- * and full run takes the whole Linux scenario, so a Linux-only break shows
- * on main the same day.
+ * Windows run what the diff picks there. Every tag and full run takes the
+ * whole Linux scenario.
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";

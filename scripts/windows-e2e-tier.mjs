@@ -28,8 +28,8 @@
  * Anything else the GPUI job reads needs the whole scenario: the
  * platform-neutral crates, cfg(windows) code, Windows packaging, the
  * scenario's harness and fixtures, the workflows, lattice-core and the
- * design-system tokens. So does every run with no diff to judge: a tag, the
- * schedule, a full dispatch, and every push to main (scripts/ci-tier.mjs).
+ * design-system tokens. So does every run with no diff to judge: a tag and a
+ * full dispatch (scripts/ci-tier.mjs).
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";

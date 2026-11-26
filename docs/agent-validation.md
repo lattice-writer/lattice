@@ -89,11 +89,16 @@ A waiter takes it over from a holder that died, or that has held it past 30 minu
 
 ### CI tiers, and `pnpm ci:local`
 
-Every push to a branch of this repository runs `ci.yml` and `gpui.yml`, each with
-only the jobs its change needs against its merge base with `origin/main`.
-`scripts/ci-tier.mjs` decides, and its header lists each job group's inputs:
+GitHub runs `ci.yml` and `gpui.yml` only for a release tag and by hand
+(Leo, 2026-11-26). Pull requests and pushes to branches or main run nothing
+there: `pnpm ci:local` on a Mac is the gate, and the nightly e2e
+(`nightly-e2e.yml`, on the Mac mini) runs the whole GPUI scenario on main
+every night. A tag runs every job. A dispatch (`gh workflow run ci.yml --ref
+<ref>`) runs only the jobs its ref's change needs against its merge base with
+`origin/main`; `scripts/ci-tier.mjs` decides, `pnpm ci:local` picks its
+stages from the same tier, and the header lists each job group's inputs:
 
-| The branch changes | CI runs |
+| The branch changes | A dispatch runs |
 | --- | --- |
 | documentation only (`docs/`, top-level Markdown, `gpui/docs/`) | nothing past the `changes` job |
 | a document a test reads (a spec, `docs/performance*`) | those tests, or the perf-evidence check |
@@ -111,17 +116,20 @@ macOS-only (the `gpui_macos` and `gpui_apple` patches, files named for
 macOS, a source under `#![cfg(target_os = "macos")]`, the parity report) or
 a file no scenario step reads runs the smoke flow alone there. Island web code
 (`src/`, `gpui/islands/`) takes the whole scenario: it renders in WebView2 on
-Windows. Every push to main, tag and full run takes the whole
+Windows. Every tag and full run takes the whole
 scenario. `scripts/windows-e2e-tier.mjs` decides, and the `changes` job's
 summary says which and why; `node scripts/ci-tier.mjs` prints it for your
 branch as `windowsE2e`.
 
-A newer push to a branch cancels its older run. A push to main runs what that
-merge changed and is never cancelled. Everything runs for a release tag, the
-weekly schedule, a dispatch on main, `gh workflow run ci.yml --ref <branch> -f
+A newer dispatch for a branch cancels its older run. Everything runs for a
+release tag, a dispatch on main, `gh workflow run ci.yml --ref <branch> -f
 full=true`, a head commit with a `CI: full` trailer, or a pull request labelled
 `ci:full`. A dispatch's `-f base=<ref>` compares with another ref, such as the
-branch below yours in a stack.
+branch below yours in a stack. `-f platform=windows` (or `linux`, `macos`)
+runs that platform's job alone, in full: the Rust job for `ci.yml`, the GPUI
+job for `gpui.yml`, nothing else, for a port's pull request that needs a real
+Windows or Linux run. No weekly run warms main's Rust caches any more, so a
+dispatch on main before a release saves the tag's jobs a cold build.
 
 The GPUI e2e jobs fail only on a step that passes on main. The steps main
 fails on the hosted runners are in `scripts/gpui-e2e-known-failures.json`, each
@@ -209,7 +217,8 @@ benchmark, Linux and Windows run in CI only.
 When it passes on a clean tree and the change needed a macOS job, it prints
 "local macOS gate passed at <sha>" and a trailer naming the commit's tree and
 the stages that ran, such as `CI-local: macos 1a2b3c4d5e6f gpui e2e=smoke+pdf+pdf_notes`
-or `CI-local: macos 1a2b3c4d5e6f rust gpui e2e=full`. On a pushed head
+or `CI-local: macos 1a2b3c4d5e6f rust gpui e2e=full`. The trailer is the
+record that the gate passed on that tree. On a dispatched head
 commit whose tree it names, CI skips each macOS job (Rust, GPUI, the WebKit
 benchmark) whose needs those stages cover for the diff; a job they do not
 cover, such as GPUI after a change that needs a module the trailer's e2e did
@@ -220,15 +229,14 @@ macOS job.
 The WebKit benchmark measures the classic app in WKWebView, and classic
 macOS is frozen (no Mac user runs it since 0.20.0), so neither `ci:local`
 nor a branch's CI runs it unless the change touches its tooling; it then
-appears in the trailer as `webkit`. A push to main and a tag still run it
+appears in the trailer as `webkit`. A tag and a full dispatch still run it
 on GitHub.
 
 For a release path only the full gate's trailer
 (`rust gpui e2e=full`, which `ci:local` prints for such a diff) stands
 for the macOS jobs; a tree-only or partial trailer does not, and those jobs run
 on GitHub. A release is still built and checked for real on GitHub when its
-tag is pushed: a tag runs every job and ignores any trailer (so does every
-push to main), and
+tag is pushed: a tag runs every job and ignores any trailer, and
 `release.yml` and `gpui-package.yml` take no trailer at all.
 `pnpm ci:local --full` runs every stage and the whole e2e, except the WebKit benchmark unless the diff changes it.
 
