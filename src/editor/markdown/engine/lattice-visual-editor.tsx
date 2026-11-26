@@ -653,10 +653,10 @@ export function LatticeVisualMarkdownEditor(props: VisualMarkdownEditorProps): J
   // A large read-only document opens passive until the reader asks for the complete editor (R-PERF-1–3).
   const [activated, setActivated] = useState<{ path: string; href: string | null } | null>(null);
   const passiveWanted = !editable && activated?.path !== activePath;
-  // Only the text, the file and reading mode shape the passive layout.
+  // Only these shape the passive layout.
   const passive = useMemo(
-    () => (passiveWanted ? passiveFor(text, activePath, Boolean(optimizeForReading)) : null),
-    [passiveWanted, text, activePath, optimizeForReading],
+    () => (passiveWanted ? passiveFor(text, activePath, optimizeForReading, props.textColors) : null),
+    [passiveWanted, text, activePath, optimizeForReading, props.textColors],
   );
 
   useLayoutEffect(() => {

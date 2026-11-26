@@ -249,8 +249,8 @@ function ChunkEditor({ chunk, labels, reading, onLink, onPage }: {
 }
 
 /** The passive layout for a large read-only document (R-PERF-1), or null to draw it whole. */
-export function passiveFor(text: string, activePath: string, reading: boolean): PassiveModel | null {
-  const opened = openMarkdown(text, engineSchema(), openOptions({ activePath, optimizeForReading: reading }));
+export function passiveFor(text: string, activePath: string, reading = false, textColors = false): PassiveModel | null {
+  const opened = openMarkdown(text, engineSchema(), openOptions({ activePath, optimizeForReading: reading, textColors }));
   return "unavailable" in opened ? null : passiveModel(opened.doc, opened.baseline, text.length, reading);
 }
 

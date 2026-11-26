@@ -22,7 +22,9 @@
 //! - a word typed into the visual editor just before its tab closes is in
 //!   the file once the tab has gone;
 //! - hidden past the (shortened) hibernation delay the page is torn down,
-//!   and drawn again with the document when shown.
+//!   and drawn again with the document when shown;
+//! - author text colours are drawn and kept through an edit
+//!   (`markdown_colors.rs`).
 
 #![cfg(target_os = "macos")]
 
@@ -95,7 +97,7 @@ fn caret_after(text: &str) -> String {
 
 /// The middle of the visual editor's paragraph holding `text`, in the
 /// page's coordinates, brought into view first; null when it is missing.
-fn paragraph_point(text: &str) -> String {
+pub(super) fn paragraph_point(text: &str) -> String {
     format!(
         "(() => {{ const p = [...document.querySelectorAll('.lx-md-surface p')].find((node) => node.textContent.includes({text:?})); \
          if (!p) return null; p.scrollIntoView({{ block: 'center' }}); const r = p.getBoundingClientRect(); \
@@ -141,6 +143,7 @@ impl Run {
             .await?;
         self.markdown_split_scroll(cx, steps, root).await?;
         self.markdown_page_index(cx, steps, root).await?;
+        self.markdown_colors(cx, steps, root).await?;
         Ok(())
     }
 
@@ -729,6 +732,7 @@ pub(super) const MODULE: super::registry::Module = super::registry::Module {
         "gpui/crates/lattice-gpui/src/editor_panel/markdown_view.rs",
         "gpui/crates/lattice-webview/",
         "gpui/islands/",
+        "gpui/crates/lattice-gpui/src/scenario/e2e/markdown_colors.rs",
         "gpui/crates/lattice-gpui/src/scenario/e2e/markdown_pages.rs",
         "gpui/crates/lattice-gpui/src/scenario/e2e/markdown_scroll.rs",
     ],
