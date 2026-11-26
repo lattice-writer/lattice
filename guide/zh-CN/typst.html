@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Typst 文档 · Lattice 使用指南</title>
+<link rel="alternate" hreflang="en" href="../typst.html">
+<style>
+:root { color-scheme: light dark; --text: #1f2328; --muted: #59636e; --line: #d8dbd2; --surface: #f4f5f0; --accent: #556324; --background: #fff; --mark: #e7ecc9; }
+@media (prefers-color-scheme: dark) { :root { --text: #e6e6e3; --muted: #9a9a95; --line: #3a3a37; --surface: #252523; --accent: #b5c47a; --background: #181817; --mark: #3d4423; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--background); color: var(--text); font: 16px/1.65 -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif; }
+header { position: sticky; top: 0; z-index: 2; display: flex; gap: 20px; align-items: center; padding: 10px 28px; border-bottom: 1px solid var(--line); background: var(--background); }
+header a { color: var(--text); text-decoration: none; }
+header .home { font-weight: 650; white-space: nowrap; }
+header .language { margin-left: auto; color: var(--muted); white-space: nowrap; }
+.search { position: relative; flex: 0 1 360px; }
+.search input { width: 100%; font: inherit; font-size: 14px; padding: 5px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--text); }
+.search input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+#results { position: absolute; top: calc(100% + 6px); left: 0; width: min(560px, 90vw); max-height: 70vh; overflow-y: auto; margin: 0; padding: 6px; list-style: none; background: var(--background); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 12px 32px rgb(0 0 0 / 0.14); }
+#results a { display: block; padding: 7px 10px; border-radius: 6px; color: var(--text); text-decoration: none; }
+#results a:hover, #results a[aria-selected] { background: var(--surface); }
+#results strong { display: block; font-size: 14px; }
+#results span { display: block; font-size: 13px; color: var(--muted); line-height: 1.45; }
+#results mark { background: var(--mark); color: inherit; border-radius: 2px; }
+#results .empty { padding: 8px 10px; color: var(--muted); font-size: 14px; }
+.layout { display: grid; grid-template-columns: 230px minmax(0, 800px); gap: 44px; padding: 28px; }
+nav { position: sticky; top: 76px; align-self: start; max-height: calc(100vh - 96px); overflow-y: auto; }
+nav h2 { margin: 18px 0 4px; padding: 0 10px; font-size: 12px; font-weight: 650; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+nav h2:first-child { margin-top: 0; }
+nav ol { list-style: none; margin: 0; padding: 0; }
+nav a { display: block; padding: 3px 10px; border-radius: 6px; color: var(--muted); text-decoration: none; font-size: 15px; }
+nav a:hover { color: var(--text); }
+nav a[aria-current] { background: var(--surface); color: var(--text); font-weight: 600; }
+main h1 { font-size: 30px; line-height: 1.25; margin: 0 0 18px; }
+main h2 { font-size: 21px; margin: 36px 0 10px; padding-top: 10px; border-top: 1px solid var(--line); scroll-margin-top: 64px; }
+main h3 { font-size: 17px; margin: 26px 0 8px; scroll-margin-top: 64px; }
+main a { color: var(--accent); }
+main img { max-width: 100%; border: 1px solid var(--line); border-radius: 10px; margin: 8px 0; }
+main code, main kbd { font: 13.5px ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--surface); border-radius: 4px; padding: 1px 5px; }
+main pre { background: var(--surface); padding: 12px 14px; border-radius: 8px; overflow-x: auto; }
+main pre code { padding: 0; }
+main table { border-collapse: collapse; margin: 12px 0; }
+main th, main td { border: 1px solid var(--line); padding: 6px 12px; text-align: left; vertical-align: top; }
+main blockquote { margin: 12px 0; padding: 2px 16px; border-left: 3px solid var(--accent); color: var(--muted); }
+.pager { display: flex; justify-content: space-between; gap: 16px; margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--line); }
+.pager a { display: flex; flex-direction: column; padding: 10px 14px; border: 1px solid var(--line); border-radius: 8px; text-decoration: none; }
+.pager a[rel="next"] { margin-left: auto; text-align: right; }
+.pager small { color: var(--muted); font-size: 12px; }
+@media (max-width: 860px) { header { flex-wrap: wrap; padding: 10px 16px; } .search { order: 3; flex-basis: 100%; } .layout { grid-template-columns: 1fr; gap: 20px; padding: 16px; } nav { position: static; max-height: none; } }
+</style>
+<script src="search-index.js" defer></script>
+<script src="../search.js" defer></script>
+</head>
+<body>
+<header>
+<a class="home" href="index.html">Lattice 使用指南</a>
+<div class="search" role="search">
+<input type="search" id="search" placeholder="搜索指南" aria-label="搜索指南" autocomplete="off" spellcheck="false" data-empty="没有匹配的页面。">
+<ol id="results" hidden></ol>
+</div>
+<a class="language" href="../typst.html" hreflang="en" lang="en">English</a>
+</header>
+<div class="layout">
+<nav aria-label="目录"><h2>快速上手</h2><ol><li><a href="getting-started.html">快速上手</a></li><li><a href="workspaces.html">面板与工作区</a></li></ol><h2>写作</h2><ol><li><a href="writing.html">写作</a></li><li><a href="boards.html">白板</a></li><li><a href="history.html">历史与版本对比</a></li></ol><h2>编译与 PDF</h2><ol><li><a href="building.html">编译与排错</a></li><li><a href="typst.html" aria-current="page">Typst 文档</a></li></ol><h2>引用与论文库</h2><ol><li><a href="citations.html">引用与论文库</a></li></ol><h2>AI 助手</h2><ol><li><a href="agent.html">AI 助手</a></li></ol><h2>Overleaf</h2><ol><li><a href="overleaf.html">Overleaf 同步</a></li></ol><h2>设置</h2><ol><li><a href="settings-and-shortcuts.html">设置与快捷键</a></li><li><a href="plugins-and-themes.html">插件与主题</a></li></ol><h2>常见问题</h2><ol><li><a href="troubleshooting.html">常见问题与排错</a></li></ol><h2>开发插件</h2><ol><li><a href="plugin-development.html">第一个插件</a></li><li><a href="plugin-reference.html">插件清单与 API</a></li><li><a href="plugin-publishing.html">发布插件</a></li><li><a href="theme-development.html">制作主题</a></li></ol></nav>
+<main>
+<h1 id="typst-文档">Typst 文档</h1>
+<p>Lattice 也能编写和编译 <a href="https://typst.app">Typst</a> 文档（<code>.typ</code> 文件）。<code>.typ</code> 文件打开即有语法高亮。Typst 编译器需要另外下载一次，这样不用 Typst 的用户也不会多占空间。</p>
+<h2 id="下载-typst-支持">下载 Typst 支持</h2>
+<p>第一次编译 Typst 文档，或开始边写边编译时，Lattice 会询问是否下载 Typst 支持，这是一次性下载，约 22 MB。选择 <strong>下载</strong> 会下载它、校验签名后继续编译。选择 <strong>以后再说</strong> 则保持原样，文件只有语法高亮；在重新打开 Lattice 之前，输入时不会再询问，下次编译时会再次询问。应用更新后，Lattice 会自动下载对应版本。</p>
+<p><strong>设置 › 编辑编译 › Typst 支持</strong> 显示是否已安装，并有 <strong>下载</strong>，或 <strong>重新下载</strong> 和 <strong>移除</strong>。Apple 芯片和 Intel 芯片的 Mac 都可以使用 Typst 支持。</p>
+<h2 id="新建">新建</h2>
+<ul>
+<li>创建项目时，会议模板选 <strong>Blank Typst document</strong>；或在项目面板的 <strong>+</strong> 菜单中选择 <strong>新建 Typst</strong>。</li>
+<li>打开的文件夹如果没有 LaTeX 文档、但有 <code>main.typ</code>（或引入其他文件的那个 <code>.typ</code>），就会编译这个文件。</li>
+<li><strong>在 LaTeX 项目中</strong>编译某个 <code>.typ</code> 文件时，只单独编译它，其他编译仍然编译原来的 LaTeX 论文。</li>
+</ul>
+<h2 id="编写与编译">编写与编译</h2>
+<ul>
+<li><strong>编译与预览</strong>：<code>⌘S</code>、编译按钮和自动编译与 LaTeX 相同。Typst 还会边写边编译：停止输入片刻后，PDF 就会显示刚才未保存的修改，并保持原来的页码和滚动位置。</li>
+<li><strong>错误</strong>：编译按钮和问题卡片显示 Typst 的错误与警告，并标明文件和行号，点击即可跳到对应行。</li>
+<li><strong>源码与 PDF</strong>：在 PDF 中双击某处，光标就会跳到源码中对应的那一行，<code>#include</code> 进来的文件也可以；按 <code>⌘⇧J</code> 则在 PDF 中标出光标所在的行。尚未保存的修改也算在内；需要先编译一次文档。</li>
+<li><strong>字体与包</strong>：可以使用系统字体，以及 Typst 自带的字体（Libertinus Serif、New Computer Modern、DejaVu Sans Mono）。<code>#import &quot;@preview/…&quot;</code> 第一次使用时会从 Typst Universe 下载包，之后离线也能用。</li>
+</ul>
+<p>Overleaf 同步和可视化编辑器目前只支持 LaTeX。</p>
+<footer class="pager"><a rel="prev" href="building.html"><small>上一页</small>编译与排错</a><a rel="next" href="citations.html"><small>下一页</small>引用与论文库</a></footer>
+</main>
+</div>
+</body>
+</html>

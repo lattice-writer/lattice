@@ -4,23 +4,37 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>快速上手 · Lattice 使用指南</title>
+<link rel="alternate" hreflang="en" href="../getting-started.html">
 <style>
-:root { color-scheme: light dark; --text: #1f2328; --muted: #59636e; --line: #d8dbd2; --surface: #f4f5f0; --accent: #556324; --background: #fff; }
-@media (prefers-color-scheme: dark) { :root { --text: #e6e6e3; --muted: #9a9a95; --line: #3a3a37; --surface: #252523; --accent: #b5c47a; --background: #181817; } }
+:root { color-scheme: light dark; --text: #1f2328; --muted: #59636e; --line: #d8dbd2; --surface: #f4f5f0; --accent: #556324; --background: #fff; --mark: #e7ecc9; }
+@media (prefers-color-scheme: dark) { :root { --text: #e6e6e3; --muted: #9a9a95; --line: #3a3a37; --surface: #252523; --accent: #b5c47a; --background: #181817; --mark: #3d4423; } }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--background); color: var(--text); font: 16px/1.65 -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif; }
-header { display: flex; gap: 20px; align-items: baseline; padding: 14px 28px; border-bottom: 1px solid var(--line); }
+header { position: sticky; top: 0; z-index: 2; display: flex; gap: 20px; align-items: center; padding: 10px 28px; border-bottom: 1px solid var(--line); background: var(--background); }
 header a { color: var(--text); text-decoration: none; }
-header .home { font-weight: 650; }
-header .language { margin-left: auto; color: var(--muted); }
-.layout { display: grid; grid-template-columns: 220px minmax(0, 800px); gap: 44px; padding: 28px; }
-nav ol { list-style: none; margin: 0; padding: 0; position: sticky; top: 28px; }
-nav a { display: block; padding: 4px 10px; border-radius: 6px; color: var(--muted); text-decoration: none; }
+header .home { font-weight: 650; white-space: nowrap; }
+header .language { margin-left: auto; color: var(--muted); white-space: nowrap; }
+.search { position: relative; flex: 0 1 360px; }
+.search input { width: 100%; font: inherit; font-size: 14px; padding: 5px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--text); }
+.search input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+#results { position: absolute; top: calc(100% + 6px); left: 0; width: min(560px, 90vw); max-height: 70vh; overflow-y: auto; margin: 0; padding: 6px; list-style: none; background: var(--background); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 12px 32px rgb(0 0 0 / 0.14); }
+#results a { display: block; padding: 7px 10px; border-radius: 6px; color: var(--text); text-decoration: none; }
+#results a:hover, #results a[aria-selected] { background: var(--surface); }
+#results strong { display: block; font-size: 14px; }
+#results span { display: block; font-size: 13px; color: var(--muted); line-height: 1.45; }
+#results mark { background: var(--mark); color: inherit; border-radius: 2px; }
+#results .empty { padding: 8px 10px; color: var(--muted); font-size: 14px; }
+.layout { display: grid; grid-template-columns: 230px minmax(0, 800px); gap: 44px; padding: 28px; }
+nav { position: sticky; top: 76px; align-self: start; max-height: calc(100vh - 96px); overflow-y: auto; }
+nav h2 { margin: 18px 0 4px; padding: 0 10px; font-size: 12px; font-weight: 650; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+nav h2:first-child { margin-top: 0; }
+nav ol { list-style: none; margin: 0; padding: 0; }
+nav a { display: block; padding: 3px 10px; border-radius: 6px; color: var(--muted); text-decoration: none; font-size: 15px; }
 nav a:hover { color: var(--text); }
 nav a[aria-current] { background: var(--surface); color: var(--text); font-weight: 600; }
 main h1 { font-size: 30px; line-height: 1.25; margin: 0 0 18px; }
-main h2 { font-size: 21px; margin: 36px 0 10px; padding-top: 10px; border-top: 1px solid var(--line); }
-main h3 { font-size: 17px; margin: 26px 0 8px; }
+main h2 { font-size: 21px; margin: 36px 0 10px; padding-top: 10px; border-top: 1px solid var(--line); scroll-margin-top: 64px; }
+main h3 { font-size: 17px; margin: 26px 0 8px; scroll-margin-top: 64px; }
 main a { color: var(--accent); }
 main img { max-width: 100%; border: 1px solid var(--line); border-radius: 10px; margin: 8px 0; }
 main code, main kbd { font: 13.5px ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--surface); border-radius: 4px; padding: 1px 5px; }
@@ -29,21 +43,34 @@ main pre code { padding: 0; }
 main table { border-collapse: collapse; margin: 12px 0; }
 main th, main td { border: 1px solid var(--line); padding: 6px 12px; text-align: left; vertical-align: top; }
 main blockquote { margin: 12px 0; padding: 2px 16px; border-left: 3px solid var(--accent); color: var(--muted); }
-@media (max-width: 860px) { .layout { grid-template-columns: 1fr; gap: 20px; } nav ol { position: static; } }
+.pager { display: flex; justify-content: space-between; gap: 16px; margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--line); }
+.pager a { display: flex; flex-direction: column; padding: 10px 14px; border: 1px solid var(--line); border-radius: 8px; text-decoration: none; }
+.pager a[rel="next"] { margin-left: auto; text-align: right; }
+.pager small { color: var(--muted); font-size: 12px; }
+@media (max-width: 860px) { header { flex-wrap: wrap; padding: 10px 16px; } .search { order: 3; flex-basis: 100%; } .layout { grid-template-columns: 1fr; gap: 20px; padding: 16px; } nav { position: static; max-height: none; } }
 </style>
+<script src="search-index.js" defer></script>
+<script src="../search.js" defer></script>
 </head>
 <body>
-<header><a class="home" href="../../">Lattice</a><a class="language" href="../getting-started.html" hreflang="en" lang="en">English</a></header>
+<header>
+<a class="home" href="index.html">Lattice 使用指南</a>
+<div class="search" role="search">
+<input type="search" id="search" placeholder="搜索指南" aria-label="搜索指南" autocomplete="off" spellcheck="false" data-empty="没有匹配的页面。">
+<ol id="results" hidden></ol>
+</div>
+<a class="language" href="../getting-started.html" hreflang="en" lang="en">English</a>
+</header>
 <div class="layout">
-<nav><ol><li><a href="index.html">Lattice 使用指南</a></li><li><a href="getting-started.html" aria-current="page">快速上手</a></li><li><a href="writing.html">写作</a></li><li><a href="citations.html">引用与论文库</a></li><li><a href="building.html">编译与排错</a></li><li><a href="history.html">历史与版本对比</a></li><li><a href="overleaf.html">Overleaf 同步</a></li><li><a href="boards.html">白板</a></li><li><a href="agent.html">AI 助手</a></li><li><a href="plugins-and-themes.html">插件与主题</a></li><li><a href="workspaces.html">面板与工作区</a></li><li><a href="settings-and-shortcuts.html">设置与快捷键</a></li><li><a href="troubleshooting.html">常见问题</a></li><li><a href="plugin-development.html">第一个插件</a></li><li><a href="plugin-reference.html">插件清单与 API</a></li><li><a href="plugin-publishing.html">发布插件</a></li><li><a href="theme-development.html">制作主题</a></li></ol></nav>
+<nav aria-label="目录"><h2>快速上手</h2><ol><li><a href="getting-started.html" aria-current="page">快速上手</a></li><li><a href="workspaces.html">面板与工作区</a></li></ol><h2>写作</h2><ol><li><a href="writing.html">写作</a></li><li><a href="boards.html">白板</a></li><li><a href="history.html">历史与版本对比</a></li></ol><h2>编译与 PDF</h2><ol><li><a href="building.html">编译与排错</a></li><li><a href="typst.html">Typst 文档</a></li></ol><h2>引用与论文库</h2><ol><li><a href="citations.html">引用与论文库</a></li></ol><h2>AI 助手</h2><ol><li><a href="agent.html">AI 助手</a></li></ol><h2>Overleaf</h2><ol><li><a href="overleaf.html">Overleaf 同步</a></li></ol><h2>设置</h2><ol><li><a href="settings-and-shortcuts.html">设置与快捷键</a></li><li><a href="plugins-and-themes.html">插件与主题</a></li></ol><h2>常见问题</h2><ol><li><a href="troubleshooting.html">常见问题与排错</a></li></ol><h2>开发插件</h2><ol><li><a href="plugin-development.html">第一个插件</a></li><li><a href="plugin-reference.html">插件清单与 API</a></li><li><a href="plugin-publishing.html">发布插件</a></li><li><a href="theme-development.html">制作主题</a></li></ol></nav>
 <main>
 <h1 id="快速上手">快速上手</h1>
 <h2 id="安装-lattice">安装 Lattice</h2>
 <ol>
 <li>从 <a href="https://github.com/lattice-writer/lattice/releases/latest">最新版本</a> 下载 <code>.dmg</code>，把 Lattice 拖进「应用程序」。Intel Mac 请下载以 <code>_x64.dmg</code> 结尾的文件。也可以用 Homebrew：<code>brew install --cask lattice</code>。</li>
-<li>打开 Lattice。它会自动更新：新版本下载好后，<strong>Lattice › 重新启动以更新…</strong> 即可安装。可在 <strong>设置 › 编辑编译 › 更新</strong> 中修改。</li>
+<li>打开 Lattice。它会自动更新：新版本下载好后，<strong>Lattice › 重新启动以更新…</strong> 即可安装。<strong>设置 › 编辑编译 › 更新</strong> 显示当前版本，并有 <strong>检查更新</strong>。</li>
 </ol>
-<p>Lattice 需要 macOS 14 或更高版本。Linux（AppImage）和 Windows 版本仍是实验性的，没有 AI 助手。</p>
+<p>Lattice 需要 macOS 14 或更高版本。Windows 和 Linux 版本仍是实验性的，运行的是经典版本，没有 AI 助手；本指南介绍的是 Mac 版。</p>
 <h2 id="原生-lattice">原生 Lattice</h2>
 <p>在 Mac 上，Lattice 就是原生版本：界面由 Mac 直接绘制，而不是网页，Apple 芯片和 Intel 芯片的 Mac 都一样。从 0.20.0 起，它取代了经典版本；Windows 和 Linux 继续使用经典版本。更新经典版本时，会直接把原生版本装在原处，不需要做任何选择；0.20.0 及以后的经典版本一启动就会安装原生版本，下载时会显示一条简短的提示。</p>
 <ul>
@@ -52,26 +79,28 @@ main blockquote { margin: 12px 0; padding: 2px 16px; border-left: 3px solid var(
 <li><strong>不一样的地方：</strong> 原生版本用 macOS 自带的检查器检查拼写，没有语法检查，也没有其他语言的词典。在 Mac 上无法再回到经典版本；经典版本的数据仍留在你的 Mac 上，原封不动。</li>
 </ul>
 <h2 id="配置-tex">配置 TeX</h2>
-<p>Lattice 使用你自己的 TeX 发行版（MacTeX 或 TeX Live）编译 PDF。如果还没有安装，Lattice 可以帮你安装 <strong>BasicTeX</strong>：这是「上手」清单的第一步，找不到 TeX 的编译也会提示安装。编译时发现缺少的 LaTeX 宏包，也可以直接在编译问题里安装。</p>
-<p>随时可以打开 <strong>设置 › TeX 检查</strong> 查看环境。它列出编译用到的每个工具，以及当前项目需要的东西（主文档、参考文献、会议模板宏包和字体）。显示 <strong>可以编译了</strong> 就说明一切就绪。有红色项时，点 <strong>安装所需工具</strong> 即可；添加论文和查找引用需要一个小的 Python 工具（<code>uv</code>），同一个按钮也会安装它。</p>
+<p>Lattice 使用你自己的 TeX 发行版（MacTeX 或 TeX Live）编译 PDF。如果还没有安装，Lattice 可以帮你安装 <strong>BasicTeX</strong>：这是「上手」清单的第一步，找不到 TeX 的编译也会提示安装。编译时发现缺少的 LaTeX 宏包，也可以直接在编译问题里安装。Typst 文档完全不需要 TeX，见 <a href="typst.html">Typst 文档</a>。</p>
+<p>随时可以打开 <strong>设置 › TeX 检查</strong> 查看环境。它列出编译用到的每个工具，以及当前项目需要的东西（主文档、参考文献、会议模板宏包和字体）。显示 <strong>可以编译了</strong> 就说明一切就绪。有红色项时，点 <strong>安装所需工具</strong> 即可。添加论文和查找引用需要一个小的 Python 工具（<code>uv</code>），同一个按钮也会安装它；「上手」面板里的 <strong>安装论文工具</strong> 作用相同（约 45 MB）。</p>
 <p><img src="../images/zh-tex-doctor.webp" alt="TeX 检查：所有工具都已找到，可以编译了"></p>
 <h2 id="打开或新建项目">打开或新建项目</h2>
-<p>左上角的项目名菜单和 <strong>文件</strong> 菜单里有相同的操作：</p>
+<p>左上角的项目名菜单和 <strong>文件</strong> 菜单里有打开和新建项目的各种方式：</p>
 <ul>
-<li><strong>打开文件夹</strong>（<code>⌘O</code>）：任何包含 <code>.tex</code> 文件的文件夹，Lattice 直接在原处编辑。</li>
-<li><strong>新建项目</strong>（<code>⌘⇧N</code>）：起个名字，选一个会议模板（NeurIPS、ICML、ICLR、ACL、CVPR、AAAI 或学位论文模板）或你自己保存的模板，再点 <strong>选择位置</strong>。原生版 Lattice 里这个按钮叫 <strong>选择上级文件夹…</strong>：你选的文件夹里会新建项目自己的文件夹，点 <strong>创建项目</strong> 之前对话框会写明将要创建什么（例如 <strong>将创建 ProjectA/Manuscript/</strong>）。如果上级文件夹已经和项目同名，它会提醒你，免得建出 <code>Manuscript/Manuscript/</code>。</li>
+<li><strong>打开文件夹</strong>（<code>⌘O</code>，<strong>文件 › 打开…</strong>）：任何包含 <code>.tex</code> 或 <code>.typ</code> 文件的文件夹，Lattice 直接在原处编辑。项目菜单里的 <strong>在此窗口中打开文件夹</strong> 会把它作为当前窗口的一个标签打开。</li>
+<li><strong>新建项目</strong>（<code>⌘⇧N</code>）：打开 <strong>新建论文</strong> 对话框。填写项目名，在 <strong>投稿模板</strong> 中选一个（空白文章、使用 ctexart 的中文文章、NeurIPS、ICML、ICLR、ACL、CVPR 及 CVPR rebuttal、AAAI、IEEE 会议和期刊、ACM、清华大学和中国科大学位论文，或 <strong>Blank Typst document</strong>），或 <strong>我的模板</strong> 中你自己保存的模板，再点 <strong>选择上级文件夹…</strong>。你选的文件夹里会新建项目自己的文件夹，点 <strong>创建项目</strong> 之前对话框会写明将要创建什么（例如 <strong>将创建 ProjectA/Manuscript/</strong>）。如果上级文件夹已经和项目同名，它会提醒你，免得建出 <code>Manuscript/Manuscript/</code>。</li>
 <li><strong>克隆仓库…</strong>：来自 GitHub 或其他地方的 Git 仓库。</li>
 <li><strong>从 Overleaf 打开</strong>：见 <a href="overleaf.html">Overleaf 同步</a>。</li>
-<li><strong>导入 Overleaf ZIP…</strong>：从 Overleaf 下载的 ZIP 项目。</li>
+<li><strong>文件 › 导入 Overleaf ZIP…</strong>：从 Overleaf 下载的 ZIP 项目。</li>
 </ul>
-<p><img src="../images/en-new-project.webp" alt="新建项目：名称、会议模板和选择位置"></p>
-<p>最近的项目在 <strong>文件 › 打开最近使用</strong>。一个窗口可以在标题栏以标签形式打开多个项目。</p>
+<p><img src="../images/zh-new-project.webp" alt="新建论文：项目名、会议模板和选择上级文件夹"></p>
+<p>最近的项目在项目菜单顶部和 <strong>文件 › 打开最近使用</strong> 中。一个窗口可以在标题栏以标签形式打开多个项目。</p>
 <h3 id="一个仓库里放多篇稿件">一个仓库里放多篇稿件</h3>
 <p>项目就是一个文件夹，所以它可以是整个代码仓库：分析代码、数据和一篇或几篇论文放在一起。把仓库根目录作为项目打开，Agent 就能在整个仓库里工作，比如先拿 <code>analysis/</code> 的输出核对结果部分的一个数字，再在同一个对话里修改论文。</p>
-<p>在原生版 Lattice 里，每篇论文都可以用 <strong>从模板新建稿件…</strong> 开始。它在文件夹的右键菜单、项目面板空白处的右键菜单、面板的 <strong>+</strong> 菜单和命令面板里。选一个模板（和新建项目里的一样，也包括你保存的模板）和文件夹名，需要的话勾上 <strong>设为主文档</strong>，这样 <strong>编译</strong> 会编译它。Lattice 把模板文件写进这个文件夹并打开主文件。当前项目保持打开，设置、历史和 Agent 对话都不变，也不会另建项目。如果其中有文件已经存在，就什么也不写，对话框会列出这些文件。</p>
+<p>每篇论文都可以用 <strong>从模板新建稿件…</strong> 开始。它在文件夹的右键菜单、项目面板空白处的右键菜单、面板的 <strong>+</strong> 菜单和命令面板（<code>⌘K</code>）里。选一个 <strong>模板</strong>（和新建项目里的一样，也包括你保存的模板）和 <strong>文件夹</strong>（默认是 <code>Manuscript</code>），需要的话勾上 <strong>设为主文档</strong>，这样 <strong>编译</strong> 会编译它。点 <strong>创建稿件</strong>，Lattice 把模板文件写进这个文件夹并打开主文件。当前项目保持打开，设置、历史和 Agent 对话都不变，也不会另建项目。如果其中有文件已经存在，就什么也不写，对话框会列出这些文件。</p>
+<p><img src="../images/zh-new-manuscript.webp" alt="从模板新建稿件：模板、要写入的文件夹和「设为主文档」"></p>
 <h2 id="上手清单">「上手」清单</h2>
-<p>项目菜单中的 <strong>新手教程</strong> 会打开一篇示例论文，旁边是 <strong>上手</strong> 清单，共六步：安装 LaTeX、修改标题并编译、在 PDF 和源码之间跳转、引用一篇论文、让 AI 助手修改一段话、开始写你自己的论文。每一步都有 <strong>指给我看</strong>，自己完成的步骤会自动打勾。可以从 <strong>面板 › 上手</strong> 重新打开清单。</p>
+<p>项目菜单中的 <strong>新手教程</strong> 会打开一篇示例论文，旁边是 <strong>上手</strong> 清单，共六步：安装 LaTeX、修改标题并编译、在 PDF 和源码之间跳转、引用一篇论文、让 AI 助手修改一段话、开始写你自己的论文。每一步都有 <strong>指给我看</strong>，自己完成的步骤会自动打勾。之后想重新打开清单，在命令面板（<code>⌘K</code>）里运行 <strong>显示上手</strong>。</p>
 <p><img src="../images/zh-get-started.webp" alt="教程论文：左边是「上手」清单，右边是 PDF"></p>
+<footer class="pager"><a rel="prev" href="index.html"><small>上一页</small>Lattice 使用指南</a><a rel="next" href="workspaces.html"><small>下一页</small>面板与工作区</a></footer>
 </main>
 </div>
 </body>
