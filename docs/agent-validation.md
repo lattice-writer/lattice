@@ -27,9 +27,9 @@ setup file; a test three or more imports away, such as a suite that mounts the
 whole app, runs in the nightly and release CI), the tests `vitest related` finds
 from any other changed file (a stylesheet, a JSON file), and `pnpm test:invariants`, the tests that read
 stylesheets and fixtures, or run scripts, no import leads to. The scripts
-tests among them run once more in a one-commit copy of the working tree with
-no remote (`scripts/shallow-tests.mjs`, a few seconds), as CI's test job
-checks out a tag: a test that reads `HEAD~1` or `origin/main` passes on every
+tests within two imports run once more in a one-commit copy of the working
+tree with no remote and no global git config (`scripts/shallow-tests.mjs`, a
+few seconds), as CI's test job checks out a tag: a test that reads `HEAD~1` or `origin/main` passes on every
 Mac and fails there. Do not assemble
 your own list of test files. The no-mistakes pipeline's test step runs this
 same gate (`.no-mistakes.yaml`).
