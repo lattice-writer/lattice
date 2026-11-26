@@ -59,8 +59,10 @@ pub(super) struct Project {
     pub(super) history_requests: Vec<String>,
     /// The live channel is served.
     realtime: bool,
-    /// Uploads still to answer 429, as Overleaf's rate limit does.
+    /// Uploads still to answer 429, as Overleaf's rate limit does, and the
+    /// Retry-After (s) they answer with.
     rate_limited_uploads: u32,
+    rate_limit_retry_after: u64,
     pub(super) live: Live,
 }
 
@@ -165,9 +167,12 @@ impl MockOverleaf {
     }
 
     /// Answer the next `count` uploads 429 Too Many Requests, with a
-    /// Retry-After past what a request waits out on its own.
-    pub fn rate_limit_uploads(&self, count: u32) {
-        self.project.lock().unwrap().rate_limited_uploads = count;
+    /// Retry-After of `retry_after` seconds, past what a request waits out
+    /// on its own.
+    pub fn rate_limit_uploads(&self, count: u32, retry_after: u64) {
+        let mut project = self.project.lock().unwrap();
+        project.rate_limited_uploads = count;
+        project.rate_limit_retry_after = retry_after;
     }
 
     /// Drop the live socket at the app's next update, after it lands
@@ -632,7 +637,7 @@ fn answer(stream: TcpStream, project: Arc<Mutex<Project>>) -> std::io::Result<()
                 (
                     429,
                     "text/plain",
-                    Some("Retry-After: 30".into()),
+                    Some(format!("Retry-After: {}", project.rate_limit_retry_after)),
                     b"Too Many Requests".to_vec(),
                 )
             }

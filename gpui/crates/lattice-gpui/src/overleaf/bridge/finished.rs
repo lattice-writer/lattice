@@ -20,10 +20,23 @@ const RATE_LIMIT_COOLDOWN_MAX: Duration = Duration::from_secs(300);
 const RATE_LIMIT_RETRIES: u32 = 4;
 
 /// The cool-down after the `rate_limits`th 429 in a row (from 1).
-fn rate_limit_cooldown(rate_limits: u32) -> Duration {
-    RATE_LIMIT_COOLDOWN
-        .saturating_mul(1 << rate_limits.saturating_sub(1).min(16))
-        .min(RATE_LIMIT_COOLDOWN_MAX)
+///
+/// A 429 that says when to come back (`retry_after`, its `Retry-After`)
+/// is taken at its word, held between [`RATE_LIMIT_COOLDOWN`] and
+/// [`RATE_LIMIT_COOLDOWN_MAX`]; one that doesn't gets the doubling. The
+/// floor stays because a short Retry-After that reaches here has already
+/// failed: lattice-core waits out one of up to 8 s itself and asks again,
+/// twice, before giving up (an upload, which it never resends, is the one
+/// exception and pays a few extra seconds). Taken as-is, it would also
+/// spend the four quiet 429s in seconds and report a limit Overleaf lifts
+/// within the minute. The cap keeps an absurd value, or a date far off,
+/// from stalling live mode past the five minutes it would wait anyway.
+fn rate_limit_cooldown(rate_limits: u32, retry_after: Option<Duration>) -> Duration {
+    retry_after
+        .unwrap_or_else(|| {
+            RATE_LIMIT_COOLDOWN.saturating_mul(1 << rate_limits.saturating_sub(1).min(16))
+        })
+        .clamp(RATE_LIMIT_COOLDOWN, RATE_LIMIT_COOLDOWN_MAX)
 }
 
 impl OverleafBridge {
@@ -31,6 +44,13 @@ impl OverleafBridge {
     #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn sync_owed(&self) -> bool {
         self.transport_retry
+    }
+
+    /// What is left of a 429's cool-down, for a scenario's checks.
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+    pub fn rate_limit_left(&self) -> Option<Duration> {
+        self.rate_limited_until
+            .map(|until| until.saturating_duration_since(Instant::now()))
     }
 }
 
@@ -241,7 +261,8 @@ impl OverleafBridge {
         let rate_limited = options.automatic && outcome::is_rate_limited(&error);
         if rate_limited {
             self.rate_limits += 1;
-            self.rate_limited_until = Some(Instant::now() + rate_limit_cooldown(self.rate_limits));
+            let cooldown = rate_limit_cooldown(self.rate_limits, outcome::retry_after(&error));
+            self.rate_limited_until = Some(Instant::now() + cooldown);
         }
         let retryable = outcome::is_transient_transport_failure(&error)
             || (rate_limited && self.rate_limits != RATE_LIMIT_RETRIES)
@@ -303,10 +324,26 @@ mod tests {
 
     #[test]
     fn a_rate_limit_in_a_row_cools_down_twice_as_long_up_to_five_minutes() {
-        assert_eq!(rate_limit_cooldown(1), Duration::from_secs(30));
-        assert_eq!(rate_limit_cooldown(2), Duration::from_secs(60));
-        assert_eq!(rate_limit_cooldown(4), Duration::from_secs(240));
-        assert_eq!(rate_limit_cooldown(5), RATE_LIMIT_COOLDOWN_MAX);
-        assert_eq!(rate_limit_cooldown(u32::MAX), RATE_LIMIT_COOLDOWN_MAX);
+        assert_eq!(rate_limit_cooldown(1, None), Duration::from_secs(30));
+        assert_eq!(rate_limit_cooldown(2, None), Duration::from_secs(60));
+        assert_eq!(rate_limit_cooldown(4, None), Duration::from_secs(240));
+        assert_eq!(rate_limit_cooldown(5, None), RATE_LIMIT_COOLDOWN_MAX);
+        assert_eq!(rate_limit_cooldown(u32::MAX, None), RATE_LIMIT_COOLDOWN_MAX);
+    }
+
+    #[test]
+    fn a_rate_limit_that_says_when_cools_down_that_long_within_the_bounds() {
+        let secs = |s| Some(Duration::from_secs(s));
+        // Its word, not the doubling's, whichever 429 in a row it is.
+        assert_eq!(rate_limit_cooldown(1, secs(45)), Duration::from_secs(45));
+        assert_eq!(rate_limit_cooldown(3, secs(45)), Duration::from_secs(45));
+        assert_eq!(rate_limit_cooldown(1, secs(200)), Duration::from_secs(200));
+        // Too short, or none at all, is the floor; too long, the cap.
+        assert_eq!(rate_limit_cooldown(1, secs(5)), RATE_LIMIT_COOLDOWN);
+        assert_eq!(rate_limit_cooldown(1, secs(0)), RATE_LIMIT_COOLDOWN);
+        assert_eq!(
+            rate_limit_cooldown(1, secs(86_400)),
+            RATE_LIMIT_COOLDOWN_MAX
+        );
     }
 }

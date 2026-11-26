@@ -1,7 +1,10 @@
 //! The e2e check of Overleaf's rate limit on live mode's own sync
 //! (`OverleafBridge::failed`): a new file here whose upload Overleaf answers
 //! 429 is not reported as a failed sync, stays owed, and goes up once the
-//! cool-down is over, exactly once.
+//! cool-down is over, exactly once. The 429 asks for 40 s, not the 30 s the
+//! doubling starts at, so only a cool-down that honours Retry-After passes:
+//! the cool-down is read off the bridge, since when the upload goes after it
+//! also depends on where the 45 s poll stood.
 
 use std::time::{Duration, Instant};
 
@@ -24,6 +27,7 @@ impl Run {
     ) -> Result<()> {
         const PATH: &str = "notes/rate-limited.txt";
         const TEXT: &str = "Written while Overleaf was rate limiting us.\n";
+        const RETRY_AFTER: Duration = Duration::from_secs(40);
         let root = self.root(cx).await?;
         let upload = format!("POST /project/{PROJECT_ID}/upload");
         let settled = self
@@ -44,7 +48,7 @@ impl Run {
         };
         let failures_before = failures(cx);
         let uploads_before = mock.requests(&upload);
-        mock.rate_limit_uploads(1);
+        mock.rate_limit_uploads(1, RETRY_AFTER.as_secs());
         std::fs::create_dir_all(root.join("notes"))?;
         std::fs::write(root.join(PATH), TEXT)?;
         let started = Instant::now();
@@ -54,22 +58,37 @@ impl Run {
                 shell.read(cx).overleaf.read(cx).sync_owed()
             })
             .await;
+        // Held for its Retry-After, less the moment since it came back; the
+        // doubling would have left 30 s at most.
+        let cooling = cx.update(|cx| {
+            self.shell
+                .read(cx)
+                .overleaf
+                .read(cx)
+                .rate_limit_left()
+                .unwrap_or_default()
+        });
+        let honoured = cooling > RETRY_AFTER - Duration::from_secs(5) && cooling <= RETRY_AFTER;
         // No failure shown that wasn't up before (one expiring is fine).
         let quiet_owed = failures(cx).is_subset(&failures_before);
+        // The next poll after the cool-down sends it: up to 45 s later.
         let landed = self
-            .wait_for(cx, Duration::from_secs(90), |_, _| mock.file(PATH).is_some())
+            .wait_for(cx, Duration::from_secs(100), |_, _| mock.file(PATH).is_some())
             .await;
         let took = started.elapsed();
         let text = mock.file(PATH).as_deref() == Some(TEXT);
         // One answered 429, then the one that went up after the cool-down.
         let uploads = mock.requests(&upload) - uploads_before;
-        let waited = took >= Duration::from_secs(25);
+        // Its Retry-After waited out, give or take the sync's own start:
+        // the doubling's 30 s would land by about 33 s.
+        let waited = took >= RETRY_AFTER - Duration::from_secs(2);
         let quiet = quiet_owed && failures(cx).is_subset(&failures_before);
         steps.check(
-            "a sync Overleaf answers 429 stays owed without an error, and goes up once after the cool-down",
-            settled && owed && landed && text && uploads == 2 && waited && quiet,
+            "a sync Overleaf answers 429 stays owed without an error, and goes up once after the Retry-After it asked for",
+            settled && owed && honoured && landed && text && uploads == 2 && waited && quiet,
             json!({
                 "settled": settled, "owed": owed, "landed": landed, "text": text,
+                "cooling_ms": cooling.as_millis(),
                 "uploads": uploads, "took_ms": took.as_millis(), "quiet": quiet,
                 "overleaf": mock.file(PATH),
             }),
