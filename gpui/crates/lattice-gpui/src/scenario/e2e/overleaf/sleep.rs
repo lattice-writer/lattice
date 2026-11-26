@@ -9,7 +9,10 @@
 //!   `watch_heartbeat`) gives a silent socket up within the timeout the
 //!   handshake named, before the edit sent on it times out; what was typed
 //!   before and during the silence lands once when the channel is back, and
-//!   the file is never left paused as unconfirmed.
+//!   the file is never left paused as unconfirmed;
+//! - with a long heartbeat timeout, an edit whose answer never comes on the
+//!   silent socket ends the connection (lattice-core's `heard_nothing_since`)
+//!   instead of pausing the file as unconfirmed, and lands once on the next.
 
 use std::{
     cell::Cell,
@@ -126,6 +129,36 @@ impl Run {
                 "steady": steady, "dropped": dropped, "dropped_ms": dropped_after.as_millis(),
                 "converged": converged, "once": once, "unconfirmed": unconfirmed.get(),
                 "overleaf": overleaf, "rejected": mock.rejected(),
+            }),
+        );
+
+        // A minute's heartbeat timeout: the edit's unanswered send is what
+        // finds the silent socket, within the 10 s it waits for an answer.
+        let settled_first = self.wait_for(cx, Duration::from_secs(10), &settled).await;
+        mock.go_silent();
+        let silenced = Instant::now();
+        self.type_text(cx, "Hypatia ").await?;
+        let dropped = self
+            .wait_for(cx, Duration::from_secs(15), |shell, cx| {
+                let bridge = shell.read(cx).overleaf.read(cx);
+                unconfirmed.set(unconfirmed.get() || bridge.unconfirmed());
+                bridge.channel() != ChannelStatus::Live
+            })
+            .await;
+        let dropped_after = silenced.elapsed();
+        let converged = self.wait_for(cx, Duration::from_secs(40), &settled).await;
+        let overleaf = mock.file("main.tex").unwrap_or_default();
+        steps.check(
+            "an edit left unanswered on a silent socket ends the connection rather than pausing the file, and lands once on the next",
+            settled_first
+                && dropped
+                && converged
+                && !unconfirmed.get()
+                && overleaf.matches("Hypatia ").count() == 1
+                && mock.rejected().is_empty(),
+            json!({
+                "settled": settled_first, "dropped": dropped, "dropped_ms": dropped_after.as_millis(),
+                "converged": converged, "unconfirmed": unconfirmed.get(), "overleaf": overleaf,
             }),
         );
         Ok(())

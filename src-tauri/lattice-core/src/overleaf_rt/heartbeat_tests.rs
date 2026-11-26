@@ -1,10 +1,12 @@
 //! The heartbeat watchdog and the wake, against the mock server: a socket
-//! gone quiet is reported lost, and so is one the computer slept on.
+//! gone quiet is reported lost, and so is one the computer slept on, and an
+//! answer that never comes ends the connection only on a silent socket.
 
 use super::client::{awake_or_asleep, lock};
 use super::mock_server::*;
 use super::tests::{connect, wait_for};
 use super::*;
+use crate::runtime as rt;
 use std::time::{Duration, Instant};
 
 #[test]
@@ -43,4 +45,57 @@ fn waking_from_sleep_reports_the_connection_lost_at_once() {
     });
     assert!(lost.is_some_and(|reason| reason.contains("slept")), "{:?}", lock(&events));
     assert!(client.current_entities().is_none());
+}
+
+/// An update left unanswered on a socket that stays `heard`: the send's
+/// error, and whether the connection was reported lost.
+fn unanswered_update(heard: Heard) -> (String, Option<String>, bool) {
+    let (host, state) = start_mock(false);
+    let (client, events) = connect(mock_config(&host, "overleaf_session2=test-cookie"));
+    rt::block_on(client.join_doc("doc-1", None)).expect("join");
+    // What the mock sends after the join, an update and then a heartbeat,
+    // arrives before the update goes: the echo is the heartbeat heard.
+    wait_for(&events, 2, |event| matches!(event, RealtimeEvent::DocUpdate { .. }).then_some(()));
+    let echoed = (0..40).any(|_| {
+        std::thread::sleep(Duration::from_millis(50));
+        lock(&state).frames.iter().any(|frame| frame == "2::")
+    });
+    assert!(echoed, "the mock's heartbeat was never echoed");
+    leave_updates_unanswered(&state, heard);
+    let op = OtOp { p: 0, i: Some("x".into()), d: None, u: None };
+    let sent = rt::block_on(client.send_ops("doc-1", 43, vec![op], false, Submission::default()));
+    let lost = wait_for(&events, 1, |event| match event {
+        RealtimeEvent::Disconnected { reason } => Some(reason.clone()),
+        _ => None,
+    });
+    let live = client.current_entities().is_some();
+    client.shutdown();
+    (sent.expect_err("no answer came"), lost, live)
+}
+
+#[test]
+fn a_join_ask_the_server_never_answers_ends_nothing() {
+    // A server that pushes the project ignores the `joinProject` ask, and
+    // this mock sends nothing after the join: a quiet but healthy socket.
+    let (host, _state) = start_mock(true);
+    let (client, events) = connect(mock_config(&host, "overleaf_session2=test-cookie"));
+    std::thread::sleep(Duration::from_secs(11));
+    let lost =
+        lock(&events).iter().any(|event| matches!(event, RealtimeEvent::Disconnected { .. }));
+    assert!(!lost && client.current_entities().is_some(), "{:?}", lock(&events));
+    client.shutdown();
+}
+
+#[test]
+fn an_answer_that_never_comes_on_a_silent_socket_ends_the_connection() {
+    let (error, lost, live) = unanswered_update(Heard::Nothing);
+    assert!(lost.is_some_and(|reason| reason.contains("sent nothing since")), "{error}");
+    assert!(!live, "{error}");
+}
+
+#[test]
+fn an_answer_that_never_comes_on_a_socket_still_heard_from_is_only_a_timeout() {
+    let (error, lost, live) = unanswered_update(Heard::Heartbeats);
+    assert!(error.contains("timed out"), "{error}");
+    assert!(lost.is_none() && live, "{lost:?}");
 }

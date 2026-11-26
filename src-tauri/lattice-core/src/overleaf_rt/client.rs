@@ -11,7 +11,7 @@ use crate::util::url_encode;
 use futures_util::sink::{Sink, SinkExt};
 use futures_util::stream::{Stream, StreamExt};
 pub(super) use heartbeat::awake_or_asleep;
-use heartbeat::watch_heartbeat;
+use heartbeat::{heard_nothing_since, watch_heartbeat, SILENT_SINCE};
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -150,11 +150,14 @@ struct AckSlot {
 /// Registers an ack waiter and arms its timeout. The timer lives on a parked
 /// helper thread (this crate cannot reach `tokio::time`) and exits early — well
 /// before the full timeout — as soon as the waiter goes away.
-fn open_slot(shared: &Arc<Shared>, id: u32, label: &str) -> AckSlot {
+///
+/// `drop_if_silent`: a timeout on a silent socket ends the connection.
+fn open_slot(shared: &Arc<Shared>, id: u32, label: &str, drop_if_silent: bool) -> AckSlot {
     let (tx, rx) = rt::channel::<Ack>(2);
     let timer_tx = tx.clone();
     lock(&shared.pending).insert(id, tx);
     let timed_out = format!("{label} timed out after {}s.", ACK_TIMEOUT.as_secs());
+    let (shared, opened) = (shared.clone(), awake_or_asleep());
     std::thread::spawn(move || {
         let deadline = Instant::now() + ACK_TIMEOUT;
         while Instant::now() < deadline {
@@ -162,6 +165,9 @@ fn open_slot(shared: &Arc<Shared>, id: u32, label: &str) -> AckSlot {
                 return;
             }
             std::thread::sleep(ACK_TIMER_TICK);
+        }
+        if drop_if_silent && heard_nothing_since(&shared, opened) {
+            return shared.finish(format!("{timed_out} {SILENT_SINCE}"));
         }
         let _ = timer_tx.try_send(Err(timed_out));
     });
@@ -175,10 +181,12 @@ async fn await_slot(shared: &Arc<Shared>, mut slot: AckSlot) -> Ack {
 }
 
 /// Emits `5:{id}+::{"name":…,"args":…}` and waits for the matching ack.
-async fn emit_with_ack<A: Serialize>(shared: &Arc<Shared>, name: &str, args: A) -> Ack {
+async fn emit_with_ack<A: Serialize>(
+    shared: &Arc<Shared>, name: &str, args: A, drop_if_silent: bool,
+) -> Ack {
     let payload = encode_event(name, args)?;
     let id = shared.next_ack.fetch_add(1, Ordering::SeqCst);
-    let slot = open_slot(shared, id, &format!("Overleaf's answer to {name}"));
+    let slot = open_slot(shared, id, &format!("Overleaf's answer to {name}"), drop_if_silent);
     let frame = encode_frame(FRAME_EVENT, &format!("{id}+"), "", &payload);
     if let Err(e) = shared.send_frame(frame).await {
         lock(&shared.pending).remove(&id);
@@ -491,8 +499,8 @@ impl RealtimeClient {
         // `joinProjectResponse` immediately after accepting the connection,
         // and an answer that arrives before anyone is waiting is simply lost.
         let connect_slot =
-            open_slot(&shared, CONNECT_SLOT, "Overleaf's realtime connect handshake");
-        let join_slot = open_slot(&shared, JOIN_SLOT, "Overleaf's project join");
+            open_slot(&shared, CONNECT_SLOT, "Overleaf's realtime connect handshake", false);
+        let join_slot = open_slot(&shared, JOIN_SLOT, "Overleaf's project join", false);
         rt::spawn(read_loop(source, shared.clone()));
         // Zero is the handshake saying it sends no heartbeats at all.
         if heartbeat > 0 {
@@ -509,7 +517,8 @@ impl RealtimeClient {
         let asker = shared.clone();
         rt::spawn(async move {
             let args = (JoinProjectArg { project_id: &project_id },);
-            let asked = emit_with_ack(&asker, "joinProject", args).await;
+            // Servers that push the join never answer this: no drop.
+            let asked = emit_with_ack(&asker, "joinProject", args, false).await;
             asker.resolve(JOIN_SLOT, asked);
         });
         let ack = await_slot(&shared, join_slot).await?;
@@ -529,7 +538,7 @@ impl RealtimeClient {
     /// Emit `name` and wait for Overleaf's answer; its error slot becomes an
     /// `Err`, and what follows it is returned.
     async fn call<A: Serialize>(&self, name: &str, args: A) -> Ack {
-        let ack = emit_with_ack(&self.shared, name, args).await?;
+        let ack = emit_with_ack(&self.shared, name, args, true).await?;
         Ok(ack_body(&ack, name)?.to_vec())
     }
 

@@ -69,3 +69,20 @@ pub(super) fn watch_heartbeat(shared: Arc<Shared>, timeout: Duration) {
         }
     });
 }
+
+/// Why a connection ended on an answer that never came.
+pub(super) const SILENT_SINCE: &str =
+    "Overleaf has sent nothing since, so the connection is presumed lost.";
+
+/// Nothing at all has arrived since `since`, on [`awake_or_asleep`]'s clock.
+///
+/// An answer that times out on a socket that has stayed silent since the
+/// request went out is a dead connection, not a lost answer: Overleaf
+/// answers an update within milliseconds, and a live socket hears
+/// heartbeats and collaborators meanwhile. Taking it as a drop lets the app
+/// hold the document and prove the edit by replay on a fresh connection,
+/// rather than pausing the file on this one until the watchdog notices. A
+/// socket still heard from keeps the timeout as an unknown outcome.
+pub(super) fn heard_nothing_since(shared: &Shared, since: Duration) -> bool {
+    *lock(&shared.last_heard) <= since
+}
