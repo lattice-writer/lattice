@@ -35,7 +35,8 @@ const DEVICE_CONTROL_ENTITLEMENT: &str = "LATTICE_DEVICE_CONTROL_ENABLED";
 /// would otherwise hand it to every provider CLI the sidecar pipes: Claude
 /// Code then writes its errors with SGR codes, and the fork shows them, and
 /// caches them, as provider status text (LEO-58). Nothing the sidecar runs
-/// reads a terminal, and its own terminals pin their colour themselves.
+/// reads a terminal, and Lattice's terminals are separate processes that
+/// set their own colour.
 const FORCED_COLOR: &[&str] = &["FORCE_COLOR", "CLICOLOR_FORCE"];
 /// Every variable of these families configures a provider CLI: Claude Code
 /// pointed at Kimi, GLM or DeepSeek through `ANTHROPIC_BASE_URL`, its model
@@ -287,7 +288,18 @@ mod tests {
         // As if the login shell or Lattice's own launch exported it.
         command.env(DEVICE_CONTROL_ENTITLEMENT, "true");
         AgentEnvironment::default().apply(&mut command);
-        assert_eq!(command_env_entry(&command, DEVICE_CONTROL_ENTITLEMENT), Some(None));
+        // Exactly the removals: anything else set here by accident fails.
+        let mut envs = command.get_envs().collect::<Vec<_>>();
+        envs.sort();
+        let removed = |name| (std::ffi::OsStr::new(name), None);
+        assert_eq!(
+            envs,
+            [
+                removed("CLICOLOR_FORCE"),
+                removed("FORCE_COLOR"),
+                removed(DEVICE_CONTROL_ENTITLEMENT)
+            ]
+        );
     }
 
     #[test]
