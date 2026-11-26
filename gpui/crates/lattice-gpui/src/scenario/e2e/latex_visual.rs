@@ -89,6 +89,18 @@ const DRAWN: &str = "JSON.stringify({ \
     text: document.querySelector('.cm-content')?.textContent ?? '', \
     theme: document.documentElement.dataset.theme || null })";
 
+/// Whether the page's document, and its drawn lines, hold the text
+/// `latex_visual_follows` put into the buffer. CodeMirror keeps no public
+/// handle on the page, so the view is found the way `EditorView.findFromDOM`
+/// finds it (`cmTile` now, `cmView` in older releases).
+const FOLLOWED: &str = "JSON.stringify((() => { \
+    const content = document.querySelector('.cm-latex-visual .cm-content'); \
+    const view = (content?.cmTile?.root ?? content?.cmView?.rootView)?.view; \
+    const doc = view ? view.state.doc.toString() : null; \
+    return { \
+      doc: doc === null ? null : doc.includes('Written in the source.'), \
+      drawn: (content?.textContent ?? '').includes('Written in the source.') }; })())";
+
 /// The page's `\\colorbox`es (lattice#1327): each one element over its whole
 /// command, laid out on one line and filled in its colour, and none for
 /// soul's `\\hl`.
@@ -519,25 +531,27 @@ impl Run {
                 });
             }
         })?;
-        // On GitHub's macOS runner the edit had not reached the page within
-        // 6 s (the v0.20.1 tag run), though it does on the Mac mini; the
-        // bound allows a slow machine, and `ms` records how long it took.
-        let mut followed = false;
+        // The page's own document, not `.cm-content`'s text: CodeMirror draws
+        // only the lines near the viewport, and in GitHub's macOS runner's
+        // 1024×674 window the edit before `\end{document}` lies past them, so
+        // the DOM never held it there however long the step waited (the
+        // v0.20.1 tag run and main at 0fef86e94), while the Mac mini's larger
+        // window draws the whole fixture. `drawn` still records whether the
+        // DOM holds it, and `ms` how long the document took.
+        let mut page = Value::Null;
         let started = std::time::Instant::now();
-        while started.elapsed() < Duration::from_secs(20) {
-            let page = self.evaluate(cx, island, DRAWN).await;
-            followed = page["text"]
-                .as_str()
-                .is_some_and(|text| text.contains("Written in the source."));
-            if followed {
+        while started.elapsed() < Duration::from_secs(10) {
+            page = self.evaluate(cx, island, FOLLOWED).await;
+            if page["doc"] == true {
                 break;
             }
             self.pause(cx, Duration::from_millis(150)).await;
         }
+        let followed = page["doc"] == true;
         steps.check(
             "text put into the buffer reaches the Visual view",
             followed,
-            json!({ "followed": followed, "ms": started.elapsed().as_millis() }),
+            json!({ "followed": followed, "drawn": page["drawn"], "ms": started.elapsed().as_millis() }),
         );
         Ok(())
     }
