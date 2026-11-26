@@ -52,6 +52,7 @@ describe.skipIf(process.platform === "win32")("ci:local", () => {
     expect(await runStages([stage("e2e", true), stage("rescue", false, { rescues: "e2e" })])).toBe(0);
     expect(await runStages([stage("e2e", false), stage("rescue", true, { rescues: "e2e" })])).toBe(0);
     expect(await runStages([stage("e2e", false), stage("rescue", false, { rescues: "e2e" })])).toBe(2);
+    expect(await runStages([stage("build", false), stage("e2e", true, { needs: "build" }), stage("rescue", true, { rescues: "e2e" })])).toBe(2);
   });
 
   it("runs the whole e2e before the main baseline when an ancestor has one, and records it first when none has", () => {

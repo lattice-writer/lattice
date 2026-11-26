@@ -32,7 +32,8 @@
  * ones, for a run on a developer's Mac rather than a hosted runner.
  *
  * With $LATTICE_E2E_VERDICT_OUT set, the verdict is also saved there as
- * `{ fresh, rest }`: the new failures left after the rerun, and whether
+ * `{ fresh, rest }`: the failures the checked-in list does not excuse (the
+ * new ones left after the rerun, and those only `--baseline` excused), and whether
  * everything else passed (the run finished, no flaky-tier step counted, the
  * quit saved). `--rejudge SAVED --baseline FILE` judges that saved verdict
  * again with FILE's failing steps known too, without running anything: ci:local
@@ -180,7 +181,13 @@ function main() {
     }
   }
   console.log(lines.join("\n"));
-  if (process.env.LATTICE_E2E_VERDICT_OUT) writeFileSync(process.env.LATTICE_E2E_VERDICT_OUT, `${JSON.stringify({ fresh: verdict.fresh, rest: quitSaved && passes({ ...verdict, fresh: [] }) })}\n`);
+  if (process.env.LATTICE_E2E_VERDICT_OUT) {
+    // A step only the baseline excused is judged again too: a rejudge against
+    // a newer baseline that passes it must not keep the older one's excuse.
+    const listed = new Set(knownFailures().filter((entry) => entry.platforms.includes(platform)).map((entry) => entry.step));
+    const fresh = [...verdict.fresh, ...verdict.known.filter((step) => !listed.has(step))];
+    writeFileSync(process.env.LATTICE_E2E_VERDICT_OUT, `${JSON.stringify({ fresh, rest: quitSaved && passes({ ...verdict, fresh: [] }) })}\n`);
+  }
   for (const step of verdict.fresh) console.log(`::error title=New e2e failure (${platform})::${step}`);
   for (const step of verdict.flaky) console.log(`::warning title=Flaky e2e step (${platform})::${step} (failed, then passed when its module ran again)`);
   for (const step of verdict.quarantined) {

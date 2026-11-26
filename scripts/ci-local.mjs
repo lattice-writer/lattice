@@ -108,6 +108,11 @@ const PERF_LOCK = process.env.INAPP_LOCK_FILE ?? "/tmp/lattice-inapp-test.lock";
 const WINDOWED = new Set(["gpui-main", "gpui-e2e", "webkit-bench"]);
 // How long a windowed stage waits for the in-app lock before it gives up.
 const INAPP_WAIT_S = 3600;
+// How far back an ancestor's main baseline may be to judge the whole e2e by
+// (localStages). A step that fails only on this Mac, fixed on main since, stays
+// excused by it; the nightly records one a day, and a merge base further back
+// records its own first.
+const OLDER_BASELINE_MAX = 30;
 
 /**
  * Runs a windowed stage under the in-app lock. Waiting for the lock to be free
@@ -228,7 +233,7 @@ function mainBaselineStage(mergeBase, verdict = null) {
     why: `the e2e failed beyond the older baseline: the merge base's own (${mergeBase.slice(0, 9)}), and those failures judged against it`,
     rescues: "gpui-e2e",
     command: "sh",
-    args: ["-c", `[ -f "$4" ] || { ${record}; [ $status = 0 ] || exit $status; }; exec node scripts/gpui-e2e-verdict.mjs --rejudge "$3" --baseline "$4"`, "sh", worktree, mergeBase, verdict, path.join(baselineDir(), `known-failures@${mergeBase}.json`)],
+    args: ["-c", `[ -f "$3" ] || { echo "gpui-main: the e2e saved no verdict (it did not finish), so a baseline would not settle it"; exit 1; }; [ -f "$4" ] || { ${record}; [ $status = 0 ] || exit $status; }; exec node scripts/gpui-e2e-verdict.mjs --rejudge "$3" --baseline "$4"`, "sh", worktree, mergeBase, verdict, path.join(baselineDir(), `known-failures@${mergeBase}.json`)],
     timeout: 3_600_000,
   };
 }
@@ -244,9 +249,10 @@ function mainBaselineStage(mergeBase, verdict = null) {
  * Recording one takes a build and the whole e2e of main (about 20 minutes,
  * with the in-app lock held), and most gates land on a merge base that has
  * none yet, so without one it is judged against the newest baseline of an
- * ancestor (ancestorBaseline), and the merge base's own is recorded only when
- * steps outside that one fail (mainBaselineStage's lazy form). Only a Mac
- * with no baseline for any ancestor records it first.
+ * ancestor up to OLDER_BASELINE_MAX commits back (ancestorBaseline), and the
+ * merge base's own is recorded only when steps outside that one fail
+ * (mainBaselineStage's lazy form), which then judges every step only that
+ * older one excused again. A Mac with no such baseline records it first.
  */
 export function localStages(tier, files, mergeBase, e2eNeed = macosNeeds(tier, files, mergeBase).e2e) {
   const { jobs, vitestFiles } = tier;
@@ -273,7 +279,8 @@ export function localStages(tier, files, mergeBase, e2eNeed = macosNeeds(tier, f
       continue;
     }
     const only = e2eNeed.modules.length ? e2eNeed.modules.join(",") : "smoke";
-    const older = e2eNeed.full && !readBaseline(mergeBase)?.exact ? ancestorBaseline(mergeBase) : null;
+    const ancestor = e2eNeed.full && !readBaseline(mergeBase)?.exact ? ancestorBaseline(mergeBase) : null;
+    const older = ancestor?.distance <= OLDER_BASELINE_MAX ? ancestor : null;
     const verdict = path.join(repo, ".tmp", "ci-local", "e2e-verdict.json");
     if (e2eNeed.full && !older) stages.push(mainBaselineStage(mergeBase));
     const e2e = e2eNeed.full

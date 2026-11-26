@@ -113,6 +113,13 @@ describe("gpui-e2e-verdict", () => {
       const still = again(["something else"]);
       expect(still.status).toBe(1);
       expect(still.stdout).toContain("still failing against baseline.json: new on this mac");
+      // A step an older baseline excused is judged again by the newer one.
+      const older = path.join(dir, "older.json");
+      writeFileSync(older, JSON.stringify({ e2e: { failing: ["new on this mac"] } }));
+      writeFileSync(result, JSON.stringify(run({ "new on this mac": false, "branch broke it": false })));
+      spawnSync(process.execPath, [script, "--platform", "macos", "--baseline", older, result], { encoding: "utf8", env: { ...process.env, GITHUB_STEP_SUMMARY: "", LATTICE_E2E_VERDICT_OUT: saved } });
+      expect(JSON.parse(readFileSync(saved, "utf8")).fresh.toSorted()).toEqual(["branch broke it", "new on this mac"]);
+      expect(again(["branch broke it"]).status).toBe(1);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
