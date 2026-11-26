@@ -59,6 +59,28 @@ describe.skipIf(process.platform === "win32")("inapp-lock", () => {
     expect(lock("--thread", "B", "--wait", "0", "--", "true").status).toBe(0);
   });
 
+  it("starts a quiet holder only once the builds running beside an e2e end, and holds new builds off", async () => {
+    const log = path.join(dir, "log");
+    const note = (name, seconds) => `echo start ${name} >> "$1"; sleep ${seconds}; echo end ${name} >> "$1"`;
+    const start = (args) => new Promise((resolve) => spawn(script, args, { env }).on("exit", resolve));
+    const e2e = start(["--thread", "E", "--kind", "e2e", "--", "sh", "-c", note("e2e", 0.3), "sh", log]);
+    execFileSync("sleep", ["0.1"]);
+    const builds = start(["build", "--", "sh", "-c", note("build", 1.5), "sh", log]);
+    execFileSync("sleep", ["0.1"]);
+    const quiet = start(["--thread", "Q", "--", "sh", "-c", note("quiet", 1), "sh", log]);
+    execFileSync("sleep", ["2"]);
+    const late = start(["build", "--", "sh", "-c", note("late", 0.1), "sh", log]);
+    expect(await Promise.all([e2e, builds, quiet, late])).toEqual([0, 0, 0, 0]);
+    const lines = readFileSync(log, "utf8").trim().split("\n");
+    expect(lines.indexOf("start quiet")).toBeGreaterThan(lines.indexOf("end build"));
+    expect(lines.indexOf("start late")).toBeGreaterThan(lines.indexOf("end quiet"));
+    expect(lines.indexOf("start build")).toBeLessThan(lines.indexOf("end e2e"));
+  });
+
+  it("runs a build under a holder of the lock at once", () => {
+    expect(lock("--thread", "A", "--", script, "build", "--", "true").status).toBe(0);
+  });
+
   it("keeps the lock when someone deletes and recreates its file", () => {
     expect(lock("--thread", "A", "hold", "30").status).toBe(0);
     rmSync(env.INAPP_LOCK_FILE);

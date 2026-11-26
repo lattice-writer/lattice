@@ -25,14 +25,20 @@ describe.skipIf(process.platform === "win32")("ci:local", () => {
     }
   });
 
-  it("builds beside another run's e2e, and waits for a perf measurement, a hand test or an unreadable holder", () => {
-    for (const command of ["script/e2e --only annotations,overleaf /Volumes/LatticeBuild/work/lata-96/e2e.json", "/Users/leo/w/gpui/script/e2e --only smoke out.json", "sh -c git worktree add --detach x y && (cd x && node scripts/gpui-main-baseline.mjs --sha y)", "node scripts/gpui-e2e-light.mjs"]) {
-      expect(holderRunsE2e({ command }), command).toBe(true);
-    }
-    for (const command of ["/Volumes/LatticeBuild/work/LATA-99/measure/run.sh sanity", "sh -c pnpm exec playwright-core install webkit >/dev/null && pnpm perf:bench --check", "hold 3600", "script/e2e-notes.sh", ""]) {
-      expect(holderRunsE2e({ command }), command).toBe(false);
-    }
+  it("builds beside a live e2e holder only, and waits for any other, a stale or an unreadable one", () => {
+    const live = () => [process.pid];
+    expect(holderRunsE2e({ kind: "e2e", pid: process.pid, command: "gpui/script/e2e --only smoke out.json" }, live)).toBe(true);
+    expect(holderRunsE2e({ kind: "quiet", pid: process.pid, command: "script/e2e --only smoke out.json" }, live)).toBe(false);
+    expect(holderRunsE2e({ pid: process.pid, command: "node scripts/gpui-e2e-light.mjs && measure/series.sh" }, live)).toBe(false);
+    expect(holderRunsE2e({ kind: "e2e", pid: process.pid }, () => [])).toBe(false);
+    const gone = spawnSync("sh", ["-c", "echo $$"], { encoding: "utf8" }).stdout.trim();
+    expect(holderRunsE2e({ kind: "e2e", pid: Number(gone) }, () => [Number(gone)])).toBe(false);
     expect(holderRunsE2e(null)).toBe(false);
+  });
+
+  it("marks the e2e stages as e2e holders and the WebKit benchmark as quiet", () => {
+    const kind = (name) => { const args = holdingInappLock({ name, command: "true", timeout: 1 }).args; return args[args.indexOf("--kind") + 1]; };
+    expect([kind("gpui-e2e"), kind("gpui-main"), kind("webkit-bench")]).toEqual(["e2e", "e2e", "quiet"]);
   });
 
   it("runs the docs-only profile without a stage that opens a window, and builds", () => {

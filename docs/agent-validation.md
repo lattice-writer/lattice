@@ -182,9 +182,14 @@ A change to `scripts/ci-local.mjs`, `scripts/ci-local-select.mjs`, `scripts/gpui
 
 Rust and GPUI build and unit-test stages wait while a perf measurement or a
 hand test holds `/tmp/lattice-inapp-test.lock` (`$INAPP_LOCK_FILE` when set),
-but not while another run's GPUI e2e holds it: a waiting gate builds
-meanwhile and queues for the lock only for its own windowed stages (the e2e,
-its main baseline and the WebKit benchmark). The literature
+but not while another run's GPUI e2e holds it (a live holder whose record
+says `--kind e2e`): a waiting gate builds meanwhile and queues for the lock
+only for its own windowed stages (the e2e, its main baseline and the WebKit
+benchmark). Those builds run as `scripts/inapp-lock build`, and a quiet
+holder (anything not `--kind e2e`) that takes the lock after that e2e waits
+for them to end before its command starts, so a measurement never runs
+beside a build. The main baseline builds main while it holds the lock, so a
+gate's build beside it can stretch its hold. The literature
 Worker, the Open Slide runtime, the research environment, the Chromium
 benchmark, Linux and Windows run in CI only.
 

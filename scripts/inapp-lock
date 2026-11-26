@@ -17,13 +17,23 @@ gone one. flock is released by the kernel when its holder dies, so a dead
 holder never keeps the lock; when the recorded pid is gone and the lock is
 still held, some other process holds it, and `status` names it from lsof.
 
+The holder also says what kind of session it is (--kind, default quiet). A
+GPUI e2e (--kind e2e) drives only its own windows, so ci:local builds beside
+it. Any other holder wants a quiet machine: once it has the lock it waits,
+before its command starts, for the builds already running to end. A build
+runs under `inapp-lock build -- COMMAND`, which holds the lock file's
+companion <lock>.builds shared while the quiet holder takes it exclusively,
+so no build starts after the quiet holder has it either. A build started
+under a holder of this lock (INAPP_LOCK_HELD) skips that, or it would wait on
+its own parent.
+
 `hold` detaches: it takes the lock in a process of its own session, apart
 from the shell that ran it, and returns once that process holds it, so the
 hold outlives the command or tool call that started it (a tool that ends its
 command's process group would otherwise end the hold, and with it the lock).
 
 Usage:
-  inapp-lock [--thread CODE] [--wait SECONDS] -- COMMAND [ARGS...]
+  inapp-lock [--thread CODE] [--wait SECONDS] [--kind quiet|e2e] -- COMMAND [ARGS...]
       Run COMMAND holding the lock, and release it when COMMAND exits (its
       exit status is this one's). --wait gives up after SECONDS with status 75
       (default: wait as long as it takes; 0 means try once).
@@ -32,6 +42,9 @@ Usage:
       held; it is released after SECONDS (default 7200) or on `release`.
   inapp-lock [--thread CODE] release
       End this thread's hold (the one `hold` started under the same code).
+  inapp-lock build -- COMMAND [ARGS...]
+      Run COMMAND as a build: it waits while a quiet holder has the lock and
+      holds that holder off until it ends.
   inapp-lock status
       Print whether the lock is held, and by whom. Status 0 free, 1 held.
 
@@ -49,7 +62,9 @@ import threading
 import time
 
 LOCK = os.environ.get("INAPP_LOCK_FILE", "/tmp/lattice-inapp-test.lock")
+BUILDS = LOCK + ".builds"
 TIMED_OUT = 75
+KINDS = ("quiet", "e2e")
 
 
 def alive(pid):
@@ -111,8 +126,10 @@ def lock_at_path():
     return lock_at_path()
 
 
-def acquire(thread, command, wait, notes):
-    """Take the lock and write the record, or return None after `wait` seconds."""
+def acquire(thread, command, wait, notes, kind="quiet"):
+    """Take the lock and write the record, or return None after `wait` seconds.
+    A quiet holder also waits, within the same `wait`, for the running builds
+    to end, and keeps them off until its release."""
     started = time.monotonic()
     last_note = None
     while True:
@@ -132,11 +149,40 @@ def acquire(thread, command, wait, notes):
         "host": socket.gethostname(),
         "since": time.strftime("%Y-%m-%d %H:%M:%S %Z"),
         "command": " ".join(command),
+        "kind": kind,
     }
     os.ftruncate(fd, 0)
     os.pwrite(fd, json.dumps(record).encode(), 0)
     keep_at_path(fd, record)
+    if kind != "e2e" and not quiet_builds(fd, started, wait, notes):
+        release(fd)
+        return None
     return fd
+
+
+def quiet_builds(fd, started, wait, notes):
+    """Wait for the builds to end and hold them off while `fd` is open: the
+    builds file locked exclusively, kept open as long as the lock is held."""
+    builds = os.open(BUILDS, os.O_RDONLY | os.O_CREAT, 0o666)
+    last_note = None
+    while True:
+        try:
+            fcntl.flock(builds, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            QUIET[fd] = builds
+            return True
+        except BlockingIOError:
+            pass
+        waited = time.monotonic() - started
+        if wait is not None and waited >= wait:
+            os.close(builds)
+            return False
+        if last_note is None or waited - last_note >= 60:
+            last_note = waited
+            print(f"inapp-lock: holding the lock, waiting ({int(waited // 60)} min so far) for the builds running beside an e2e to end", file=notes, flush=True)
+        time.sleep(1)
+
+
+QUIET = {}
 
 
 def keep_at_path(fd, record):
@@ -166,10 +212,27 @@ def keep_at_path(fd, record):
 def release(fd):
     os.ftruncate(fd, 0)
     os.close(fd)
+    builds = QUIET.pop(fd, None)
+    if builds is not None:
+        os.close(builds)
 
 
-def run(thread, wait, command):
-    fd = acquire(thread, command, wait, sys.stderr)
+def build(command):
+    """Run a build holding the builds file shared, which waits while a quiet
+    holder has it and keeps one from starting until the build ends."""
+    if not os.environ.get("INAPP_LOCK_HELD"):
+        builds = os.open(BUILDS, os.O_RDONLY | os.O_CREAT, 0o666)
+        try:
+            fcntl.flock(builds, fcntl.LOCK_SH | fcntl.LOCK_NB)
+        except BlockingIOError:
+            print(f"inapp-lock: waiting for {describe(holder())} before this build", file=sys.stderr, flush=True)
+            fcntl.flock(builds, fcntl.LOCK_SH)
+        os.set_inheritable(builds, True)
+    os.execvp(command[0], command)
+
+
+def run(thread, wait, command, kind):
+    fd = acquire(thread, command, wait, sys.stderr, kind)
     if fd is None:
         print(f"inapp-lock: gave up after {wait:g} s; held by {describe(holder())}", file=sys.stderr)
         return TIMED_OUT
@@ -177,7 +240,7 @@ def run(thread, wait, command):
     try:
         # Its own process group, so a signal that ends this one ends the
         # whole run with it rather than leaving it on the screen unlocked.
-        child = subprocess.Popen(command, start_new_session=True)
+        child = subprocess.Popen(command, start_new_session=True, env={**os.environ, "INAPP_LOCK_HELD": "1"})
 
         # The group may be gone (ProcessLookupError), or hold only processes
         # this one may not signal, such as one that changed its user, or one
@@ -203,7 +266,7 @@ def run(thread, wait, command):
         release(fd)
 
 
-def hold(thread, wait, seconds):
+def hold(thread, wait, seconds, kind):
     """Take the lock in a detached process; return once it holds it."""
     read_end, write_end = os.pipe()
     if os.fork():
@@ -223,7 +286,7 @@ def hold(thread, wait, seconds):
     for stream in (0, 1, 2):
         os.dup2(devnull, stream)
     signal.signal(signal.SIGHUP, signal.SIG_IGN)
-    fd = acquire(thread, [f"hold {int(seconds)} s"], wait, notes)
+    fd = acquire(thread, [f"hold {int(seconds)} s"], wait, notes, kind)
     if fd is None:
         print(f"inapp-lock: gave up after {wait:g} s; held by {describe(holder())}", file=notes, flush=True)
         os._exit(TIMED_OUT)
@@ -253,16 +316,21 @@ def release_hold(thread):
 def main(argv):
     thread = os.environ.get("CAPY_THREAD") or "unknown"
     wait = None
+    kind = "quiet"
     while argv and argv[0].startswith("--") and argv[0] != "--":
         flag = argv.pop(0)
         if flag == "--thread" and argv:
             thread = argv.pop(0)
         elif flag == "--wait" and argv:
             wait = float(argv.pop(0))
+        elif flag == "--kind" and argv and argv[0] in KINDS:
+            kind = argv.pop(0)
         else:
             sys.exit(f"inapp-lock: unknown option {flag}\n{__doc__}")
     if argv and argv[0] == "--":
-        return run(thread, wait, argv[1:]) if len(argv) > 1 else sys.exit(__doc__)
+        return run(thread, wait, argv[1:], kind) if len(argv) > 1 else sys.exit(__doc__)
+    if argv[:2] == ["build", "--"] and len(argv) > 2:
+        return build(argv[2:])
     if argv == ["status"]:
         if not held():
             print("inapp-lock: free")
@@ -273,11 +341,11 @@ def main(argv):
             print(f"inapp-lock: the lock file is open in pids {lockers()}; one of them holds it")
         return 1
     if argv and argv[0] == "hold" and len(argv) <= 2:
-        return hold(thread, wait, float(argv[1]) if len(argv) == 2 else 7200.0)
+        return hold(thread, wait, float(argv[1]) if len(argv) == 2 else 7200.0, kind)
     if argv == ["release"]:
         return release_hold(thread)
     if argv:
-        return run(thread, wait, argv)
+        return run(thread, wait, argv, kind)
     sys.exit(__doc__)
 
 
