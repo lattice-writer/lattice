@@ -92,7 +92,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as sleep } from "node:timers/promises";
 import { FULL, RELEASE_PATHS, coveredJobs, docsGate, findGate, formatTrailer, macosNeeds, mainMergeRegate } from "./ci-local-select.mjs";
-import { JOBS, ciTier } from "./ci-tier.mjs";
+import { JOBS, ciTier, selectorListsEdited } from "./ci-tier.mjs";
 import { changedFiles, gateStages, runStages } from "./gate-changed.mjs";
 import { readBaseline } from "./gpui-e2e-light.mjs";
 import { baselineDir } from "./gpui-main-baseline.mjs";
@@ -322,7 +322,7 @@ async function main() {
     return;
   }
   const release = files.filter((file) => RELEASE_PATHS.test(file));
-  const tier = ciTier(files, { full: options.full || release.length > 0 });
+  const tier = ciTier(files, { full: options.full || release.length > 0, selector: !selectorListsEdited(mergeBase, files) });
   const needs = macosNeeds(tier, files);
   console.log(`ci:local: ${files.length} changed file(s) against ${options.base} (${mergeBase.slice(0, 9)})`);
   if (release.length) console.log(`ci:local: release paths changed (${release.slice(0, 3).join(", ")}): the full gate runs, and only its full trailer lets GitHub skip the macOS jobs`);

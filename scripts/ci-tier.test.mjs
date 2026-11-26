@@ -98,15 +98,19 @@ describe("ci-tier", () => {
     const imports = (file, seen = new Set()) => {
       if (seen.has(file) || !existsSync(file)) return seen;
       seen.add(file);
-      for (const [, spec] of readFileSync(file, "utf8").matchAll(/(?:from|import\()\s*["'](\.{1,2}\/[^"']+)["']/g)) imports(path.resolve(path.dirname(file), spec), seen);
+      for (const [, spec] of readFileSync(file, "utf8").matchAll(/(?:from|import\(?)\s*["'](\.{1,2}\/[^"']+)["']/g)) imports(path.resolve(path.dirname(file), spec), seen);
       return seen;
     };
     const control = [...CI_CONTROL].map((file) => path.resolve(scripts, "..", file));
     const reaching = readdirSync(scripts)
-      .filter((name) => name.endsWith(".test.mjs"))
+      .filter((name) => /\.test\.(mjs|ts)$/.test(name))
       .filter((name) => [...imports(path.join(scripts, name))].some((file) => control.includes(file)))
       .map((name) => "scripts/" + name);
     expect(reaching.sort()).toEqual([...CI_CONTROL_TESTS].sort());
+    // selectorListsEdited reads the lists line by line.
+    const source = readFileSync(path.join(scripts, "ci-tier.mjs"), "utf8");
+    for (const name of ["CI_CONTROL_TESTS", "CI_CONTROL", "DOCS"]) expect(source, name).toMatch(new RegExp(`^(export )?const ${name} = .*;$`, "m"));
+    expect(JOBS.filter((job) => ciTier(["scripts/ci-tier.mjs"], { scan, selector: false }).jobs[job])).toEqual(JOBS);
   });
 
   it("reads the CI: full trailer and the ci:full label", () => {

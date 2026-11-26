@@ -159,7 +159,24 @@ function gpuiIncludes() {
  * and the shards run them alone. `scan` carries what the git scans find;
  * tests pass their own.
  */
-export function ciTier(files, { full = false, scan = null } = {}) {
+/**
+ * Whether the diff from `base` edits a line (not a comment) naming one of
+ * the lists that decide what counts as the selector's change alone. Such a
+ * diff takes every job (ciTier's `selector: false`), so a change never
+ * widens the rule that judges it; the lists stay one-line literals for this
+ * (ci-tier.test.mjs).
+ */
+export function selectorListsEdited(base, files) {
+  if (!base || !files.includes("scripts/ci-tier.mjs")) return false;
+  // Against the working tree, which is HEAD in CI and holds a local run's
+  // uncommitted edits too.
+  return git("diff", "-U0", base, "--", "scripts/ci-tier.mjs")
+    .split("\n")
+    .filter((line) => /^[-+](?![-+])/.test(line) && !/^[-+]\s*(\/\/|\*|\/\*)/.test(line))
+    .some((line) => /\b(CI_CONTROL|CI_CONTROL_TESTS|DOCS)\b/.test(line));
+}
+
+export function ciTier(files, { full = false, scan = null, selector = true } = {}) {
   const jobs = Object.fromEntries(JOBS.map((job) => [job, full]));
   const why = Object.fromEntries(JOBS.map((job) => [job, full ? ["full run"] : []]));
   if (full) return { full, jobs, why, vitestFiles: [], gpuiFiles: [], docsOnly: false };
@@ -183,6 +200,7 @@ export function ciTier(files, { full = false, scan = null } = {}) {
   // A deleted test of the list would match nothing and pass, so it runs
   // everything.
   const selectorOnly =
+    selector &&
     files.some((file) => CI_CONTROL.has(file)) &&
     files.every((file) => CI_CONTROL.has(file) || CI_CONTROL_TESTS.includes(file) || DOCS.test(file)) &&
     CI_CONTROL_TESTS.every((test) => existsSync(path.join(repo, test)));
@@ -299,13 +317,7 @@ function github() {
 
   const files = base ? git("-c", "core.quotePath=false", "diff", "--no-renames", "--name-only", base, "HEAD").split("\n").filter(Boolean) : [];
   if (!reason && event === "workflow_dispatch" && files.length === 0) reason = "a dispatch of a branch that changes nothing (a baseline)";
-  // This file's lists decide which change counts as the selector's alone;
-  // a diff that edits them is judged by every job, not by its own lists.
-  if (!reason && files.includes("scripts/ci-tier.mjs")) {
-    const edits = git("diff", "-U0", base, "HEAD", "--", "scripts/ci-tier.mjs").split("\n").filter((line) => /^[-+](?![-+])/.test(line));
-    if (edits.some((line) => /\b(CI_CONTROL|CI_CONTROL_TESTS|DOCS)\b/.test(line))) reason = "the change edits CI_CONTROL, CI_CONTROL_TESTS or DOCS, the lists that judge it";
-  }
-  const tier = ciTier(files, { full: Boolean(reason) });
+  const tier = ciTier(files, { full: Boolean(reason), selector: !selectorListsEdited(base, files) });
   const named = trailerHonoured({ full: tier.full, event, ref }) && localMacosPass(message, git("rev-parse", "HEAD^{tree}")) ? parseTrailer(message) : null;
   // A docs-only pass checked the text files since its gate; the gate's own
   // cover has to cover everything else the branch changes.
