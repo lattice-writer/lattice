@@ -22,7 +22,6 @@
 
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use super::ot::transform_span;
 use super::{CommentRange, OtOp, Suggester, TrackedChange};
 
 const PROVISIONAL: &str = "provisional:";
@@ -241,15 +240,43 @@ fn after_delete(
 
 /// Carry the open document's comment anchors across `ops`. Overleaf states
 /// where comments sit when the document is joined and never mentions them
-/// again: they ride along on the operations that move the text. Only the
-/// position moves; the quote is what Overleaf recorded.
+/// again: they ride along on the operations that move the text, and its
+/// ranges tracker (`applyInsertToComments`, `applyDeleteToComments`) edits
+/// the quote with them. Text typed strictly inside a comment joins it, typed
+/// at either edge stays out; a deletion takes its overlap out of the quote.
+/// A comment whose whole passage is deleted keeps its thread but is left
+/// detached: an empty quote at the point where the passage was, which text
+/// typed there only pushes along. Keeping the old quote instead would lay
+/// its length over whatever follows the deletion (#1399).
 pub fn comments_after(comments: &[CommentRange], ops: &[OtOp]) -> Vec<CommentRange> {
     comments
         .iter()
         .map(|comment| {
-            let length = len(&comment.quote).max(0) as usize;
-            let (from, _) = transform_span(comment.position.max(0) as usize, length, ops);
-            CommentRange { position: from as i64, ..comment.clone() }
+            let mut next = comment.clone();
+            for op in ops {
+                let (start, quoted) = (next.position, len(&next.quote));
+                let p = op.p as i64;
+                if let Some(inserted) = &op.i {
+                    if p <= start {
+                        next.position += len(inserted);
+                    } else if p < start + quoted {
+                        next.quote = splice(&next.quote, p - start, inserted);
+                    }
+                } else if let Some(deleted) = &op.d {
+                    let end = p + len(deleted);
+                    if end <= start {
+                        next.position -= len(deleted);
+                    } else if p < start + quoted {
+                        next.quote = format!(
+                            "{}{}",
+                            slice(&next.quote, 0, p - start),
+                            slice(&next.quote, end - start, quoted)
+                        );
+                        next.position = start.min(p);
+                    }
+                }
+            }
+            next
         })
         .collect()
 }

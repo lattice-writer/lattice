@@ -116,6 +116,108 @@ fn ordinary_edits_move_comments_and_leave_untouched_changes_as_they_were() {
     assert_eq!(comments_after(&comments, &[delete(14, "xxx")])[0].position, 14);
 }
 
+/// A comment on `quote` at `position` of `text`, carried across `ops`:
+/// the text they leave, and the comment's position and quote. While the
+/// comment is attached, its quote must be exactly the text it covers, which
+/// is what Overleaf's ranges tracker checks (`validate`).
+fn comment_through(text: &str, position: i64, quote: &str, ops: &[OtOp]) -> (String, i64, String) {
+    let comments = [CommentRange { thread_id: "t".into(), position, quote: quote.into() }];
+    let text = apply_ops(text, ops).expect("ops fit the text");
+    let after = comments_after(&comments, ops).remove(0);
+    let covered = slice(&text, after.position, after.position + len(&after.quote));
+    assert_eq!(covered, after.quote, "the quote is the text it covers");
+    (text, after.position, after.quote)
+}
+
+#[test]
+fn cutting_or_deleting_a_whole_commented_passage_detaches_its_comment() {
+    // #1399: "quick " commented, followed by "brown fox". Cut and Delete both
+    // reach Overleaf as one deletion of the passage.
+    let (text, position, quote) =
+        comment_through("The quick brown fox", 4, "quick ", &[delete(4, "quick ")]);
+    assert_eq!(text, "The brown fox");
+    // Detached where the passage was, covering nothing: never "brown ".
+    assert_eq!((position, quote.as_str()), (4, ""));
+    // A deletion reaching past both edges detaches it too.
+    let (_, position, quote) =
+        comment_through("The quick brown fox", 4, "quick", &[delete(3, " quick ")]);
+    assert_eq!((position, quote.as_str()), (3, ""));
+}
+
+#[test]
+fn partly_deleting_a_commented_passage_leaves_the_rest_commented() {
+    let at = |ops: &[OtOp]| {
+        let (_, position, quote) = comment_through("The quick brown fox", 4, "quick brown", ops);
+        (position, quote)
+    };
+    assert_eq!(at(&[delete(4, "quick ")]), (4, "brown".into()));
+    assert_eq!(at(&[delete(9, " brown")]), (4, "quick".into()));
+    assert_eq!(at(&[delete(6, "ick br")]), (4, "quown".into()));
+    // Across its start: what is left of it begins where the deletion did.
+    assert_eq!(at(&[delete(0, "The qu")]), (0, "ick brown".into()));
+    // Across its end.
+    assert_eq!(at(&[delete(10, "brown fox")]), (4, "quick ".into()));
+}
+
+#[test]
+fn text_typed_inside_a_comment_joins_it_and_at_its_edges_stays_out() {
+    let at = |ops: &[OtOp]| {
+        let (_, position, quote) = comment_through("The quick fox", 4, "quick", ops);
+        (position, quote)
+    };
+    assert_eq!(at(&[insert(6, "XX")]), (4, "quXXick".into()));
+    assert_eq!(at(&[insert(4, "a ")]), (6, "quick".into()));
+    assert_eq!(at(&[insert(9, "est")]), (4, "quick".into()));
+}
+
+#[test]
+fn undo_or_paste_back_does_not_reattach_a_detached_comment_by_itself() {
+    // Overleaf's ranges tracker moves a detached comment past text typed at
+    // its point, so the passage coming back (Undo, or pasting the cut text
+    // where it was) leaves the comment detached; only a comment op from the
+    // editor re-attaches it. The mark must not reappear on the restored
+    // text, nor on the text after it.
+    let ops = [delete(4, "quick "), insert(4, "quick ")];
+    let (text, position, quote) = comment_through("The quick brown fox", 4, "quick ", &ops);
+    assert_eq!(text, "The quick brown fox");
+    assert_eq!((position, quote.as_str()), (10, ""));
+    // Pasted somewhere else: still detached, moved along by nothing.
+    let ops = [delete(4, "quick "), insert(13, " quick")];
+    let (text, position, quote) = comment_through("The quick brown fox", 4, "quick ", &ops);
+    assert_eq!(text, "The brown fox quick");
+    assert_eq!((position, quote.as_str()), (4, ""));
+}
+
+#[test]
+fn a_detached_comment_moves_only_with_deletions_before_or_across_its_point() {
+    // A deletion spanning the point pulls it back to where it began.
+    let ops = [delete(4, "quick "), delete(2, "e brown")];
+    let (_, position, quote) = comment_through("The quick brown fox", 4, "quick ", &ops);
+    assert_eq!((position, quote.as_str()), (2, ""));
+    // One starting at the point leaves it there.
+    let ops = [delete(4, "quick "), delete(4, "brown ")];
+    let (_, position, quote) = comment_through("The quick brown fox", 4, "quick ", &ops);
+    assert_eq!((position, quote.as_str()), (4, ""));
+}
+
+#[test]
+fn each_op_edits_the_quote_the_last_one_left() {
+    // The deletion takes out text the insertion put inside the comment.
+    let ops = [insert(6, "XX"), delete(5, "uXXi")];
+    let (text, position, quote) = comment_through("The quick fox", 4, "quick", &ops);
+    assert_eq!(text, "The qck fox");
+    assert_eq!((position, quote.as_str()), (4, "qck"));
+}
+
+#[test]
+fn comment_quotes_are_edited_in_utf16_units() {
+    // "é" is one unit, "𝛼" two: Overleaf counts positions in UTF-16.
+    let (_, position, quote) = comment_through("a 𝛼 bé c", 2, "𝛼 bé", &[delete(2, "𝛼 ")]);
+    assert_eq!((position, quote.as_str()), (2, "bé"));
+    let (_, position, quote) = comment_through("a 𝛼 bé c", 2, "𝛼 bé", &[insert(4, "x")]);
+    assert_eq!((position, quote.as_str()), (2, "𝛼x bé"));
+}
+
 #[test]
 fn suggested_deletion_records_the_removed_text_at_its_point() {
     // The report's 'quick ' case.

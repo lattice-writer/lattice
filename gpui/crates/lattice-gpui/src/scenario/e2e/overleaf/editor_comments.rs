@@ -55,7 +55,7 @@ impl Run {
     }
 
     /// Select `quote` in the editor, with the keyboard in it.
-    fn select_quote(
+    pub(super) fn select_quote(
         &self,
         cx: &mut AsyncApp,
         editor: &Entity<EditorPanel>,

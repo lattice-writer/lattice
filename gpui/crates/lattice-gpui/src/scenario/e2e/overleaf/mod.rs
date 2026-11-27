@@ -26,6 +26,7 @@
 #![cfg(target_os = "macos")]
 
 mod chat;
+mod comment_detach;
 mod editor_comments;
 mod live;
 mod local_copy;
