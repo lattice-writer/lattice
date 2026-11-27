@@ -92,10 +92,9 @@
       "step": "a question put up during the import conflict dialog's exit stays up, unanswered",
       "platforms": [
         "macos",
-        "windows",
-        "linux"
+        "windows"
       ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"first_answered\":true,\"second_answered\":false,\"second_up\":true} | Windows: failed in every main run (44162980527, 44213516921); observed {\"first_answered\":true,\"second_answered\":false,\"second_up\":true} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"first_answered\":false,\"second_answered\":true,\"second_up\":false}",
+      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"first_answered\":true,\"second_answered\":false,\"second_up\":true} | Windows: failed in every main run (44162980527, 44213516921); observed {\"first_answered\":true,\"second_answered\":false,\"second_up\":true}",
       "followup": "LEO-14"
     },
     {
