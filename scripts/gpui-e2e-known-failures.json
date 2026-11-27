@@ -1514,30 +1514,6 @@
       "followup": "LEO-129"
     },
     {
-      "step": "a typo's explanation offers the paper's command, and Replace saves and builds clean",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"offered\":null,\"fixed\":false}",
-      "followup": "LEO-129"
-    },
-    {
-      "step": "Clean deletes the build files, and a clean rebuild writes them again",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"settled\":true,\"focus_in_shell\":true,\"cleaned\":true,\"rebuilt\":true,\"succeeded\":false,\"aux_written\":true,\"at_clean\":{\"ms\":0,\"building\":false,\"cleaning\":false,\"builds\":56,\"aux\":true},\"at_rebuild\":{\"ms\":1495,\"building\":false,\"cleaning\":false,\"builds\":56,\"aux\":false},\"at_end\":{\"ms\":3890,\"building\":fals…",
-      "followup": "LEO-129"
-    },
-    {
-      "step": "Hide auxiliary files moves the build files into .research/build at the next build, and back",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"layouts\":[{\"hidden\":true,\"built\":true,\"succeeded\":false,\"synctex\":true,\"aux_in_hidden_folder\":true,\"aux_beside\":true,\"maps\":[true,false],\"pdf\":true,\"placed\":false}]}",
-      "followup": "LEO-129"
-    },
-    {
       "step": "⌘-click adds a row without opening it, and ⇧-click selects the rows shown between",
       "platforms": [
         "linux"
