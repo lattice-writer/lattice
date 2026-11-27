@@ -58,4 +58,47 @@ describe("assertFreshSynaraBuild", () => {
     expect(() => assertFreshSynaraBuild(root, { buildStartedAt, webBuildReused: false }))
       .toThrow(/dist\/index\.mjs was not rewritten/);
   });
+
+  describe("with the web build reused", () => {
+    const reused = () => {
+      const buildStartedAt = Date.now() - 1_000;
+      put("apps/web/dist/index.html", "<html>v2</html>", hourAgo());
+      copyKeepingTime("apps/web/dist/index.html", "apps/server/dist/client/index.html", hourAgo());
+      put("apps/server/dist/index.mjs", "server");
+      return () => assertFreshSynaraBuild(root, { buildStartedAt, webBuildReused: true });
+    };
+
+    it("refuses a server build that did not copy the client in", () => {
+      const check = reused();
+      rmSync(join(root, "apps/server/dist/client/index.html"));
+      expect(check).toThrow(/did not produce apps\/server\/dist\/client\/index\.html/);
+    });
+
+    it("refuses a web build that is not there to reuse", () => {
+      const check = reused();
+      rmSync(join(root, "apps/web/dist/index.html"));
+      expect(check).toThrow(/did not produce apps\/web\/dist\/index\.html/);
+    });
+
+    it("still refuses a server bundle from before the build", () => {
+      const check = reused();
+      put("apps/server/dist/index.mjs", "server", hourAgo());
+      expect(check).toThrow(/dist\/index\.mjs was not rewritten/);
+    });
+
+    it("refuses a client copy that stopped part way", () => {
+      const check = reused();
+      put("apps/web/dist/assets/index-abc123.js", "chunk", hourAgo());
+      put("apps/web/dist/assets/index-def456.css", "styles", hourAgo());
+      copyKeepingTime("apps/web/dist/assets/index-abc123.js", "apps/server/dist/client/assets/index-abc123.js", hourAgo());
+      expect(check).toThrow(/missing 1 of the files in apps\/web\/dist, such as assets\/index-def456\.css/);
+    });
+
+    it("accepts a client whose favicon the server build replaced", () => {
+      const check = reused();
+      put("apps/web/dist/favicon.ico", "release icon", hourAgo());
+      put("apps/server/dist/client/favicon.ico", "development icon");
+      expect(check).not.toThrow();
+    });
+  });
 });
