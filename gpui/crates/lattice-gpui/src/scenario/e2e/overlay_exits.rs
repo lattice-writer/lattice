@@ -16,7 +16,7 @@ use gpui::{
     AsyncApp, Keystroke, Modifiers, MouseButton, MouseDownEvent, MouseUpEvent, PlatformInput,
 };
 use lattice_core::project::NameConflict;
-use lattice_ui::components::exit_frames;
+use lattice_ui::{components::exit_frames, motion::Exit};
 use serde_json::json;
 
 use super::{Fixture, Steps};
@@ -54,10 +54,17 @@ impl Run {
         let (_, dialog_before) = exit_frames();
         let pressed = Instant::now();
         self.dispatch_key(cx, "enter").await?;
-        self.pause(cx, Duration::from_millis(60)).await;
+        // Read at once and timed from the press, not after a fixed pause: on
+        // a software renderer (llvmpipe under Xvfb) one frame can hold the
+        // main thread past the whole 160ms exit, so a pause there would wake
+        // after the answer, and the answer itself waits for a drawn frame.
         let early = answered.borrow().is_some();
         let asking_mid = cx.update(|cx| import_conflict::install(cx).read(cx).asking().is_some());
-        self.pause(cx, Duration::from_millis(400)).await;
+        let settled = answered.clone();
+        self.wait_for(cx, Duration::from_secs(3), move |_, cx| {
+            settled.borrow().is_some() && import_conflict::install(cx).read(cx).asking().is_none()
+        })
+        .await;
         let (_, dialog_after) = exit_frames();
         let answer = *answered.borrow();
         let asking_end = cx.update(|cx| import_conflict::install(cx).read(cx).asking().is_some());
@@ -66,6 +73,7 @@ impl Run {
             "Enter on the import conflict dialog plays its exit, then answers Keep both",
             !early
                 && asking_mid
+                && waited.is_some_and(|ms| ms >= Exit::DIALOG.duration().as_millis())
                 && dialog_after > dialog_before
                 && answer.map(|(choice, _)| choice) == Some(Some(NameConflict::KeepBoth))
                 && !asking_end,
@@ -94,7 +102,8 @@ impl Run {
         });
         self.pause(cx, Duration::from_millis(500)).await;
         self.dispatch_key(cx, "enter").await?;
-        self.pause(cx, Duration::from_millis(40)).await;
+        // Asked straight after the Enter, so it lands inside the exit
+        // however slowly the window draws.
         let record = second.clone();
         cx.update(|cx| {
             import_conflict::ask(
