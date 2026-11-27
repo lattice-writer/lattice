@@ -41,9 +41,9 @@ describe("ci-local-select: the e2e a change needs", () => {
     for (const file of ["gpui/crates/lattice-gpui/src/scenario/e2e.rs", "gpui/crates/lattice-gpui/src/scenario/drag.rs", "gpui/crates/lattice-gpui/src/host_errors.rs", "src-tauri/lattice-core/src/latex/synctex.rs", "src-tauri/lattice-core/src/testsupport.rs"]) expect(e2eNeeds([file]), file).toMatchObject({ full: true });
   });
 
-  it("runs the TeX modules for the LaTeX build", () => {
+  it("runs TeX modules for the LaTeX build", () => {
     const tex = ["build_flow", "build_marks", "compile_repair", "pdf_compounds", "pdf_sync_polish", "project_entry", "watched_builds"];
-    for (const file of ["latex.rs", "latex/build.rs", "latex/build/beside.rs", "latex/aux_files.rs"]) expect(e2eNeeds(['src-tauri/lattice-core/src/' + file])).toMatchObject({ full: false, modules: tex });
+    for (const file of ["latex.rs", "latex/build.rs", "latex/build/current.rs", "latex/aux_files.rs"]) expect(e2eNeeds(['src-tauri/lattice-core/src/' + file])).toMatchObject({ full: false, modules: tex });
   });
 
   it("runs what the island config picks for the script that builds the island pages", () => {

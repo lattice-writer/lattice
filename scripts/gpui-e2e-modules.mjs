@@ -88,7 +88,6 @@ export function modulesFor(files) {
   return { gpui: files.some((file) => file.startsWith("gpui/") || file.startsWith("src-tauri/lattice-core/")), modules, why: Object.fromEntries(modules.map((module) => [module, why.get(module)])) };
 }
 
-/** Files the branch changed against `base`'s merge base, committed or not. */
 export const KNOWN_FAILURES_FILE = "scripts/gpui-e2e-known-failures.json";
 
 /**
@@ -100,7 +99,12 @@ export const KNOWN_FAILURES_FILE = "scripts/gpui-e2e-known-failures.json";
  * `sources` maps scenario files to their text.
  */
 export function knownFailuresNeeds(before, after, sources) {
-  const entries = (text) => new Map(JSON.parse(text).steps.map((entry) => [entry.step, JSON.stringify(entry)]));
+  // Every entry for a step, in order: a name can be listed once per platform group.
+  const entries = (text) => {
+    const byStep = new Map();
+    for (const entry of JSON.parse(text).steps) byStep.set(entry.step, [...(byStep.get(entry.step) ?? []), JSON.stringify(entry)]);
+    return new Map([...byStep].map(([step, list]) => [step, list.join("\n")]));
+  };
   const [old, now] = [entries(before), entries(after)];
   const changed = [...new Set([...old.keys(), ...now.keys()])].filter((step) => old.get(step) !== now.get(step));
   const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -114,7 +118,10 @@ export function knownFailuresNeeds(before, after, sources) {
       for (const [file, text] of sources) {
         for (const needle of needles) {
           for (const match of text.matchAll(needle)) {
-            if (file.startsWith(SCENARIO)) reached.add(file);
+            if (file.startsWith(SCENARIO)) {
+              if (!modulesFor([file]).modules.length) return { full: true, modules: [], why: step };
+              reached.add(file);
+            }
             const name = [...text.slice(0, match.index).matchAll(/\bfn\s+(\w+)/g)].pop()?.[1];
             if (file.startsWith(SCENARIO) || !name || seen.has(name)) continue;
             seen.add(name);
@@ -124,6 +131,7 @@ export function knownFailuresNeeds(before, after, sources) {
       }
       needles = callers;
     }
+    if (needles.length) return { full: true, modules: [], why: step };
     const modules = reached.size ? modulesFor([...reached]).modules : [];
     if (!modules.length) return { full: true, modules: [], why: step };
     for (const file of reached) files.add(file);
@@ -144,6 +152,7 @@ export function knownFailuresDiff(base, root = repo) {
   }
 }
 
+/** Files the branch changed against `base`'s merge base, committed or not. */
 export function changedFiles(base) {
   const git = (...args) => execFileSync("git", args, { cwd: repo, encoding: "utf8" });
   const mergeBase = git("merge-base", base, "HEAD").trim();

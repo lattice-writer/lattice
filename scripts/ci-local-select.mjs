@@ -282,6 +282,8 @@ export function e2eNeeds(gpuiFiles, covers = MODULE_COVERS, actions = null, know
       fullBecause.push(file);
       continue;
     }
+    // The LaTeX build reaches every TeX module, even where one module's covers name the file.
+    if (LATEX_BUILD.test(file)) for (const module of TEX_BUILD_MODULES) picked.add(module);
     if (!picked.size) {
       for (const [module, prefixes] of covers) {
         if (prefixes.some((prefix) => file.startsWith(prefix))) picked.add(module);

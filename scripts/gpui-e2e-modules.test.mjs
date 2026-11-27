@@ -51,6 +51,7 @@ describe("knownFailuresNeeds", () => {
     ["gpui/crates/lattice-gpui/src/scenario/shell_steps.rs", 'async fn shell_steps(&self) { self.closing(cx).await; }'],
     ["gpui/crates/lattice-gpui/src/scenario/shell_steps/closing.rs", 'pub(super) async fn closing(&self) { steps.push(("a tab closes", ok)); }'],
     ["gpui/crates/lattice-gpui/src/scenario/e2e/tree.rs", 'for step in run.shell_steps(cx).await? {}'],
+    ["gpui/crates/lattice-gpui/src/scenario/e2e/steps.rs", 'fn shared() { steps.check("a shared step", ok, json!({})); }'],
     ["gpui/crates/lattice-gpui/src/scenario/smoke.rs", 'fn smoke() { steps.check("the app opens", ok, json!({})); }'],
   ]);
   const before = list(["a panel closes", "a"], ["PDF: copies \\cmpd{key}", "b"], ["the app opens", "c"]);
@@ -65,6 +66,12 @@ describe("knownFailuresNeeds", () => {
     expect(knownFailuresNeeds(before, list(["a tab closes", "d"], ...JSON.parse(before).steps.map((entry) => [entry.step, entry.reason])), sources)).toMatchObject({ full: false, modules: ["tree"] });
     expect(knownFailuresNeeds(before, list(["a panel closes", "a"], ["PDF: copies \\cmpd{key}", "b"]), sources)).toMatchObject({ full: true });
     expect(knownFailuresNeeds(before, list(["a step built at run time", "d"]), sources)).toMatchObject({ full: true });
+  });
+
+  it("counts every entry a step name has, and runs everything for a step only a non-module file under e2e/ checks", () => {
+    const twice = JSON.stringify({ steps: [{ step: "a panel closes", platforms: ["macos"], reason: "m" }, ...JSON.parse(before).steps] });
+    expect(knownFailuresNeeds(before, twice, sources)).toMatchObject({ full: false, modules: ["dock"] });
+    expect(knownFailuresNeeds(before, list(["a shared step", "e"], ...JSON.parse(before).steps.map((entry) => [entry.step, entry.reason])), sources)).toMatchObject({ full: true });
   });
 
   it("stands in for the file's whole-scenario need in e2eNeeds only when it could be read", () => {
