@@ -140,7 +140,7 @@ impl Run {
         self.pause(cx, Duration::from_millis(100)).await;
         self.frame_after_input(cx).await?;
         let filtered = rows(cx);
-        let row = self.tree_row_center(cx, "notes/n13.md")?;
+        let row = self.tree_row_center(cx, "notes/n13.md").await?;
         self.click_with(cx, row, Modifiers::default()).await?;
         let picked = self
             .wait_for(cx, Duration::from_secs(4), |shell, cx| {
@@ -182,7 +182,7 @@ impl Run {
         cx.update(|cx| tree.update(cx, |tree, cx| tree.scroll_rows_to(0., cx)));
         self.pause(cx, Duration::from_millis(200)).await;
         self.frame_after_input(cx).await?;
-        let at = self.tree_row_center(cx, "notes/n01.md")?;
+        let at = self.tree_row_center(cx, "notes/n01.md").await?;
         let native = self.native(cx)?;
         native::send_mouse(native, native::Mouse::Moved, at)?;
         self.frame_after_input(cx).await?;
@@ -228,7 +228,7 @@ impl Run {
         // The motion is read as the release lands, before a frame: waiting
         // for the next frame can take the whole 160ms on a loaded machine,
         // and then the motion has already ended.
-        let notes = self.tree_row_center(cx, "notes")?;
+        let notes = self.tree_row_center(cx, "notes").await?;
         self.pointer(cx, PointerStep::Down, notes).await?;
         self.with_window(cx, move |_, window, cx| {
             window.dispatch_event(
@@ -248,7 +248,7 @@ impl Run {
         let rest = cx.update(|cx| tree.read(cx).motion_state(cx));
         // Closing it with reduced motion moves nothing.
         cx.update(|cx| cx.set_reduce_motion(true));
-        let notes = self.tree_row_center(cx, "notes")?;
+        let notes = self.tree_row_center(cx, "notes").await?;
         self.click_with(cx, notes, Modifiers::default()).await?;
         let reduced = cx.update(|cx| tree.read(cx).motion_state(cx));
         cx.update(|cx| cx.set_reduce_motion(false));

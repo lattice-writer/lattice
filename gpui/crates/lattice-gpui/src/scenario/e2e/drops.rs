@@ -58,7 +58,7 @@ impl Run {
 
         // Finder → a folder's row: it lands there, the folder lit meanwhile,
         // even right after typing (AppKit sends no mouse moves meanwhile).
-        let chapters = self.tree_row_center(cx, "chapters")?;
+        let chapters = self.tree_row_center(cx, "chapters").await?;
         self.with_window(cx, |_, window, cx| {
             window.dispatch_event(
                 PlatformInput::KeyDown(gpui::KeyDownEvent {
@@ -226,7 +226,7 @@ impl Run {
 
         // A file's row dragged out of the Project panel: Trellis lands it
         // in the documents' panel.
-        let bib = self.tree_row_center(cx, "references.bib")?;
+        let bib = self.tree_row_center(cx, "references.bib").await?;
         let target = self
             .with_window(cx, |_, window, cx| editor.update(cx, |editor, cx| editor.point_before(second, window, cx)))?
             .context("the editor is on screen")?;
@@ -266,7 +266,7 @@ impl Run {
         // the next move without the button lets go of it, the tab it opened
         // closed again, rather than the tab following the bare pointer.
         self.pause(cx, Duration::from_millis(300)).await;
-        let bib = self.tree_row_center(cx, "references.bib")?;
+        let bib = self.tree_row_center(cx, "references.bib").await?;
         self.pointer(cx, PointerStep::Down, bib).await?;
         self.pointer(cx, PointerStep::Move, bib + gpui::point(gpui::px(12.), gpui::px(0.)))
             .await?;
@@ -429,14 +429,14 @@ impl Run {
         // The import revealed its figure, opening figures/ (revealRequest);
         // a click opens the folder only when it was closed since.
         if !cx.update(|cx| rows(cx, "figures/finder-plot.png")) {
-            let folder = self.tree_row_center(cx, "figures")?;
+            let folder = self.tree_row_center(cx, "figures").await?;
             self.pointer(cx, PointerStep::Down, folder).await?;
             self.pointer(cx, PointerStep::Up, folder).await?;
         }
         self.wait_for(cx, Duration::from_secs(4), |_, cx| rows(cx, "figures/finder-plot.png"))
             .await;
         self.pause(cx, Duration::from_millis(200)).await;
-        let row = self.tree_row_center(cx, "figures/finder-plot.png")?;
+        let row = self.tree_row_center(cx, "figures/finder-plot.png").await?;
         let at = self
             .with_window(cx, |_, window, cx| editor.update(cx, |editor, cx| editor.point_before(second, window, cx)))?
             .context("the second line is on screen")?;
@@ -468,24 +468,32 @@ impl Run {
         }
     }
 
-    /// The middle of the tree's row for `path`, as last drawn.
-    pub(super) fn tree_row_center(&self, cx: &mut AsyncApp, path: &str) -> Result<Point<Pixels>> {
+    /// A tree row's center. A row outside those drawn (a tree that earlier
+    /// modules grew past the panel's height) is scrolled into view first.
+    pub(super) async fn tree_row_center(&self, cx: &mut AsyncApp, path: &str) -> Result<Point<Pixels>> {
         let tree = cx.update(|cx| self.shell.read(cx).file_tree().clone());
-        cx.update(|cx| {
-            let tree = tree.read(cx);
+        let drawn = |tree: &crate::file_tree::FileTreePanel, cx: &gpui::App| -> Result<(usize, Option<Point<Pixels>>)> {
             let ix = tree
                 .row_paths(cx)
                 .iter()
                 .position(|row| row == path)
                 .with_context(|| format!("{path} is a row of the tree"))?;
             let snapshot = tree.hover_snapshot(cx).context("the tree was drawn")?;
-            let (_, bounds, _) = snapshot
-                .rows
-                .iter()
-                .find(|(row, ..)| *row == ix)
-                .with_context(|| format!("{path}'s row is laid out"))?;
-            Ok(bounds.center())
+            let center = snapshot.rows.iter().find(|(row, ..)| *row == ix).map(|(_, bounds, _)| bounds.center());
+            Ok((ix, center))
+        };
+        let (ix, center) = cx.update(|cx| drawn(tree.read(cx), cx))?;
+        if let Some(center) = center {
+            return Ok(center);
+        }
+        cx.update(|cx| tree.update(cx, |tree, cx| tree.scroll_rows_to(ix.saturating_sub(2) as f32, cx)));
+        self.wait_for(cx, Duration::from_secs(2), |_, cx| {
+            drawn(tree.read(cx), cx).is_ok_and(|(_, center)| center.is_some())
         })
+        .await;
+        cx.update(|cx| drawn(tree.read(cx), cx))?
+            .1
+            .with_context(|| format!("{path}'s row is laid out"))
     }
 
     /// A point in the tree below its last row.

@@ -38,7 +38,7 @@ impl Run {
         self.open(cx, &root.join("main.tex"), Some(1))?;
         self.pause(cx, Duration::from_millis(300)).await;
         if rows(cx).contains(&intro) {
-            let chapters = self.tree_row_center(cx, "chapters")?;
+            let chapters = self.tree_row_center(cx, "chapters").await?;
             self.click_with(cx, chapters, Modifiers::default()).await?;
         }
         let closed = !rows(cx).contains(&intro);
@@ -68,11 +68,11 @@ impl Run {
 
         // ⌘-click adds main.tex without opening it; ⇧-click takes the rows
         // shown from there to references.bib.
-        let main = self.tree_row_center(cx, "main.tex")?;
+        let main = self.tree_row_center(cx, "main.tex").await?;
         self.click_with(cx, main, Modifiers::command()).await?;
         let (added, _) = selection(cx);
         let front = cx.update(|cx| self.shell.read(cx).active_editor_path(cx));
-        let bib = self.tree_row_center(cx, "references.bib")?;
+        let bib = self.tree_row_center(cx, "references.bib").await?;
         self.click_with(cx, bib, Modifiers::shift()).await?;
         let (ranged, _) = selection(cx);
         self.drop_shot(cx, "tree-multi-select").await;
@@ -114,7 +114,7 @@ impl Run {
         self.tree_key(cx, &tree, "enter")?;
         self.pause(cx, Duration::from_millis(150)).await;
         let several = self.naming_of(cx, &tree)?;
-        let main = self.tree_row_center(cx, "main.tex")?;
+        let main = self.tree_row_center(cx, "main.tex").await?;
         self.click_with(cx, main, Modifiers::default()).await?;
         self.tree_key(cx, &tree, "enter")?;
         self.pause(cx, Duration::from_millis(150)).await;
@@ -137,9 +137,9 @@ impl Run {
             tree.read(cx).row_paths(cx).contains(&"scratch-b.tex".to_string())
         })
         .await;
-        let a = self.tree_row_center(cx, "scratch-a.tex")?;
+        let a = self.tree_row_center(cx, "scratch-a.tex").await?;
         self.click_with(cx, a, Modifiers::default()).await?;
-        let b = self.tree_row_center(cx, "scratch-b.tex")?;
+        let b = self.tree_row_center(cx, "scratch-b.tex").await?;
         self.click_with(cx, b, Modifiers::command()).await?;
         cx.update(|cx| tree.update(cx, |tree, cx| tree.delete_from_menu("scratch-b.tex", cx)));
         self.pause(cx, Duration::from_millis(200)).await;
@@ -201,7 +201,7 @@ impl Run {
         // it, and a ⌘-click adds to it rather than to the clicked rows. A
         // folder's row is clicked, as a file's would hand the keyboard to the
         // editor it opens.
-        let folder = self.tree_row_center(cx, "chapters")?;
+        let folder = self.tree_row_center(cx, "chapters").await?;
         self.click_with(cx, folder, Modifiers::default()).await?;
         self.pause(cx, Duration::from_millis(200)).await;
         self.tree_key(cx, &tree, "down")?;
@@ -210,7 +210,7 @@ impl Run {
         cx.update(|cx| tree.update(cx, |tree, cx| tree.refresh(cx)));
         self.pause(cx, Duration::from_millis(800)).await;
         let (rescanned, _) = selection(cx);
-        let bib = self.tree_row_center(cx, "references.bib")?;
+        let bib = self.tree_row_center(cx, "references.bib").await?;
         self.click_with(cx, bib, Modifiers::command()).await?;
         let (toggled, _) = selection(cx);
         let mut below_chapters = |list: &[String]| {
@@ -243,7 +243,7 @@ impl Run {
         let switched = match (original, opened) {
             (Some(a), Ok(b)) => {
                 if rows(cx).iter().any(|row| row.starts_with("figures/")) {
-                    let folder = self.tree_row_center(cx, "figures")?;
+                    let folder = self.tree_row_center(cx, "figures").await?;
                     self.click_with(cx, folder, Modifiers::default()).await?;
                     self.pause(cx, Duration::from_millis(200)).await;
                 }
@@ -254,7 +254,7 @@ impl Run {
                 })
                 .await;
                 if !rows(cx).contains(&"figures/fig.txt".to_string()) {
-                    let folder = self.tree_row_center(cx, "figures")?;
+                    let folder = self.tree_row_center(cx, "figures").await?;
                     self.click_with(cx, folder, Modifiers::default()).await?;
                 }
                 let b_open = self
@@ -338,7 +338,7 @@ impl Run {
         // file stays open.
         self.open(cx, &root.join("main.tex"), Some(1))?;
         self.pause(cx, Duration::from_millis(300)).await;
-        let chapters = self.tree_row_center(cx, "chapters")?;
+        let chapters = self.tree_row_center(cx, "chapters").await?;
         self.click_with(cx, chapters, Modifiers::default()).await?;
         let (picked, _) = selection(cx);
         let folder_before = cx.update(|cx| tree.read(cx).new_entry_folder(cx));

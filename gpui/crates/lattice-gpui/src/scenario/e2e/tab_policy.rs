@@ -92,7 +92,7 @@ impl Run {
         };
 
         // A row's click opens a preview; the next row's takes its place.
-        let alpha = self.tree_row_center(cx, "alpha.md")?;
+        let alpha = self.tree_row_center(cx, "alpha.md").await?;
         self.click_with(cx, alpha, Modifiers::default()).await?;
         self.wait_for(cx, Duration::from_secs(4), |shell, cx| {
             shell.read(cx).tab_state("alpha.md", cx).is_some()
@@ -105,7 +105,7 @@ impl Run {
             cx.update(|cx| self.shell.read(cx).strip_documents(&panel, cx))
         };
         let before = strip(cx);
-        let beta = self.tree_row_center(cx, "beta.md")?;
+        let beta = self.tree_row_center(cx, "beta.md").await?;
         self.click_with(cx, beta, Modifiers::default()).await?;
         self.wait_for(cx, Duration::from_secs(4), |shell, cx| {
             shell.read(cx).tab_state("beta.md", cx).is_some()
@@ -131,7 +131,7 @@ impl Run {
         );
 
         // A double-click on the row keeps it.
-        let beta = self.tree_row_center(cx, "beta.md")?;
+        let beta = self.tree_row_center(cx, "beta.md").await?;
         self.double_click(cx, beta).await?;
         self.pause(cx, Duration::from_millis(200)).await;
         let kept = state(cx, "beta.md");
@@ -142,7 +142,7 @@ impl Run {
         );
 
         // An edit keeps a preview too.
-        let gamma = self.tree_row_center(cx, "gamma.md")?;
+        let gamma = self.tree_row_center(cx, "gamma.md").await?;
         self.click_with(cx, gamma, Modifiers::default()).await?;
         self.wait_for(cx, Duration::from_secs(4), |shell, cx| {
             shell.read(cx).tab_state("gamma.md", cx).is_some()
@@ -178,7 +178,7 @@ impl Run {
             shell.read(cx).tab_state("gamma.md", cx).is_none()
         })
         .await;
-        let gamma = self.tree_row_center(cx, "gamma.md")?;
+        let gamma = self.tree_row_center(cx, "gamma.md").await?;
         self.click_with(cx, gamma, Modifiers::default()).await?;
         self.wait_for(cx, Duration::from_secs(4), |shell, cx| {
             shell.read(cx).tab_state("gamma.md", cx).is_some()
@@ -195,7 +195,7 @@ impl Run {
                     .is_some_and(|(_, _, preview, _)| !preview)
             })
             .await;
-        let alpha = self.tree_row_center(cx, "alpha.md")?;
+        let alpha = self.tree_row_center(cx, "alpha.md").await?;
         self.click_with(cx, alpha, Modifiers::default()).await?;
         self.wait_for(cx, Duration::from_secs(4), |shell, cx| {
             shell.read(cx).tab_state("alpha.md", cx).is_some()
@@ -212,7 +212,7 @@ impl Run {
         );
 
         // A pinned preview stays when the next quick look comes.
-        let delta = self.tree_row_center(cx, "delta.md")?;
+        let delta = self.tree_row_center(cx, "delta.md").await?;
         self.click_with(cx, delta, Modifiers::default()).await?;
         self.wait_for(cx, Duration::from_secs(4), |shell, cx| {
             shell.read(cx).tab_state("delta.md", cx).is_some()
@@ -220,7 +220,7 @@ impl Run {
         .await;
         cx.update(|cx| self.shell.update(cx, |shell, cx| shell.pin_document("delta.md", true, cx)));
         let pinned = state(cx, "delta.md");
-        let chapter = self.tree_row_center(cx, "a-long-chapter-name-01.md")?;
+        let chapter = self.tree_row_center(cx, "a-long-chapter-name-01.md").await?;
         self.click_with(cx, chapter, Modifiers::default()).await?;
         self.wait_for(cx, Duration::from_secs(4), |shell, cx| {
             shell.read(cx).tab_state("a-long-chapter-name-01.md", cx).is_some()
