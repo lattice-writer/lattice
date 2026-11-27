@@ -54,9 +54,30 @@ impl Run {
             Ok(()) => self.papers_panel_steps(cx, steps, root, &papers).await,
             Err(error) => Err(error),
         };
-        std::fs::write(&bibliography, original)?;
+        // The audit writes an applied fix from a task of its own; one that
+        // outlasted its step's wait would land on top of the restore and
+        // leave its fields in the fixture the later modules read.
+        let apply_settled = self
+            .wait_for(cx, Duration::from_secs(30), |shell, cx| {
+                !shell
+                    .read(cx)
+                    .audit()
+                    .is_some_and(|audit| audit.read(cx).is_applying())
+            })
+            .await;
+        std::fs::write(&bibliography, &original)?;
         std::fs::remove_dir_all(root.join(BUNDLE))?;
         outcome?;
+        // The editor these steps opened on the bibliography takes the file
+        // back as an outside edit a moment later; the modules after this one
+        // reuse it and must find it as it was.
+        let reloaded = self
+            .wait_for(cx, Duration::from_secs(10), |shell, cx| {
+                shell
+                    .update(cx, |shell, cx| shell.open_editor(&bibliography, cx))
+                    .is_none_or(|editor| editor.read(cx).editor().read(cx).text(cx) == original)
+            })
+            .await;
         let restored = self
             .wait_for(cx, Duration::from_secs(15), |_, cx| {
                 papers.read(cx).papers.len() == 1
@@ -72,8 +93,13 @@ impl Run {
         });
         steps.check(
             "the project's bibliography and papers are put back as they were",
-            restored && left == ["The TeXbook"],
-            json!({ "restored": restored, "papers": left }),
+            apply_settled && reloaded && restored && left == ["The TeXbook"],
+            json!({
+                "apply_settled": apply_settled,
+                "reloaded": reloaded,
+                "restored": restored,
+                "papers": left
+            }),
         );
         Ok(())
     }
