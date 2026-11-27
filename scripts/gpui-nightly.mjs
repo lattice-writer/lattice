@@ -310,7 +310,13 @@ function rerunModulesInScratch(modules, out) {
   // module's first step fails at once, so a rerun could never clear it.
   const helper = path.join(repo, "gpui", "target", "release", "lattice-typst");
   try {
-    if (existsSync(helper)) env.LATTICE_E2E_TYPST_RELEASE = path.dirname(fakeTypstRelease(helper, path.join(home, "typst-release")));
+    if (existsSync(helper)) {
+      try {
+        env.LATTICE_E2E_TYPST_RELEASE = path.dirname(fakeTypstRelease(helper, path.join(home, "typst-release")));
+      } catch (error) {
+        console.log(`gpui-nightly: no Typst stand-in release for the rerun (${error.message})`);
+      }
+    }
     const result = rerun(path.join(repo, "gpui", "target", "release", "lattice-gpui"), path.join(repo, "gpui", "fixtures", "e2e"), modules.split(","), env);
     if (result) writeFileSync(out, JSON.stringify(result));
   } finally {
