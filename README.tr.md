@@ -19,7 +19,7 @@ macOS için yerel öncelikli bir LaTeX çalışma alanı; makaleleriniz, ortak y
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.webp" />
-    <img src="docs/images/hero-light.webp" alt="Bir LaTeX makalesi açıkken Lattice: solda Proje ağacı ve Makaleler kütüphanesi, ortada kaynak kod, sağda derlenmiş PDF" width="900" />
+    <img src="docs/images/hero-light.webp" alt="Bir LaTeX makalesi açıkken Lattice: solda Project tree ve Papers kütüphanesi, ortada kaynak kod, sağda derlenmiş PDF" width="900" />
   </picture>
 </p>
 
@@ -34,17 +34,17 @@ Projeniz diskte sıradan bir klasör olarak kalır; böylece çevrimdışı çal
 Yazarken tamamlama ve tanılama, çift yönlü SyncTeX atlamaları ve kendi TeX Live kurulumunuzla tek tıkla derleme ile kaynak kod ve PDF yan yana (veya ikinci bir ekran için PDF ayrı bir pencerede).
 Bir `.tex` sekmesini **Source** görünümünden **Visual** görünümüne geçirerek başlıkları, vurguları, denklemleri, listeleri ve şekilleri aynı düzenleyici içinde yerinde çizilmiş hâliyle okuyup düzenleyin.
 Bir anahat şeridi bölümlerinizi takip eder, `\cite` anahtarları üzerine gelindiğinde referansını gösterir ve anlamları tanımlı altı vurgulayıcı hâlâ üzerinde çalışılması gereken yerleri işaretler.
-Bir NeurIPS, ICML, ICLR, ACL, CVPR ya da AAAI şablonundan veya iki tez sınıfından biriyle başlayın; **Export for arXiv** kendi başına derlenen tek bir ZIP oluşturur.
+Bir NeurIPS, ICML, ICLR, ACL, CVPR ya da AAAI şablonuyla ya da iki tez sınıfından biriyle başlayın; **Export for arXiv** kendi başına derlenen tek bir ZIP oluşturur.
 Herhangi bir paneli istediğiniz yere sabitleyin, Yazma, Okuma ve Kaynakça düzenlerini saklayın veya kendi çalışma alanlarınızı kaydedin.
 
 ## Gözden Geçirin
 
-<img src="docs/images/review.webp" alt="2. turda üç öneri içeren Açıklamalar paneli; ajanın özetin açılış cümlesini yeniden yazımı main.tex içinde Kabul Et, Reddet ve Yeniden Dene seçenekleriyle satır içi açık" width="900" />
+<img src="docs/images/review.webp" alt="2. turda üç öneri içeren Annotations paneli; ajanın özetin açılış cümlesini yeniden yazımı main.tex içinde Accept, Reject ve Retry seçenekleriyle satır içi açık" width="900" />
 
 Her düzenleme için bir gerekçeyle birlikte yerinde **Proofread** (Yazım Denetimi) veya **Polish** (İyileştirme) yapmak üzere metin seçin.
 Kaynak koda veya PDF'e notlar ekleyin, ardından notlarınızdan turlar hâlinde düzeltme yapın: ajan her biri için bir düzenleme önerir ve siz bunu yerinde kabul eder veya reddedersiniz.
 Notlar ve Overleaf yorumları PDF'in yanındaki bir sütunda da hizalanır; her biri sayfadaki işaretiyle aynı hizada gösterilir ve bunları orada okuyabilir, yanıtlayabilir ve çözümleyebilirsiniz.
-**Export review PDF**, işaretlediğiniz notları derlenmiş PDF'in bir kopyasına standart PDF yorumları olarak yazar; böylece iş birliği yaptığınız kişiler bunları Preview, Acrobat veya Zotero'da okuyabilir.
+**Export review PDF**, işaretlediğiniz notları derlenmiş PDF'in bir kopyasına standart PDF yorumları olarak yazar; böylece iş birliği yaptığınız kişiler bunları Önizleme, Acrobat veya Zotero'da okuyabilir.
 
 ### Kendi ajanınızı getirin
 
@@ -56,7 +56,7 @@ Ayrıca Zotero veya Heptabase gibi bu CLI'a eklediğiniz MCP sunucularını da k
 
 ## Araştırın
 
-<img src="docs/images/papers.webp" alt="Solda dokuz makale bulunan Makaleler kütüphanesi, ortada okunabilir bir sayfa olarak açık Mamba: Linear-Time Sequence Modeling with Selective State Spaces makalesi ve sağda derlenmiş taslak" width="900" />
+<img src="docs/images/papers.webp" alt="Solda dokuz makale bulunan Papers kütüphanesi, ortada okunabilir bir sayfa olarak açık Mamba: Linear-Time Sequence Modeling with Selective State Spaces makalesi ve sağda derlenmiş taslak" width="900" />
 
 <sub>Gösterilen makale: Albert Gu ve Tri Dao, “Mamba: Linear-Time Sequence Modeling with Selective State Spaces”, arXiv:2312.00752, CC BY 4.0.</sub>
 
@@ -66,15 +66,15 @@ Kütüphane atıf yaptıklarınıza göre sıralar, filtreler ve gruplar; **Chec
 
 ## Overleaf ile İş Birliği Yapın
 
-<img src="docs/images/collab.webp" alt="Overleaf yorum vurguları ve bir ortak yazarın canlı imleciyle main.tex; yanında demo ortak yazarlardan üç konu içeren Overleaf panelinin Yorumlar sekmesi ile Öneriler ve Sohbet sekmeleri" width="900" />
+<img src="docs/images/collab.webp" alt="Overleaf yorum vurguları ve bir ortak yazarın canlı imleciyle main.tex; yanında demo ortak yazarlardan üç konu içeren Overleaf panelinin Comments sekmesi ile Suggestions ve Chat sekmeleri" width="900" />
 
-Canlı varlık bilgisi, sohbet, yorumlar ve izlenen değişikliklerle çift yönlü Overleaf eşitlemesi.
+Canlı çevrimiçi durum, sohbet, yorumlar ve izlenen değişikliklerle çift yönlü Overleaf eşitlemesi.
 Ortak yazarlarınız Overleaf'te kalır ve düzenlemeleri yazdıkları anda gelir; başka kimsenin Lattice kullanması gerekmez.
 Yorumlar kişi başına tek bir renkle konuşma düzeninde okunur ve kenar boşluğu incelemesi yorumlar ile önerileri ilgili satırların yanına yerleştirir.
 
 ## Her Format
 
-<img src="docs/images/formats.webp" alt="Biçimlendirilmiş bir Markdown belgesi olarak gösterilen notes.md'nin yanında düzenleyicide açık attention-map.tldr beyaz tahtası; Proje ağacı aynı projenin HTML sayfasını, elektronik tablosunu ve slaytlarını listeler" width="900" />
+<img src="docs/images/formats.webp" alt="Biçimlendirilmiş bir Markdown belgesi olarak gösterilen notes.md'nin yanında düzenleyicide açık attention-map.tldr beyaz tahtası; Project tree aynı projenin HTML sayfasını, elektronik tablosunu ve slaytlarını listeler" width="900" />
 
 Bloklar hâlinde düzenlenen Markdown notları, Excalidraw beyaz tahtaları, etkileşimli HTML sayfaları ve formüllü elektronik tablolar makaleyle aynı projede yer alır.
 Slaytlar [Open Slide](https://github.com/open-slide/open-slide) altyapısını kullanan React sunumlarıdır: bunları düzenleyin, üzerlerine yorum yapın, ajanın revize etmesini sağlayın ve Lattice içinden sunum yapın.
@@ -82,7 +82,7 @@ Slaytlar [Open Slide](https://github.com/open-slide/open-slide) altyapısını k
 
 ## Geçmiş
 
-<img src="docs/images/history.webp" alt="Geçmiş paneli: ajanın özeti yeniden yazımı Bu dosyayı geri yükle seçeneğiyle diff'ine genişletilmiş; ardından bir atıf, kendi düzenlemeniz ve ortak yazarların kaydettiği sürümler, sağda ise derlenmiş PDF" width="900" />
+<img src="docs/images/history.webp" alt="History paneli: ajanın özeti yeniden yazımı Restore this file seçeneğiyle diff'ine genişletilmiş; ardından bir atıf, kendi düzenlemeniz ve ortak yazarların kaydettiği sürümler, sağda ise derlenmiş PDF" width="900" />
 
 Kaydedilen sürümler, sizin veya ajanın yaptığı her düzenleme ve Overleaf geçmişi için tek bir zaman çizelgesi.
 Herhangi bir kaydı açarak diff'ini görün ve bir dosyayı geri yükleyin ya da herhangi iki sürümü **Compare…** ile karşılaştırıp değişikliklerin işaretlendiği PDF'i (TeX Live'ınızdaki `latexdiff` aracılığıyla) dışa aktarın.
@@ -92,13 +92,13 @@ Proje bir depo olduğunda Git paneli değişiklikleri ve pull request'leri göst
 ## Kurulum
 
 Lattice, Apple silicon veya Intel işlemcili macOS 14 ve üzeri Mac'lerde çalışır ve kendi [MacTeX](https://tug.org/mactex/) veya TeX Live kurulumunuzla derler.
-Henüz TeX kurulu değil mi? Lattice sizin için BasicTeX kurmayı teklif eder: bu Başlangıç kontrol listesinin ilk adımıdır ve TeX bulamayan bir derleme de bunu önerir.
+Henüz TeX kurulu değil mi? Lattice sizin için BasicTeX kurmayı teklif eder: bu Getting Started kontrol listesinin ilk adımıdır ve TeX bulamayan bir derleme de bunu önerir.
 
-1. [Son sürümden](https://github.com/lattice-writer/lattice/releases/latest) `.dmg` dosyasını indirin ve Lattice'i Applications klasörüne sürükleyin.
+1. [Son sürümden](https://github.com/lattice-writer/lattice/releases/latest) `.dmg` dosyasını indirin ve Lattice'i Uygulamalar klasörüne sürükleyin.
    Intel işlemcili bir Mac'te `_x64.dmg` ile biten dosyayı indirin (Apple menüsü → Bu Mac Hakkında penceresi Apple silicon'da **Çip**, Intel'de **İşlemci** gösterir).
    Veya Homebrew ile kurun: `brew install --cask lattice`. Uygulama kendini günceller, bu nedenle Homebrew yükseltmeleri uygulamaya bırakır.
 2. Bir klasör açın, bir şablondan başlayın veya bir Overleaf projesi bağlayın.
-   Proje menüsündeki **Guided tutorial**, Başlangıç listesinin (PDF derlemekten ajanın bir paragrafı revize etmesine izin vermeye kadar altı adımlı kontrol listesi) yanında örnek bir makale açar.
+   Proje menüsündeki **Guided tutorial**, Getting Started listesinin (PDF derlemekten ajanın bir paragrafı revize etmesine izin vermeye kadar altı adımlı kontrol listesi) yanında örnek bir makale açar.
 
 Resmi derlemeler imzalıdır, Apple tarafından onaylanmıştır (notarized) ve kendilerini günceller.
 
@@ -111,7 +111,7 @@ Windows (deneysel). Windows kontrollerinden geçen sürümler, SHA-256 sağlama 
 ## Katkıda Bulunma
 
 Kaynaktan derlemek için [CONTRIBUTING.md](CONTRIBUTING.md) ve [mimari belgelerine](docs/README.md) bakın.
-Hata bildirimleri ve pull request'ler memnuniyetle karşılanır; büyük bir yeniden düzenlemeden önce lütfen bir [issue](https://github.com/lattice-writer/lattice/issues) açın.
+Hata bildirimleri ve pull request'ler memnuniyetle karşılanır; büyük bir yeniden düzenlemeden önce lütfen bir [sorun kaydı](https://github.com/lattice-writer/lattice/issues) açın.
 
 ## Teşekkürler
 
