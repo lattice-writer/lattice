@@ -82,8 +82,7 @@ impl Run {
             .ok()
             .flatten()
             .is_some_and(|link| link.paused);
-        let offered =
-            cx.update(|cx| self.shell.read(cx).command_context(cx).overleaf_paused);
+        let offered = cx.update(|cx| self.shell.read(cx).command_context(cx).overleaf_paused);
 
         self.type_text(cx, OURS).await?;
         let theirs_typed = mock.peer_typed("main.tex", vec![insert(0, THEIRS)]);
@@ -95,7 +94,9 @@ impl Run {
         // Long enough for live mode's push and poll to have gone, had they
         // still been running.
         self.pause(cx, Duration::from_secs(5)).await;
-        let held = mock.file("main.tex").is_some_and(|text| !text.contains(OURS))
+        let held = mock
+            .file("main.tex")
+            .is_some_and(|text| !text.contains(OURS))
             && std::fs::read_to_string(&main).is_ok_and(|text| !text.contains(THEIRS));
 
         self.with_window(cx, |_, window, cx| {

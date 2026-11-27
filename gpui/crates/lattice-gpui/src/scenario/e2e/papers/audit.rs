@@ -192,7 +192,8 @@ impl Run {
     /// A pointer click on the scrim at the window's left edge, beside the
     /// centred sheet.
     async fn audit_click_outside(&self, cx: &mut AsyncApp) -> Result<()> {
-        let height = self.with_window(cx, |_, window, _| f32::from(window.viewport_size().height))?;
+        let height =
+            self.with_window(cx, |_, window, _| f32::from(window.viewport_size().height))?;
         self.click_with(cx, point(px(24.), px(height * 0.5)), Modifiers::default())
             .await?;
         self.pause(cx, Duration::from_millis(200)).await;

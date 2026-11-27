@@ -35,9 +35,16 @@ fn place(editor: &Entity<EditorPanel>, cx: &mut AsyncApp) -> (f64, usize) {
 }
 
 impl Run {
-    async fn editor_place(&self, cx: &mut AsyncApp, steps: &mut Steps, root: &std::path::Path) -> Result<()> {
+    async fn editor_place(
+        &self,
+        cx: &mut AsyncApp,
+        steps: &mut Steps,
+        root: &std::path::Path,
+    ) -> Result<()> {
         let file = root.join("editor-place-check.tex");
-        let text: String = (1..=300).map(|line| format!("Line {line} of the place check.\n")).collect();
+        let text: String = (1..=300)
+            .map(|line| format!("Line {line} of the place check.\n"))
+            .collect();
         std::fs::write(&file, &text)?;
         let editor = self.open(cx, &file, Some(180))?;
         self.pause(cx, Duration::from_millis(600)).await;
@@ -48,7 +55,9 @@ impl Run {
         let again = self
             .with_window(cx, {
                 let file = file.clone();
-                move |shell, window, cx| shell.update(cx, |shell, cx| shell.open_path(file, None, window, cx))
+                move |shell, window, cx| {
+                    shell.update(cx, |shell, cx| shell.open_path(file, None, window, cx))
+                }
             })?
             .context("the file opens again")?;
         self.pause(cx, Duration::from_millis(400)).await;
@@ -86,7 +95,9 @@ impl Run {
         let reopened = self
             .with_window(cx, {
                 let file = file.clone();
-                move |shell, window, cx| shell.update(cx, |shell, cx| shell.open_path(file, None, window, cx))
+                move |shell, window, cx| {
+                    shell.update(cx, |shell, cx| shell.open_path(file, None, window, cx))
+                }
             })?
             .context("the file opens again after a quick close")?;
         self.pause(cx, Duration::from_millis(400)).await;
@@ -106,21 +117,29 @@ impl Run {
         self.pause(cx, Duration::from_millis(500)).await;
         let tree = cx.update(|cx| self.shell.read(cx).file_tree().clone());
         self.with_window(cx, |_, window, cx| {
-            tree.update(cx, |tree, cx| tree.begin_rename("editor-place-check.tex".into(), window, cx))
+            tree.update(cx, |tree, cx| {
+                tree.begin_rename("editor-place-check.tex".into(), window, cx)
+            })
         })?;
         self.pause(cx, Duration::from_millis(200)).await;
         self.with_window(cx, |_, window, cx| {
-            tree.update(cx, |tree, cx| tree.confirm_name("editor-place-renamed.tex", window, cx))
+            tree.update(cx, |tree, cx| {
+                tree.confirm_name("editor-place-renamed.tex", window, cx)
+            })
         })?;
         let renamed = root.join("editor-place-renamed.tex");
         let moved = self
-            .wait_for(cx, Duration::from_secs(8), |_, _| renamed.is_file() && !file.exists())
+            .wait_for(cx, Duration::from_secs(8), |_, _| {
+                renamed.is_file() && !file.exists()
+            })
             .await;
         self.pause(cx, Duration::from_millis(300)).await;
         let after_rename = self
             .with_window(cx, {
                 let renamed = renamed.clone();
-                move |shell, window, cx| shell.update(cx, |shell, cx| shell.open_path(renamed, None, window, cx))
+                move |shell, window, cx| {
+                    shell.update(cx, |shell, cx| shell.open_path(renamed, None, window, cx))
+                }
             })?
             .context("the renamed file opens")?;
         self.pause(cx, Duration::from_millis(400)).await;

@@ -21,8 +21,7 @@ use super::Steps;
 use crate::{
     scenario::Run,
     shell::palette_commands::{
-        NewBoardInProject, NewLatexFileInProject, NewPresentationInProject,
-        NewSpreadsheetInProject,
+        NewBoardInProject, NewLatexFileInProject, NewPresentationInProject, NewSpreadsheetInProject,
     },
 };
 
@@ -32,16 +31,24 @@ impl Run {
 
         // New LaTeX file beside the selected chapter: "untitled.tex", its
         // stem selected; "appendix" becomes appendix.tex and opens.
-        let selected = cx.update(|cx| tree.read(cx).row_paths(cx).contains(&"chapters/intro.tex".to_string()));
+        let selected = cx.update(|cx| {
+            tree.read(cx)
+                .row_paths(cx)
+                .contains(&"chapters/intro.tex".to_string())
+        });
         if selected {
             self.with_window(cx, {
                 let tree = tree.clone();
                 move |_, window, cx| {
-                    tree.update(cx, |tree, cx| tree.select_row("chapters/intro.tex", window, cx));
+                    tree.update(cx, |tree, cx| {
+                        tree.select_row("chapters/intro.tex", window, cx)
+                    });
                 }
             })?;
         }
-        let (row, named) = self.name_entry(cx, Box::new(NewLatexFileInProject), "appendix").await?;
+        let (row, named) = self
+            .name_entry(cx, Box::new(NewLatexFileInProject), "appendix")
+            .await?;
         let opened = self.opened(cx, "chapters/appendix.tex").await;
         steps.check(
             "New LaTeX file names an untitled.tex row beside the selection, and a bare name becomes a .tex that opens",
@@ -54,9 +61,13 @@ impl Run {
 
         // New spreadsheet and New board: a bare "untitled" at the root,
         // taking their extension, opened in their editors.
-        let (sheet_row, _) = self.name_entry(cx, Box::new(NewSpreadsheetInProject), "budget").await?;
+        let (sheet_row, _) = self
+            .name_entry(cx, Box::new(NewSpreadsheetInProject), "budget")
+            .await?;
         let sheet = self.opened(cx, "budget.lattice-sheet").await;
-        let (board_row, _) = self.name_entry(cx, Box::new(NewBoardInProject), "map").await?;
+        let (board_row, _) = self
+            .name_entry(cx, Box::new(NewBoardInProject), "map")
+            .await?;
         let board = self.opened(cx, "map.excalidraw").await;
         steps.check(
             "New spreadsheet and New board name a bare untitled row at the root, and open with their extension",
@@ -70,7 +81,9 @@ impl Run {
         // New presentation: its row under slides/ before the folder is
         // there, and the deck lattice-core makes opens.
         let had_slides = root.join("slides").exists();
-        let (deck_row, _) = self.name_entry(cx, Box::new(NewPresentationInProject), "talk").await?;
+        let (deck_row, _) = self
+            .name_entry(cx, Box::new(NewPresentationInProject), "talk")
+            .await?;
         let deck = self.opened(cx, "slides/talk/index.tsx").await;
         steps.check(
             "New presentation names its deck under slides/, and the deck it makes opens",
@@ -134,7 +147,11 @@ impl Run {
         });
         self.pause(cx, Duration::from_millis(300)).await;
         self.open(cx, &root.join("main.tex"), Some(1))?;
-        for made in ["chapters/appendix.tex", "budget.lattice-sheet", "map.excalidraw"] {
+        for made in [
+            "chapters/appendix.tex",
+            "budget.lattice-sheet",
+            "map.excalidraw",
+        ] {
             std::fs::remove_file(root.join(made)).ok();
         }
         std::fs::remove_dir_all(root.join("slides")).ok();

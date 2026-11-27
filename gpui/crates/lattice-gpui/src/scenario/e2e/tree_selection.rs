@@ -15,7 +15,7 @@
 use std::{path::Path, time::Duration};
 
 use anyhow::Result;
-use gpui::{AsyncApp, Modifiers, MouseButton, PlatformInput, Pixels, Point};
+use gpui::{AsyncApp, Modifiers, MouseButton, Pixels, PlatformInput, Point};
 use serde_json::json;
 
 use super::{Steps, drops::PointerStep};
@@ -103,9 +103,9 @@ impl Run {
         steps.check(
             "⌘C with several rows selected copies each one's path and says how many",
             lines == Some(ranged.len())
-                && notice
-                    .as_deref()
-                    .is_some_and(|notice| notice.starts_with(&format!("{} paths copied", ranged.len()))),
+                && notice.as_deref().is_some_and(|notice| {
+                    notice.starts_with(&format!("{} paths copied", ranged.len()))
+                }),
             json!({ "copied": copied, "notice": notice }),
         );
 
@@ -134,7 +134,9 @@ impl Run {
         }
         cx.update(|cx| tree.update(cx, |tree, cx| tree.refresh(cx)));
         self.wait_for(cx, Duration::from_secs(4), |_, cx| {
-            tree.read(cx).row_paths(cx).contains(&"scratch-b.tex".to_string())
+            tree.read(cx)
+                .row_paths(cx)
+                .contains(&"scratch-b.tex".to_string())
         })
         .await;
         let a = self.tree_row_center(cx, "scratch-a.tex").await?;
@@ -155,8 +157,7 @@ impl Run {
             .await;
         steps.check(
             "Delete on a row of the selection asks about them together and deletes both",
-            deleted
-                && question.as_deref() == Some("Delete 2 selected items from this project?"),
+            deleted && question.as_deref() == Some("Delete 2 selected items from this project?"),
             json!({ "question": question }),
         );
 
@@ -259,7 +260,9 @@ impl Run {
                 }
                 let b_open = self
                     .wait_for(cx, Duration::from_secs(4), |_, cx| {
-                        tree.read(cx).row_paths(cx).contains(&"figures/fig.txt".to_string())
+                        tree.read(cx)
+                            .row_paths(cx)
+                            .contains(&"figures/fig.txt".to_string())
                     })
                     .await;
                 cx.update(|cx| tree.update(cx, |tree, cx| tree.set_project(a.clone(), cx)));
@@ -292,7 +295,9 @@ impl Run {
         }
         cx.update(|cx| tree.update(cx, |tree, cx| tree.refresh(cx)));
         self.wait_for(cx, Duration::from_secs(4), |_, cx| {
-            tree.read(cx).row_paths(cx).contains(&"mv-b.tex".to_string())
+            tree.read(cx)
+                .row_paths(cx)
+                .contains(&"mv-b.tex".to_string())
         })
         .await;
         self.open(cx, &root.join("mv-a.tex"), Some(1))?;
@@ -306,7 +311,9 @@ impl Run {
             })
         });
         let moved = self
-            .wait_for(cx, Duration::from_secs(8), |_, _| root.join("dest/mv-a.tex").is_file())
+            .wait_for(cx, Duration::from_secs(8), |_, _| {
+                root.join("dest/mv-a.tex").is_file()
+            })
             .await;
         self.pause(cx, Duration::from_millis(500)).await;
         let front = cx.update(|cx| self.shell.read(cx).active_editor_path(cx));
@@ -316,10 +323,14 @@ impl Run {
             moved
                 && front.as_deref() == Some("dest/mv-a.tex")
                 && root.join("mv-b.tex").is_file()
-                && notice.as_deref().is_some_and(|notice| notice.starts_with("Could not move it")),
+                && notice
+                    .as_deref()
+                    .is_some_and(|notice| notice.starts_with("Could not move it")),
             json!({ "moved": moved, "front": front, "notice": notice }),
         );
-        if let Some(view) = cx.update(|cx| self.shell.read(cx).view_of_document("dest/mv-a.tex", cx)) {
+        if let Some(view) =
+            cx.update(|cx| self.shell.read(cx).view_of_document("dest/mv-a.tex", cx))
+        {
             cx.update(|cx| {
                 self.shell
                     .read(cx)

@@ -99,8 +99,8 @@ impl Run {
 
         // Awake: heartbeats keep a quiet channel up past the timeout...
         self.pause(cx, Duration::from_secs(HEARTBEAT + 2)).await;
-        let steady = cx.update(|cx| self.shell.read(cx).overleaf.read(cx).channel())
-            == ChannelStatus::Live;
+        let steady =
+            cx.update(|cx| self.shell.read(cx).overleaf.read(cx).channel()) == ChannelStatus::Live;
         // ...and silence ends it within the timeout, the network gone too.
         mock.disable_realtime();
         mock.go_silent();

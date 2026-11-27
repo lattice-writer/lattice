@@ -35,7 +35,14 @@ impl Run {
 
     /// This window's project order.
     fn project_order(&self, cx: &mut AsyncApp) -> Vec<PathBuf> {
-        cx.update(|cx| self.shell.read(cx).projects.iter().map(|p| p.root.clone()).collect())
+        cx.update(|cx| {
+            self.shell
+                .read(cx)
+                .projects
+                .iter()
+                .map(|p| p.root.clone())
+                .collect()
+        })
     }
 
     /// The middle of `root`'s tab, in its window's coordinates.
@@ -55,16 +62,24 @@ impl Run {
         let first = cx
             .update(|cx| self.shell.read(cx).root(cx))
             .context("the run's project is open")?;
-        let other = std::env::temp_dir().join(format!("lattice-gpui-tab-drag-{}", std::process::id()));
+        let other =
+            std::env::temp_dir().join(format!("lattice-gpui-tab-drag-{}", std::process::id()));
         std::fs::create_dir_all(&other)?;
-        std::fs::write(other.join("main.tex"), "\\documentclass{article}\n\\begin{document}\nOther.\n\\end{document}\n")?;
+        std::fs::write(
+            other.join("main.tex"),
+            "\\documentclass{article}\n\\begin{document}\nOther.\n\\end{document}\n",
+        )?;
         let other = other.canonicalize()?;
         self.with_window(cx, {
             let other = other.clone();
-            move |shell, window, cx| shell.update(cx, |shell, cx| shell.open_project(other, window, cx))
+            move |shell, window, cx| {
+                shell.update(cx, |shell, cx| shell.open_project(other, window, cx))
+            }
         })?;
-        self.wait_for(cx, Duration::from_secs(8), |shell, cx| shell.read(cx).projects.len() == 2)
-            .await;
+        self.wait_for(cx, Duration::from_secs(8), |shell, cx| {
+            shell.read(cx).projects.len() == 2
+        })
+        .await;
         self.pause(cx, Duration::from_millis(600)).await;
 
         // A click on the active tab opens the project menu (the press held
@@ -74,7 +89,9 @@ impl Run {
             cx.update(|cx| lattice_ui::components::menu_snapshot(&label, cx).is_some())
         };
         cx.update(lattice_ui::components::record_menus);
-        let title = self.tab_middle(cx, &other).context("the active tab is drawn")?;
+        let title = self
+            .tab_middle(cx, &other)
+            .context("the active tab is drawn")?;
         self.pointer(cx, PointerStep::Down, title).await?;
         self.pointer(cx, PointerStep::Up, title).await?;
         self.pause(cx, Duration::from_millis(400)).await;
@@ -104,12 +121,19 @@ impl Run {
         // other tab's far half the line goes to the end; the order holds
         // until the release, which switches nothing.
         let before = self.project_order(cx);
-        let from = self.tab_middle(cx, &first).context("the first tab is drawn")?;
-        let past = self.tab_middle(cx, &other).context("the second tab is drawn")? + point(px(20.), px(0.));
+        let from = self
+            .tab_middle(cx, &first)
+            .context("the first tab is drawn")?;
+        let past = self
+            .tab_middle(cx, &other)
+            .context("the second tab is drawn")?
+            + point(px(20.), px(0.));
         self.pointer(cx, PointerStep::Down, from).await?;
-        self.pointer(cx, PointerStep::Move, from + point(px(3.), px(0.))).await?;
+        self.pointer(cx, PointerStep::Move, from + point(px(3.), px(0.)))
+            .await?;
         let small = cx.update(|cx| self.shell.read(cx).project_drag_view().0);
-        self.pointer(cx, PointerStep::Move, from + point(px(9.), px(0.))).await?;
+        self.pointer(cx, PointerStep::Move, from + point(px(9.), px(0.)))
+            .await?;
         let lifted = cx.update(|cx| self.shell.read(cx).project_drag_view().0);
         self.pointer(cx, PointerStep::Move, past).await?;
         let (_, line, _) = cx.update(|cx| self.shell.read(cx).project_drag_view());
@@ -132,8 +156,13 @@ impl Run {
         );
 
         // Escape puts a lifted tab back.
-        let from = self.tab_middle(cx, &first).context("the first tab is drawn")?;
-        let left = self.tab_middle(cx, &other).context("the second tab is drawn")? - point(px(30.), px(0.));
+        let from = self
+            .tab_middle(cx, &first)
+            .context("the first tab is drawn")?;
+        let left = self
+            .tab_middle(cx, &other)
+            .context("the second tab is drawn")?
+            - point(px(30.), px(0.));
         self.pointer(cx, PointerStep::Down, from).await?;
         self.pointer(cx, PointerStep::Move, left).await?;
         escape(self, cx)?;
@@ -148,10 +177,13 @@ impl Run {
 
         // Let go over no window: the tab gets a window of its own.
         let windows_before = cx.update(|cx| cx.windows().len());
-        let from = self.tab_middle(cx, &first).context("the first tab is drawn")?;
+        let from = self
+            .tab_middle(cx, &first)
+            .context("the first tab is drawn")?;
         let away = point(px(-4000.), px(-4000.));
         self.pointer(cx, PointerStep::Down, from).await?;
-        self.pointer(cx, PointerStep::Move, from + point(px(0.), px(12.))).await?;
+        self.pointer(cx, PointerStep::Move, from + point(px(0.), px(12.)))
+            .await?;
         self.pointer(cx, PointerStep::Move, away).await?;
         self.pointer(cx, PointerStep::Up, away).await?;
         let opened = self
@@ -161,8 +193,9 @@ impl Run {
             .await;
         self.pause(cx, Duration::from_millis(800)).await;
         let torn = cx.update(|cx| {
-            crate::shell::windows::window_showing_except(&first, None, cx)
-                .and_then(|handle| crate::shell::windows::shell_of(handle, cx).map(|shell| (handle, shell)))
+            crate::shell::windows::window_showing_except(&first, None, cx).and_then(|handle| {
+                crate::shell::windows::shell_of(handle, cx).map(|shell| (handle, shell))
+            })
         });
         steps.check(
             "a project tab let go over no window gets a window of its own, and leaves this one",
@@ -192,7 +225,9 @@ impl Run {
             })
             .context("the lone project's title is drawn")?;
         second.pointer(cx, PointerStep::Down, lone).await?;
-        second.pointer(cx, PointerStep::Move, lone + point(px(0.), px(12.))).await?;
+        second
+            .pointer(cx, PointerStep::Move, lone + point(px(0.), px(12.)))
+            .await?;
         second.pointer(cx, PointerStep::Move, away).await?;
         second.pointer(cx, PointerStep::Up, away).await?;
         self.pause(cx, Duration::from_millis(800)).await;
@@ -208,10 +243,13 @@ impl Run {
 
         // Its lone project let go over this window's strip moves here, in
         // front, before the tab under it; the window it left closes.
-        let target = self.tab_middle(cx, &other).context("this window's tab")? - point(px(20.), px(0.));
+        let target =
+            self.tab_middle(cx, &other).context("this window's tab")? - point(px(20.), px(0.));
         let (here, there) = cx.update(|cx| {
             let origin = |handle: gpui::AnyWindowHandle, cx: &mut gpui::App| {
-                handle.update(cx, |_, window, _| window.bounds().origin).unwrap_or_default()
+                handle
+                    .update(cx, |_, window, _| window.bounds().origin)
+                    .unwrap_or_default()
             };
             (origin(self.window, cx), origin(handle, cx))
         });
@@ -224,19 +262,31 @@ impl Run {
             })
             .context("the lone project's title is drawn")?;
         second.pointer(cx, PointerStep::Down, lone).await?;
-        second.pointer(cx, PointerStep::Move, lone + point(px(0.), px(12.))).await?;
+        second
+            .pointer(cx, PointerStep::Move, lone + point(px(0.), px(12.)))
+            .await?;
         second.pointer(cx, PointerStep::Move, at).await?;
         let incoming = cx.update(|cx| self.shell.read(cx).project_drag_view().1);
         second.pointer(cx, PointerStep::Up, at).await?;
         let moved = self
-            .wait_for(cx, Duration::from_secs(10), |shell, cx| shell.read(cx).root(cx).as_ref() == Some(&first))
+            .wait_for(cx, Duration::from_secs(10), |shell, cx| {
+                shell.read(cx).root(cx).as_ref() == Some(&first)
+            })
             .await;
         self.pause(cx, Duration::from_millis(800)).await;
-        let closed = cx.update(|cx| !cx.windows().iter().any(|open| open.window_id() == handle.window_id()));
+        let closed = cx.update(|cx| {
+            !cx.windows()
+                .iter()
+                .any(|open| open.window_id() == handle.window_id())
+        });
         let order = self.project_order(cx);
         let canonical = main.canonicalize().unwrap_or(main.clone());
-        let here_editor = cx.update(|cx| self.shell.update(cx, |shell, cx| shell.open_editor(&canonical, cx)));
-        let caret_here = here_editor.map(|editor| cx.update(|cx| editor.read(cx).text_and_caret(cx).1));
+        let here_editor = cx.update(|cx| {
+            self.shell
+                .update(cx, |shell, cx| shell.open_editor(&canonical, cx))
+        });
+        let caret_here =
+            here_editor.map(|editor| cx.update(|cx| editor.read(cx).text_and_caret(cx).1));
         steps.check(
             "a lone project let go over another window's strip moves there in front, before the tab under it, its caret kept, and its window closes",
             incoming.as_ref().is_some_and(|slot| slot.before.as_ref() == Some(&other))
@@ -250,7 +300,9 @@ impl Run {
         // The steps after these find the project alone in its window.
         self.with_window(cx, {
             let other = other.clone();
-            move |shell, window, cx| shell.update(cx, |shell, cx| shell.close_project(&other, window, cx))
+            move |shell, window, cx| {
+                shell.update(cx, |shell, cx| shell.close_project(&other, window, cx))
+            }
         })?;
         self.pause(cx, Duration::from_millis(500)).await;
         std::fs::remove_dir_all(&other).ok();

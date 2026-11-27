@@ -30,7 +30,10 @@ use lattice_webview::Island;
 use serde_json::{Value, json};
 
 use super::{Run, Steps};
-use crate::{editor_panel::{EditorPanel, table_widths}, native};
+use crate::{
+    editor_panel::{EditorPanel, table_widths},
+    native,
+};
 
 const FILE: &str = "e2e-tables.md";
 
@@ -159,7 +162,11 @@ impl Run {
         let edge = bounds.and_then(|bounds| to_window(bounds, &before["edge"]));
         let mut hover = Value::Null;
         if let Some(edge) = edge {
-            native::send_mouse(native, native::Mouse::Moved, edge - gpui::point(gpui::px(20.), gpui::px(0.)))?;
+            native::send_mouse(
+                native,
+                native::Mouse::Moved,
+                edge - gpui::point(gpui::px(20.), gpui::px(0.)),
+            )?;
             self.pause(cx, Duration::from_millis(80)).await;
             native::send_mouse(native, native::Mouse::Moved, edge)?;
             self.pause(cx, Duration::from_millis(150)).await;
@@ -168,7 +175,8 @@ impl Run {
             // page's view (WebKit hears moves through its tracking areas),
             // so the page is also given the move at the same point.
             if hover["cursor"] != true {
-                let [x, y] = [&before["edge"][0], &before["edge"][1]].map(|v| v.as_f64().unwrap_or_default());
+                let [x, y] = [&before["edge"][0], &before["edge"][1]]
+                    .map(|v| v.as_f64().unwrap_or_default());
                 hover = self
                     .evaluate(
                         cx,
@@ -185,10 +193,18 @@ impl Run {
             native::send_mouse(native, native::Mouse::Down, edge)?;
             for step in 1..=8 {
                 let dx = DRAG as f32 * step as f32 / 8.;
-                native::send_mouse(native, native::Mouse::Dragged, edge + gpui::point(gpui::px(dx), gpui::px(0.)))?;
+                native::send_mouse(
+                    native,
+                    native::Mouse::Dragged,
+                    edge + gpui::point(gpui::px(dx), gpui::px(0.)),
+                )?;
                 self.pause(cx, Duration::from_millis(30)).await;
             }
-            native::send_mouse(native, native::Mouse::Up, edge + gpui::point(gpui::px(DRAG as f32), gpui::px(0.)))?;
+            native::send_mouse(
+                native,
+                native::Mouse::Up,
+                edge + gpui::point(gpui::px(DRAG as f32), gpui::px(0.)),
+            )?;
         }
         steps.check(
             "the pointer resting on a Markdown table's column border shows the resize cursor",
@@ -251,7 +267,11 @@ impl Run {
         let stale = self.evaluate(cx, &island, &table_facts(0)).await;
         if let Some(edge) = bounds.and_then(|bounds| to_window(bounds, &stale["edge"])) {
             native::send_mouse(native, native::Mouse::Down, edge)?;
-            native::send_mouse(native, native::Mouse::Dragged, edge + gpui::point(gpui::px(10.), gpui::px(0.)))?;
+            native::send_mouse(
+                native,
+                native::Mouse::Dragged,
+                edge + gpui::point(gpui::px(10.), gpui::px(0.)),
+            )?;
             self.pause(cx, Duration::from_millis(100)).await;
         }
         let pressed = self.evaluate(cx, &island, &table_facts(1)).await;
@@ -259,15 +279,29 @@ impl Run {
             native::send_mouse(native, native::Mouse::Down, edge)?;
             for step in 1..=6 {
                 let dx = REPRESS_DRAG as f32 * step as f32 / 6.;
-                native::send_mouse(native, native::Mouse::Dragged, edge + gpui::point(gpui::px(dx), gpui::px(0.)))?;
+                native::send_mouse(
+                    native,
+                    native::Mouse::Dragged,
+                    edge + gpui::point(gpui::px(dx), gpui::px(0.)),
+                )?;
                 self.pause(cx, Duration::from_millis(30)).await;
             }
-            native::send_mouse(native, native::Mouse::Up, edge + gpui::point(gpui::px(REPRESS_DRAG as f32), gpui::px(0.)))?;
+            native::send_mouse(
+                native,
+                native::Mouse::Up,
+                edge + gpui::point(gpui::px(REPRESS_DRAG as f32), gpui::px(0.)),
+            )?;
         }
         let from = pressed["width"].as_f64().unwrap_or_default();
-        let wanted = |saved: &Value| kept_at(saved, 1).first().is_some_and(|width| (width - from - REPRESS_DRAG).abs() <= 2.);
-        self.wait_for(cx, Duration::from_secs(3), |_, _| wanted(&table_widths::page_widths(root, FILE)))
-            .await;
+        let wanted = |saved: &Value| {
+            kept_at(saved, 1)
+                .first()
+                .is_some_and(|width| (width - from - REPRESS_DRAG).abs() <= 2.)
+        };
+        self.wait_for(cx, Duration::from_secs(3), |_, _| {
+            wanted(&table_widths::page_widths(root, FILE))
+        })
+        .await;
         let repressed = self.evaluate(cx, &island, &table_facts(1)).await;
         let saved = kept(cx);
         steps.check(
@@ -288,7 +322,8 @@ impl Run {
             hover = self.evaluate(cx, &island, &row_facts(0)).await;
             // As for the column's border: the page is also given the move.
             if hover["cursor"] != true {
-                let [x, y] = [&row["edge"][0], &row["edge"][1]].map(|v| v.as_f64().unwrap_or_default());
+                let [x, y] =
+                    [&row["edge"][0], &row["edge"][1]].map(|v| v.as_f64().unwrap_or_default());
                 hover = self
                     .evaluate(
                         cx,
@@ -305,10 +340,18 @@ impl Run {
             native::send_mouse(native, native::Mouse::Down, edge)?;
             for step in 1..=6 {
                 let dy = ROW_DRAG as f32 * step as f32 / 6.;
-                native::send_mouse(native, native::Mouse::Dragged, edge + gpui::point(gpui::px(0.), gpui::px(dy)))?;
+                native::send_mouse(
+                    native,
+                    native::Mouse::Dragged,
+                    edge + gpui::point(gpui::px(0.), gpui::px(dy)),
+                )?;
                 self.pause(cx, Duration::from_millis(30)).await;
             }
-            native::send_mouse(native, native::Mouse::Up, edge + gpui::point(gpui::px(0.), gpui::px(ROW_DRAG as f32)))?;
+            native::send_mouse(
+                native,
+                native::Mouse::Up,
+                edge + gpui::point(gpui::px(0.), gpui::px(ROW_DRAG as f32)),
+            )?;
         }
         self.wait_for(cx, Duration::from_secs(3), |_, _| {
             !heights_at(&table_widths::page_widths(root, FILE), 0).is_empty()
@@ -383,7 +426,10 @@ impl Run {
             let kept = kept_at(&saved, table);
             !kept.is_empty()
                 && shown.len() == kept.len()
-                && shown.iter().zip(&kept).all(|(shown, kept)| (shown - kept).abs() < 0.5)
+                && shown
+                    .iter()
+                    .zip(&kept)
+                    .all(|(shown, kept)| (shown - kept).abs() < 0.5)
         };
         steps.check(
             "a Markdown file closed and opened again draws its tables at the column widths kept",
@@ -457,7 +503,11 @@ impl Run {
         let started = std::time::Instant::now();
         while started.elapsed() < Duration::from_secs(10) {
             let count = self
-                .evaluate(cx, &island, "document.querySelectorAll('.lx-md-surface table').length")
+                .evaluate(
+                    cx,
+                    &island,
+                    "document.querySelectorAll('.lx-md-surface table').length",
+                )
                 .await;
             if count == 2 {
                 return Some(island);

@@ -18,7 +18,7 @@
 use std::{path::Path, time::Duration};
 
 use anyhow::{Context as _, Result};
-use gpui::{AsyncApp, Entity, Modifiers, PlatformInput, Point, Pixels, px};
+use gpui::{AsyncApp, Entity, Modifiers, Pixels, PlatformInput, Point, px};
 use serde_json::json;
 
 use super::{Steps, drops::PointerStep};
@@ -33,8 +33,14 @@ impl Run {
         // queue/ follows notes/, so the tree still scrolls with notes/ closed.
         std::fs::create_dir_all(root.join("queue"))?;
         for n in 1..=NOTES {
-            std::fs::write(root.join(format!("notes/n{n:02}.md")), format!("# Note {n}\n"))?;
-            std::fs::write(root.join(format!("queue/q{n:02}.md")), format!("# Queued {n}\n"))?;
+            std::fs::write(
+                root.join(format!("notes/n{n:02}.md")),
+                format!("# Note {n}\n"),
+            )?;
+            std::fs::write(
+                root.join(format!("queue/q{n:02}.md")),
+                format!("# Queued {n}\n"),
+            )?;
         }
         let tree = cx.update(|cx| self.shell.read(cx).file_tree().clone());
         cx.update(|cx| tree.update(cx, |tree, cx| tree.refresh(cx)));
@@ -45,7 +51,9 @@ impl Run {
         let rows = |cx: &mut AsyncApp| cx.update(|cx| tree.read(cx).row_paths(cx));
         let search = |run: &Self, cx: &mut AsyncApp| {
             let tree = tree.clone();
-            run.with_window(cx, move |_, window, cx| tree.read(cx).search_state(window, cx))
+            run.with_window(cx, move |_, window, cx| {
+                tree.read(cx).search_state(window, cx)
+            })
         };
 
         // Typing "i" in the tree opens the field seeded with it; "intro"
@@ -56,7 +64,9 @@ impl Run {
         let opened = search(self, cx)?;
         self.with_window(cx, {
             let tree = tree.clone();
-            move |_, window, cx| tree.update(cx, |tree, cx| tree.type_in_search("Intro", window, cx))
+            move |_, window, cx| {
+                tree.update(cx, |tree, cx| tree.type_in_search("Intro", window, cx))
+            }
         })?;
         let filtered = rows(cx);
         self.drop_shot(cx, "tree-filter").await;
@@ -107,8 +117,7 @@ impl Run {
         // "q" leaves queue/ and its files, opened, and no note.
         self.type_in_tree(cx, &tree, "q")?;
         self.pause(cx, Duration::from_millis(100)).await;
-        let narrowed =
-            rows(cx).contains(&"queue/q01.md".to_string()) && rows(cx).len() < all.len();
+        let narrowed = rows(cx).contains(&"queue/q01.md".to_string()) && rows(cx).len() < all.len();
         self.type_in_tree(cx, &tree, "escape")?;
         self.pause(cx, Duration::from_millis(100)).await;
         let (_, open) = cx.update(|cx| tree.read(cx).selection_state(cx));
@@ -170,10 +179,14 @@ impl Run {
 
         // Scrolled a dozen rows into notes/, its row stays pinned at the top.
         cx.update(|cx| {
-            tree.update(cx, |tree, cx| tree.reveal_paths(vec!["queue/q01.md".into()], cx))
+            tree.update(cx, |tree, cx| {
+                tree.reveal_paths(vec!["queue/q01.md".into()], cx)
+            })
         });
         self.wait_for(cx, Duration::from_secs(4), |_, cx| {
-            tree.read(cx).row_paths(cx).contains(&"queue/q01.md".to_string())
+            tree.read(cx)
+                .row_paths(cx)
+                .contains(&"queue/q01.md".to_string())
         })
         .await;
         // The reveal's scroll lands with the next frames; then the top.
@@ -209,7 +222,10 @@ impl Run {
         self.click_with(cx, pin, Modifiers::default()).await?;
         let collapsed = self
             .wait_for(cx, Duration::from_secs(2), |_, cx| {
-                !tree.read(cx).row_paths(cx).contains(&"notes/n01.md".to_string())
+                !tree
+                    .read(cx)
+                    .row_paths(cx)
+                    .contains(&"notes/n01.md".to_string())
             })
             .await;
         self.pause(cx, Duration::from_millis(250)).await;
@@ -275,7 +291,12 @@ impl Run {
 
     /// Type `key` in the tree: a key name ("down", "enter", "escape") or one
     /// character, sent as the keyboard sends it.
-    fn type_in_tree(&self, cx: &mut AsyncApp, tree: &Entity<FileTreePanel>, key: &'static str) -> Result<()> {
+    fn type_in_tree(
+        &self,
+        cx: &mut AsyncApp,
+        tree: &Entity<FileTreePanel>,
+        key: &'static str,
+    ) -> Result<()> {
         let tree = tree.clone();
         let mut keystroke = gpui::Keystroke::parse(key)?;
         if key.chars().count() == 1 {

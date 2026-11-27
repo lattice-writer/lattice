@@ -49,7 +49,9 @@ impl Run {
             return Ok(());
         };
         let drawn = self
-            .wait_for(cx, Duration::from_secs(20), |_, cx| surface.read(cx).is_drawn())
+            .wait_for(cx, Duration::from_secs(20), |_, cx| {
+                surface.read(cx).is_drawn()
+            })
             .await;
         let marked = self.evaluate(cx, &island, MARK).await;
         let builds = cx.update(|cx| island.read(cx).stats().builds);
@@ -106,11 +108,16 @@ impl Run {
             palette,
             json!({ "palette": palette }),
         );
-        self.agent_window_keys(cx, steps, &main, &island, agent_window).await?;
+        self.agent_window_keys(cx, steps, &main, &island, agent_window)
+            .await?;
 
         // Moved, the window's place is kept once it rests, with its display,
         // before anything closes it.
-        native::move_window_by(agent_window.update(cx, |_, window, _| native::native(window))??, 40., 30.);
+        native::move_window_by(
+            agent_window.update(cx, |_, window, _| native::native(window))??,
+            40.,
+            30.,
+        );
         let moved = agent_window.update(cx, |_, window, _| placed(window))?;
         let kept_moved = self
             .wait_for(cx, Duration::from_secs(3), |_, _| {
@@ -160,19 +167,20 @@ impl Run {
         cx.update(|cx| panel.update(cx, |panel, cx| panel.detach(cx)));
         let reopened = self
             .wait_for(cx, Duration::from_secs(10), |_, cx| {
-                cx.windows().len() == windows + 1 && island.read(cx).window().window_id() != home.window_id()
+                cx.windows().len() == windows + 1
+                    && island.read(cx).window().window_id() != home.window_id()
             })
             .await;
         let again = cx.update(|cx| panel.read(cx).window_handle());
         let frame_again = match again {
-            Some(handle) => handle
-                .update(cx, |_, window, _| placed(window))
-                .ok(),
+            Some(handle) => handle.update(cx, |_, window, _| placed(window)).ok(),
             None => None,
         };
         // As the panel's Return to workspace does: inside the workspace
         // window's own update, which closes the Agent's window from there.
-        self.with_window(cx, |_, _, cx| panel.update(cx, |panel, cx| panel.dock(true, cx)))?;
+        self.with_window(cx, |_, _, cx| {
+            panel.update(cx, |panel, cx| panel.dock(true, cx))
+        })?;
         let returned = self
             .wait_for(cx, Duration::from_secs(10), |_, cx| {
                 cx.windows().len() == windows
@@ -211,7 +219,10 @@ impl Run {
                 .update(cx, |_, window, cx| {
                     let bounds = window.window_bounds().get_bounds();
                     let screen = window.display(cx).map(|display| display.bounds());
-                    (format!("{bounds:?}"), screen.is_some_and(|screen| crate::window_place::reaches(bounds, screen)))
+                    (
+                        format!("{bounds:?}"),
+                        screen.is_some_and(|screen| crate::window_place::reaches(bounds, screen)),
+                    )
                 })
                 .ok(),
             None => None,
@@ -224,7 +235,8 @@ impl Run {
         }
         let docked_again = self
             .wait_for(cx, Duration::from_secs(10), |_, cx| {
-                cx.windows().len() == windows && island.read(cx).window().window_id() == home.window_id()
+                cx.windows().len() == windows
+                    && island.read(cx).window().window_id() == home.window_id()
             })
             .await;
         // The workspace window takes the app forward again as it closes:
@@ -250,7 +262,8 @@ impl Run {
         }
         let closed_by_key = self
             .wait_for(cx, Duration::from_secs(10), |_, cx| {
-                cx.windows().len() == windows && island.read(cx).window().window_id() == home.window_id()
+                cx.windows().len() == windows
+                    && island.read(cx).window().window_id() == home.window_id()
             })
             .await;
         self.pause(cx, Duration::from_millis(400)).await;
@@ -277,8 +290,11 @@ impl Run {
         agent_window: AnyWindowHandle,
     ) -> Result<()> {
         const STEP: &str = "Agent: in its own window, typing and ⌘V go to the composer and never to the .tex editor, which still takes its own keys";
-        let _foreground = self.foreground(cx, "the Agent's window takes the keyboard").await?;
-        let editor_text = |cx: &mut AsyncApp| cx.update(|cx| main.read(cx).editor().read(cx).text(cx));
+        let _foreground = self
+            .foreground(cx, "the Agent's window takes the keyboard")
+            .await?;
+        let editor_text =
+            |cx: &mut AsyncApp| cx.update(|cx| main.read(cx).editor().read(cx).text(cx));
         let before = editor_text(cx);
         let framed = self.evaluate(cx, island, COMPOSER).await;
         let agent_native = agent_window.update(cx, |_, window, _| native::native(window))??;
@@ -295,7 +311,9 @@ impl Run {
             .context("the Agent's page has no bounds")?;
         native::send_click(agent_native, bounds.center())?;
         let in_page = self
-            .wait_for(cx, Duration::from_secs(3), |_, cx| island.read(cx).page_focused())
+            .wait_for(cx, Duration::from_secs(3), |_, cx| {
+                island.read(cx).page_focused()
+            })
             .await;
         for character in ['l', 'a', 't', 't'] {
             native::send_key(agent_native, character, false)?;
@@ -324,7 +342,9 @@ impl Run {
         // the Agent window's, which is that window's alone.
         let workspace = self.native(cx)?;
         let gpui_keyboard = self
-            .wait_for(cx, Duration::from_secs(3), |_, _| workspace.view_has_keyboard())
+            .wait_for(cx, Duration::from_secs(3), |_, _| {
+                workspace.view_has_keyboard()
+            })
             .await;
         native::send_key(self.native(cx)?, 'q', false)?;
         let typed = self
@@ -362,7 +382,11 @@ impl Run {
     ) -> Value {
         let (builds, bounds, frame) = cx.update(|cx| {
             let island = island.read(cx);
-            (island.stats().builds, island.bounds(cx), island.native_frame(cx))
+            (
+                island.stats().builds,
+                island.bounds(cx),
+                island.native_frame(cx),
+            )
         });
         let viewport = window.and_then(|handle| {
             handle

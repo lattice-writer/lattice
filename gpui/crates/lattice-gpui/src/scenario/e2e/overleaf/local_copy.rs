@@ -164,8 +164,10 @@ impl Run {
                 picker.read(cx).scenario_copies_read(cx)
             })
             .await;
-        let unnamed =
-            read && cx.update(|cx| picker.read(cx).scenario_local_copy(PROJECT_NAME, cx)).is_none();
+        let unnamed = read
+            && cx
+                .update(|cx| picker.read(cx).scenario_local_copy(PROJECT_NAME, cx))
+                .is_none();
         self.shoot_looks(cx, label).await;
         cx.update(|cx| picker.update(cx, |picker, cx| picker.scenario_dismiss(cx)));
         self.wait_for(cx, Duration::from_secs(5), |shell, cx| {

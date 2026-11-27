@@ -41,7 +41,9 @@ impl Run {
         let editor = self.open(cx, &chapter, Some(2))?;
 
         // Track changes, from the titlebar's toggle.
-        self.with_window(cx, |shell, _, cx| shell.update(cx, |shell, cx| shell.toggle_review_mode(cx)))?;
+        self.with_window(cx, |shell, _, cx| {
+            shell.update(cx, |shell, cx| shell.toggle_review_mode(cx))
+        })?;
         let on = self
             .wait_for(cx, Duration::from_secs(5), |_, cx| {
                 editor.read(cx).review_bar_state(cx).is_some()
@@ -63,7 +65,11 @@ impl Run {
         }
         let one = self
             .wait_for(cx, Duration::from_secs(3), |_, cx| {
-                editor.read(cx).review_bar_state(cx).map(|state| state.count) == Some(1)
+                editor
+                    .read(cx)
+                    .review_bar_state(cx)
+                    .map(|state| state.count)
+                    == Some(1)
             })
             .await;
         let at_caret = self.review_state(cx, &editor);
@@ -79,7 +85,11 @@ impl Run {
         })?;
         let two = self
             .wait_for(cx, Duration::from_secs(3), |_, cx| {
-                editor.read(cx).review_bar_state(cx).map(|state| state.count) == Some(2)
+                editor
+                    .read(cx)
+                    .review_bar_state(cx)
+                    .map(|state| state.count)
+                    == Some(2)
             })
             .await;
         steps.check(
@@ -91,7 +101,9 @@ impl Run {
         // Accept at the caret, then ⌘Z.
         self.review_select(cx, &editor, "presents")?;
         self.with_window(cx, |_, window, cx| {
-            editor.update(cx, |editor, cx| editor.review_decide_at_caret(true, window, cx))
+            editor.update(cx, |editor, cx| {
+                editor.review_decide_at_caret(true, window, cx)
+            })
         })?;
         let accepted = self.review_state(cx, &editor).map(|state| state.0) == Some(1);
         let saved = self
@@ -104,7 +116,11 @@ impl Run {
             let _front = self.focused(cx, "editor").await?;
             self.press(cx, 'z', true).await?;
             self.wait_for(cx, Duration::from_secs(2), |_, cx| {
-                editor.read(cx).review_bar_state(cx).map(|state| state.count) == Some(2)
+                editor
+                    .read(cx)
+                    .review_bar_state(cx)
+                    .map(|state| state.count)
+                    == Some(2)
             })
             .await
         };
@@ -133,16 +149,32 @@ impl Run {
         // A co-author's live edits: one away from the writer's changes, then
         // one inside the sentence the writer added.
         let notice = |cx: &mut AsyncApp| cx.update(|cx| store::store(cx).read(cx).notice(root));
-        let base_now =
-            |cx: &mut AsyncApp| cx.update(|cx| store::store(cx).read(cx).base_for(root, "chapters/intro.tex"));
-        let away = self.editor_text(cx, &editor).replacen("The last line.", "The very last line.", 1);
-        self.with_window(cx, |_, _, cx| editor.update(cx, |editor, cx| editor.take_overleaf_text(&away, true, cx)))?;
+        let base_now = |cx: &mut AsyncApp| {
+            cx.update(|cx| {
+                store::store(cx)
+                    .read(cx)
+                    .base_for(root, "chapters/intro.tex")
+            })
+        };
+        let away =
+            self.editor_text(cx, &editor)
+                .replacen("The last line.", "The very last line.", 1);
+        self.with_window(cx, |_, _, cx| {
+            editor.update(cx, |editor, cx| editor.take_overleaf_text(&away, true, cx))
+        })?;
         let moved = base_now(cx).is_some_and(|base| base.contains("The very last line."))
             && self.review_state(cx, &editor).map(|state| state.0) == Some(2)
             && notice(cx).is_none();
-        let inside = self.editor_text(cx, &editor).replacen(" One more.", " One or two more.", 1);
-        self.with_window(cx, |_, _, cx| editor.update(cx, |editor, cx| editor.take_overleaf_text(&inside, true, cx)))?;
-        let noticed = notice(cx).is_some() && base_now(cx).is_some_and(|base| base.contains("or two"));
+        let inside = self
+            .editor_text(cx, &editor)
+            .replacen(" One more.", " One or two more.", 1);
+        self.with_window(cx, |_, _, cx| {
+            editor.update(cx, |editor, cx| {
+                editor.take_overleaf_text(&inside, true, cx)
+            })
+        })?;
+        let noticed =
+            notice(cx).is_some() && base_now(cx).is_some_and(|base| base.contains("or two"));
         steps.check(
             "a co-author's live edit moves the base with it, and one inside the writer's change says both versions are kept",
             moved && noticed,
@@ -150,7 +182,9 @@ impl Run {
         );
 
         // Reject all, then Stop tracking.
-        self.with_window(cx, |_, _, cx| editor.update(cx, |editor, cx| editor.review_reject_all(cx)))?;
+        self.with_window(cx, |_, _, cx| {
+            editor.update(cx, |editor, cx| editor.review_reject_all(cx))
+        })?;
         let text = self.editor_text(cx, &editor);
         let rejected = Some(&text) == base_now(cx).as_ref()
             && text.contains("The very last line.")
@@ -189,7 +223,10 @@ impl Run {
                     && std::fs::read_to_string(&chapter).ok().as_deref() == Some(original.as_str())
             })
             .await;
-        anyhow::ensure!(restored, "chapters/intro.tex was not restored to the fixture's text");
+        anyhow::ensure!(
+            restored,
+            "chapters/intro.tex was not restored to the fixture's text"
+        );
         Ok(())
     }
 
@@ -206,14 +243,30 @@ impl Run {
         }
     }
 
-    fn review_state(&self, cx: &mut AsyncApp, editor: &Entity<EditorPanel>) -> Option<(usize, Option<usize>)> {
-        cx.update(|cx| editor.read(cx).review_bar_state(cx).map(|state| (state.count, state.index)))
+    fn review_state(
+        &self,
+        cx: &mut AsyncApp,
+        editor: &Entity<EditorPanel>,
+    ) -> Option<(usize, Option<usize>)> {
+        cx.update(|cx| {
+            editor
+                .read(cx)
+                .review_bar_state(cx)
+                .map(|state| (state.count, state.index))
+        })
     }
 
     /// Select the first `needle` in the editor.
-    fn review_select(&self, cx: &mut AsyncApp, editor: &Entity<EditorPanel>, needle: &str) -> Result<()> {
+    fn review_select(
+        &self,
+        cx: &mut AsyncApp,
+        editor: &Entity<EditorPanel>,
+        needle: &str,
+    ) -> Result<()> {
         let text = self.editor_text(cx, editor);
-        let from = text.find(needle).ok_or_else(|| anyhow::anyhow!("{needle} is not in the chapter"))?;
+        let from = text
+            .find(needle)
+            .ok_or_else(|| anyhow::anyhow!("{needle} is not in the chapter"))?;
         let to = from + needle.len();
         let point = |at: usize| {
             let row = text[..at].matches('\n').count() as u32;
@@ -224,9 +277,12 @@ impl Run {
         self.with_window(cx, |_, window, cx| {
             editor.update(cx, |editor, cx| {
                 editor.editor().update(cx, |editor, cx| {
-                    editor.change_selections(SelectionEffects::no_scroll(), window, cx, |selections| {
-                        selections.select_ranges([start..end])
-                    })
+                    editor.change_selections(
+                        SelectionEffects::no_scroll(),
+                        window,
+                        cx,
+                        |selections| selections.select_ranges([start..end]),
+                    )
                 })
             })
         })

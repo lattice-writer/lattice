@@ -13,7 +13,7 @@
 use std::{path::Path, time::Duration};
 
 use anyhow::Result;
-use gpui::{AsyncApp, Modifiers, MouseButton, PlatformInput, Pixels, Point};
+use gpui::{AsyncApp, Modifiers, MouseButton, Pixels, PlatformInput, Point};
 use serde_json::json;
 
 use super::Steps;
@@ -37,9 +37,14 @@ impl Run {
             let Ok(path) = root.join(name).canonicalize() else {
                 continue;
             };
-            let editor = cx.update(|cx| self.shell.update(cx, |shell, cx| shell.open_editor(&path, cx)));
+            let editor = cx.update(|cx| {
+                self.shell
+                    .update(cx, |shell, cx| shell.open_editor(&path, cx))
+            });
             if let Some(editor) = editor {
-                cx.update(|cx| editor.update(cx, |editor, cx| editor.save(cx))).await.ok();
+                cx.update(|cx| editor.update(cx, |editor, cx| editor.save(cx)))
+                    .await
+                    .ok();
             }
         }
         cx.update(|cx| {
@@ -47,9 +52,14 @@ impl Run {
                 for name in &names {
                     shell.pin_document(name, false, cx);
                 }
-                let views: Vec<String> =
-                    names.iter().filter_map(|name| shell.view_of_document(name, cx)).collect();
-                shell.workspace().clone().update(cx, |workspace, cx| workspace.close(&views, cx));
+                let views: Vec<String> = names
+                    .iter()
+                    .filter_map(|name| shell.view_of_document(name, cx))
+                    .collect();
+                shell
+                    .workspace()
+                    .clone()
+                    .update(cx, |workspace, cx| workspace.close(&views, cx));
             })
         });
         self.pause(cx, Duration::from_millis(300)).await;
@@ -59,7 +69,10 @@ impl Run {
         let tree = cx.update(|cx| self.shell.read(cx).file_tree().clone());
         cx.update(|cx| tree.update(cx, |tree, cx| tree.refresh(cx)));
         self.wait_for(cx, Duration::from_secs(8), |_, cx| {
-            !tree.read(cx).row_paths(cx).contains(&"delta.md".to_string())
+            !tree
+                .read(cx)
+                .row_paths(cx)
+                .contains(&"delta.md".to_string())
         })
         .await;
         result
@@ -83,7 +96,9 @@ impl Run {
         let tree = cx.update(|cx| self.shell.read(cx).file_tree().clone());
         cx.update(|cx| tree.update(cx, |tree, cx| tree.refresh(cx)));
         self.wait_for(cx, Duration::from_secs(8), |_, cx| {
-            tree.read(cx).row_paths(cx).contains(&"delta.md".to_string())
+            tree.read(cx)
+                .row_paths(cx)
+                .contains(&"delta.md".to_string())
         })
         .await;
         let state = |cx: &mut AsyncApp, key: &str| {
@@ -99,7 +114,10 @@ impl Run {
         })
         .await;
         let first = state(cx, "alpha.md");
-        let panel = first.as_ref().map(|(panel, ..)| panel.clone()).unwrap_or_default();
+        let panel = first
+            .as_ref()
+            .map(|(panel, ..)| panel.clone())
+            .unwrap_or_default();
         let strip = |cx: &mut AsyncApp| {
             let panel = panel.clone();
             cx.update(|cx| self.shell.read(cx).strip_documents(&panel, cx))
@@ -118,14 +136,22 @@ impl Run {
         // any tab a full strip spared.
         let expected: Vec<String> = before
             .iter()
-            .map(|key| if key == "alpha.md" { "beta.md".to_string() } else { key.clone() })
+            .map(|key| {
+                if key == "alpha.md" {
+                    "beta.md".to_string()
+                } else {
+                    key.clone()
+                }
+            })
             .filter(|key| after.contains(key))
             .collect();
         steps.check(
             "a tree row's click opens a preview tab, and the next row's takes its place",
             first.as_ref().is_some_and(|(_, _, preview, _)| *preview)
                 && after_alpha.is_none()
-                && after_beta.as_ref().is_some_and(|(_, _, preview, _)| *preview)
+                && after_beta
+                    .as_ref()
+                    .is_some_and(|(_, _, preview, _)| *preview)
                 && after == expected,
             json!({ "alpha": first, "before": before, "after": after, "beta": after_beta }),
         );
@@ -162,7 +188,10 @@ impl Run {
             .await;
         steps.check(
             "an edit keeps a preview tab",
-            previewed.as_ref().is_some_and(|(_, _, preview, _)| *preview) && edited,
+            previewed
+                .as_ref()
+                .is_some_and(|(_, _, preview, _)| *preview)
+                && edited,
             json!({ "gamma": previewed, "kept": edited }),
         );
 
@@ -170,9 +199,13 @@ impl Run {
         // by its next edit, and the next quick look leaves it.
         let gamma_path = root.join("gamma.md").canonicalize()?;
         let editor = cx
-            .update(|cx| self.shell.update(cx, |shell, cx| shell.open_editor(&gamma_path, cx)))
+            .update(|cx| {
+                self.shell
+                    .update(cx, |shell, cx| shell.open_editor(&gamma_path, cx))
+            })
             .ok_or_else(|| anyhow::anyhow!("gamma.md has no editor"))?;
-        cx.update(|cx| editor.update(cx, |editor, cx| editor.save(cx))).await?;
+        cx.update(|cx| editor.update(cx, |editor, cx| editor.save(cx)))
+            .await?;
         self.close_tab(cx, editor)?;
         self.wait_for(cx, Duration::from_secs(4), |shell, cx| {
             shell.read(cx).tab_state("gamma.md", cx).is_none()
@@ -218,12 +251,20 @@ impl Run {
             shell.read(cx).tab_state("delta.md", cx).is_some()
         })
         .await;
-        cx.update(|cx| self.shell.update(cx, |shell, cx| shell.pin_document("delta.md", true, cx)));
+        cx.update(|cx| {
+            self.shell
+                .update(cx, |shell, cx| shell.pin_document("delta.md", true, cx))
+        });
         let pinned = state(cx, "delta.md");
-        let chapter = self.tree_row_center(cx, "a-long-chapter-name-01.md").await?;
+        let chapter = self
+            .tree_row_center(cx, "a-long-chapter-name-01.md")
+            .await?;
         self.click_with(cx, chapter, Modifiers::default()).await?;
         self.wait_for(cx, Duration::from_secs(4), |shell, cx| {
-            shell.read(cx).tab_state("a-long-chapter-name-01.md", cx).is_some()
+            shell
+                .read(cx)
+                .tab_state("a-long-chapter-name-01.md", cx)
+                .is_some()
         })
         .await;
         self.pause(cx, Duration::from_millis(200)).await;
@@ -232,7 +273,9 @@ impl Run {
         let still = state(cx, "delta.md");
         steps.check(
             "Pin tab keeps a preview, and the next quick look leaves it",
-            pinned.as_ref().is_some_and(|(_, _, preview, pinned)| !*preview && *pinned)
+            pinned
+                .as_ref()
+                .is_some_and(|(_, _, preview, pinned)| !*preview && *pinned)
                 && still.as_ref().is_some_and(|(_, _, _, pinned)| *pinned),
             json!({ "pinned": pinned, "after_next": still }),
         );

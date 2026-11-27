@@ -60,7 +60,13 @@ impl Run {
         let tabs = keys("Previous or next tab");
         // Keycaps read ⌘ ⌥ ⇧ on macOS and Ctrl+ Alt+ Shift+ elsewhere
         // (shell/commands/key_labels.rs).
-        let key = |mac: &'static str, other: &'static str| if cfg!(target_os = "macos") { mac } else { other };
+        let key = |mac: &'static str, other: &'static str| {
+            if cfg!(target_os = "macos") {
+                mac
+            } else {
+                other
+            }
+        };
         steps.check(
             "the shortcut sheet lists the table's keys and the workspace's, editor's, LaTeX's and visual Markdown's",
             ["Panels and tabs", "Text editing", "LaTeX", "Visual Markdown"]
@@ -109,7 +115,10 @@ impl Run {
             json!({ "citation_card": combos("Show the citation card"), "proofread": combos("Proofread the selection"), "order": [card, symbol, proofread] }),
         );
 
-        for (query, shot) in [("citation card", "sheet-citation-card"), ("Proofread", "sheet-proofread")] {
+        for (query, shot) in [
+            ("citation card", "sheet-citation-card"),
+            ("Proofread", "sheet-proofread"),
+        ] {
             self.sheet_type(cx, query)?;
             self.pause(cx, Duration::from_millis(200)).await;
             self.completion_shot(cx, shot).await;
@@ -122,9 +131,10 @@ impl Run {
         steps.check(
             "the sheet's field filters by key, and finds nothing for a query nothing matches",
             by_key.len() == 1
-                && by_key[0]["rows"]
-                    .as_array()
-                    .is_some_and(|rows| rows.iter().all(|row| row["combos"][0] == key("⇧⌘J", "Ctrl+Shift+J")))
+                && by_key[0]["rows"].as_array().is_some_and(|rows| {
+                    rows.iter()
+                        .all(|row| row["combos"][0] == key("⇧⌘J", "Ctrl+Shift+J"))
+                })
                 && none.is_empty(),
             json!({ "by_key": by_key, "none": none }),
         );

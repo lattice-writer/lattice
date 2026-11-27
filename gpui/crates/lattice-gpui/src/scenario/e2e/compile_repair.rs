@@ -14,9 +14,15 @@ use super::Steps;
 use crate::{build::repair::RepairStatus, build_panel::BuildAction, scenario::Run};
 
 impl Run {
-    async fn compile_repair(&self, cx: &mut AsyncApp, steps: &mut Steps, root: &std::path::Path) -> Result<()> {
+    async fn compile_repair(
+        &self,
+        cx: &mut AsyncApp,
+        steps: &mut Steps,
+        root: &std::path::Path,
+    ) -> Result<()> {
         let editor = self.open(cx, &root.join("chapters/intro.tex"), None)?;
-        let read_only = |cx: &mut AsyncApp| cx.update(|cx| editor.read(cx).editor().read(cx).read_only(cx));
+        let read_only =
+            |cx: &mut AsyncApp| cx.update(|cx| editor.read(cx).editor().read(cx).read_only(cx));
         // Fix all waits while a build runs; one the flow before started (a
         // watched build of the broken chapter) ends first.
         let idle = self
@@ -70,9 +76,14 @@ impl Run {
             .await;
         let after = cx.update(|cx| {
             let panel = self.shell.read(cx).build_panel().read(cx);
-            panel
-                .repair()
-                .map(|repair| (repair.status, repair.message.clone(), panel.card_shown(), panel.fix_disabled()))
+            panel.repair().map(|repair| {
+                (
+                    repair.status,
+                    repair.message.clone(),
+                    panel.card_shown(),
+                    panel.fix_disabled(),
+                )
+            })
         });
         let unlocked = !read_only(cx);
         steps.check(

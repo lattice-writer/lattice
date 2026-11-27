@@ -24,7 +24,7 @@ use std::{
 
 use anyhow::{Context as _, Result};
 use gpui::{
-    AsyncApp, ExternalPaths, FileDropEvent, Modifiers, MouseButton, PlatformInput, Pixels, Point,
+    AsyncApp, ExternalPaths, FileDropEvent, Modifiers, MouseButton, Pixels, PlatformInput, Point,
 };
 use serde_json::json;
 
@@ -41,7 +41,8 @@ impl Run {
         // the modules after this one (Markdown's typing would land its
         // click on the note's image), so it goes again at the end.
         let slots_before = cx.update(|cx| self.empty_slots(cx));
-        let finder = std::env::temp_dir().join(format!("lattice-e2e-finder-{}", std::process::id()));
+        let finder =
+            std::env::temp_dir().join(format!("lattice-e2e-finder-{}", std::process::id()));
         std::fs::create_dir_all(&finder)?;
         let mut png = std::io::Cursor::new(Vec::new());
         image::RgbaImage::from_pixel(4, 3, image::Rgba([30, 160, 90, 255]))
@@ -69,7 +70,8 @@ impl Run {
                 cx,
             );
         })?;
-        self.file_drag(cx, chapters, std::slice::from_ref(&notes)).await?;
+        self.file_drag(cx, chapters, std::slice::from_ref(&notes))
+            .await?;
         let aimed = cx.update(|cx| tree.read(cx).drop_folder(cx));
         self.drop_shot(cx, "drop-tree-folder").await;
         self.file_drop(cx, chapters).await?;
@@ -86,7 +88,8 @@ impl Run {
 
         // Off the rows, the project root is aimed at; leaving puts it out.
         let below = self.tree_below_rows(cx)?;
-        self.file_drag(cx, below, std::slice::from_ref(&notes)).await?;
+        self.file_drag(cx, below, std::slice::from_ref(&notes))
+            .await?;
         let root_aimed = cx.update(|cx| tree.read(cx).drop_folder(cx));
         self.drop_shot(cx, "drop-tree-root").await;
         self.file_event(cx, FileDropEvent::Exited).await?;
@@ -121,9 +124,15 @@ impl Run {
         // Finder figure → the LaTeX editor's second line: a figure there.
         let (text, _) = cx.update(|cx| editor.read(cx).text_and_caret(cx));
         let second = text.find('\n').map(|at| at + 1).context("a second line")?;
-        let second_line = text[second..].lines().next().unwrap_or_default().to_string();
+        let second_line = text[second..]
+            .lines()
+            .next()
+            .unwrap_or_default()
+            .to_string();
         let at = self
-            .with_window(cx, |_, window, cx| editor.update(cx, |editor, cx| editor.point_before(second, window, cx)))?
+            .with_window(cx, |_, window, cx| {
+                editor.update(cx, |editor, cx| editor.point_before(second, window, cx))
+            })?
             .context("the second line is on screen")?;
         self.file_drag(cx, at, std::slice::from_ref(&plot)).await?;
         let lit = cx.update(|cx| editor.read(cx).drop_lit(cx));
@@ -170,9 +179,15 @@ impl Run {
         // A figure's row from the tree over the editor: the drop caret. The
         // import's rescan shows figures/ with the figure revealed in it.
         let rows = |cx: &mut gpui::App, path: &str| {
-            self.shell.read(cx).file_tree().read(cx).row_paths(cx).contains(&path.to_string())
+            self.shell
+                .read(cx)
+                .file_tree()
+                .read(cx)
+                .row_paths(cx)
+                .contains(&path.to_string())
         };
-        self.wait_for(cx, Duration::from_secs(8), |_, cx| rows(cx, "figures")).await;
+        self.wait_for(cx, Duration::from_secs(8), |_, cx| rows(cx, "figures"))
+            .await;
         let tree_drag = self.tree_figure_drag(cx, &editor, second).await;
         steps.check(
             "a figure's row dragged from the tree over the editor draws the drop caret and goes in as a figure",
@@ -210,17 +225,20 @@ impl Run {
         let editor = self.open(cx, &chapter, Some(1))?;
         self.pause(cx, Duration::from_millis(300)).await;
         let at = self
-            .with_window(cx, |_, window, cx| editor.update(cx, |editor, cx| editor.point_before(second, window, cx)))?
+            .with_window(cx, |_, window, cx| {
+                editor.update(cx, |editor, cx| editor.point_before(second, window, cx))
+            })?
             .context("the second line is on screen")?;
-        self.file_drag(cx, at, &[notes.clone(), plot.clone()]).await?;
+        self.file_drag(cx, at, &[notes.clone(), plot.clone()])
+            .await?;
         self.file_drop(cx, at).await?;
         self.pause(cx, Duration::from_millis(200)).await;
         let notice = self.last_notice(cx)?;
         steps.check(
             "a mix of sources and figures dropped on an editor says to drop them separately",
-            notice
-                .as_deref()
-                .is_some_and(|notice| notice.starts_with("Drop source files and figures separately")),
+            notice.as_deref().is_some_and(|notice| {
+                notice.starts_with("Drop source files and figures separately")
+            }),
             json!({ "notice": notice }),
         );
 
@@ -228,11 +246,17 @@ impl Run {
         // in the documents' panel.
         let bib = self.tree_row_center(cx, "references.bib").await?;
         let target = self
-            .with_window(cx, |_, window, cx| editor.update(cx, |editor, cx| editor.point_before(second, window, cx)))?
+            .with_window(cx, |_, window, cx| {
+                editor.update(cx, |editor, cx| editor.point_before(second, window, cx))
+            })?
             .context("the editor is on screen")?;
         self.pointer(cx, PointerStep::Down, bib).await?;
-        self.pointer(cx, PointerStep::Move, bib + gpui::point(gpui::px(12.), gpui::px(0.)))
-            .await?;
+        self.pointer(
+            cx,
+            PointerStep::Move,
+            bib + gpui::point(gpui::px(12.), gpui::px(0.)),
+        )
+        .await?;
         let mid = gpui::point((bib.x + target.x) / 2., (bib.y + target.y) / 2.);
         self.pointer(cx, PointerStep::Move, mid).await?;
         self.pause(cx, Duration::from_millis(100)).await;
@@ -268,8 +292,12 @@ impl Run {
         self.pause(cx, Duration::from_millis(300)).await;
         let bib = self.tree_row_center(cx, "references.bib").await?;
         self.pointer(cx, PointerStep::Down, bib).await?;
-        self.pointer(cx, PointerStep::Move, bib + gpui::point(gpui::px(12.), gpui::px(0.)))
-            .await?;
+        self.pointer(
+            cx,
+            PointerStep::Move,
+            bib + gpui::point(gpui::px(12.), gpui::px(0.)),
+        )
+        .await?;
         self.with_window(cx, |_, window, cx| {
             window.dispatch_event(
                 PlatformInput::MouseMove(gpui::MouseMoveEvent {
@@ -424,7 +452,12 @@ impl Run {
         second: usize,
     ) -> Result<((Option<DropLit>, bool), bool)> {
         let rows = |cx: &mut gpui::App, path: &str| {
-            self.shell.read(cx).file_tree().read(cx).row_paths(cx).contains(&path.to_string())
+            self.shell
+                .read(cx)
+                .file_tree()
+                .read(cx)
+                .row_paths(cx)
+                .contains(&path.to_string())
         };
         // The import revealed its figure, opening figures/ (revealRequest);
         // a click opens the folder only when it was closed since.
@@ -433,16 +466,24 @@ impl Run {
             self.pointer(cx, PointerStep::Down, folder).await?;
             self.pointer(cx, PointerStep::Up, folder).await?;
         }
-        self.wait_for(cx, Duration::from_secs(4), |_, cx| rows(cx, "figures/finder-plot.png"))
-            .await;
+        self.wait_for(cx, Duration::from_secs(4), |_, cx| {
+            rows(cx, "figures/finder-plot.png")
+        })
+        .await;
         self.pause(cx, Duration::from_millis(200)).await;
         let row = self.tree_row_center(cx, "figures/finder-plot.png").await?;
         let at = self
-            .with_window(cx, |_, window, cx| editor.update(cx, |editor, cx| editor.point_before(second, window, cx)))?
+            .with_window(cx, |_, window, cx| {
+                editor.update(cx, |editor, cx| editor.point_before(second, window, cx))
+            })?
             .context("the second line is on screen")?;
         self.pointer(cx, PointerStep::Down, row).await?;
-        self.pointer(cx, PointerStep::Move, row + gpui::point(gpui::px(12.), gpui::px(0.)))
-            .await?;
+        self.pointer(
+            cx,
+            PointerStep::Move,
+            row + gpui::point(gpui::px(12.), gpui::px(0.)),
+        )
+        .await?;
         self.pointer(cx, PointerStep::Move, at).await?;
         let caret = cx.update(|cx| editor.read(cx).drop_lit(cx));
         self.drop_shot(cx, "drop-editor-caret").await;
@@ -470,23 +511,37 @@ impl Run {
 
     /// A tree row's center. A row outside those drawn (a tree that earlier
     /// modules grew past the panel's height) is scrolled into view first.
-    pub(super) async fn tree_row_center(&self, cx: &mut AsyncApp, path: &str) -> Result<Point<Pixels>> {
+    pub(super) async fn tree_row_center(
+        &self,
+        cx: &mut AsyncApp,
+        path: &str,
+    ) -> Result<Point<Pixels>> {
         let tree = cx.update(|cx| self.shell.read(cx).file_tree().clone());
-        let drawn = |tree: &crate::file_tree::FileTreePanel, cx: &gpui::App| -> Result<(usize, Option<Point<Pixels>>)> {
+        let drawn = |tree: &crate::file_tree::FileTreePanel,
+                     cx: &gpui::App|
+         -> Result<(usize, Option<Point<Pixels>>)> {
             let ix = tree
                 .row_paths(cx)
                 .iter()
                 .position(|row| row == path)
                 .with_context(|| format!("{path} is a row of the tree"))?;
             let snapshot = tree.hover_snapshot(cx).context("the tree was drawn")?;
-            let center = snapshot.rows.iter().find(|(row, ..)| *row == ix).map(|(_, bounds, _)| bounds.center());
+            let center = snapshot
+                .rows
+                .iter()
+                .find(|(row, ..)| *row == ix)
+                .map(|(_, bounds, _)| bounds.center());
             Ok((ix, center))
         };
         let (ix, center) = cx.update(|cx| drawn(tree.read(cx), cx))?;
         if let Some(center) = center {
             return Ok(center);
         }
-        cx.update(|cx| tree.update(cx, |tree, cx| tree.scroll_rows_to(ix.saturating_sub(2) as f32, cx)));
+        cx.update(|cx| {
+            tree.update(cx, |tree, cx| {
+                tree.scroll_rows_to(ix.saturating_sub(2) as f32, cx)
+            })
+        });
         self.wait_for(cx, Duration::from_secs(2), |_, cx| {
             drawn(tree.read(cx), cx).is_ok_and(|(_, center)| center.is_some())
         })
@@ -500,7 +555,10 @@ impl Run {
     pub(super) fn tree_below_rows(&self, cx: &mut AsyncApp) -> Result<Point<Pixels>> {
         let tree = cx.update(|cx| self.shell.read(cx).file_tree().clone());
         cx.update(|cx| {
-            let snapshot = tree.read(cx).hover_snapshot(cx).context("the tree was drawn")?;
+            let snapshot = tree
+                .read(cx)
+                .hover_snapshot(cx)
+                .context("the tree was drawn")?;
             let last = snapshot
                 .rows
                 .iter()
@@ -512,16 +570,29 @@ impl Run {
     }
 
     /// Finder's drag of `paths` entering the window, then moving, at `at`.
-    pub(super) async fn file_drag(&self, cx: &mut AsyncApp, at: Point<Pixels>, paths: &[PathBuf]) -> Result<()> {
+    pub(super) async fn file_drag(
+        &self,
+        cx: &mut AsyncApp,
+        at: Point<Pixels>,
+        paths: &[PathBuf],
+    ) -> Result<()> {
         let paths = ExternalPaths(paths.iter().cloned().collect());
-        self.file_event(cx, FileDropEvent::Entered { position: at, paths })
-            .await?;
-        self.file_event(cx, FileDropEvent::Pending { position: at }).await
+        self.file_event(
+            cx,
+            FileDropEvent::Entered {
+                position: at,
+                paths,
+            },
+        )
+        .await?;
+        self.file_event(cx, FileDropEvent::Pending { position: at })
+            .await
     }
 
     /// Finder's drop at `at`.
     pub(super) async fn file_drop(&self, cx: &mut AsyncApp, at: Point<Pixels>) -> Result<()> {
-        self.file_event(cx, FileDropEvent::Submit { position: at }).await
+        self.file_event(cx, FileDropEvent::Submit { position: at })
+            .await
     }
 
     async fn file_event(&self, cx: &mut AsyncApp, event: FileDropEvent) -> Result<()> {
@@ -533,7 +604,12 @@ impl Run {
     }
 
     /// One pointer event at `at`, with a frame drawn after it.
-    pub(super) async fn pointer(&self, cx: &mut AsyncApp, step: PointerStep, at: Point<Pixels>) -> Result<()> {
+    pub(super) async fn pointer(
+        &self,
+        cx: &mut AsyncApp,
+        step: PointerStep,
+        at: Point<Pixels>,
+    ) -> Result<()> {
         let event = match step {
             PointerStep::Down => PlatformInput::MouseDown(gpui::MouseDownEvent {
                 button: MouseButton::Left,

@@ -22,7 +22,12 @@ use crate::{
 };
 
 impl Run {
-    async fn pdf_sync_polish(&self, cx: &mut AsyncApp, steps: &mut Steps, root: &Path) -> Result<()> {
+    async fn pdf_sync_polish(
+        &self,
+        cx: &mut AsyncApp,
+        steps: &mut Steps,
+        root: &Path,
+    ) -> Result<()> {
         // A word on each of the chapter's three source lines, which TeX sets
         // as one PDF line: each found in the PDF's own text as PDFium reads
         // it, with the word a double-click on it reads there. SyncTeX names
@@ -43,7 +48,9 @@ impl Run {
             let (page, point, clicked) = found;
             let word = clicked.as_ref().map(|clicked| clicked.word.clone());
             self.with_window(cx, |shell, window, cx| {
-                shell.update(cx, |shell, cx| shell.double_click_pdf(page, point, clicked, window, cx))
+                shell.update(cx, |shell, cx| {
+                    shell.double_click_pdf(page, point, clicked, window, cx)
+                })
             })?;
             self.pause(cx, Duration::from_millis(600)).await;
             let caret = cx.update(|cx| editor.read(cx).cursor());
@@ -84,7 +91,9 @@ impl Run {
         std::fs::copy(root.join("main.pdf"), &copy)?;
         self.open(cx, &copy, None).ok();
         let tab = self
-            .wait_for(cx, Duration::from_secs(10), |shell, cx| !shell.read(cx).file_pdf_tabs().is_empty())
+            .wait_for(cx, Duration::from_secs(10), |shell, cx| {
+                !shell.read(cx).file_pdf_tabs().is_empty()
+            })
             .await;
         let notice = |cx: &mut AsyncApp| {
             cx.update(|cx| {
@@ -128,19 +137,35 @@ impl Run {
     }
 }
 
-pub(super) type Found = (u32, (f64, f64), Option<lattice_editor::latex::synctex_word::SyncTexWord>);
+pub(super) type Found = (
+    u32,
+    (f64, f64),
+    Option<lattice_editor::latex::synctex_word::SyncTexWord>,
+);
 
 impl Run {
     /// Where `word` is in the PDF's own text as PDFium reads it: its page
     /// (1-based), the point on its second letter, and the word a click
     /// there reads.
-    async fn find_in_pdf_text(&self, cx: &mut AsyncApp, root: &Path, word: &str) -> Result<Option<Found>> {
+    async fn find_in_pdf_text(
+        &self,
+        cx: &mut AsyncApp,
+        root: &Path,
+        word: &str,
+    ) -> Result<Option<Found>> {
         self.find_word_in(cx, &root.join("main.pdf"), word).await
     }
 
     /// [`Self::find_in_pdf_text`] in the PDF at `pdf`.
-    pub(super) async fn find_word_in(&self, cx: &mut AsyncApp, pdf: &Path, word: &str) -> Result<Option<Found>> {
-        let engine = cx.update(PdfEngine::global).map_err(|error| anyhow!("{error}"))?;
+    pub(super) async fn find_word_in(
+        &self,
+        cx: &mut AsyncApp,
+        pdf: &Path,
+        word: &str,
+    ) -> Result<Option<Found>> {
+        let engine = cx
+            .update(PdfEngine::global)
+            .map_err(|error| anyhow!("{error}"))?;
         let doc = engine.new_document();
         // latexmk writes the PDF in place, so a build that starts as a step
         // reads it (an automatic one after an edit, or one an earlier step
@@ -155,7 +180,9 @@ impl Run {
             };
             match opened {
                 Ok(info) => break info,
-                Err(_) if Instant::now() < deadline => self.pause(cx, Duration::from_millis(250)).await,
+                Err(_) if Instant::now() < deadline => {
+                    self.pause(cx, Duration::from_millis(250)).await
+                }
                 Err(error) => {
                     engine.close(doc);
                     return Err(error.context(format!("{} did not open", pdf.display())));
@@ -166,11 +193,18 @@ impl Run {
         let mut found = None;
         for page in 0..info.page_sizes.len() {
             let text = engine.text(doc, info.generation, page).await??;
-            let at = text.chars.windows(wanted.len()).position(|run| run.iter().map(|ch| ch.ch).eq(wanted.iter().copied()));
+            let at = text
+                .chars
+                .windows(wanted.len())
+                .position(|run| run.iter().map(|ch| ch.ch).eq(wanted.iter().copied()));
             if let Some(at) = at {
                 let ch = text.chars[at + 1];
                 let (x, y) = ((ch.x0 + ch.x1) / 2., (ch.y0 + ch.y1) / 2.);
-                found = Some((page as u32 + 1, (f64::from(x), f64::from(y)), clicked_word_at(&text, x, y)));
+                found = Some((
+                    page as u32 + 1,
+                    (f64::from(x), f64::from(y)),
+                    clicked_word_at(&text, x, y),
+                ));
                 break;
             }
         }
@@ -183,29 +217,55 @@ impl Run {
     fn landing(chapter: &Path, word: &str) -> Result<Option<(u32, u32)>> {
         let text = std::fs::read_to_string(chapter)?;
         Ok(text.lines().enumerate().find_map(|(row, source)| {
-            source.find(word).map(|column| (row as u32 + 1, column as u32 + 1))
+            source
+                .find(word)
+                .map(|column| (row as u32 + 1, column as u32 + 1))
         }))
     }
 
     /// A ⌘-double-click off a figure is the ordinary jump, through the PDF
     /// view's own event; and a plain double-click made while that ⌘ lookup
     /// still runs is the one that lands (`pdf-figure-source-open.tsx`).
-    async fn figure_and_newest_jump(&self, cx: &mut AsyncApp, steps: &mut Steps, root: &Path) -> Result<()> {
+    async fn figure_and_newest_jump(
+        &self,
+        cx: &mut AsyncApp,
+        steps: &mut Steps,
+        root: &Path,
+    ) -> Result<()> {
         let chapter = root.join("chapters/intro.tex");
         let a = self.find_in_pdf_text(cx, root, "second").await?;
         let b = self.find_in_pdf_text(cx, root, "introduces").await?;
         let (Some(a), Some(b)) = (a, b) else {
-            steps.check("PDF: a ⌘-double-click off a figure is the ordinary jump", false, json!({ "found": false }));
+            steps.check(
+                "PDF: a ⌘-double-click off a figure is the ordinary jump",
+                false,
+                json!({ "found": false }),
+            );
             return Ok(());
         };
-        let (Some(at_a), Some(at_b)) = (Self::landing(&chapter, "second")?, Self::landing(&chapter, "introduces")?) else {
-            steps.check("PDF: a ⌘-double-click off a figure is the ordinary jump", false, json!({ "landing": false }));
+        let (Some(at_a), Some(at_b)) = (
+            Self::landing(&chapter, "second")?,
+            Self::landing(&chapter, "introduces")?,
+        ) else {
+            steps.check(
+                "PDF: a ⌘-double-click off a figure is the ordinary jump",
+                false,
+                json!({ "landing": false }),
+            );
             return Ok(());
         };
         let editor = self.open(cx, &chapter, Some(1))?;
         let emit_as = |found: &Found, figure: bool| {
-            let event = PdfViewEvent::SourceAt { page: found.0, x: found.1.0, y: found.1.1, word: found.2.clone(), figure };
-            move |shell: &gpui::Entity<crate::shell::Shell>, _: &mut gpui::Window, cx: &mut gpui::App| {
+            let event = PdfViewEvent::SourceAt {
+                page: found.0,
+                x: found.1.0,
+                y: found.1.1,
+                word: found.2.clone(),
+                figure,
+            };
+            move |shell: &gpui::Entity<crate::shell::Shell>,
+                  _: &mut gpui::Window,
+                  cx: &mut gpui::App| {
                 let view = shell.read(cx).pdf().read(cx).live_view().clone();
                 view.update(cx, |_, cx| cx.emit(event));
             }
@@ -235,7 +295,9 @@ impl Run {
         self.with_window(cx, emit(&a))?;
         let (page, point, word) = b.clone();
         self.with_window(cx, move |shell, window, cx| {
-            shell.update(cx, |shell, cx| shell.double_click_pdf(page, point, word, window, cx))
+            shell.update(cx, |shell, cx| {
+                shell.double_click_pdf(page, point, word, window, cx)
+            })
         })?;
         self.pause(cx, Duration::from_millis(1200)).await;
         let caret = cx.update(|cx| editor.read(cx).cursor());

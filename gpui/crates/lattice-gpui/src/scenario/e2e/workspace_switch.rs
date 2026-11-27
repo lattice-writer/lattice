@@ -48,7 +48,9 @@ impl Run {
         };
         self.with_window(cx, {
             let first = first.clone();
-            move |shell, window, cx| shell.update(cx, |shell, cx| shell.switch_workspace(&first, window, cx))
+            move |shell, window, cx| {
+                shell.update(cx, |shell, cx| shell.switch_workspace(&first, window, cx))
+            }
         })?;
         self.pause(cx, Duration::from_millis(400)).await;
 
@@ -70,15 +72,16 @@ impl Run {
         let from = grabbed.center();
         let to = point(past.left() + px(2.), from.y);
         self.pointer(cx, PointerStep::Down, from).await?;
-        self.pointer(cx, PointerStep::Move, from - point(px(6.), px(0.))).await?;
+        self.pointer(cx, PointerStep::Move, from - point(px(6.), px(0.)))
+            .await?;
         let lifted = cx.update(|cx| self.shell.read(cx).layout.track.dragging.clone());
         self.pointer(cx, PointerStep::Move, to).await?;
         self.pointer(cx, PointerStep::Up, to).await?;
         self.pause(cx, Duration::from_millis(300)).await;
         let after = order(cx);
         let current = cx.update(|cx| self.shell.read(cx).layout.workspace.clone());
-        let moved = after.iter().position(|id| *id == next)
-            == before.iter().position(|id| *id == first);
+        let moved =
+            after.iter().position(|id| *id == next) == before.iter().position(|id| *id == first);
         steps.check(
             "a workspace tab dragged past its neighbour's middle takes its place, and the drag switches nothing",
             lifted.as_deref() == Some(next.as_str()) && moved && current.as_deref() == Some(first.as_str()),
@@ -88,7 +91,9 @@ impl Run {
         // After the drag, Enter on the dragged tab is still its click.
         self.with_window(cx, {
             let next = next.clone();
-            move |shell, window, cx| shell.update(cx, |shell, cx| shell.focus_workspace_tab(&next, window, cx))
+            move |shell, window, cx| {
+                shell.update(cx, |shell, cx| shell.focus_workspace_tab(&next, window, cx))
+            }
         })?;
         self.key(cx, "enter")?;
         self.key_up(cx, "enter")?;
@@ -101,7 +106,9 @@ impl Run {
         );
         self.with_window(cx, {
             let first = first.clone();
-            move |shell, window, cx| shell.update(cx, |shell, cx| shell.switch_workspace(&first, window, cx))
+            move |shell, window, cx| {
+                shell.update(cx, |shell, cx| shell.switch_workspace(&first, window, cx))
+            }
         })?;
         self.pause(cx, Duration::from_millis(400)).await;
 
@@ -109,7 +116,11 @@ impl Run {
         // End and Home reach the ends; ← from the first goes round.
         self.with_window(cx, {
             let first = first.clone();
-            move |shell, window, cx| shell.update(cx, |shell, cx| shell.focus_workspace_tab(&first, window, cx))
+            move |shell, window, cx| {
+                shell.update(cx, |shell, cx| {
+                    shell.focus_workspace_tab(&first, window, cx)
+                })
+            }
         })?;
         let mut visits = Vec::new();
         for key in ["right", "end", "home", "left"] {
@@ -126,12 +137,7 @@ impl Run {
         let ids = order(cx);
         let at = |id: &str| ids.iter().position(|entry| entry == id);
         let first_at = at(&first).unwrap_or(0);
-        let expected = [
-            (first_at + 1) % ids.len(),
-            ids.len() - 1,
-            0,
-            ids.len() - 1,
-        ];
+        let expected = [(first_at + 1) % ids.len(), ids.len() - 1, 0, ids.len() - 1];
         steps.check(
             "→ ← Home End switch the workspace and take the keyboard along, ← going round from the first",
             visits
@@ -143,7 +149,14 @@ impl Run {
 
         // F2 renames; a name already used stays in editing, marked;
         // Escape gives the keyboard back to the tab.
-        let current = cx.update(|cx| self.shell.read(cx).layout.workspace.clone().unwrap_or_default());
+        let current = cx.update(|cx| {
+            self.shell
+                .read(cx)
+                .layout
+                .workspace
+                .clone()
+                .unwrap_or_default()
+        });
         let taken_name = cx.update(|cx| {
             Workspaces::global(cx)
                 .list()
@@ -169,16 +182,31 @@ impl Run {
         // 24, as an HTML `maxLength` field cuts a paste to the room left.
         let pasted = "abcdefghijklmnopqrstuvwxyz0123";
         cx.update(|cx| cx.write_to_clipboard(gpui::ClipboardItem::new_string(pasted.into())));
-        self.key(cx, if cfg!(target_os = "macos") { "cmd-v" } else { "ctrl-v" })?;
+        self.key(
+            cx,
+            if cfg!(target_os = "macos") {
+                "cmd-v"
+            } else {
+                "ctrl-v"
+            },
+        )?;
         self.pause(cx, Duration::from_millis(200)).await;
         let field = field_value(cx);
         // The paste was cut before it applied, so it is one step of the
         // field's history: ⌘Z gives the name back, then the paste again.
-        let undo = if cfg!(target_os = "macos") { "cmd-z" } else { "ctrl-z" };
+        let undo = if cfg!(target_os = "macos") {
+            "cmd-z"
+        } else {
+            "ctrl-z"
+        };
         self.key(cx, undo)?;
         self.pause(cx, Duration::from_millis(200)).await;
         let undone = field_value(cx);
-        let redo = if cfg!(target_os = "macos") { "cmd-shift-z" } else { "ctrl-shift-z" };
+        let redo = if cfg!(target_os = "macos") {
+            "cmd-shift-z"
+        } else {
+            "ctrl-shift-z"
+        };
         self.key(cx, redo)?;
         self.pause(cx, Duration::from_millis(200)).await;
         let redone = field_value(cx);
@@ -192,7 +220,9 @@ impl Run {
 
         self.with_window(cx, move |shell, window, cx| {
             if let Some(input) = shell.read(cx).rename_input() {
-                input.update(cx, |input, cx| input.set_value(taken_name.clone(), window, cx));
+                input.update(cx, |input, cx| {
+                    input.set_value(taken_name.clone(), window, cx)
+                });
             }
         })?;
         self.key(cx, "enter")?;
@@ -204,7 +234,10 @@ impl Run {
             let current = current.clone();
             move |shell, window, cx| {
                 let shell = shell.read(cx);
-                (shell.workspace_renaming().0.is_none(), shell.workspace_tab_focused(&current, window))
+                (
+                    shell.workspace_renaming().0.is_none(),
+                    shell.workspace_tab_focused(&current, window),
+                )
             }
         })?;
         steps.check(
@@ -231,7 +264,9 @@ impl Run {
         // The steps after these find the workspaces as they were.
         self.with_window(cx, {
             let first = first.clone();
-            move |shell, window, cx| shell.update(cx, |shell, cx| shell.switch_workspace(&first, window, cx))
+            move |shell, window, cx| {
+                shell.update(cx, |shell, cx| shell.switch_workspace(&first, window, cx))
+            }
         })?;
         cx.update(|cx| {
             Workspaces::update(cx, |library| {

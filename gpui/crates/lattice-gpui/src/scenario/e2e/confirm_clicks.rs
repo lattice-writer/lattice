@@ -48,7 +48,9 @@ impl Run {
             )
         });
         self.wait_for(cx, Duration::from_secs(5), |_, _| {
-            ["cancel", "answer"].iter().all(|name| Self::drawn_button(name).is_some())
+            ["cancel", "answer"]
+                .iter()
+                .all(|name| Self::drawn_button(name).is_some())
         })
         .await;
         // The dialog's entry, so the press lands on where the button rests.
@@ -74,12 +76,7 @@ impl Run {
 
     /// Whether the question is still up and Settings still open.
     fn confirm_state(&self, cx: &mut AsyncApp) -> (bool, bool) {
-        cx.update(|cx| {
-            (
-                confirm::is_pending(cx),
-                self.shell.read(cx).settings_open(),
-            )
-        })
+        cx.update(|cx| (confirm::is_pending(cx), self.shell.read(cx).settings_open()))
     }
 
     async fn confirm_clicks(
@@ -176,7 +173,9 @@ impl Run {
             )
         });
         self.wait_for(cx, Duration::from_secs(5), |_, _| {
-            ["cancel", "answer"].iter().all(|name| Self::drawn_button(name).is_some())
+            ["cancel", "answer"]
+                .iter()
+                .all(|name| Self::drawn_button(name).is_some())
         })
         .await;
         self.pause(cx, Duration::from_millis(300)).await;

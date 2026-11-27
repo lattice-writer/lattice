@@ -85,11 +85,15 @@ impl Run {
         // machine can take longer than a fixed pause to do; wait for it.
         self.with_view(cx, |view, _, cx| view.apply_fit(FitMode::Height, cx))?;
         let (height_fit, height_scale) = self
-            .settled_fit(cx, |fit, scale| fit == Some(FitMode::Height) && scale <= fitted + 0.001)
+            .settled_fit(cx, |fit, scale| {
+                fit == Some(FitMode::Height) && scale <= fitted + 0.001
+            })
             .await;
         self.with_view(cx, |view, _, cx| view.apply_fit(FitMode::Width, cx))?;
         let (back_fit, back_scale) = self
-            .settled_fit(cx, |fit, scale| fit == Some(FitMode::Width) && (scale - fitted).abs() < 0.01)
+            .settled_fit(cx, |fit, scale| {
+                fit == Some(FitMode::Width) && (scale - fitted).abs() < 0.01
+            })
             .await;
         // A zoom step is a tenth from the scale rounded to one decimal.
         let step = ((fitted + 0.1) * 10.).round() / 10.;

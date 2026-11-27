@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# rustfmt over the GPUI workspace. `cargo fmt` stops at the e2e scenario's
+# modules, because build.rs lists them and scenario/e2e.rs include!s that
+# list, so rustfmt never sees a `mod` for them; they are formatted by path.
+#
+#   script/fmt           format the workspace and the e2e modules
+#   script/fmt --check   fail on any file that would change
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+case "${1:-}" in
+  "") check= ;;
+  --check) check=--check ;;
+  *) echo "usage: script/fmt [--check]" >&2; exit 2 ;;
+esac
+
+cargo fmt --all -- $check
+find crates/lattice-gpui/src/scenario/e2e -name '*.rs' -print0 \
+  | xargs -0 rustfmt --edition 2024 $check

@@ -207,8 +207,10 @@ impl Run {
         for plugin in [&ZOTERO, &CHECK, &CROSSREF] {
             self.bench_plugin(cx, plugin, plugin.manifest)?;
         }
-        host.set_enabled(ZOTERO.id, true).map_err(anyhow::Error::msg)?;
-        host.set_enabled(CHECK.id, true).map_err(anyhow::Error::msg)?;
+        host.set_enabled(ZOTERO.id, true)
+            .map_err(anyhow::Error::msg)?;
+        host.set_enabled(CHECK.id, true)
+            .map_err(anyhow::Error::msg)?;
         cx.update(crate::plugins::refresh).await;
         self.open(cx, &root.join("main.tex"), Some(1))?;
         self.pause(cx, Duration::from_millis(300)).await;
@@ -220,13 +222,17 @@ impl Run {
         self.palette_run(cx, "Zotero search: Search Zotero…")?;
         self.with_window(cx, |shell, window, cx| {
             if let Some(palette) = shell.read(cx).palette_view() {
-                palette.update(cx, |palette, cx| palette.plugin_type("attention", window, cx));
+                palette.update(cx, |palette, cx| {
+                    palette.plugin_type("attention", window, cx)
+                });
             }
         })?;
         self.bench_shot(cx, "input", theme).await;
         self.with_window(cx, |shell, window, cx| {
             if let Some(palette) = shell.read(cx).palette_view() {
-                palette.update(cx, |palette, cx| palette.plugin_submit("attention", window, cx));
+                palette.update(cx, |palette, cx| {
+                    palette.plugin_submit("attention", window, cx)
+                });
             }
         })?;
         self.bench_shot(cx, "progress", theme).await;
@@ -279,7 +285,9 @@ impl Run {
         let Some(pane) = self.settings_pane_ready(cx).await else {
             return Ok(());
         };
-        self.with_window(cx, |_, window, cx| pane.update(cx, |pane, cx| pane.reload(window, cx)))?;
+        self.with_window(cx, |_, window, cx| {
+            pane.update(cx, |pane, cx| pane.reload(window, cx))
+        })?;
         self.settings_pane_ready(cx).await;
         self.bench_shot(cx, "settings", theme).await;
         let crossref = cx.update(|cx| {
@@ -298,18 +306,22 @@ impl Run {
         // Turned on with what it asked for before; its update asks for more.
         self.rewrite_manifest(
             &CROSSREF,
-            &CROSSREF
-                .manifest
-                .replace("network = [\"https://api.crossref.org\"]\nsecrets = [\"mailto\"]\n", ""),
+            &CROSSREF.manifest.replace(
+                "network = [\"https://api.crossref.org\"]\nsecrets = [\"mailto\"]\n",
+                "",
+            ),
         )?;
-        host.set_enabled(CROSSREF.id, true).map_err(anyhow::Error::msg)?;
+        host.set_enabled(CROSSREF.id, true)
+            .map_err(anyhow::Error::msg)?;
         self.rewrite_manifest(&CROSSREF, &CROSSREF.manifest.replace("0.2.1", "0.3.0"))?;
         let home = std::env::var_os("HOME")
             .map(std::path::PathBuf::from)
             .unwrap_or_default();
         host.install_folder(&home.join("bench-plugins").join(CROSSREF.folder))
             .map_err(anyhow::Error::msg)?;
-        self.with_window(cx, |_, window, cx| pane.update(cx, |pane, cx| pane.reload(window, cx)))?;
+        self.with_window(cx, |_, window, cx| {
+            pane.update(cx, |pane, cx| pane.reload(window, cx))
+        })?;
         self.settings_pane_ready(cx).await;
         self.with_window(cx, |shell, _, cx| {
             if let Some(settings) = shell.read(cx).settings.clone() {
@@ -317,7 +329,9 @@ impl Run {
             }
         })?;
         self.bench_shot(cx, "review", theme).await;
-        self.with_window(cx, |shell, _, cx| shell.update(cx, |shell, cx| shell.close_settings(cx)))?;
+        self.with_window(cx, |shell, _, cx| {
+            shell.update(cx, |shell, cx| shell.close_settings(cx))
+        })?;
         Ok(())
     }
 
@@ -329,11 +343,15 @@ impl Run {
             (ThemePreference::Light, "light"),
             (ThemePreference::Dark, "dark"),
         ] {
-            cx.update(|cx| crate::settings::update(cx, |settings| settings.theme_preference = preference));
+            cx.update(|cx| {
+                crate::settings::update(cx, |settings| settings.theme_preference = preference)
+            });
             self.pause(cx, Duration::from_millis(600)).await;
             self.bench_states(cx, root, theme).await?;
         }
-        cx.update(|cx| crate::settings::update(cx, |settings| settings.theme_preference = theme_before));
+        cx.update(|cx| {
+            crate::settings::update(cx, |settings| settings.theme_preference = theme_before)
+        });
         Ok(())
     }
 }

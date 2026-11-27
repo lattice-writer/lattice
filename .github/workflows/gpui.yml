@@ -167,7 +167,7 @@ jobs:
           workspaces: gpui
           save-if: ${{ github.ref == 'refs/heads/main' }}
           cache-on-failure: true
-      - run: cargo fmt --all -- --check
+      - run: script/fmt --check
       - run: script/fetch-pdfium
       - run: cargo build --release --locked
       # A small TeX Live on PATH, where the app looks first. scheme-basic has

@@ -90,9 +90,7 @@ impl Run {
         let editor = self.open(cx, &fixture.root.join("main.tex"), Some(1))?;
         let was = cx.update(|cx| settings::get(cx).appearance.source_font.clone());
         for family in READING_AIDS {
-            cx.update(|cx| {
-                settings::update_appearance(cx, |a| a.source_font = family.to_string())
-            });
+            cx.update(|cx| settings::update_appearance(cx, |a| a.source_font = family.to_string()));
             self.pause(cx, Duration::from_millis(300)).await;
             let applied = cx.update(|cx| {
                 let _ = &editor;

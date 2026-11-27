@@ -222,8 +222,11 @@ impl Run {
         // poll on its 45 s cadence at once, not after one more probe on the
         // 3 s it woke with.
         let quiet_until = forward + Duration::from_secs(8);
-        self.pause(cx, quiet_until.saturating_duration_since(std::time::Instant::now()))
-            .await;
+        self.pause(
+            cx,
+            quiet_until.saturating_duration_since(std::time::Instant::now()),
+        )
+        .await;
         let reconnect_probes = mock.requests(&probes) - asked_forward;
         steps.check(
             "after the channel joins, the live poll asks no more than the probe coming forward sent",
@@ -256,9 +259,9 @@ impl Run {
         let held = mock.requests(&uploads) == sent && mock.file(board).is_none();
         self.with_window(cx, |shell, _, cx| {
             shell.update(cx, |shell, cx| {
-                shell
-                    .overleaf
-                    .update(cx, |bridge, cx| bridge.whole_files_shown(BTreeSet::new(), cx))
+                shell.overleaf.update(cx, |bridge, cx| {
+                    bridge.whole_files_shown(BTreeSet::new(), cx)
+                })
             })
         })?;
         let mut went = false;

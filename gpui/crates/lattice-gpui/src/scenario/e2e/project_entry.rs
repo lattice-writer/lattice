@@ -33,7 +33,15 @@ struct Entry {
 
 impl Run {
     fn pdf_opens(&self, cx: &mut AsyncApp) -> usize {
-        cx.update(|cx| self.shell.read(cx).pdf().read(cx).live_view().read(cx).opens())
+        cx.update(|cx| {
+            self.shell
+                .read(cx)
+                .pdf()
+                .read(cx)
+                .live_view()
+                .read(cx)
+                .opens()
+        })
     }
 
     /// Switch the window to `root` and watch the entry until its build is
@@ -43,7 +51,9 @@ impl Run {
         let opens = self.pdf_opens(cx);
         self.with_window(cx, {
             let root = root.to_path_buf();
-            move |shell, window, cx| shell.update(cx, |shell, cx| shell.switch_project(root, window, cx))
+            move |shell, window, cx| {
+                shell.update(cx, |shell, cx| shell.switch_project(root, window, cx))
+            }
         })?;
         let mut entry = Entry::default();
         let mut entered = false;
@@ -65,7 +75,9 @@ impl Run {
         entry.opens = self.pdf_opens(cx) - opens;
         entry.outcome = cx.update(|cx| {
             let panel = self.shell.read(cx).build_panel().read(cx);
-            panel.outcome().map(|outcome| (outcome.unchanged, outcome.succeeded))
+            panel
+                .outcome()
+                .map(|outcome| (outcome.unchanged, outcome.succeeded))
         });
         Ok(entry)
     }
@@ -74,7 +86,9 @@ impl Run {
         // The run's project, built as it is now.
         let before = self.builds(cx);
         self.with_window(cx, |shell, window, cx| {
-            shell.update(cx, |shell, cx| shell.build(&crate::shell::Build, window, cx))
+            shell.update(cx, |shell, cx| {
+                shell.build(&crate::shell::Build, window, cx)
+            })
         })?;
         self.built_after(cx, before).await;
         let first: PathBuf = cx
@@ -110,7 +124,11 @@ impl Run {
             );
             steps.check(
                 "switching to a project its entry built builds nothing again",
-                again.settled && !again.ran && !again.blank && again.opens == 1 && again.outcome == Some((true, true)),
+                again.settled
+                    && !again.ran
+                    && !again.blank
+                    && again.opens == 1
+                    && again.outcome == Some((true, true)),
                 json!(again),
             );
         }
@@ -119,18 +137,27 @@ impl Run {
         // over the PDF it had.
         let main = first.join("main.tex");
         let text = std::fs::read_to_string(&main)?;
-        std::fs::write(&main, format!("{text}% Changed while the project was away.\n"))?;
+        std::fs::write(
+            &main,
+            format!("{text}% Changed while the project was away.\n"),
+        )?;
         let changed = self.enter(cx, &first).await?;
         steps.check(
             "switching back to a project whose source changed builds it, its PDF shown meanwhile",
-            changed.settled && changed.ran && !changed.blank && changed.opens == 2 && changed.outcome == Some((false, true)),
+            changed.settled
+                && changed.ran
+                && !changed.blank
+                && changed.opens == 2
+                && changed.outcome == Some((false, true)),
             json!(changed),
         );
 
         // As it was: the other project's tab closed, the source put back.
         self.with_window(cx, {
             let other = other.clone();
-            move |shell, window, cx| shell.update(cx, |shell, cx| shell.close_project(&other, window, cx))
+            move |shell, window, cx| {
+                shell.update(cx, |shell, cx| shell.close_project(&other, window, cx))
+            }
         })?;
         let before = self.builds(cx);
         std::fs::write(&main, text)?;

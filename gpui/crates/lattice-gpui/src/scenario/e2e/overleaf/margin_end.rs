@@ -25,7 +25,14 @@ const LAST_LINE: &str = "% A note from Overleaf";
 /// More comments than the view holds, so the stack reaches past its bottom
 /// and past the document's last line.
 const QUOTES: [&str; 8] = [
-    "A", "note", "from", "Overleaf", "A note", "note from", "from Overleaf", "Overleaf",
+    "A",
+    "note",
+    "from",
+    "Overleaf",
+    "A note",
+    "note from",
+    "from Overleaf",
+    "Overleaf",
 ];
 
 impl Run {
@@ -91,7 +98,12 @@ impl Run {
             (
                 panel.margin_painted(),
                 panel.margin_view(),
-                panel.lattice_editor().read(cx).painted().bounds.map(|b| b.right()),
+                panel
+                    .lattice_editor()
+                    .read(cx)
+                    .painted()
+                    .bounds
+                    .map(|b| b.right()),
                 panel.margin_room(),
             )
         });
@@ -108,7 +120,11 @@ impl Run {
             .iter()
             .filter(|(key, _)| wanted.contains(key))
             .map(|(_, bounds)| *bounds)
-            .max_by(|a, b| a.bottom().partial_cmp(&b.bottom()).unwrap_or(std::cmp::Ordering::Equal));
+            .max_by(|a, b| {
+                a.bottom()
+                    .partial_cmp(&b.bottom())
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
         let reached = matches!(
             (last, view),
             (Some(last), Some(view)) if last.top() >= view.top() && last.bottom() <= view.bottom()

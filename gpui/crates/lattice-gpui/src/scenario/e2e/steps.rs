@@ -101,9 +101,8 @@ impl Steps {
     }
 
     pub(super) fn check(&mut self, name: &str, passed: bool, detail: Value) -> bool {
-        self.0.push(
-            json!({ "step": name, "passed": passed, "detail": detail, "module": self.2 }),
-        );
+        self.0
+            .push(json!({ "step": name, "passed": passed, "detail": detail, "module": self.2 }));
         *self.1.borrow_mut() = name.to_string();
         passed
     }

@@ -61,7 +61,9 @@ impl Run {
         let at = original.find('\n').unwrap_or(0);
         let caret_editor = editor.clone();
         self.with_window(cx, move |_, window, cx| {
-            caret_editor.update(cx, |editor, cx| editor.replace_range(at, at, "", at, window, cx))
+            caret_editor.update(cx, |editor, cx| {
+                editor.replace_range(at, at, "", at, window, cx)
+            })
         })?;
         let cite_before = cx.update(|cx| progress::global(cx).read(cx).is_done(Step::Cite));
         let panel = papers.clone();
@@ -129,7 +131,12 @@ impl Run {
                 })
                 .await;
             let titles: Vec<String> = cx.update(|cx| {
-                notices.read(cx).titles().iter().map(|t| t.to_string()).collect()
+                notices
+                    .read(cx)
+                    .titles()
+                    .iter()
+                    .map(|t| t.to_string())
+                    .collect()
             });
             seen.push(json!({ "warned": warned, "notices": titles }));
             cx.update(|cx| notices.update(cx, |stack, cx| stack.clear(cx)));

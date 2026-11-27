@@ -146,7 +146,9 @@ impl Run {
         self.snapshot(cx, "assets-unknown-type-tab").await;
         steps.check(
             "a file of a kind Lattice does not know has the generic file glyph on its tab",
-            icon == Some(lattice_ui::dock::TabIcon::Glyph(lattice_ui::GlyphKind::Text)),
+            icon == Some(lattice_ui::dock::TabIcon::Glyph(
+                lattice_ui::GlyphKind::Text,
+            )),
             json!({ "icon": format!("{icon:?}") }),
         );
 

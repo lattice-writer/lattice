@@ -117,7 +117,7 @@ export function extraStages(files, mergeBase, options) {
     gpui && files.some((file) => file.startsWith("gpui/patches/") || file === "gpui/script/check-patches")
       ? gpuiStage({ name: "gpui-patch", why: "patched crates against their upstream pins", command: "script/check-patches", args: [], timeout: 600_000 })
       : { name: "gpui-patch", skip: "gpui/patches unchanged" },
-    gpuiStage({ name: "gpui-fmt", why: "rustfmt over the GPUI workspace", command: "cargo", args: ["fmt", "--all", "--", "--check"], timeout: 120_000 }),
+    gpuiStage({ name: "gpui-fmt", why: "rustfmt over the GPUI workspace and the e2e modules", command: "script/fmt", args: ["--check"], timeout: 120_000 }),
     // Both build in the machine's shared GPUI tree (scripts/gpui-build.mjs),
     // which takes the machine-wide lock itself.
     gpuiStage({

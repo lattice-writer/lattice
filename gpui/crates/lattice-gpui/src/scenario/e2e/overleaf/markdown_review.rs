@@ -21,7 +21,8 @@ use crate::{
 };
 
 pub(super) const NOTES_PATH: &str = "notes.md";
-pub(super) const NOTES: &str = "---\ntitle: Notes\n---\n\n# Notes\n\nThe opening line of the notes.\n";
+pub(super) const NOTES: &str =
+    "---\ntitle: Notes\n---\n\n# Notes\n\nThe opening line of the notes.\n";
 /// A Markdown file left in Edit first, so notes.md opens in Edit with no
 /// visual editor made (the view is remembered for Markdown files).
 pub(super) const PRIMER_PATH: &str = "primer.md";
@@ -38,10 +39,15 @@ impl Run {
         let root = self.root(cx).await?;
         let primer = root.join(PRIMER_PATH);
         self.with_window(cx, |shell, window, cx| {
-            shell.update(cx, |shell, cx| shell.open_path(primer.clone(), None, window, cx))
+            shell.update(cx, |shell, cx| {
+                shell.open_path(primer.clone(), None, window, cx)
+            })
         })?;
         let primer_panel = cx
-            .update(|cx| self.shell.update(cx, |shell, cx| shell.open_editor(&primer, cx)))
+            .update(|cx| {
+                self.shell
+                    .update(cx, |shell, cx| shell.open_editor(&primer, cx))
+            })
             .context("primer.md is open")?;
         self.with_window(cx, move |_, window, cx| {
             primer_panel.update(cx, |panel, cx| {
@@ -50,7 +56,9 @@ impl Run {
         })?;
         let path = root.join(NOTES_PATH);
         self.with_window(cx, |shell, window, cx| {
-            shell.update(cx, |shell, cx| shell.open_path(path.clone(), None, window, cx))
+            shell.update(cx, |shell, cx| {
+                shell.open_path(path.clone(), None, window, cx)
+            })
         })?;
         let live = self
             .wait_for(cx, Duration::from_secs(20), |shell, cx| {
@@ -59,7 +67,10 @@ impl Run {
             })
             .await;
         let panel = cx
-            .update(|cx| self.shell.update(cx, |shell, cx| shell.open_editor(&path, cx)))
+            .update(|cx| {
+                self.shell
+                    .update(cx, |shell, cx| shell.open_editor(&path, cx))
+            })
             .context("notes.md is open")?;
         let opened_in = cx.update(|cx| panel.read(cx).document_view());
         let page_before = cx.update(|cx| panel.read(cx).markdown_document().is_some());
@@ -128,7 +139,8 @@ impl Run {
                 }
                 self.pause(cx, Duration::from_millis(250)).await;
             }
-            self.window_shots(cx, "overleaf-markdown-suggestion").await?;
+            self.window_shots(cx, "overleaf-markdown-suggestion")
+                .await?;
             // The pointer over the mark opens its card, named and with
             // Accept and Reject.
             let open_card = "JSON.stringify((() => { const mark = document.querySelector('[data-lx-change]'); \
@@ -145,7 +157,8 @@ impl Run {
                 }
                 self.pause(cx, Duration::from_millis(100)).await;
             }
-            self.window_shots(cx, "overleaf-markdown-suggestion-card").await?;
+            self.window_shots(cx, "overleaf-markdown-suggestion-card")
+                .await?;
             let accept = "JSON.stringify((() => { const card = document.querySelector('[role=dialog][aria-label=\"Suggested change\"]'); \
                           const button = card && Array.from(card.querySelectorAll('button')).find((b) => (b.getAttribute('aria-label') || b.textContent || '').includes('Accept')); \
                           if (!button) return false; button.click(); return true; })())";
@@ -154,18 +167,20 @@ impl Run {
                 && self
                     .wait_for(cx, Duration::from_secs(15), |_, _| {
                         mock.changes(NOTES_PATH).is_empty()
-                            && mock.file(NOTES_PATH).is_some_and(|text| text.contains("freshly opening"))
+                            && mock
+                                .file(NOTES_PATH)
+                                .is_some_and(|text| text.contains("freshly opening"))
                     })
                     .await;
         }
         let inserted_marked = marks.as_array().is_some_and(|marks| {
-            marks
-                .iter()
-                .any(|mark| {
-                    mark["text"] == INSERTED
-                        && mark["insert"] == true
-                        && !mark["id"].as_str().is_some_and(|id| id.starts_with("provisional"))
-                })
+            marks.iter().any(|mark| {
+                mark["text"] == INSERTED
+                    && mark["insert"] == true
+                    && !mark["id"]
+                        .as_str()
+                        .is_some_and(|id| id.starts_with("provisional"))
+            })
         });
         steps.check(
             "a collaborator's Overleaf suggestion on a .md file made while in Edit is painted in Preview's visual editor over the inserted words",
@@ -178,10 +193,16 @@ impl Run {
                 && inserted_marked,
             json!({ "live": live, "suggested": suggested, "arrived": arrived, "opened_in": format!("{opened_in:?}"), "page_before": page_before, "drawn": drawn, "marks": marks }),
         );
-        let card_ok = card["text"].as_str().is_some_and(|text| text.contains("Ada Lovelace"))
+        let card_ok = card["text"]
+            .as_str()
+            .is_some_and(|text| text.contains("Ada Lovelace"))
             && card["buttons"].as_array().is_some_and(|buttons| {
-                buttons.iter().any(|b| b.as_str().is_some_and(|b| b.contains("Accept")))
-                    && buttons.iter().any(|b| b.as_str().is_some_and(|b| b.contains("Reject")))
+                buttons
+                    .iter()
+                    .any(|b| b.as_str().is_some_and(|b| b.contains("Accept")))
+                    && buttons
+                        .iter()
+                        .any(|b| b.as_str().is_some_and(|b| b.contains("Reject")))
             });
         steps.check(
             "the Markdown suggestion's card names its author with Accept and Reject, and Accept clears it on Overleaf keeping the words",
@@ -201,7 +222,9 @@ impl Run {
         // this one were written to start from.
         let main = root.join("main.tex");
         self.with_window(cx, |shell, window, cx| {
-            shell.update(cx, |shell, cx| shell.open_path(main.clone(), None, window, cx))
+            shell.update(cx, |shell, cx| {
+                shell.open_path(main.clone(), None, window, cx)
+            })
         })?;
         self.wait_for(cx, Duration::from_secs(20), |shell, cx| {
             let bridge = shell.read(cx).overleaf.read(cx);

@@ -228,7 +228,11 @@ impl Run {
     /// The window as the screen shows it, island pages and all (an
     /// offscreen capture leaves webviews out), light and dark, as
     /// `<prefix>-light.png` and `<prefix>-dark.png`, when shots are asked for.
-    pub(in crate::scenario) async fn window_shots(&self, cx: &mut AsyncApp, prefix: &str) -> Result<()> {
+    pub(in crate::scenario) async fn window_shots(
+        &self,
+        cx: &mut AsyncApp,
+        prefix: &str,
+    ) -> Result<()> {
         let Some(dir) = std::env::var_os("LATTICE_E2E_SHOTS") else {
             return Ok(());
         };
@@ -237,7 +241,9 @@ impl Run {
             ("light", lattice_settings::ThemePreference::Light),
             ("dark", lattice_settings::ThemePreference::Dark),
         ] {
-            cx.update(|cx| crate::settings::update(cx, |settings| settings.theme_preference = theme));
+            cx.update(|cx| {
+                crate::settings::update(cx, |settings| settings.theme_preference = theme)
+            });
             self.pause(cx, Duration::from_millis(800)).await;
             let number = native::window_number(self.native(cx)?);
             native::order_front(self.native(cx)?);
@@ -337,7 +343,12 @@ impl Run {
         let colors = self.evaluate(cx, &island, COLORS).await;
         let texts: Vec<&str> = colors
             .as_array()
-            .map(|marks| marks.iter().filter_map(|mark| mark["text"].as_str()).collect())
+            .map(|marks| {
+                marks
+                    .iter()
+                    .filter_map(|mark| mark["text"].as_str())
+                    .collect()
+            })
             .unwrap_or_default();
         steps.check(
             "a \\color declaration to the end of its group and a \\textcolor's text are drawn in their colours, readable on the page's ground; an unknown colour is left alone",
@@ -392,7 +403,10 @@ impl Run {
                     "JSON.stringify(document.querySelector('.cm-activeLine')?.textContent ?? null)",
                 )
                 .await;
-            if placed.as_str().is_some_and(|line| line.contains("Some prose")) {
+            if placed
+                .as_str()
+                .is_some_and(|line| line.contains("Some prose"))
+            {
                 break;
             }
             self.pause(cx, Duration::from_millis(100)).await;
@@ -492,7 +506,10 @@ impl Run {
         let started = std::time::Instant::now();
         while started.elapsed() < Duration::from_secs(5) {
             page = self.evaluate(cx, island, DRAWN).await;
-            if page["text"].as_str().is_some_and(|text| !text.contains("quokka")) {
+            if page["text"]
+                .as_str()
+                .is_some_and(|text| !text.contains("quokka"))
+            {
                 break;
             }
             self.pause(cx, Duration::from_millis(150)).await;

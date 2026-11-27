@@ -42,17 +42,29 @@ impl Run {
         cx.update(|cx| settings::update_appearance(cx, |a| a.editor_spellcheck = true));
         let tex = root.join("spelling.tex");
         let filler = "Plain words sit here.\n".repeat(FILLER_LINES);
-        std::fs::write(&tex, format!("{TEX}{filler}Bottomm line.\n\\end{{document}}\n"))?;
+        std::fs::write(
+            &tex,
+            format!("{TEX}{filler}Bottomm line.\n\\end{{document}}\n"),
+        )?;
         std::fs::write(root.join("spelling.md"), MARKDOWN)?;
         let result = self.spell_check_steps(cx, steps, root).await;
         cx.update(|cx| settings::update_appearance(cx, |a| a.editor_spellcheck = before));
         result
     }
 
-    async fn spell_check_steps(&self, cx: &mut AsyncApp, steps: &mut Steps, root: &Path) -> Result<()> {
+    async fn spell_check_steps(
+        &self,
+        cx: &mut AsyncApp,
+        steps: &mut Steps,
+        root: &Path,
+    ) -> Result<()> {
         let panel = self.open(cx, &root.join("spelling.tex"), Some(1))?;
         let Some(spelling) = cx.update(|cx| panel.read(cx).spelling().cloned()) else {
-            steps.check("a .tex file is spell checked", false, json!({ "error": "no spell check" }));
+            steps.check(
+                "a .tex file is spell checked",
+                false,
+                json!({ "error": "no spell check" }),
+            );
             return Ok(());
         };
         let words = |cx: &mut AsyncApp| marked_words(&spelling, cx);
@@ -88,7 +100,13 @@ impl Run {
         let after = self
             .wait_for(cx, EDIT_DELAY + Duration::from_secs(3), {
                 let spelling = spelling.clone();
-                move |_, cx| spelling.read(cx).misspellings(cx).iter().any(|m| m.word == "anothr")
+                move |_, cx| {
+                    spelling
+                        .read(cx)
+                        .misspellings(cx)
+                        .iter()
+                        .any(|m| m.word == "anothr")
+                }
             })
             .await;
         steps.check(
@@ -101,12 +119,20 @@ impl Run {
         let below = words(cx).contains(&"Bottomm".to_string());
         self.with_window(cx, |_, window, cx| {
             let zed = panel.read(cx).editor().clone();
-            zed.update(cx, |zed, cx| zed.set_scroll_position(point(0., 1.0e6), window, cx));
+            zed.update(cx, |zed, cx| {
+                zed.set_scroll_position(point(0., 1.0e6), window, cx)
+            });
         })?;
         let scrolled = self
             .wait_for(cx, Duration::from_secs(5), {
                 let spelling = spelling.clone();
-                move |_, cx| spelling.read(cx).misspellings(cx).iter().any(|m| m.word == "Bottomm")
+                move |_, cx| {
+                    spelling
+                        .read(cx)
+                        .misspellings(cx)
+                        .iter()
+                        .any(|m| m.word == "Bottomm")
+                }
             })
             .await;
         steps.check(
@@ -173,7 +199,10 @@ impl Run {
         let learn = tc!("macOS menu bar", "Learn Spelling").to_string();
         let ignore = tc!("macOS menu bar", "Ignore Spelling").to_string();
         let copy = tc!("macOS menu bar", "Copy").to_string();
-        let open_on = async |run: &Run, cx: &mut AsyncApp, word: &str| -> Result<Vec<(String, gpui::Point<gpui::Pixels>)>> {
+        let open_on = async |run: &Run,
+                             cx: &mut AsyncApp,
+                             word: &str|
+               -> Result<Vec<(String, gpui::Point<gpui::Pixels>)>> {
             let (_, rect) = run.text_point(cx, panel, &lattice, word, 2).await?;
             let at = point(rect.left() + px(2.), rect.center().y);
             native::send_mouse(native, native::Mouse::Moved, at)?;
@@ -193,7 +222,10 @@ impl Run {
 
         let rows = open_on(self, cx, "introductiom").await?;
         let labels: Vec<&str> = rows.iter().map(|(label, _)| label.as_str()).collect();
-        let guess = rows.iter().find(|(label, _)| label == "introduction").map(|(_, at)| *at);
+        let guess = rows
+            .iter()
+            .find(|(label, _)| label == "introduction")
+            .map(|(_, at)| *at);
         let ordered = labels.iter().position(|l| *l == "introduction")
             < labels.iter().position(|l| *l == ignore.as_str())
             && labels.iter().position(|l| *l == ignore.as_str())
@@ -211,9 +243,19 @@ impl Run {
                 let panel = panel.clone();
                 let spelling = spelling.clone();
                 move |_, cx| {
-                    let text = panel.read(cx).lattice_editor().read(cx).buffer().read(cx).text();
+                    let text = panel
+                        .read(cx)
+                        .lattice_editor()
+                        .read(cx)
+                        .buffer()
+                        .read(cx)
+                        .text();
                     text.contains("an introduction to the method")
-                        && !spelling.read(cx).misspellings(cx).iter().any(|m| m.word == "introductiom")
+                        && !spelling
+                            .read(cx)
+                            .misspellings(cx)
+                            .iter()
+                            .any(|m| m.word == "introductiom")
                 }
             })
             .await;
@@ -224,7 +266,10 @@ impl Run {
         );
 
         let rows = open_on(self, cx, "sentnce").await?;
-        let ignore_at = rows.iter().find(|(label, _)| *label == ignore).map(|(_, at)| *at);
+        let ignore_at = rows
+            .iter()
+            .find(|(label, _)| *label == ignore)
+            .map(|(_, at)| *at);
         if let Some(at) = ignore_at {
             native::send_mouse(native, native::Mouse::Moved, at)?;
             native::send_click(native, at)?;
@@ -234,10 +279,17 @@ impl Run {
         let ignored = self
             .wait_for(cx, Duration::from_secs(5), {
                 let spelling = spelling.clone();
-                move |_, cx| !spelling.read(cx).misspellings(cx).iter().any(|m| m.word == "sentnce")
+                move |_, cx| {
+                    !spelling
+                        .read(cx)
+                        .misspellings(cx)
+                        .iter()
+                        .any(|m| m.word == "sentnce")
+                }
             })
             .await;
-        self.pause(cx, EDIT_DELAY + Duration::from_millis(300)).await;
+        self.pause(cx, EDIT_DELAY + Duration::from_millis(300))
+            .await;
         let stays = !marked_words(spelling, cx).contains(&"sentnce".to_string());
         steps.check(
             "Ignore Spelling clears the word's mark, and the next check leaves it unmarked",

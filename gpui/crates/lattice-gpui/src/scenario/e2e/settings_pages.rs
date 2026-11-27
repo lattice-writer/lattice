@@ -32,7 +32,11 @@ const PAGES: &[(SettingsTab, Option<&str>, Option<&str>)] = &[
     (SettingsTab::Api, None, Some("skills")),
     (SettingsTab::Usage, None, Some("usage")),
     (SettingsTab::Archived, None, Some("archived")),
-    (SettingsTab::ModelEndpoint, Some("model-endpoint-address"), None),
+    (
+        SettingsTab::ModelEndpoint,
+        Some("model-endpoint-address"),
+        None,
+    ),
     (SettingsTab::Environment, Some("agent-restart"), None),
     (SettingsTab::Literature, Some("literature-email"), None),
     (SettingsTab::Editor, Some("auto-build"), None),
@@ -53,7 +57,9 @@ impl Run {
             })
         })?;
         let opened = self
-            .wait_for(cx, Duration::from_secs(3), |shell, cx| shell.read(cx).settings.is_some())
+            .wait_for(cx, Duration::from_secs(3), |shell, cx| {
+                shell.read(cx).settings.is_some()
+            })
             .await;
         if !opened {
             steps.check("Settings opens for its other pages", false, json!({}));
@@ -94,7 +100,11 @@ impl Run {
         for (query, tab, row) in [
             ("mcp", SettingsTab::Mcp, None),
             ("https_proxy", SettingsTab::Environment, None),
-            ("crossref", SettingsTab::Literature, Some("literature-email")),
+            (
+                "crossref",
+                SettingsTab::Literature,
+                Some("literature-email"),
+            ),
             ("automatic build", SettingsTab::Editor, Some("auto-build")),
         ] {
             let result = cx.update(|cx| {
@@ -125,21 +135,27 @@ impl Run {
         // Acknowledgements opens the notices in a sheet; Escape closes it
         // and leaves Settings open.
         cx.update(|cx| {
-            dialog.update(cx, |dialog, cx| dialog.open_tab(SettingsTab::Acknowledgements, cx))
+            dialog.update(cx, |dialog, cx| {
+                dialog.open_tab(SettingsTab::Acknowledgements, cx)
+            })
         });
         self.pause(cx, Duration::from_millis(300)).await;
         self.with_window(cx, |_, window, cx| {
             dialog.update(cx, |dialog, cx| dialog.open_notices(window, cx))
         })?;
         let sheet = self
-            .wait_for(cx, Duration::from_secs(2), |_, cx| dialog.read(cx).sheet_open(cx))
+            .wait_for(cx, Duration::from_secs(2), |_, cx| {
+                dialog.read(cx).sheet_open(cx)
+            })
             .await;
         // Escape is a native key, which reaches only the key window.
         let front = self.foreground(cx, "settings pages' sheet").await?;
         self.press(cx, '\u{1b}', false).await?;
         drop(front);
         let closed = self
-            .wait_for(cx, Duration::from_secs(2), |_, cx| !dialog.read(cx).sheet_open(cx))
+            .wait_for(cx, Duration::from_secs(2), |_, cx| {
+                !dialog.read(cx).sheet_open(cx)
+            })
             .await;
         let settings_open = cx.update(|cx| self.shell.read(cx).settings.is_some());
         steps.check(
@@ -155,7 +171,9 @@ impl Run {
                 s.settings_tab = before.settings_tab;
             })
         });
-        self.with_window(cx, |shell, _, cx| shell.update(cx, |shell, cx| shell.close_settings(cx)))?;
+        self.with_window(cx, |shell, _, cx| {
+            shell.update(cx, |shell, cx| shell.close_settings(cx))
+        })?;
         self.pause(cx, Duration::from_millis(200)).await;
         Ok(())
     }

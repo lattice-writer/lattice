@@ -62,7 +62,10 @@ impl Run {
         let mut items: Vec<(i64, String)> = mock
             .comments("main.tex")
             .into_iter()
-            .filter(|comment| mock.thread(&comment.thread_id).is_some_and(|(_, resolved)| !resolved))
+            .filter(|comment| {
+                mock.thread(&comment.thread_id)
+                    .is_some_and(|(_, resolved)| !resolved)
+            })
             .map(|comment| (comment.position, format!("comment:{}", comment.thread_id)))
             .chain(
                 mock.changes("main.tex")

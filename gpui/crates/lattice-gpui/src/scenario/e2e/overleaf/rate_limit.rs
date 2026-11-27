@@ -97,7 +97,9 @@ impl Run {
             (Some(first), Some(then)) if first <= RETRY_AFTER.as_secs() && then + 2 <= first
         );
         let landed = self
-            .wait_for(cx, Duration::from_secs(100), |_, _| mock.file(PATH).is_some())
+            .wait_for(cx, Duration::from_secs(100), |_, _| {
+                mock.file(PATH).is_some()
+            })
             .await;
         let took = started.elapsed();
         let sent_badge = badge(cx);
