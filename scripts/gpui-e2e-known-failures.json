@@ -1588,10 +1588,11 @@
     {
       "step": "a panel whose last tab closes (a split document, the PDF, the last document) goes at once, with no Empty panel drawn",
       "platforms": [
+        "macos",
         "windows",
         "linux"
       ],
-      "reason": "Windows: failed in main runs 45505984609 (a2d78773a) and 45507027636; observed {\"split_gone\":true,\"pdf_gone\":false} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"documents_closed\":6,\"docs_empty_in_update\":[],\"docs_empty_after_frame\":[],\"split\":\"panel-3csr4kp\",\"split_gone\":true,\"empty_in_update\":[],\"empty_after_frame\":[],\"pdf_gone\":false,\"pdf_empty_in_update\":[],\"pdf_empty_after_frame\":[]}",
+      "reason": "macOS: order-dependent on the Mac mini: fails when pdf runs before dock (pnpm ci:local full gate for #1368 at b57fccf45, and script/e2e --only design_calls,manuscripts,pdf,dock on both that branch and a main-equivalent tree at 7e617ea63, each observed {\"split_gone\":true,\"pdf_gone\":false}), while --only dock alone passes on both; tracked under LEO-129 | Windows: failed in main runs 45505984609 (a2d78773a) and 45507027636; observed {\"split_gone\":true,\"pdf_gone\":false} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"documents_closed\":6,\"docs_empty_in_update\":[],\"docs_empty_after_frame\":[],\"split\":\"panel-3csr4kp\",\"split_gone\":true,\"empty_in_update\":[],\"empty_after_frame\":[],\"pdf_gone\":false,\"pdf_empty_in_update\":[],\"pdf_empty_after_frame\":[]}",
       "followup": "LEO-15"
     },
     {
@@ -1703,14 +1704,6 @@
       "tier": "flaky",
       "reason": "Linux: failed in main run 45697918320 (881a0c9ac), where its module rerun timed out without a result, and failed twice (its module rerun) in branch run 45717317312, and passed in main runs 45713416093 and 45716281447; observed {\"panels_before\":4,\"panels_after\":5}: the pointer's path across the row reached the submenu, which opened a split",
       "followup": "LEO-129"
-    },
-    {
-      "step": "PDF: resting on a compound's number shows its chemnum key, and a click on the number copies \\cmpd{key}",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed in branch run 45777036795 (gpui.yml full=true at 183f98d51, #1296's head, merged as 41dfb2672) and again in its module rerun, while macOS and Windows passed it in the same run; the step was first reached on Linux there, once chemnum was installed; observed {\"built\":true,\"shown\":true,\"card\":null}",
-      "followup": "LEO-144"
     },
     {
       "step": "live mode probes Overleaf every 45 s while the channel carries documents, and not at all from a window off screen",
