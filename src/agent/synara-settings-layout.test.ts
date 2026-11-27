@@ -6,6 +6,7 @@ import {
   isSettingsViewportNearBottom,
   normalizeSynaraSettingsHeight,
   scrollSynaraSettingsViewportBy,
+  visibleSynaraSettingsFrame,
 } from "./synara-settings-layout";
 
 describe("Synara settings layout", () => {
@@ -53,5 +54,18 @@ describe("Synara settings layout", () => {
     const lineMode = viewport();
     expect(applySynaraSettingsWheel(lineMode, { deltaX: 0, deltaY: 3, deltaMode: 1 })).toEqual({ left: 0, top: 1_048 });
     expect(lineMode.scrollTop).toBe(1_048);
+  });
+
+  it.each([
+    // Scrolled 300px down a 2,000px frame in a 600px sheet at the window's top.
+    [{ top: -300, bottom: 1_700 }, { top: 0, bottom: 600 }, 900, { top: 300, height: 600 }],
+    // The sheet starts 80px down; the frame's top is in view.
+    [{ top: 120, bottom: 2_120 }, { top: 80, bottom: 680 }, 900, { top: 0, height: 560 }],
+    // The window cuts the sheet before its own bottom.
+    [{ top: -100, bottom: 1_900 }, { top: 50, bottom: 1_000 }, 700, { top: 150, height: 650 }],
+    // Scrolled past the frame.
+    [{ top: -2_100, bottom: -100 }, { top: 0, bottom: 600 }, 900, { top: 2_100, height: 0 }],
+  ])("sees frame %o in sheet %o (window %i) as %o", (frame, viewport, windowHeight, visible) => {
+    expect(visibleSynaraSettingsFrame(frame, viewport, windowHeight)).toEqual(visible);
   });
 });
