@@ -208,6 +208,8 @@ export function SynaraSettingsPane(props: {
     const schedule = () => scheduleFrame(viewportFrame, postViewport);
     const resize = new ResizeObserver(schedule);
     resize.observe(viewport);
+    // Content above the frame growing moves it without a scroll or resize of the viewport.
+    if (viewport.firstElementChild) resize.observe(viewport.firstElementChild);
     viewport.addEventListener("scroll", schedule, { passive: true });
     window.addEventListener("resize", schedule);
     schedule();
