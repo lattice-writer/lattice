@@ -74,10 +74,13 @@ env:
 # build took 31 minutes on macOS and 28 on Windows (2026-11-11); everything
 # after it takes about two.
 #
-# The Rust caches are written from main only (a dispatch there, which is
-# worth running before a release, since nothing else refreshes them), and only when their key (the lockfile, the toolchain, this job)
+# The Rust caches are written from main (a dispatch there, which is worth
+# running before a release, since nothing else refreshes them; not Linux's),
+# and from a dispatch on a branch, which only that branch's later dispatches
+# restore. Only when their key (the lockfile, the toolchain, this job)
 # changes, because the repository's 10 GB Actions cache also holds the Tauri
-# release cache that tag builds restore. A tag run reads main's cache and
+# release cache that tag builds restore: each branch that dispatches adds its
+# own, and GitHub evicts the least recently used first. A tag run reads main's cache and
 # writes none, since a cache written from a tag is visible to that tag alone.
 # They are written even when a test fails: the compiled crates are what the
 # next run needs, and a red test does not make them wrong.
@@ -422,7 +425,7 @@ jobs:
       # first use are in it. Saved only from main (a tag's cache is visible to
       # that tag alone) and only when the tree is new to the key.
       - name: Save MiKTeX
-        if: ${{ !cancelled() && steps.miktex.outputs.save == 'True' && github.ref == 'refs/heads/main' }}
+        if: ${{ !cancelled() && steps.miktex.outputs.save == 'True' && github.ref == 'refs/heads/main' && inputs.only == '' }}
         uses: actions/cache/save@v5
         with:
           path: |
@@ -575,12 +578,12 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: gpui
-          # Not from main: the repository's Actions cache is at its 10 GB
+          # Not from main, even dispatched: the repository's Actions cache is at its 10 GB
           # limit, and a third multi-GB GPUI cache from main would evict the
           # Tauri release caches tag builds restore. Saved once Linux ships.
           # A run started by hand saves one its own branch's later dispatches
           # restore, since a cold build takes over half an hour.
-          save-if: ${{ github.event_name == 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/') }}
+          save-if: ${{ github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/') }}
       - run: script/fetch-pdfium
       - run: cargo build --release --locked
       # Without TeX, so the ignored latexmk build test stays ignored. Not in
