@@ -176,6 +176,16 @@ impl Run {
             );
             return Ok(());
         }
+        // The jump above builds the fixture, and leaving a project while it
+        // builds asks first (`confirm_leaving`), so the tutorial would wait
+        // on that question. On a slow runner (Linux CI) the build is still
+        // going here; the switch waits for it, as the switch back does.
+        let fixture_building = cx.update(|cx| self.shell.read(cx).building());
+        let fixture_built = self
+            .wait_for(cx, Duration::from_secs(60), |shell, cx| {
+                !shell.read(cx).building()
+            })
+            .await;
         self.with_window(cx, |shell, window, cx| {
             shell.update(cx, |shell, cx| shell.open_tutorial(window, cx))
         })?;
@@ -188,10 +198,14 @@ impl Run {
                     && shell.view_on_screen("start", cx)
             })
             .await;
+        let asked = cx.update(|cx| crate::confirm::is_pending(cx));
         steps_run.check(
             "opening the tutorial shows the checklist with the sample",
-            tutorial,
-            json!({}),
+            fixture_built && tutorial,
+            json!({
+                "fixture_build": { "running": fixture_building, "finished": fixture_built },
+                "question_left_open": asked,
+            }),
         );
         // Opening the tutorial builds its sample, and a switch while a build
         // runs asks first ("Switch away from …?", the shells'
