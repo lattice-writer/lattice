@@ -93,20 +93,40 @@ export const KNOWN_FAILURES_FILE = "scripts/gpui-e2e-known-failures.json";
 
 /**
  * The modules a change to the known failures (KNOWN_FAILURES_FILE) needs:
- * those whose scenario files name each step it adds, removes or edits; a
- * step only the smoke flow or the harness checks needs none. `full` when
- * one is named nowhere as written (a step built at run time). `sources`
- * maps scenario files to their text.
+ * those that run each step it adds, removes or edits. A step checked in a
+ * shared scenario file is followed through the functions that call it, a
+ * few calls deep, to the module files that do. `full` when a step is named
+ * nowhere as written (built at run time) or no module reaches it.
+ * `sources` maps scenario files to their text.
  */
 export function knownFailuresNeeds(before, after, sources) {
   const entries = (text) => new Map(JSON.parse(text).steps.map((entry) => [entry.step, JSON.stringify(entry)]));
   const [old, now] = [entries(before), entries(after)];
   const changed = [...new Set([...old.keys(), ...now.keys()])].filter((step) => old.get(step) !== now.get(step));
+  const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const files = new Set();
   for (const step of changed) {
-    const named = [...sources].filter(([, text]) => text.includes(JSON.stringify(step))).map(([file]) => file);
-    if (!named.length) return { full: true, modules: [], why: step };
-    for (const file of named) if (file.startsWith(SCENARIO)) files.add(file);
+    const reached = new Set();
+    const seen = new Set();
+    let needles = [new RegExp(escape(JSON.stringify(step)), "g")];
+    for (let depth = 0; depth < 4 && needles.length; depth += 1) {
+      const callers = [];
+      for (const [file, text] of sources) {
+        for (const needle of needles) {
+          for (const match of text.matchAll(needle)) {
+            if (file.startsWith(SCENARIO)) reached.add(file);
+            const name = [...text.slice(0, match.index).matchAll(/\bfn\s+(\w+)/g)].pop()?.[1];
+            if (file.startsWith(SCENARIO) || !name || seen.has(name)) continue;
+            seen.add(name);
+            callers.push(new RegExp(`(?<!fn\\s)\\b${name}\\(`, "g"));
+          }
+        }
+      }
+      needles = callers;
+    }
+    const modules = reached.size ? modulesFor([...reached]).modules : [];
+    if (!modules.length) return { full: true, modules: [], why: step };
+    for (const file of reached) files.add(file);
   }
   return { full: false, modules: files.size ? modulesFor([...files]).modules : [], why: changed };
 }

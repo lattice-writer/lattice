@@ -48,7 +48,10 @@ describe("knownFailuresNeeds", () => {
   const sources = new Map([
     ["gpui/crates/lattice-gpui/src/scenario/e2e/dock.rs", 'steps.check("a panel closes", ok, json!({}));'],
     ["gpui/crates/lattice-gpui/src/scenario/e2e/pdf/navigation.rs", 'steps.check("PDF: copies \\\\cmpd{key}", ok, json!({}));'],
-    ["gpui/crates/lattice-gpui/src/scenario/smoke.rs", 'steps.check("the app opens", ok, json!({}));'],
+    ["gpui/crates/lattice-gpui/src/scenario/shell_steps.rs", 'async fn shell_steps(&self) { self.closing(cx).await; }'],
+    ["gpui/crates/lattice-gpui/src/scenario/shell_steps/closing.rs", 'pub(super) async fn closing(&self) { steps.push(("a tab closes", ok)); }'],
+    ["gpui/crates/lattice-gpui/src/scenario/e2e/tree.rs", 'for step in run.shell_steps(cx).await? {}'],
+    ["gpui/crates/lattice-gpui/src/scenario/smoke.rs", 'fn smoke() { steps.check("the app opens", ok, json!({})); }'],
   ]);
   const before = list(["a panel closes", "a"], ["PDF: copies \\cmpd{key}", "b"], ["the app opens", "c"]);
 
@@ -58,8 +61,9 @@ describe("knownFailuresNeeds", () => {
     expect(knownFailuresNeeds(before, before, sources)).toMatchObject({ full: false, modules: [] });
   });
 
-  it("needs nothing for a step the smoke flow checks, and everything for one named nowhere as written", () => {
-    expect(knownFailuresNeeds(before, list(["a panel closes", "a"], ["PDF: copies \\cmpd{key}", "b"]), sources)).toMatchObject({ full: false, modules: [] });
+  it("follows a step checked in a shared file to the modules that call it, and runs everything when none does", () => {
+    expect(knownFailuresNeeds(before, list(["a tab closes", "d"], ...JSON.parse(before).steps.map((entry) => [entry.step, entry.reason])), sources)).toMatchObject({ full: false, modules: ["tree"] });
+    expect(knownFailuresNeeds(before, list(["a panel closes", "a"], ["PDF: copies \\cmpd{key}", "b"]), sources)).toMatchObject({ full: true });
     expect(knownFailuresNeeds(before, list(["a step built at run time", "d"]), sources)).toMatchObject({ full: true });
   });
 
