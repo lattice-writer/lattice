@@ -932,24 +932,6 @@
       "followup": "LEO-14"
     },
     {
-      "step": "KaTeX sets an equation with the project's macros, as a picture with ink, kept once set",
-      "platforms": [
-        "windows",
-        "linux"
-      ],
-      "reason": "Windows: failed in 1 of 2 main runs (44213516921), so intermittent; observed {\"first_ms\":152,\"kept_us\":1,\"ink\":0,\"size\":null} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"first_ms\":616,\"kept_us\":0,\"ink\":0,\"size\":null}",
-      "followup": "LEO-15"
-    },
-    {
-      "step": "an equation is set in the card's ink: dark in the light appearance, light in the dark",
-      "platforms": [
-        "windows",
-        "linux"
-      ],
-      "reason": "Windows: failed in 1 of 2 main runs (44213516921), so intermittent; observed {\"inks\":[null,null]} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"inks\":[null,null]}",
-      "followup": "LEO-15"
-    },
-    {
       "step": "PDF: Open in separate window shows the PDF in a window of its own at the same page, and Return to workspace brings it back",
       "platforms": [
         "macos",
