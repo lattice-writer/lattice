@@ -58,7 +58,22 @@ async function download(url, output) {
  * path for a remote host, so staging failed there with status 128.
  */
 export function windowsTar(env = process.env) {
-  return win32.join(env.SystemRoot ?? env.windir ?? "C:\\Windows", "System32", "tar.exe");
+  // `||`, not `??`: an empty SystemRoot would leave a relative System32\tar.exe.
+  return win32.join(env.SystemRoot || env.windir || "C:\\Windows", "System32", "tar.exe");
+}
+
+/** Refuse early, by name, where Windows is too old to ship its tar, instead of a bare ENOENT. */
+export function assertWindowsTar(tar, exists = existsSync) {
+  if (!exists(tar)) {
+    throw new Error(`Could not find ${tar}, which unpacks Node's zip archive. Windows 10 1803 and later include it.`);
+  }
+}
+
+/** The command that unpacks a Node archive into `destination` on `platform`. */
+export function extractCommand(archive, destination, platform = process.platform) {
+  if (!archive.endsWith(".zip")) return ["tar", ["-xzf", archive, "-C", destination]];
+  if (platform !== "win32") return ["unzip", ["-q", archive, "-d", destination]];
+  return [windowsTar(), ["-xf", archive, "-C", destination]];
 }
 
 export async function prepareNodeRuntime(stageRoot, { cacheRoot, target, nodeVersion }) {
@@ -76,13 +91,9 @@ export async function prepareNodeRuntime(stageRoot, { cacheRoot, target, nodeVer
 
   const extractionRoot = mkdtempSync(join(cacheRoot, "node-extract-"));
   try {
-    if (!release.archive.endsWith(".zip")) {
-      run("tar", ["-xzf", archive, "-C", extractionRoot]);
-    } else if (process.platform !== "win32") {
-      run("unzip", ["-q", archive, "-d", extractionRoot]);
-    } else {
-      run(windowsTar(), ["-xf", archive, "-C", extractionRoot]);
-    }
+    const [command, args] = extractCommand(archive, extractionRoot);
+    if (command === windowsTar()) assertWindowsTar(command);
+    run(command, args);
     const extractedRoot = join(extractionRoot, release.archive.replace(/\.tar\.gz$|\.zip$/g, ""));
     mkdirSync(join(stageRoot, "bin"), { recursive: true });
     cpSync(join(extractedRoot, nodeExecutable === "node.exe" ? "node.exe" : "bin/node"), join(stageRoot, "bin", nodeExecutable));

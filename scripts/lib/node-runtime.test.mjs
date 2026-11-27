@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { NODE_RELEASES, nodeRelease, prepareNodeRuntime, windowsTar } from "./node-runtime.mjs";
+import { NODE_RELEASES, assertWindowsTar, extractCommand, nodeRelease, prepareNodeRuntime, windowsTar } from "./node-runtime.mjs";
 import { projectRoot, readJson } from "./util.mjs";
 
 let scratch;
@@ -21,7 +21,17 @@ describe("shared standalone Node archives", () => {
     expect(windowsTar({ SystemRoot: "D:\\Windows" })).toBe("D:\\Windows\\System32\\tar.exe");
     expect(windowsTar({ windir: "E:\\WINDOWS" })).toBe("E:\\WINDOWS\\System32\\tar.exe");
     expect(windowsTar({})).toBe("C:\\Windows\\System32\\tar.exe");
+    expect(windowsTar({ SystemRoot: "", windir: "E:\\WINDOWS" })).toBe("E:\\WINDOWS\\System32\\tar.exe");
+    expect(windowsTar({ SystemRoot: "" })).toBe("C:\\Windows\\System32\\tar.exe");
     if (process.platform === "win32") expect(existsSync(windowsTar())).toBe(true);
+
+    expect(extractCommand("node.zip", "out", "win32")).toEqual([windowsTar(), ["-xf", "node.zip", "-C", "out"]]);
+    expect(extractCommand("node.zip", "out", "linux")).toEqual(["unzip", ["-q", "node.zip", "-d", "out"]]);
+    expect(extractCommand("node.tar.gz", "out", "win32")).toEqual(["tar", ["-xzf", "node.tar.gz", "-C", "out"]]);
+  });
+  it("names the Windows release that ships tar when it is missing", () => {
+    expect(() => assertWindowsTar("C:\\Windows\\System32\\tar.exe", () => false)).toThrow(/Windows 10 1803/);
+    expect(() => assertWindowsTar("C:\\Windows\\System32\\tar.exe", () => true)).not.toThrow();
   });
   it("refuses an archive with the wrong digest before extraction", async () => {
     scratch = mkdtempSync(join(tmpdir(), "node-runtime-test-"));
