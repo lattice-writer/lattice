@@ -11,7 +11,7 @@ use std::{
 
 use gpui::{
     App, Bounds, Global, Modifiers, MouseButton, MouseDownEvent, MouseUpEvent, Pixels,
-    PlatformInput, Point, Window, point, px,
+    PlatformInput, Point, Window, WindowId, point, px,
 };
 use wry::dpi::{PhysicalPosition, PhysicalSize};
 use wry::raw_window_handle::{
@@ -22,9 +22,10 @@ use wry::raw_window_handle::{
 const GTK_POLL_INTERVAL: Duration = Duration::from_millis(16);
 
 /// Marks that GTK is initialized and its main loop is driven by GPUI, and holds every webview
-/// built since, to take out of GPUI's windows before the application quits.
+/// built since with the GPUI window it was built in, to take out of GPUI's windows before the
+/// application quits or when that window closes.
 struct GtkMainLoop {
-    webviews: RefCell<Vec<Weak<wry::WebView>>>,
+    webviews: RefCell<Vec<(WindowId, Weak<wry::WebView>)>>,
 }
 
 impl Global for GtkMainLoop {}
@@ -50,11 +51,27 @@ pub(crate) fn ensure_gtk(cx: &mut App) -> wry::Result<()> {
     // process on. Quit observers run before the windows are destroyed.
     cx.on_app_quit(|cx| {
         if let Some(gtk) = cx.try_global::<GtkMainLoop>() {
-            for webview in gtk.webviews.borrow().iter().filter_map(Weak::upgrade) {
-                detach_from_surface(&webview);
+            for (_, webview) in gtk.webviews.borrow().iter() {
+                if let Some(webview) = webview.upgrade() {
+                    detach_from_surface(&webview);
+                }
             }
         }
         async {}
+    })
+    .detach();
+    // Closing one window destroys its X11 tree the same way, while its webviews' entities are
+    // released only later. GPUI's request to destroy that tree is sent only when the window is
+    // dropped, after its window-closed observers run, so moving Wry's windows out here keeps
+    // them, as at quit; GDK then never sees them destroyed.
+    cx.on_window_closed(|cx, closed| {
+        if let Some(gtk) = cx.try_global::<GtkMainLoop>() {
+            for (window, webview) in gtk.webviews.borrow().iter() {
+                if *window == closed && let Some(webview) = webview.upgrade() {
+                    detach_from_surface(&webview);
+                }
+            }
+        }
     })
     .detach();
     cx.spawn(async move |cx| {
@@ -70,12 +87,13 @@ pub(crate) fn ensure_gtk(cx: &mut App) -> wry::Result<()> {
     Ok(())
 }
 
-/// Remember `webview` so it is taken out of GPUI's windows before the application quits.
-pub(crate) fn track(webview: &Rc<wry::WebView>, cx: &App) {
+/// Remember `webview`, built in `window`, so it is taken out of GPUI's windows before the
+/// application quits or `window` closes.
+pub(crate) fn track(webview: &Rc<wry::WebView>, window: WindowId, cx: &App) {
     if let Some(gtk) = cx.try_global::<GtkMainLoop>() {
         let mut webviews = gtk.webviews.borrow_mut();
-        webviews.retain(|webview| webview.strong_count() > 0);
-        webviews.push(Rc::downgrade(webview));
+        webviews.retain(|(_, webview)| webview.strong_count() > 0);
+        webviews.push((window, Rc::downgrade(webview)));
     }
 }
 
