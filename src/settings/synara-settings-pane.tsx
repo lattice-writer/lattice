@@ -15,6 +15,7 @@ import {
   applySynaraSettingsWheel,
   isSettingsViewportNearBottom,
   normalizeSynaraSettingsHeight,
+  visibleSynaraSettingsFrame,
 } from "../agent/synara-settings-layout";
 import { mediaQueryStore } from "../lib/media-query-store";
 import { prefersReducedMotion } from "../lib/reduced-motion";
@@ -25,6 +26,7 @@ const SETTINGS_REVEAL_MARGIN = 16;
 /** Where Settings narrows its nav and page insets (adaptive-feedback.css). */
 const COMPACT_SETTINGS_QUERY = "(max-width: 680px)";
 const SETTINGS_LAYOUT = "lattice:settings-layout";
+const SETTINGS_VIEWPORT = "lattice:settings-viewport";
 
 const compactSettings = mediaQueryStore(COMPACT_SETTINGS_QUERY);
 
@@ -181,10 +183,43 @@ export function SynaraSettingsPane(props: {
   // height and wheel messages from the iframe are ordered, but a React update
   // is not committed before the following wheel message, and that first wheel
   // has to use the real scroll range.
+  // Which part of the frame is in view, for the page's popups to stay within
+  // (Synara's Settings selects): only the host can tell.
+  const postViewport = useCallback(() => {
+    const frameElement = frameRef.current;
+    const viewport = viewportRef.current;
+    if (!origin || !frameElement || !viewport) return;
+    const visible = visibleSynaraSettingsFrame(
+      frameElement.getBoundingClientRect(), viewport.getBoundingClientRect(), window.innerHeight,
+    );
+    frameElement.contentWindow?.postMessage({ type: SETTINGS_VIEWPORT, ...visible }, origin);
+  }, [origin, viewportRef]);
+
   const showHeight = useCallback((height: number) => {
     frameHeightRef.current = height;
     applySynaraSettingsHeight({ container: embedRef.current, frame: frameRef.current, height, active: true });
-  }, []);
+    postViewport();
+  }, [postViewport]);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport || !section) return;
+    const viewportFrame: FrameSlot = { current: null };
+    const schedule = () => scheduleFrame(viewportFrame, postViewport);
+    const resize = new ResizeObserver(schedule);
+    resize.observe(viewport);
+    // Content above the frame growing moves it without a scroll or resize of the viewport.
+    if (viewport.firstElementChild) resize.observe(viewport.firstElementChild);
+    viewport.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    schedule();
+    return () => {
+      cancelFrame(viewportFrame);
+      resize.disconnect();
+      viewport.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+    };
+  }, [postViewport, section, src, viewportRef]);
 
   useLayoutEffect(() => {
     cancelFrame(bottomPinFrameRef);
@@ -283,6 +318,7 @@ export function SynaraSettingsPane(props: {
           setEmbedReadySrc(frame.src);
           postHostTheme();
           postLayout();
+          postViewport();
           return;
         case "synara:settings-section-ready":
           if (typeof data.section !== "string" || !Number.isSafeInteger(data.request)) return;
@@ -313,7 +349,7 @@ export function SynaraSettingsPane(props: {
     };
     window.addEventListener("message", receive);
     return () => window.removeEventListener("message", receive);
-  }, [frame, key, origin, postHostTheme, postLayout, section, showHeight, viewportRef]);
+  }, [frame, key, origin, postHostTheme, postLayout, postViewport, section, showHeight, viewportRef]);
 
   useEffect(() => {
     // WKWebView delivers wheel to the iframe element when scrolling="no", not

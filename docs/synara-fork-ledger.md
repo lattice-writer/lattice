@@ -482,6 +482,12 @@ The pin is upstream main `557533309` (the 1.6.8 release and a label-automation c
 
 `pnpm prepare:synara` stages 165.2 MB on the Mac mini (1.6.2 at `29c3621cf`: 183.1 MB). Most of the drop is `@pierre/diffs` and `@opencode/client` moving into the bundle.
 
+**Follow-up pin `f93766556` (lattice-writer/lattice#1379).** Fork PRs [51](https://github.com/leo1oel/synara/pull/51) and [53](https://github.com/leo1oel/synara/pull/53) on `amp/lattice-v1.6.8-sync`:
+
+- **Lists in embedded Settings scroll.** The Settings route forwarded every wheel to Lattice and cancelled it, so the Proofreading, Git writing and Compile repair model lists never moved. A wheel now stays in the page when something under the pointer can scroll on that axis, and each gesture is routed by its first moving event until it pauses for 100 ms (`lib/embeddedSettingsWheel.ts`).
+- **Settings popups stay in the visible sheet.** The frame is as tall as its page and Lattice scrolls it inside a shorter sheet, so a select placed itself against the whole frame and a long list could open past the sheet's edge. Lattice's pane now posts the visible part of the frame (`lattice:settings-viewport`, `top` and `height` in the frame's CSS px, from `visibleSynaraSettingsFrame`) on scroll, resize and every height change, and Settings selects use it as their collision boundary. Before the first message they fall back to an IntersectionObserver, which in a cross-origin WKWebView frame clips only by the window.
+- **The Antigravity usage probe no longer opens sign-in.** `agy --print /usage` opened Google's sign-in page in the default browser when `agy` was signed out, `NO_BROWSER` notwithstanding. The probe now runs `agy models` first and stops at a signed-out or failed answer, as the Providers page does.
+
 ## Synara 1.6.2 compatibility
 
 The pin is upstream 1.6.2 (`47f8f3997`) merged with the whole `amp/lattice-v1.5.2-sync` history through fork PR 36 ([fork PR 37](https://github.com/leo1oel/synara/pull/37)). That history includes PR 35, which creates Agent boards as `.excalidraw`, PR 34, which reports project Agent activity, and PR 36, which adds link destinations; none of the three had been pinned before. `amp/lattice-v1.6.2-sync` started as upstream's 1.6.2 commit, and the Lattice integration reaches it through that one pull request with a merge commit. 1.5.3, 1.5.4, 1.6.0 and 1.6.1 come in with it.

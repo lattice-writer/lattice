@@ -64,3 +64,18 @@ export function applySynaraSettingsWheel(
       : 1;
   return scrollSynaraSettingsViewportBy(viewport, event.deltaY * scale, event.deltaX * scale);
 }
+
+type Span = Pick<DOMRect, "top" | "bottom">;
+
+/**
+ * The part of the page-tall Settings frame the writer can see, as offsets
+ * into the frame's own document: the frame cannot tell, since the host
+ * scrolls it inside a shorter sheet, and WKWebView clips a cross-origin
+ * frame's IntersectionObserver rect by the window, not by the sheet. Its
+ * popups place themselves within this part.
+ */
+export function visibleSynaraSettingsFrame(frame: Span, viewport: Span, windowHeight: number): { top: number; height: number } {
+  const top = Math.max(frame.top, viewport.top, 0);
+  const bottom = Math.min(frame.bottom, viewport.bottom, windowHeight);
+  return { top: Math.max(0, top - frame.top), height: Math.max(0, bottom - top) };
+}
