@@ -83,12 +83,19 @@ pub fn ask(
 }
 
 impl ImportConflict {
+    /// Answer question `serial`. An answer that arrives once a newer question
+    /// has taken the dialog's place (its exit outlasted by a slow frame, a
+    /// question asked during it) is dropped, so it never answers that one.
     fn answer(
         &mut self,
+        serial: usize,
         choice: Option<NameConflict>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        if serial != self.serial {
+            return;
+        }
         if let Some(question) = self.open.take() {
             cx.notify();
             (question.answer)(choice, window, cx);
@@ -136,7 +143,7 @@ impl ImportConflict {
     /// Press `choice`'s button, as the writer would, for a scenario.
     #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn choose(&mut self, choice: NameConflict, window: &mut Window, cx: &mut Context<Self>) {
-        self.answer(Some(choice), window, cx);
+        self.answer(self.serial, Some(choice), window, cx);
     }
 }
 
@@ -179,7 +186,7 @@ impl Render for ImportConflict {
                 button.on_click(ModalLayer::closing(
                     ("import-conflict", serial),
                     cx,
-                    move |this, window, cx| this.answer(choice, window, cx),
+                    move |this, window, cx| this.answer(serial, choice, window, cx),
                 ))
             };
         let actions = div()
@@ -254,13 +261,16 @@ impl Render for ImportConflict {
                 }
                 // Enter answers as Keep both does, after the exit.
                 let view = cx.entity().downgrade();
+                let serial = this.serial;
                 ModalLayer::leave(
-                    ("import-conflict", this.serial),
+                    ("import-conflict", serial),
                     window,
                     cx,
                     move |window, cx| {
-                        view.update(cx, |this, cx| this.answer(Some(DEFAULT_ANSWER), window, cx))
-                            .ok();
+                        view.update(cx, |this, cx| {
+                            this.answer(serial, Some(DEFAULT_ANSWER), window, cx)
+                        })
+                        .ok();
                     },
                 );
                 cx.stop_propagation();
@@ -272,7 +282,7 @@ impl Render for ImportConflict {
             LayerPlacement::UpperThird,
             keys,
             move |window, cx| {
-                view.update(cx, |this, cx| this.answer(None, window, cx))
+                view.update(cx, |this, cx| this.answer(serial, None, window, cx))
                     .ok();
             },
         )
