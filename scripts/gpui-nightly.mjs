@@ -18,8 +18,8 @@
  *           chunks of modules (gpui-main-baseline.mjs --chunks), each under
  *           scripts/inapp-lock, letting the lock go in between so a queued
  *           gate or lab run gets in; the rerun takes the lock too (`rerun`),
- *           with the scratch HOME and lab switches gpui/script/e2e gives the
- *           scenario. Then the idle guard (gpui/script/idle-guard, lattice#1025):
+ *           with the scratch HOME, lab switches and Typst stand-in release
+ *           gpui/script/e2e gives the scenario. Then the idle guard (gpui/script/idle-guard, lattice#1025):
  *           its frame counts under the lock, and 30 minutes of idle memory
  *           growth outside it, then the typing guard (gpui/script/typing-guard,
  *           LEO-6) under the lock (runGuards). Then the whole Vitest suite,
@@ -47,6 +47,7 @@ import { fileURLToPath } from "node:url";
 import { judge, knownFailures, rerun, rerunModules, settle } from "./gpui-e2e-verdict.mjs";
 import { CHUNKS, baselineDir } from "./gpui-main-baseline.mjs";
 import { isMain } from "./lib/util.mjs";
+import { fakeTypstRelease } from "./typst-helper-fake-release.mjs";
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const git = (...args) => execFileSync("git", args, { cwd: repo, encoding: "utf8" }).trim();
@@ -305,7 +306,11 @@ function report({ dryRun }) {
 function rerunModulesInScratch(modules, out) {
   const home = mkdtempSync(path.join(tmpdir(), "gpui-nightly-home-"));
   const env = { ...process.env, HOME: home, GPUI_LAB_IGNORE_OCCLUSION: "1", GPUI_LAB_ASSUME_KEY: "1", PATH: `${process.env.PATH}:/Library/TeX/texbin` };
+  // The Typst stand-in release gpui/script/e2e makes: without it the typst
+  // module's first step fails at once, so a rerun could never clear it.
+  const helper = path.join(repo, "gpui", "target", "release", "lattice-typst");
   try {
+    if (existsSync(helper)) env.LATTICE_E2E_TYPST_RELEASE = path.dirname(fakeTypstRelease(helper, path.join(home, "typst-release")));
     const result = rerun(path.join(repo, "gpui", "target", "release", "lattice-gpui"), path.join(repo, "gpui", "fixtures", "e2e"), modules.split(","), env);
     if (result) writeFileSync(out, JSON.stringify(result));
   } finally {
