@@ -7,6 +7,8 @@
 //! - accepting a suggestion leaves the text and clears it on both sides;
 //! - rejecting one undoes it on both sides;
 //! - a comment made here is posted and anchored on Overleaf;
+//! - a commented passage cut away detaches its thread, whose marks never
+//!   move onto the text after it (`comment_detach`);
 //! - with track changes on, typing here reaches Overleaf as a suggestion,
 //!   and the provisional one shown at once gives way to Overleaf's.
 
@@ -256,6 +258,8 @@ impl Run {
         // shared from its card.
         self.overleaf_editor_comments(cx, steps, mock, &editor)
             .await?;
+        // A commented passage cut away, and Undo.
+        self.overleaf_comment_cut(cx, steps, mock, &editor).await?;
 
         // Track changes on: typing goes out as a suggestion.
         mock.set_track_changes(true);

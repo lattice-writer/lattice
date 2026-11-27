@@ -157,7 +157,9 @@ impl OverleafBridge {
 
     /// The comment threads anchored in `path`: the live document's own
     /// ranges when it is live, REST's anchors otherwise, each with its
-    /// thread, unresolved ones only.
+    /// thread, unresolved ones only. A detached thread (its passage deleted,
+    /// so its quote is empty) is anchored nowhere and gets no mark, as in
+    /// Overleaf's editor.
     pub fn comments_in(&self, path: &str) -> Vec<(CommentRange, &OverleafThread)> {
         let thread = |id: &str| {
             self.review
@@ -169,6 +171,7 @@ impl OverleafBridge {
             return review
                 .comments
                 .iter()
+                .filter(|range| !range.quote.is_empty())
                 .filter_map(|range| Some((range.clone(), thread(&range.thread_id)?)))
                 .collect();
         }
@@ -178,7 +181,7 @@ impl OverleafBridge {
         self.review
             .anchors
             .iter()
-            .filter(|anchor| anchor.doc_id == doc_id)
+            .filter(|anchor| anchor.doc_id == doc_id && !anchor.quote.is_empty())
             .filter_map(|anchor| {
                 let range = CommentRange {
                     thread_id: anchor.thread_id.clone(),
