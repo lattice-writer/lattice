@@ -476,7 +476,7 @@ impl Shell {
                     }
                     panel.finished(&result, wrote_pdf, request.requested, sources, cx)
                 });
-                self.build_pass_finished(&result, revision, cx);
+                self.build_pass_finished(&result, revision, request.live, cx);
                 project.update(cx, |project, cx| {
                     // A build may adopt the open document or switch the
                     // engine, which it writes to the manifest.
