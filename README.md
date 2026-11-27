@@ -8,7 +8,7 @@
 
 A local-first LaTeX workspace for macOS, with your papers, your co-authors and an AI agent in the same window
 
-[Download](https://github.com/lattice-writer/lattice/releases/latest)&emsp;[Try it in your browser](https://lattice-writer.github.io/lattice/demo/)&emsp;[Website](https://lattice-writer.github.io/lattice/)&emsp;[Watch the film](https://lattice-writer.github.io/lattice/#film)&emsp;[Release notes](https://github.com/lattice-writer/lattice/releases)&emsp;[Developer docs](docs/README.md)&emsp;[Issues](https://github.com/lattice-writer/lattice/issues)&emsp;[中文](README.zh-CN.md)
+[Download](https://github.com/lattice-writer/lattice/releases/latest)&emsp;[Try it in your browser](https://lattice-writer.github.io/lattice/demo/)&emsp;[Website](https://lattice-writer.github.io/lattice/)&emsp;[Watch the film](https://lattice-writer.github.io/lattice/#film)&emsp;[Release notes](https://github.com/lattice-writer/lattice/releases)&emsp;[Developer docs](docs/README.md)&emsp;[Issues](https://github.com/lattice-writer/lattice/issues)&emsp;[中文](README.zh-CN.md)&emsp;[Türkçe](README.tr.md)
 
 [![Release](https://img.shields.io/github/v/release/lattice-writer/lattice?style=flat-square&label=release&color=556324)](https://github.com/lattice-writer/lattice/releases/latest)
 [![CI](https://img.shields.io/github/actions/workflow/status/lattice-writer/lattice/ci.yml?branch=main&style=flat-square&label=checks)](https://github.com/lattice-writer/lattice/actions/workflows/ci.yml)
