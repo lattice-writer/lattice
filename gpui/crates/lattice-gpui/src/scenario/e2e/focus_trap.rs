@@ -104,7 +104,10 @@ impl Run {
         // The close lands once a frame has drawn the layer's exit, which a
         // software renderer (lavapipe under Xvfb) can take well past the
         // exit's own 160ms to draw over a large surface such as Settings.
-        self.wait_for(cx, Duration::from_millis(2500), |shell, cx| !shell.read(cx).dialog_open(cx))
+        // The 600ms settle stays first: the next surface opening sooner
+        // after a close loses its focus trap on macOS.
+        self.pause(cx, Duration::from_millis(600)).await;
+        self.wait_for(cx, Duration::from_secs(2), |shell, cx| !shell.read(cx).dialog_open(cx))
             .await;
         let check = document.clone();
         let (open_after, returned) = self.with_window(cx, move |shell, window, cx| {
