@@ -8,8 +8,11 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-check=
-[ "${1:-}" = "--check" ] && check=--check
+case "${1:-}" in
+  "") check= ;;
+  --check) check=--check ;;
+  *) echo "usage: script/fmt [--check]" >&2; exit 2 ;;
+esac
 
 cargo fmt --all -- $check
 find crates/lattice-gpui/src/scenario/e2e -name '*.rs' -print0 \
