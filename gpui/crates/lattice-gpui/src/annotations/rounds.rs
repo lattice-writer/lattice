@@ -44,12 +44,14 @@ use crate::{
 const CONCURRENT_REVISIONS: usize = 3;
 
 /// What the rounds read from the window, which the window keeps up to
-/// date (`set_host`): the project's folder and its open editors, whose
-/// buffers hold a file's live text. Pushed rather than asked for, since the
+/// date (`set_host`): the project's folder, its main document, and its open
+/// editors, whose buffers hold a file's live text. Pushed rather than asked for, since the
 /// window calls the rounds in its own updates, where it cannot be read.
 #[derive(Default)]
 pub struct RoundsHost {
     pub project: Option<PathBuf>,
+    /// Project-relative, as `Project::main_document` names it.
+    pub main: Option<String>,
     pub editors: Vec<WeakEntity<EditorPanel>>,
 }
 
@@ -111,6 +113,7 @@ pub struct AnnotationRounds {
 impl EventEmitter<RoundsEvent> for AnnotationRounds {}
 
 mod agent_tools;
+mod prompt_context;
 mod queries;
 mod review;
 
@@ -482,23 +485,6 @@ impl AnnotationRounds {
         self.record(root, id, revision, |_| {}, cx);
     }
 
-    /// The project's citation keys and titles, for the "Add a citation"
-    /// intent's prompt.
-    fn citations(root: &Path) -> Vec<revision::Citation> {
-        project::citations(root)
-            .map(|index| {
-                index
-                    .citations
-                    .into_iter()
-                    .map(|citation| revision::Citation {
-                        key: citation.key,
-                        title: Some(citation.title).filter(|title| !title.is_empty()),
-                    })
-                    .collect()
-            })
-            .unwrap_or_default()
-    }
-
     /// Ask the agent about one annotation in its round.
     fn ask(&mut self, job: Job, cx: &mut Context<Self>) -> Task<()> {
         let Job {
@@ -567,6 +553,7 @@ impl AnnotationRounds {
                     .and_then(|revision| revision.text.clone())
             }),
             guidance: extra.guidance,
+            paper: revision::Paper::default(),
             language: if lattice_i18n::locale().is_chinese() {
                 "Simplified Chinese".into()
             } else {
@@ -574,11 +561,26 @@ impl AnnotationRounds {
             },
             citations: None,
         };
+        let main = self.host.main.clone();
+        let open = prompt_context::open_sources(&self.host.editors, cx);
         cx.spawn(async move |this, cx| {
+            let project = root.clone();
+            let paper = cx
+                .background_spawn(async move {
+                    prompt_context::paper(
+                        &project,
+                        &open,
+                        main.as_deref(),
+                        &comment.path,
+                        &source,
+                        range,
+                    )
+                })
+                .await;
             let citations = if cites {
                 let project = root.clone();
                 Some(
-                    cx.background_spawn(async move { Self::citations(&project) })
+                    cx.background_spawn(async move { prompt_context::citations(&project) })
                         .await,
                 )
             } else {
@@ -586,6 +588,7 @@ impl AnnotationRounds {
             };
             let prompt = revision::prompt(&revision::Request {
                 citations,
+                paper,
                 ..request
             });
             let Ok((task, answer)) = this.update(cx, |this, cx| match this.scripted.clone() {

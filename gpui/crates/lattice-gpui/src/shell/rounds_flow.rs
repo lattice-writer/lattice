@@ -60,6 +60,10 @@ impl Shell {
     pub(crate) fn sync_rounds(&mut self, cx: &mut Context<Self>) {
         let host = RoundsHost {
             project: self.root(cx),
+            main: self
+                .project
+                .as_ref()
+                .and_then(|project| project.read(cx).main_document().map(str::to_string)),
             editors: self.editors.clone(),
         };
         self.annotation_rounds()

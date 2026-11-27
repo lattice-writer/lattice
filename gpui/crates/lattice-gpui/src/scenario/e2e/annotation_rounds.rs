@@ -523,6 +523,7 @@ pub(super) const MODULE: super::registry::Module = super::registry::Module {
         "gpui/crates/lattice-gpui/src/annotations/rounds_sheet.rs",
         "gpui/crates/lattice-gpui/src/history/focus_entry.rs",
         "gpui/crates/lattice-editor/src/annotation_revision.rs",
+        "gpui/crates/lattice-editor/src/annotation_revision",
     ],
     run: |run, cx, steps, fixture| Box::pin(run.annotation_rounds(cx, steps, &fixture.root)),
 };
