@@ -286,23 +286,27 @@ pub(super) fn parse_format_diagnostics(preamble_output: &str, log: &str) -> Vec<
     diagnostics
 }
 
-/// From where the last engine run starts. TeX's banner opens each run in its
-/// own output. latexmk before 4.8x (Ubuntu 22.04's 4.76) prints its
-/// `Running '…'` headers to stderr, which reaches the combined output after
-/// all of TeX's, so slicing at the last header there found no TeX output at
-/// all, and a failed build reported no error.
+/// From where the last engine run starts: latexmk's last `Running '…'`
+/// header, unless it comes after the last of TeX's banners. latexmk before
+/// 4.8x (Ubuntu 22.04's 4.76) prints its headers to stderr, which reaches the
+/// combined output after all of TeX's, so slicing at the header there found
+/// no TeX output at all, and a failed build reported no error; the banner
+/// that opens each engine run marks the pass instead. A header before it
+/// wins: a nested run (tikz external) prints banners inside the pass.
 fn last_typeset_pass(log: &str) -> &str {
     static ENGINE_BANNER: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
-        Regex::new(r"(?m)^This is (?:pdf|Xe|Lua|LuaHB|e-|e?u?p)?TeX, Version").unwrap()
+        Regex::new(r"(?m)^This is (?:pdf|Xe|LuaHB|Lua|e-u?p|e-|u?p)?TeX, Version").unwrap()
     });
-    if let Some(banner) = ENGINE_BANNER.find_iter(log).last() {
-        return &log[banner.start()..];
-    }
-    let start = ["pdflatex", "xelatex", "lualatex", "latex"]
+    let header = ["pdflatex", "xelatex", "lualatex", "latex"]
         .iter()
         .filter_map(|engine| log.rfind(&format!("Running '{engine}")))
-        .max()
-        .unwrap_or(0);
+        .max();
+    let banner = ENGINE_BANNER.find_iter(log).last().map(|banner| banner.start());
+    let start = match (header, banner) {
+        (Some(header), Some(banner)) if header > banner => banner,
+        (None, Some(banner)) => banner,
+        (header, _) => header.unwrap_or(0),
+    };
     &log[start..]
 }
 
@@ -578,6 +582,21 @@ Latexmk: Missing input file 'nosuchfile.tex' message in .log file:
         assert_eq!(diagnostics.len(), 1, "{diagnostics:?}");
         assert_eq!(diagnostics[0].message, "Undefined control sequence.");
         assert_eq!(diagnostics[0].line, Some(7));
+        // latexmk 4.8x's header comes first: a banner a nested run printed
+        // later in the pass does not cut off what the pass reported before it.
+        let nested = format!(
+            "------------\nRunning 'pdflatex  \"main.tex\"'\n------------\n{tex}./main.tex:3: Undefined control sequence.\nl.3 \\emhp\n{tex}"
+        );
+        assert_eq!(parse_diagnostics(&nested).len(), 1);
+        for banner in [
+            "This is e-upTeX, Version 3.141592653-p4.1.1-u2.02",
+            "This is LuaHBTeX, Version 1.24.0",
+        ] {
+            assert_eq!(
+                last_typeset_pass(&format!("noise\n{banner}\nrest")),
+                format!("{banner}\nrest")
+            );
+        }
     }
 
     /// Logs whose every message is noise or terminal boilerplate.
