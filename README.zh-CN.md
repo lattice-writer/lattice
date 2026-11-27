@@ -8,7 +8,7 @@
 
 macOS 上的本地优先 LaTeX 工作区：论文、文献、合作者和 AI 智能体在同一个窗口里
 
-[下载](https://github.com/lattice-writer/lattice/releases/latest)&emsp;[在浏览器中试用](https://lattice-writer.github.io/lattice/demo/)&emsp;[官网](https://lattice-writer.github.io/lattice/)&emsp;[观看短片](https://lattice-writer.github.io/lattice/#film)&emsp;[更新日志](https://github.com/lattice-writer/lattice/releases)&emsp;[开发者文档](docs/README.md)&emsp;[反馈](https://github.com/lattice-writer/lattice/issues)&emsp;[English](README.md)
+[下载](https://github.com/lattice-writer/lattice/releases/latest)&emsp;[在浏览器中试用](https://lattice-writer.github.io/lattice/demo/)&emsp;[官网](https://lattice-writer.github.io/lattice/)&emsp;[观看短片](https://lattice-writer.github.io/lattice/#film)&emsp;[更新日志](https://github.com/lattice-writer/lattice/releases)&emsp;[开发者文档](docs/README.md)&emsp;[反馈](https://github.com/lattice-writer/lattice/issues)&emsp;[English](README.md)&emsp;[Türkçe](README.tr.md)
 
 </div>
 
