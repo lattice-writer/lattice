@@ -211,7 +211,13 @@ impl Run {
                 && !contents.contains("secret-paper")
                 && url.starts_with("https://github.com/lattice-writer/lattice/issues/new?template=bug_report.yml")
                 && url.contains(&format!("lattice-version={RUNNING_VERSION}"))
-                && url.contains("macos-version=macOS+")
+                && url.contains(if cfg!(target_os = "macos") {
+                    "macos-version=macOS+"
+                } else if cfg!(target_os = "windows") {
+                    "macos-version=Windows+"
+                } else {
+                    "macos-version=Linux+"
+                })
                 && !url.contains("secret")
                 && !url.contains("E2E"),
             json!({ "saved": saved.as_ref().map(|saved| saved.path.display().to_string()).map_err(Clone::clone), "url": url }),
