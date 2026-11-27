@@ -62,7 +62,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ACTIONS_FILE, actionsDiff, actionsNeeds } from "./gpui-actions-e2e.mjs";
-import { readModules } from "./gpui-e2e-modules.mjs";
+import { KNOWN_FAILURES_FILE, knownFailuresDiff, readModules } from "./gpui-e2e-modules.mjs";
 import { codeStream, streamable } from "./lib/token-stream.mjs";
 import { harnessInputs } from "./perf-bench/harness-inputs.mjs";
 
@@ -146,7 +146,17 @@ const AGENT_MODULES = [...new Set([...ISLAND_MODULES, ...[...MODULE_COVERS.keys(
  * of E2E_TABLE, whose empty rows the Windows and Linux tiers read as files no
  * e2e step reads anywhere (windows-e2e-tier.mjs NO_STEP).
  */
-const MACOS_SMOKE = [/^gpui\/crates\/lattice-gpui\/src\/native_(linux|windows)\.rs$/, /^src\/locales\//];
+const MACOS_SMOKE = [/^gpui\/crates\/lattice-gpui\/src\/native_(linux|windows)\.rs$/, /^src\/locales\//, /^\.github\/workflows\/gpui\.yml$/];
+
+/**
+ * lattice-core's LaTeX build: how latexmk is invoked (latex.rs), the build
+ * itself and where its files go (latex/build.rs, latex/build/, the hidden
+ * layout in latex/aux_files.rs). The modules that build TeX and read what
+ * a build leaves (its PDF, SyncTeX map, .aux, diagnostics) show it; the
+ * rest of lattice-core stays FULL.
+ */
+const LATEX_BUILD = /^src-tauri\/lattice-core\/src\/latex(\.rs|\/build\.rs|\/aux_files\.rs|\/build\/(?!(.*_)?tests?\.rs$)[^/]+\.rs)$/;
+const TEX_BUILD_MODULES = ["build_flow", "build_marks", "compile_repair", "pdf_compounds", "pdf_sync_polish", "project_entry", "watched_builds"];
 
 export const E2E_TABLE = [
   // The Overleaf mock servers only the overleaf module's steps start
@@ -193,9 +203,11 @@ export const E2E_TABLE = [
   // bindings, is read hunk by hunk instead when its diff can be
   // (scripts/gpui-actions-e2e.mjs); this row is for when it cannot.
   [/^gpui\/crates\/lattice-gpui\/src\/(shell\.rs|shell\/(actions|views|parts|workspaces|entries|ground|editor_events)\.rs|native\.rs)$|^gpui\/crates\/lattice-gpui\/src\/native\//, FULL],
-  [/^src-tauri\/lattice-(core|theme)\/(?!tests\/|src\/(.*\/)?tests?(\.rs$|\/))/, FULL],
+  // The LaTeX build's own test modules (#[cfg(test)] in build.rs).
+  [/^src-tauri\/lattice-core\/src\/latex\/build\/[a-z_]+_tests\.rs$/, []],
+  [LATEX_BUILD, TEX_BUILD_MODULES],
+  [/^src-tauri\/lattice-(core|theme)\/(?!tests\/|src\/(.*\/)?tests?(\.rs$|\/))(?!src\/latex(\.rs|\/build\.rs|\/aux_files\.rs|\/build\/[^/]+\.rs)$)/, FULL],
   [/^design-system\//, FULL],
-  [/^\.github\/workflows\/gpui\.yml$/, FULL],
   // lattice-i18n's string catalogs: the build and the unit tests check them
   // (lattice-i18n's coverage test), settings and find_in_file read zh-CN
   // strings, and the rest of the strings as shown are left to the nightly
@@ -250,7 +262,7 @@ export function dirModules(file, covers = MODULE_COVERS) {
  * shell's command bindings needs (actionsNeeds in scripts/gpui-actions-e2e.mjs),
  * which stands in for that file's FULL row when it could be read.
  */
-export function e2eNeeds(gpuiFiles, covers = MODULE_COVERS, actions = null) {
+export function e2eNeeds(gpuiFiles, covers = MODULE_COVERS, actions = null, known = null) {
   const scenario = "gpui/crates/lattice-gpui/src/scenario/e2e/";
   const why = {};
   const fullBecause = [];
@@ -258,6 +270,10 @@ export function e2eNeeds(gpuiFiles, covers = MODULE_COVERS, actions = null) {
     const picked = new Set();
     if (file === ACTIONS_FILE && actions && !actions.full) {
       for (const module of actions.modules) (why[module] ??= []).push(file);
+      continue;
+    }
+    if (file === KNOWN_FAILURES_FILE && known && !known.full) {
+      for (const module of known.modules) (why[module] ??= []).push(file);
       continue;
     }
     const stem = file.startsWith(scenario) ? file.slice(scenario.length).split("/")[0].replace(/\.rs$/, "") : null;
@@ -300,7 +316,7 @@ export function macosNeeds(tier, files, base = null) {
   for (const file of tier.macosInert) inert.add(file);
   const gpuiFiles = tier.gpuiFiles.filter((file) => !inert.has(file));
   const diff = base && gpuiFiles.includes(ACTIONS_FILE) ? actionsDiff(base) : null;
-  const e2e = tier.full ? { full: true, modules: [], why: {}, fullBecause: ["full run"] } : gpuiFiles.length || !tier.gpuiFiles.length ? e2eNeeds(gpuiFiles, MODULE_COVERS, diff && actionsNeeds(diff, MODULE_COVERS)) : null;
+  const e2e = tier.full ? { full: true, modules: [], why: {}, fullBecause: ["full run"] } : gpuiFiles.length || !tier.gpuiFiles.length ? e2eNeeds(gpuiFiles, MODULE_COVERS, diff && actionsNeeds(diff, MODULE_COVERS), base && gpuiFiles.includes(KNOWN_FAILURES_FILE) ? knownFailuresDiff(base) : null) : null;
   return {
     rust: tier.jobs.rust,
     gpui: tier.jobs.gpui,

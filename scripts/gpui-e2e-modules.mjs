@@ -89,6 +89,41 @@ export function modulesFor(files) {
 }
 
 /** Files the branch changed against `base`'s merge base, committed or not. */
+export const KNOWN_FAILURES_FILE = "scripts/gpui-e2e-known-failures.json";
+
+/**
+ * The modules a change to the known failures (KNOWN_FAILURES_FILE) needs:
+ * those whose scenario files name each step it adds, removes or edits; a
+ * step only the smoke flow or the harness checks needs none. `full` when
+ * one is named nowhere as written (a step built at run time). `sources`
+ * maps scenario files to their text.
+ */
+export function knownFailuresNeeds(before, after, sources) {
+  const entries = (text) => new Map(JSON.parse(text).steps.map((entry) => [entry.step, JSON.stringify(entry)]));
+  const [old, now] = [entries(before), entries(after)];
+  const changed = [...new Set([...old.keys(), ...now.keys()])].filter((step) => old.get(step) !== now.get(step));
+  const files = new Set();
+  for (const step of changed) {
+    const named = [...sources].filter(([, text]) => text.includes(JSON.stringify(step))).map(([file]) => file);
+    if (!named.length) return { full: true, modules: [], why: step };
+    for (const file of named) if (file.startsWith(SCENARIO)) files.add(file);
+  }
+  return { full: false, modules: files.size ? modulesFor([...files]).modules : [], why: changed };
+}
+
+/** knownFailuresNeeds for the change from `base` to the working tree, or null when it cannot be read. */
+export function knownFailuresDiff(base, root = repo) {
+  try {
+    const before = execFileSync("git", ["show", base + ":" + KNOWN_FAILURES_FILE], { cwd: root, encoding: "utf8", maxBuffer: 64 << 20 });
+    const after = readFileSync(path.join(root, KNOWN_FAILURES_FILE), "utf8");
+    const listed = execFileSync("git", ["ls-files", "gpui/crates/lattice-gpui/src/scenario"], { cwd: root, encoding: "utf8" }).split("\n");
+    const sources = new Map(listed.filter((file) => file.endsWith(".rs") && existsSync(path.join(root, file))).map((file) => [file, readFileSync(path.join(root, file), "utf8")]));
+    return knownFailuresNeeds(before, after, sources);
+  } catch {
+    return null;
+  }
+}
+
 export function changedFiles(base) {
   const git = (...args) => execFileSync("git", args, { cwd: repo, encoding: "utf8" });
   const mergeBase = git("merge-base", base, "HEAD").trim();

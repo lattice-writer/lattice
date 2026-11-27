@@ -23,7 +23,7 @@ describe("ci-local-select: the e2e a change needs", () => {
   });
 
   it("runs the smoke flow alone for files no scenario step reads", () => {
-    expect(e2eNeeds(["gpui/README.md", "gpui/crates/lattice-editor/tests/motion.rs", "gpui/crates/lattice-gpui/src/pdf/tests.rs"], new Map())).toMatchObject({ full: false, modules: [] });
+    expect(e2eNeeds([".github/workflows/gpui.yml", "gpui/README.md", "gpui/crates/lattice-editor/tests/motion.rs", "gpui/crates/lattice-gpui/src/pdf/tests.rs"], new Map())).toMatchObject({ full: false, modules: [] });
   });
 
   it("takes the shell's command bindings hunk by hunk when their diff could be read, and the whole scenario otherwise", () => {
@@ -37,8 +37,13 @@ describe("ci-local-select: the e2e a change needs", () => {
   it("runs the overleaf module for its mock servers, and the smoke flow for the host error catalog and lattice-core's tests", () => {
     for (const mock of ["overleaf_mock", "overleaf_realtime_mock", "overleaf_review_mock", "overleaf_history_mock"]) expect(e2eNeeds([`gpui/crates/lattice-gpui/src/scenario/${mock}.rs`]), mock).toMatchObject({ full: false, modules: ["overleaf"] });
     for (const guard of ["gpui/crates/lattice-gpui/src/scenario/idle.rs", "gpui/crates/lattice-gpui/src/scenario/typing.rs", "gpui/script/idle-guard", "gpui/script/typing-guard"]) expect(e2eNeeds([guard]), guard).toMatchObject({ full: false, modules: [] });
-    for (const file of ["gpui/crates/lattice-gpui/src/host_errors/catalog.rs", "src-tauri/lattice-core/src/latex/build/tests.rs", "src-tauri/lattice-core/src/latex/synctex/highlighted/tests.rs", "src-tauri/lattice-core/tests/build.rs", "src-tauri/lattice-theme/src/tests.rs"]) expect(e2eNeeds([file]), file).toMatchObject({ full: false, modules: [] });
-    for (const file of ["gpui/crates/lattice-gpui/src/scenario/e2e.rs", "gpui/crates/lattice-gpui/src/scenario/drag.rs", "gpui/crates/lattice-gpui/src/host_errors.rs", "src-tauri/lattice-core/src/latex.rs", "src-tauri/lattice-core/src/testsupport.rs"]) expect(e2eNeeds([file]), file).toMatchObject({ full: true });
+    for (const file of ["gpui/crates/lattice-gpui/src/host_errors/catalog.rs", "src-tauri/lattice-core/src/latex/build/tests.rs", "src-tauri/lattice-core/src/latex/build/hidden_tests.rs", "src-tauri/lattice-core/src/latex/synctex/highlighted/tests.rs", "src-tauri/lattice-core/tests/build.rs", "src-tauri/lattice-theme/src/tests.rs"]) expect(e2eNeeds([file]), file).toMatchObject({ full: false, modules: [] });
+    for (const file of ["gpui/crates/lattice-gpui/src/scenario/e2e.rs", "gpui/crates/lattice-gpui/src/scenario/drag.rs", "gpui/crates/lattice-gpui/src/host_errors.rs", "src-tauri/lattice-core/src/latex/synctex.rs", "src-tauri/lattice-core/src/testsupport.rs"]) expect(e2eNeeds([file]), file).toMatchObject({ full: true });
+  });
+
+  it("runs the TeX modules for the LaTeX build", () => {
+    const tex = ["build_flow", "build_marks", "compile_repair", "pdf_compounds", "pdf_sync_polish", "project_entry", "watched_builds"];
+    for (const file of ["latex.rs", "latex/build.rs", "latex/build/beside.rs", "latex/aux_files.rs"]) expect(e2eNeeds(['src-tauri/lattice-core/src/' + file])).toMatchObject({ full: false, modules: tex });
   });
 
   it("runs what the island config picks for the script that builds the island pages", () => {
