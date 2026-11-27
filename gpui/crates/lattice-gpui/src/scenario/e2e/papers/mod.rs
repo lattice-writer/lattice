@@ -65,9 +65,19 @@ impl Run {
                     .is_some_and(|audit| audit.read(cx).is_applying())
             })
             .await;
-        std::fs::write(&bibliography, original)?;
+        std::fs::write(&bibliography, &original)?;
         std::fs::remove_dir_all(root.join(BUNDLE))?;
         outcome?;
+        // The editor these steps opened on the bibliography takes the file
+        // back as an outside edit a moment later; the modules after this one
+        // reuse it and must find it as it was.
+        let reloaded = self
+            .wait_for(cx, Duration::from_secs(10), |shell, cx| {
+                shell
+                    .update(cx, |shell, cx| shell.open_editor(&bibliography, cx))
+                    .is_none_or(|editor| editor.read(cx).editor().read(cx).text(cx) == original)
+            })
+            .await;
         let restored = self
             .wait_for(cx, Duration::from_secs(15), |_, cx| {
                 papers.read(cx).papers.len() == 1
@@ -83,8 +93,13 @@ impl Run {
         });
         steps.check(
             "the project's bibliography and papers are put back as they were",
-            apply_settled && restored && left == ["The TeXbook"],
-            json!({ "apply_settled": apply_settled, "restored": restored, "papers": left }),
+            apply_settled && reloaded && restored && left == ["The TeXbook"],
+            json!({
+                "apply_settled": apply_settled,
+                "reloaded": reloaded,
+                "restored": restored,
+                "papers": left
+            }),
         );
         Ok(())
     }
