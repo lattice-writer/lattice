@@ -126,7 +126,7 @@ impl WebView {
         )))]
         let _ = window;
 
-        Self {
+        let this = Self {
             focus_handle: cx.focus_handle(),
             visible: Cell::new(true),
             bounds: Bounds::default(),
@@ -145,7 +145,10 @@ impl WebView {
             origin,
             #[cfg(all(feature = "gpui-fast", target_os = "windows"))]
             cutouts,
-        }
+        };
+        #[cfg(target_os = "linux")]
+        linux::track(&this.webview, cx);
+        this
     }
 
     /// Build a webview as a child of `window`, performing the platform setup Wry requires.
