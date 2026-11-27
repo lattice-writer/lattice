@@ -91,6 +91,9 @@ impl Run {
                     && !shell.read(cx).overleaf.read(cx).live_sending()
             })
             .await;
+        // The margin is painted after the editor's review is refreshed: give
+        // a pip that should not come back the time to show.
+        self.pause(cx, Duration::from_millis(800)).await;
         let off_after = cx.update(|cx| !drawn(&self.shell, editor, &thread, cx));
         steps.check(
             "cutting a whole commented passage detaches its thread on both sides, and its marks never move onto the text after it, also once Undo brings the passage back",
@@ -107,10 +110,13 @@ impl Run {
                 .update(cx, |bridge, cx| bridge.delete_thread(&thread, cx))
         });
         mock.peer_typed("main.tex", vec![delete(0, &line)]);
-        self.wait_for(cx, Duration::from_secs(15), |_, cx| {
-            mock.thread(&thread).is_none() && !editor.read(cx).overleaf_text(cx).contains(PASSAGE)
-        })
-        .await;
+        let cleared = self
+            .wait_for(cx, Duration::from_secs(15), |_, cx| {
+                mock.thread(&thread).is_none()
+                    && !editor.read(cx).overleaf_text(cx).contains(PASSAGE)
+            })
+            .await;
+        anyhow::ensure!(cleared, "the cut passage's thread and line did not go");
         Ok(())
     }
 }

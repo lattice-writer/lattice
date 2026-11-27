@@ -115,8 +115,9 @@ impl OverleafBridge {
 
     /// Where thread `thread_id` is anchored: its file (none when Overleaf
     /// names a document this project does not know), UTF-16 position and
-    /// quote; the live document's own ranges are the newest. None when its
-    /// passage was deleted from the document.
+    /// quote; the live document's own ranges are the newest. The quote is
+    /// empty when its passage was deleted (the thread is detached, and still
+    /// acted on in its document); None when Overleaf has no anchor for it.
     pub fn thread_anchor(&self, thread_id: &str) -> Option<(Option<String>, i64, String)> {
         let live = self.review.docs.iter().find_map(|(doc_id, review)| {
             let range = review
