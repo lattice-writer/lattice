@@ -482,6 +482,7 @@ impl OverleafBridge {
                 // Asked while that probe ran: it already answered.
                 while woken.try_recv().is_ok() {}
                 let slept = Instant::now();
+                let cadence = this.update(cx, |this, _| this.base_poll()).ok();
                 let mut rest = wait;
                 loop {
                     let mut timer = cx.background_executor().timer(rest).fuse();
@@ -500,13 +501,24 @@ impl OverleafBridge {
                     // asked again seconds after a push's probe had (LEO-14).
                     // Reads before the wait began are this probe's own or
                     // older, so a backoff after a failed probe is kept.
-                    let since = this
-                        .update(cx, |this, _| this.version_read.filter(|read| *read > slept))
-                        .ok()
-                        .flatten()
-                        .map(|read| read.elapsed());
-                    match since {
-                        Some(since) if since < wait => rest = wait - since,
+                    let Ok((read, base)) = this.update(cx, |this, _| {
+                        (
+                            this.version_read.filter(|read| *read > slept),
+                            this.base_poll(),
+                        )
+                    }) else {
+                        return;
+                    };
+                    // The channel came up (or went down) while this waited on
+                    // the cadence it had then: the rest of the wait is on the
+                    // new one. Without this a poll woken while the channel was
+                    // still joining asked once more 3 s on, after it joined.
+                    if cadence == Some(wait) && base != wait {
+                        wait = base;
+                    }
+                    let waited = read.map_or_else(|| slept.elapsed(), |read| read.elapsed());
+                    match wait.checked_sub(waited) {
+                        Some(left) if !left.is_zero() => rest = left,
                         _ => break,
                     }
                 }

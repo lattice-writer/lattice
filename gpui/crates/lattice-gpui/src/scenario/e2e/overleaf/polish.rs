@@ -189,6 +189,8 @@ impl Run {
             })
             .await;
         mock.enable_realtime();
+        let asked_forward = mock.requests(&probes);
+        let forward = std::time::Instant::now();
         self.with_window(cx, |shell, _, cx| {
             shell.update(cx, |shell, cx| {
                 shell.overleaf.update(cx, |bridge, cx| {
@@ -215,6 +217,18 @@ impl Run {
             "a channel waiting out its backoff joins as the window comes forward, and says it reconnected",
             waiting && joined && told,
             json!({ "waiting": waiting, "joined": joined, "told": told }),
+        );
+        // Coming forward probes once; the channel joining meanwhile puts the
+        // poll on its 45 s cadence at once, not after one more probe on the
+        // 3 s it woke with.
+        let quiet_until = forward + Duration::from_secs(8);
+        self.pause(cx, quiet_until.saturating_duration_since(std::time::Instant::now()))
+            .await;
+        let reconnect_probes = mock.requests(&probes) - asked_forward;
+        steps.check(
+            "after the channel joins, the live poll asks no more than the probe coming forward sent",
+            joined && reconnect_probes <= 1,
+            json!({ "probes": reconnect_probes, "joined": joined }),
         );
 
         // A board being edited waits; leaving it sends it up.
