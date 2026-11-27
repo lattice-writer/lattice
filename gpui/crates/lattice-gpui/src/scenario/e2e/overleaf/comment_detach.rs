@@ -9,7 +9,8 @@
 //! - the same text pasted anywhere else leaves it detached;
 //! - pasted back in place after that near miss, it is re-attached;
 //! - pasted back after the document was joined again in between, it stays
-//!   detached.
+//!   detached;
+//! - a thread resolved after its cut stays detached when pasted back.
 
 use std::time::Duration;
 
@@ -209,15 +210,78 @@ impl Run {
             json!({ "detached": detached, "rejoined": rejoined, "home": home, "back": back, "stayed": stayed, "sent": anchors_sent(mock, &thread), "comments": mock.comments("main.tex"), "overleaf": mock.file("main.tex") }),
         );
 
-        // Leave main.tex and the threads as the next steps expect them.
+        // A thread resolved on Overleaf after its cut is never re-attached,
+        // even when its passage is pasted back in place.
+        let resolving = mock.peer_commented("main.tex", 0, PASSAGE, "Resolve me.");
+        let anchored = self
+            .wait_for(cx, Duration::from_secs(15), |shell, cx| {
+                drawn(shell, editor, &resolving, cx)
+            })
+            .await;
+        self.select_quote(cx, editor, PASSAGE)?;
+        self.cut_keys(cx, &[('x', true)]).await?;
+        let cut_off = self
+            .wait_for(cx, Duration::from_secs(15), |shell, cx| {
+                anchored_at(mock, &resolving, 0, "") && settled(shell, cx)
+            })
+            .await;
         let shell = self.shell.clone();
         cx.update(|cx| {
-            shell
-                .read(cx)
-                .overleaf
-                .clone()
-                .update(cx, |bridge, cx| bridge.delete_thread(&thread, cx))
+            shell.read(cx).overleaf.clone().update(cx, |bridge, cx| {
+                bridge.set_thread_resolved(&resolving, true, cx)
+            })
         });
+        let resolved = self
+            .wait_for(cx, Duration::from_secs(15), |shell, cx| {
+                mock.thread(&resolving)
+                    .is_some_and(|(_, resolved)| resolved)
+                    && shell
+                        .read(cx)
+                        .overleaf
+                        .read(cx)
+                        .threads()
+                        .iter()
+                        .any(|thread| thread.id == resolving && thread.resolved)
+            })
+            .await;
+        let home = self.caret_to(cx, editor, 0)?;
+        self.cut_keys(cx, &[('v', true)]).await?;
+        let pasted = self
+            .wait_for(cx, Duration::from_secs(15), |shell, cx| {
+                mock.file("main.tex")
+                    .is_some_and(|text| text.starts_with(&line))
+                    && settled(shell, cx)
+            })
+            .await;
+        self.pause(cx, Duration::from_millis(1500)).await;
+        // Still detached, wherever the pasted text pushed its empty range.
+        let kept_off = mock
+            .comments("main.tex")
+            .iter()
+            .any(|range| range.thread_id == resolving && range.quote.is_empty())
+            && anchors_sent(mock, &resolving) == 0;
+        steps.check(
+            "a thread resolved on Overleaf after its cut stays detached when its passage is pasted back, with no comment op",
+            anchored && cut_off && resolved && home && pasted && kept_off && mock.rejected().is_empty(),
+            json!({ "anchored": anchored, "cut_off": cut_off, "resolved": resolved, "home": home, "pasted": pasted, "kept_off": kept_off, "sent": anchors_sent(mock, &resolving), "comments": mock.comments("main.tex"), "overleaf": mock.file("main.tex") }),
+        );
+
+        // Leave main.tex and the threads as the next steps expect them.
+        // One at a time: the bridge runs one review action at once.
+        for id in [&thread, &resolving] {
+            cx.update(|cx| {
+                shell
+                    .read(cx)
+                    .overleaf
+                    .clone()
+                    .update(cx, |bridge, cx| bridge.delete_thread(id, cx))
+            });
+            self.wait_for(cx, Duration::from_secs(10), |shell, cx| {
+                mock.thread(id).is_none()
+                    && shell.read(cx).overleaf.read(cx).review_busy().is_none()
+            })
+            .await;
+        }
         mock.peer_typed(
             "main.tex",
             vec![lattice_core::overleaf_rt::ot::delete(0, &line)],
@@ -225,6 +289,7 @@ impl Run {
         let cleared = self
             .wait_for(cx, Duration::from_secs(15), |_, cx| {
                 mock.thread(&thread).is_none()
+                    && mock.thread(&resolving).is_none()
                     && !editor.read(cx).overleaf_text(cx).contains(PASSAGE)
             })
             .await;
