@@ -18,7 +18,9 @@
 //! needs.
 
 use super::super::aux_files;
-use super::super::build_log::{log_conference_template, pages_written, trim_log};
+use super::super::build_log::{
+    log_conference_template, pages_written, parse_diagnostics, skipped_recompile, trim_log,
+};
 use super::diagnose;
 use crate::latex::BuildResult;
 use std::fs;
@@ -46,6 +48,22 @@ pub(super) fn restate(root: &Path, skipped: BuildResult) -> BuildResult {
         unchanged: true,
         ..skipped
     }
+}
+
+/// latexmk 4.76, Ubuntu 22.04's, keeps no record of a run that failed (its
+/// `.fdb_latexmk` is version 3, with no result per rule), so built again
+/// with nothing changed it answers "All targets … are up-to-date" and exits
+/// 0, as if the last run had succeeded. The TeX log that run left still names
+/// its errors: `skipped` is then the failure newer latexmk reports as
+/// "gave an error in previous invocation".
+pub(super) fn forgotten_failure(root: &Path, skipped: &BuildResult) -> bool {
+    skipped.success
+        && skipped_recompile(&skipped.log)
+        && fs::read_to_string(aux_files::file(root, &skipped.root_document, "log")).is_ok_and(
+            |tex_log| {
+                parse_diagnostics(&tex_log).iter().any(|diagnostic| diagnostic.level == "error")
+            },
+        )
 }
 
 #[cfg(test)]
@@ -79,6 +97,77 @@ mod tests {
     fn errors(result: &BuildResult) -> Vec<(Option<String>, Option<u32>, String)> {
         let errors = result.diagnostics.iter().filter(|diagnostic| diagnostic.level == "error");
         errors.map(|error| (error.file.clone(), error.line, error.message.clone())).collect()
+    }
+
+    /// latexmk 4.76 answers a rebuild of a document whose last run failed as
+    /// if it had succeeded; the TeX log that run left decides. A run that
+    /// typeset, or one whose log names no error, is no forgotten failure.
+    #[test]
+    fn a_skip_after_a_failure_latexmk_forgot_is_that_failure() {
+        let root = TempDir::new("latex");
+        root.write("main.tex", FAILING);
+        root.write(
+            "main.log",
+            "./main.tex:5: Undefined control sequence.\nl.5 Two, \\undefinedtwo\n",
+        );
+        let answered = |log: &str| BuildResult {
+            success: true,
+            has_pdf: true,
+            log: log.to_string(),
+            duration_ms: 0,
+            diagnostics: Vec::new(),
+            root_document: "main.tex".to_string(),
+            one_off: false,
+            venue: None,
+            steps: Vec::new(),
+            pages: None,
+            synctex: None,
+            outputs: Vec::new(),
+            unchanged: false,
+            aux_folder: String::new(),
+        };
+        let skipped = "Latexmk: Nothing to do\nLatexmk: All targets (main.pdf) are up-to-date\n";
+        let typeset = "Latexmk: applying rule 'pdflatex'...\nLatexmk: All targets (main.pdf) are up-to-date\n";
+        assert!(super::forgotten_failure(&root, &answered(skipped)));
+        assert!(!super::forgotten_failure(&root, &answered(typeset)));
+        assert!(!super::forgotten_failure(
+            &root,
+            &BuildResult { success: false, ..answered(skipped) }
+        ));
+        root.write("main.log", "Output written on main.pdf (1 page, 1000 bytes).\n");
+        assert!(!super::forgotten_failure(&root, &answered(skipped)));
+    }
+
+    /// The same through a real latexmk: built again with nothing changed,
+    /// unasked or asked, the failing document still fails with its errors,
+    /// whether latexmk remembers the failure or forgets it (4.76).
+    #[test]
+    #[ignore = "requires latexmk and pdfLaTeX"]
+    fn a_failing_document_built_again_unchanged_still_fails() {
+        let root = TempDir::new("latex");
+        project::write_manifest(&root, &project::default_manifest("paper")).unwrap();
+        root.write("main.tex", FAILING);
+        let build = |unattended| {
+            build(
+                &root,
+                false,
+                unattended,
+                &ActiveBuild::default(),
+                None,
+                &BuildSteps::silent(),
+                AuxFiles::Beside,
+            )
+            .unwrap()
+        };
+        let failed = build(false);
+        assert!(!failed.success, "{}", failed.log);
+        assert_eq!(errors(&failed).len(), 2, "{:?}", failed.diagnostics);
+        std::thread::sleep(Duration::from_millis(1100));
+        for unattended in [true, false] {
+            let again = build(unattended);
+            assert!(!again.success, "{}", again.log);
+            assert_eq!(errors(&again), errors(&failed));
+        }
     }
 
     /// The ThinkMorph loop (Drive re-uploading every rebuild's output, each
