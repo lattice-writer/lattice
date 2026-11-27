@@ -19,7 +19,7 @@
 
 use super::super::aux_files;
 use super::super::build_log::{
-    log_conference_template, pages_written, skipped_recompile, trim_log,
+    log_conference_template, pages_written, parse_diagnostics, skipped_recompile, trim_log,
 };
 use super::diagnose;
 use crate::latex::BuildResult;
@@ -61,8 +61,7 @@ pub(super) fn forgotten_failure(root: &Path, skipped: &BuildResult) -> bool {
         && skipped_recompile(&skipped.log)
         && fs::read_to_string(aux_files::file(root, &skipped.root_document, "log")).is_ok_and(
             |tex_log| {
-                let (diagnostics, _) = diagnose(root, &skipped.root_document, &tex_log, None, None);
-                diagnostics.iter().any(|diagnostic| diagnostic.level == "error")
+                parse_diagnostics(&tex_log).iter().any(|diagnostic| diagnostic.level == "error")
             },
         )
 }
