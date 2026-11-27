@@ -88,6 +88,70 @@ export function modulesFor(files) {
   return { gpui: files.some((file) => file.startsWith("gpui/") || file.startsWith("src-tauri/lattice-core/")), modules, why: Object.fromEntries(modules.map((module) => [module, why.get(module)])) };
 }
 
+export const KNOWN_FAILURES_FILE = "scripts/gpui-e2e-known-failures.json";
+
+/**
+ * The modules a change to the known failures (KNOWN_FAILURES_FILE) needs:
+ * those that run each step it adds, removes or edits. A step checked in a
+ * shared scenario file is followed through the functions that call it, a
+ * few calls deep, to the module files that do. `full` when a step is named
+ * nowhere as written (built at run time) or no module reaches it.
+ * `sources` maps scenario files to their text.
+ */
+export function knownFailuresNeeds(before, after, sources) {
+  // Every entry for a step, in order: a name can be listed once per platform group.
+  const entries = (text) => {
+    const byStep = new Map();
+    for (const entry of JSON.parse(text).steps) byStep.set(entry.step, [...(byStep.get(entry.step) ?? []), JSON.stringify(entry)]);
+    return new Map([...byStep].map(([step, list]) => [step, list.join("\n")]));
+  };
+  const [old, now] = [entries(before), entries(after)];
+  const changed = [...new Set([...old.keys(), ...now.keys()])].filter((step) => old.get(step) !== now.get(step));
+  const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const files = new Set();
+  for (const step of changed) {
+    const reached = new Set();
+    const seen = new Set();
+    let needles = [new RegExp(escape(JSON.stringify(step)), "g")];
+    for (let depth = 0; depth < 4 && needles.length; depth += 1) {
+      const callers = [];
+      for (const [file, text] of sources) {
+        for (const needle of needles) {
+          for (const match of text.matchAll(needle)) {
+            if (file.startsWith(SCENARIO)) {
+              if (!modulesFor([file]).modules.length) return { full: true, modules: [], why: step };
+              reached.add(file);
+            }
+            const name = [...text.slice(0, match.index).matchAll(/\bfn\s+(\w+)/g)].pop()?.[1];
+            if (file.startsWith(SCENARIO) || !name || seen.has(name)) continue;
+            seen.add(name);
+            callers.push(new RegExp(`(?<!fn\\s)\\b${name}\\(`, "g"));
+          }
+        }
+      }
+      needles = callers;
+    }
+    if (needles.length) return { full: true, modules: [], why: step };
+    const modules = reached.size ? modulesFor([...reached]).modules : [];
+    if (!modules.length) return { full: true, modules: [], why: step };
+    for (const file of reached) files.add(file);
+  }
+  return { full: false, modules: files.size ? modulesFor([...files]).modules : [], why: changed };
+}
+
+/** knownFailuresNeeds for the change from `base` to the working tree, or null when it cannot be read. */
+export function knownFailuresDiff(base, root = repo) {
+  try {
+    const before = execFileSync("git", ["show", base + ":" + KNOWN_FAILURES_FILE], { cwd: root, encoding: "utf8", maxBuffer: 64 << 20 });
+    const after = readFileSync(path.join(root, KNOWN_FAILURES_FILE), "utf8");
+    const listed = execFileSync("git", ["ls-files", "gpui/crates/lattice-gpui/src/scenario"], { cwd: root, encoding: "utf8" }).split("\n");
+    const sources = new Map(listed.filter((file) => file.endsWith(".rs") && existsSync(path.join(root, file))).map((file) => [file, readFileSync(path.join(root, file), "utf8")]));
+    return knownFailuresNeeds(before, after, sources);
+  } catch {
+    return null;
+  }
+}
+
 /** Files the branch changed against `base`'s merge base, committed or not. */
 export function changedFiles(base) {
   const git = (...args) => execFileSync("git", args, { cwd: repo, encoding: "utf8" });

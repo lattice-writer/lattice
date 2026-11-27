@@ -540,6 +540,10 @@ impl Run {
             layouts.len() == 2 && layouts.iter().all(|layout| layout["placed"] == json!(true) && layout["synctex"] == json!(true)),
             json!({ "layouts": layouts }),
         );
+        // A layout that failed above leaves the loop with the setting on, and
+        // every later module would build into the hidden folder (LEO-144:
+        // pdf_compounds then found no compounds on Linux).
+        cx.update(|cx| crate::settings::update(cx, |settings| settings.hidden_build_files = false));
 
         // A document that loops: Stop ends the build, which reports nothing.
         // The outside edit builds it on its own (main.tex is open); only
