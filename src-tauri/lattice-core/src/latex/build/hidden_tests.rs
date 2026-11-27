@@ -72,6 +72,8 @@ fn a_hidden_build_names_its_folder_to_latexmk() {
     let beside = args.iter().position(|arg| arg == "-auxdir=.").unwrap();
     let hidden = args.iter().position(|arg| arg == "-auxdir=/p/.research/build/paper").unwrap();
     assert!(beside < hidden, "{args:?}");
+    let emulated = args.windows(2).any(|pair| pair == ["-e", "$emulate_aux = 1;"]);
+    assert_eq!(emulated, cfg!(not(windows)), "{args:?}");
     let command = latexmk_into(Path::new("/p"), AuxFiles::Beside, "paper/main.tex");
     assert!(!command.get_args().any(|arg| arg.to_string_lossy().contains(".research")));
 }
