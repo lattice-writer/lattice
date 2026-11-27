@@ -27,7 +27,7 @@ import { pruneServerRuntime } from "./lib/synara-server-prune.mjs";
 import { capture, projectRoot, readJson, removePath, run, sha256, treeBytes, walkFiles, writeJson } from "./lib/util.mjs";
 import { NODE_RELEASES as TARGETS, prepareNodeRuntime } from "./lib/node-runtime.mjs";
 import { SYNARA_RUNTIME_INPUTS } from "./synara-runtime-inputs.mjs";
-import { patchCodexHostProcess } from "./synara-codex-host.mjs";
+import { verifyCodexHostProcess } from "./synara-codex-host.mjs";
 
 const runtimeConfig = readJson(join(projectRoot, "scripts/synara-runtime.json"));
 const allowDirty = process.argv.includes("--allow-dirty");
@@ -236,8 +236,7 @@ function installServerRuntime(stageRoot) {
     join(stageRoot, "bin/bibtex-tidy.cmd"),
     "@echo off\r\n\"%~dp0node.exe\" \"%~dp0..\\tools\\bibtex-tidy.mjs\" %*\r\n",
   );
-  const bundle = join(serverRoot, "dist/index.mjs");
-  writeFileSync(bundle, patchCodexHostProcess(readFileSync(bundle, "utf8")));
+  verifyCodexHostProcess(readFileSync(join(serverRoot, "dist/index.mjs"), "utf8"));
   mkdirSync(join(stageRoot, "licenses"), { recursive: true });
   cpSync(join(sourceRoot, "LICENSE"), join(stageRoot, "licenses/Synara-MIT.txt"));
   return serverPackage.version;

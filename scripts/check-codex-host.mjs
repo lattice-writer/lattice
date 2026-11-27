@@ -1,5 +1,6 @@
 // Opt-in macOS smoke: node scripts/check-codex-host.mjs /absolute/path/to/codex
-// Uses the staged spawn path, a disposable Codex home, and no model requests.
+// Checks the staged bundle's Codex host fixes, then runs Codex inside the host sandbox
+// with a disposable Codex home and no model requests.
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -7,7 +8,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
-import { runInNewContext } from "node:vm";
+import { verifyCodexHostProcess } from "./synara-codex-host.mjs";
 
 const script = fileURLToPath(import.meta.url);
 const root = resolve(dirname(script), "..");
@@ -36,19 +37,12 @@ if (!inside) {
     rmSync(fixture, { recursive: true, force: true });
   }
 } else {
-  const bundle = readFileSync(join(root, "src-tauri/synara-runtime/server/dist/index.mjs"), "utf8");
-  const start = bundle.indexOf("function spawnCodexAppServer(input) {");
-  const end = bundle.indexOf("\nfunction ", start + 1);
-  assert.ok(start >= 0 && end > start);
-  const spawnCodex = runInNewContext(`${bundle.slice(start, end)}; spawnCodexAppServer`, {
-    process,
-    ACTIVE_AGENT_HOST_PROFILE: { id: "lattice" },
-    spawnProcess: (command, args, options) => {
-      assert.equal(command, binary, "Do not nest sandbox-exec inside the host sandbox");
-      return spawn(command, args, options);
-    },
-  });
-  const child = spawnCodex({ binaryPath: binary, cwd: inside, env: {
+  // Since Synara 1.6.8 the bundle is minified, so its spawn function can no longer be
+  // lifted out by name. Staging checks that it still skips the nested sandbox under
+  // LATTICE_BIBLIOGRAPHY_SANDBOX=1 (synara-codex-host.mjs); here Codex runs as that
+  // branch starts it, directly inside the host sandbox.
+  verifyCodexHostProcess(readFileSync(join(root, "src-tauri/synara-runtime/server/dist/index.mjs"), "utf8"));
+  const child = spawn(binary, ["app-server"], { cwd: inside, env: {
     PATH: process.env.PATH, HOME: inside, CODEX_HOME: join(inside, "codex-home"),
     TMPDIR: process.env.TMPDIR, LATTICE_BIBLIOGRAPHY_SANDBOX: "1",
   } });
