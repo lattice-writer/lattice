@@ -312,7 +312,14 @@ fn build_passes(
     // is the answer (`unchanged`). After fixing missing packages, latexmk often
     // reports "Nothing to do" while still remembering the previous failed
     // pass: a build the writer asked for cleans once and forces a fresh run.
-    let stale = !result.success && is_stale_previous_invocation_log(&result.log);
+    // An older latexmk that forgot the failure answers the same way, with
+    // success: it is that same stale failure.
+    let forgotten = unchanged::forgotten_failure(root, &result);
+    if forgotten {
+        wide_event::record("forgotten_failure", true);
+        result.success = false;
+    }
+    let stale = forgotten || (!result.success && is_stale_previous_invocation_log(&result.log));
     if stale && unattended {
         wide_event::record("unchanged_failure", true);
         result = unchanged::restate(root, result);
