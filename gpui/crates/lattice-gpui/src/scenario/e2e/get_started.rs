@@ -176,6 +176,28 @@ impl Run {
             );
             return Ok(());
         }
+        // Leaving a project while its build or a terminal command runs asks
+        // first (`confirm_leaving`), so the tutorial would wait on that
+        // question. The jump above builds the fixture, and the terminal
+        // module before this one can leave a command running; on a slow
+        // runner (Linux CI) either can still be going here, so the switch
+        // waits for both, as the switch back waits for the build.
+        let running = |shell: &gpui::Entity<crate::shell::Shell>, cx: &gpui::App| {
+            let shell = shell.read(cx);
+            (shell.building(), shell.terminal.read(cx).running(None, cx))
+        };
+        let (fixture_building, commands) = cx.update(|cx| running(&self.shell, cx));
+        let asking = |cx: &mut gpui::App| {
+            let host = crate::confirm::install(cx).read(cx);
+            host.question().map(|title| (title, host.question_body()))
+        };
+        let asked_before = cx.update(asking);
+        let fixture_settled = self
+            .wait_for(cx, Duration::from_secs(60), |shell, cx| {
+                let (building, commands) = running(shell, cx);
+                !building && commands.is_empty()
+            })
+            .await;
         self.with_window(cx, |shell, window, cx| {
             shell.update(cx, |shell, cx| shell.open_tutorial(window, cx))
         })?;
@@ -188,10 +210,19 @@ impl Run {
                     && shell.view_on_screen("start", cx)
             })
             .await;
+        let asked = cx.update(asking);
         steps_run.check(
             "opening the tutorial shows the checklist with the sample",
-            tutorial,
-            json!({}),
+            fixture_settled && tutorial,
+            json!({
+                "before": {
+                    "building": fixture_building,
+                    "commands": commands,
+                    "settled": fixture_settled,
+                    "question": asked_before,
+                },
+                "question_left_open": asked,
+            }),
         );
         // Opening the tutorial builds its sample, and a switch while a build
         // runs asks first ("Switch away from …?", the shells'
