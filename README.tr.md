@@ -43,7 +43,7 @@ Herhangi bir paneli istediğiniz yere sabitleyin, Yazma, Okuma ve Kaynakça düz
 
 Her düzenleme için bir gerekçeyle birlikte yerinde **Proofread** (Yazım Denetimi) veya **Polish** (İyileştirme) yapmak üzere metin seçin.
 Kaynak koda veya PDF'e notlar ekleyin, ardından notlarınızdan turlar hâlinde düzeltme yapın: ajan her biri için bir düzenleme önerir ve siz bunu yerinde kabul eder veya reddedersiniz.
-Notlar ve Overleaf yorumları PDF'in yanındaki bir sütunda da hizalanır; her seviye sayfadaki işaretiyle gösterilir ve bunları orada okuyabilir, yanıtlayabilir ve çözümleyebilirsiniz.
+Notlar ve Overleaf yorumları PDF'in yanındaki bir sütunda da hizalanır; her biri sayfadaki işaretiyle aynı hizada gösterilir ve bunları orada okuyabilir, yanıtlayabilir ve çözümleyebilirsiniz.
 **Export review PDF**, işaretlediğiniz notları derlenmiş PDF'in bir kopyasına standart PDF yorumları olarak yazar; böylece iş birliği yaptığınız kişiler bunları Preview, Acrobat veya Zotero'da okuyabilir.
 
 ### Kendi ajanınızı getirin
@@ -100,7 +100,7 @@ Henüz TeX kurulu değil mi? Lattice sizin için BasicTeX kurmayı teklif eder: 
 2. Bir klasör açın, bir şablondan başlayın veya bir Overleaf projesi bağlayın.
    Proje menüsündeki **Guided tutorial**, Başlangıç listesinin (PDF derlemekten ajanın bir paragrafı revize etmesine izin vermeye kadar altı adımlı kontrol listesi) yanında örnek bir makale açar.
 
-Resmi derlemeler Apple tarafından imzalanır, noter onayından geçer ve kendilerini günceller.
+Resmi derlemeler imzalıdır, Apple tarafından onaylanmıştır (notarized) ve kendilerini günceller.
 
 **Linux (deneysel).** Linux kontrollerinden geçen sürümler, Ubuntu 22.04 veya üzeri, Fedora 45 ve benzeri dağıtımlar için x86_64 `.AppImage` dosyası da içerir.
 Çalıştırılabilir yapın (`chmod +x Lattice_*.AppImage`) ve çalıştırın; dağıtımınızın paketlerindeki TeX Live ile derler.
@@ -118,7 +118,7 @@ Hata bildirimleri ve pull request'ler memnuniyetle karşılanır; büyük bir ye
 Lattice birçok açık kaynak projenin üzerinde yükselmektedir. Başlıcaları:
 
 - [Open Knowledge](https://github.com/inkeep/open-knowledge) (inkeep/open-knowledge) — Inkeep tarafından geliştirilen ve Lattice'in önceki görsel Markdown düzenleyicisinin özgün temelini oluşturan proje. Lattice o zamandan beri kendi motoruna geçti ancak düzenleyici oradan başladı ve kendilerine minnettarız.
-- [Trellis](https://github.com/DanFessler/trellis) — Dan Fessler tarafından geliştirilen, Lattice çalışma alanının sabitlenebilir panel düzeni. DanFessler tarafından geliştirilen Trellis kullanılmaktadır - github.com/DanFessler/trellis.
+- [Trellis](https://github.com/DanFessler/trellis) — Dan Fessler tarafından geliştirilen, Lattice çalışma alanının sabitlenebilir panel düzeni. Uses Trellis by DanFessler - github.com/DanFessler/trellis.
 - [Synara](https://github.com/Emanuele-web04/synara) — T3 Tools Inc. ve Emanuele Di Pietro tarafından geliştirilen, Lattice'in yapay zeka asistanının arkasındaki ajan çalışma zamanı.
 - [Open Slide](https://github.com/open-slide/open-slide) — sunumlara güç veren proje.
 - [Tiptap](https://github.com/ueberdosis/tiptap) ve [CodeMirror](https://codemirror.net/) — zengin metin ve kaynak kod düzenleyicileri.
@@ -128,11 +128,13 @@ Lattice birçok açık kaynak projenin üzerinde yükselmektedir. Başlıcaları
 
 ## Lisans
 
-Lattice, T3 Tools Inc. ve Emanuele Di Pietro tarafından geliştirilen MIT lisanslı [Synara](https://github.com/Emanuele-web04/synara) ajan çalışma zamanıyla birlikte [Apache License 2.0](LICENSE) altında lisanslanmıştır (ayrıca bkz. [NOTICE](NOTICE)).
+Lattice [Apache License 2.0](LICENSE) altında lisanslanmıştır (ayrıca bkz. [NOTICE](NOTICE)); T3 Tools Inc. ve Emanuele Di Pietro tarafından geliştirilen MIT lisanslı [Synara](https://github.com/Emanuele-web04/synara) ajan çalışma zamanını içerir.
 0.1.341 dahil ve öncesi sürümler GPL-3.0-or-later lisanslıydı ve bu koşullar altında kullanılabilir olmaya devam etmektedir.
 Bileşen lisansları için [üçüncü taraf bildirimlerine](THIRD_PARTY_NOTICES.md) ve çalışma zamanı ayrıntıları için [Synara entegrasyon notlarına](docs/synara-runtime.md) bakın.
 
 [`gpui/`](gpui/) içindeki GPUI önizleme uygulaması, Zed'in GPL-3.0-or-later düzenleyici crate'lerini bağladığı için GPL-3.0-or-later ([`gpui/LICENSE`](gpui/LICENSE)) altında ayrı bir programdır; [kendi README'sinde](gpui/README.md#license) listelendiği gibi birkaç parçası Apache-2.0 lisanslıdır.
 `gpui/` dışındaki her şey Apache-2.0 olarak kalır.
 
-Bir bileşenin kendi koşulları vardır: çalışma alanının panel düzeni `@danfessler/trellis` (`@danfessler/trellis-react` ile birlikte), ticari bir katmana sahip kendi ticari olmayan lisansı altındadır; bkz. [lisansı](public/licenses/trellis-LICENSE.md), [ticari olmayan koşullar](public/licenses/trellis-LICENSE-NONCOMMERCIAL.md) ve [ticari koşullar](public/licenses/trellis-LICENSE-COMMERCIAL.md). Bu koşullar Lattice'i kullanan herkes için geçerlidir: ücretsiz katman yalnızca ticari olmayan kullanımı kapsar; dolayısıyla bir şirkette veya kâr amacı güden bir kuruluşta kullanım için yazarından bir Trellis lisansı alınması gerekir. DanFessler tarafından geliştirilen Trellis kullanılmaktadır - github.com/DanFessler/trellis.
+Bir bileşenin kendi koşulları vardır: çalışma alanının panel düzeni `@danfessler/trellis` (`@danfessler/trellis-react` ile birlikte), ticari bir katmana sahip kendi ticari olmayan lisansı altındadır; bkz. [lisansı](public/licenses/trellis-LICENSE.md), [ticari olmayan koşullar](public/licenses/trellis-LICENSE-NONCOMMERCIAL.md) ve [ticari koşullar](public/licenses/trellis-LICENSE-COMMERCIAL.md). Bu koşullar Lattice'i kullanan herkes için geçerlidir: ücretsiz katman yalnızca ticari olmayan kullanımı kapsar; dolayısıyla bir şirkette veya kâr amacı güden bir kuruluşta kullanım için yazarından bir Trellis lisansı alınması gerekir. Uses Trellis by DanFessler - github.com/DanFessler/trellis.
+
+> Hukuki ve lisans koşullarında İngilizce [README](README.md) ve depo içindeki `LICENSE` dosyaları esas alınır.
