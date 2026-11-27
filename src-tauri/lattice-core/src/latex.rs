@@ -179,6 +179,15 @@ fn latexmk_into(root: &Path, layout: AuxFiles, document: &str) -> Command {
         let folder = PathBuf::from(crate::host_paths::tex_path(&folder));
         // After `-auxdir=.` in the overrides: the last one wins.
         command.arg(format!("-auxdir={}", folder.display()));
+        // TeX Live's engines have no -aux-directory (MiKTeX's do). latexmk
+        // 4.76, Ubuntu 22.04's, passes it anyway: that first run fails and
+        // leaves its .aux beside the document, and only then does latexmk
+        // switch to emulating the folder. Newer ones emulate from the start
+        // on their own. Set as a variable, not -emulate-aux-dir, which
+        // latexmk 4.67 (Ubuntu 20.04's) rejects as a bad option; that one
+        // ignores the variable.
+        #[cfg(not(windows))]
+        command.args(["-e", "$emulate_aux = 1;"]);
     }
     unwrapped_log(&mut command);
     command
