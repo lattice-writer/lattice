@@ -123,7 +123,7 @@ impl Run {
         );
 
         let places = cx.update(|cx| {
-            crate::titlebar::places(&second.shell.read(cx), cx)
+            crate::titlebar::places(second.shell.read(cx), cx)
                 .map(|places| (places.history, places.main, places.agent))
         });
         steps.check(

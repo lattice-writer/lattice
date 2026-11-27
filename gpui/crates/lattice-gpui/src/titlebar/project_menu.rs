@@ -72,10 +72,7 @@ pub(super) fn project_menu(
     let others = RecentProjects::others(current.as_deref(), cx);
     let more = others.len() > MAX_SWITCHER_PROJECTS;
     let mut menu = menu.min_w(px(208.));
-    if let Some(places) = shell
-        .upgrade()
-        .and_then(|shell| places(&shell.read(cx), cx))
-    {
+    if let Some(places) = shell.upgrade().and_then(|shell| places(shell.read(cx), cx)) {
         let (history, main, agent) = (shell.clone(), shell.clone(), shell.clone());
         let main_document = places.main_document.clone();
         menu = menu

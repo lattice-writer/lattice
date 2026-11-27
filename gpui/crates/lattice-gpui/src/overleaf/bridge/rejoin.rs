@@ -48,11 +48,11 @@ impl OverleafBridge {
     /// one waiting to join does so now. Documents with work out are held
     /// over the drop and carried on (`documents/resume.rs`).
     pub fn system_woke(&mut self) {
-        if self.channel == ChannelStatus::Live {
-            if let Some(client) = &self.client {
-                client.rejoin_after_sleep();
-                return;
-            }
+        if self.channel == ChannelStatus::Live
+            && let Some(client) = &self.client
+        {
+            client.rejoin_after_sleep();
+            return;
         }
         self.network_came_back();
     }
@@ -63,11 +63,11 @@ impl OverleafBridge {
     /// hears nothing (`probe_after_path_change`); one waiting to join does
     /// so now. Documents with work out are carried over, as after a wake.
     pub fn network_path_changed(&mut self) {
-        if self.channel == ChannelStatus::Live {
-            if let Some(client) = &self.client {
-                client.probe_after_path_change();
-                return;
-            }
+        if self.channel == ChannelStatus::Live
+            && let Some(client) = &self.client
+        {
+            client.probe_after_path_change();
+            return;
         }
         self.network_came_back();
     }

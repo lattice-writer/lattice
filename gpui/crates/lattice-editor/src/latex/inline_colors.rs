@@ -468,6 +468,8 @@ mod tests {
         );
         // A light highlight's ink takes the bytes it covers.
         let revised = text.find("revised").unwrap();
+        // One highlight: a slice of one range, not a range of indices.
+        #[allow(clippy::single_range_in_vec_init)]
         let inked = paint(&text[1..], 1, false, &[revised..revised + 3]);
         let ranges: Vec<&str> = inked.iter().map(|mark| &text[mark.range.clone()]).collect();
         assert_eq!(ranges, vec![" ", "ised"]);

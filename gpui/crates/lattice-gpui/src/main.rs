@@ -7,6 +7,12 @@
 //! Windows and Linux, the measurements on macOS):
 //! `lattice-gpui PROJECT_DIR --scenario e2e|perf|ime --out RESULT.json`.
 
+// Many e2e modules run on macOS only (`#![cfg(target_os = "macos")]`, see
+// `scenario/e2e/registry.rs`), so elsewhere the scenario hooks, mocks and
+// re-exports only they call are unused, as is code only macOS's native
+// features reach. macOS builds still report dead code and unused imports.
+#![cfg_attr(not(target_os = "macos"), allow(dead_code, unused_imports))]
+
 mod agent;
 mod annotations;
 mod app;

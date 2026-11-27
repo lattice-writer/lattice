@@ -460,6 +460,8 @@ impl Shell {
         self.workspace.read(cx).engine().min_width() + WORKSPACE_SIDES
     }
 
+    // Elsewhere nothing follows the early return, which only macOS needs.
+    #[cfg_attr(not(target_os = "macos"), allow(clippy::needless_return))]
     fn apply_minimum_size(&self, window: &mut Window, cx: &mut Context<Self>) {
         let layout = self.layout_minimum_width(cx);
         let screen = window
