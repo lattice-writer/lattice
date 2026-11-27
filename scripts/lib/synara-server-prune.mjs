@@ -71,16 +71,20 @@ export function pruneServerRuntime(stageRoot, { target, platform }) {
 }
 
 /**
- * Pruning Shiki's grammars and themes is safe only while the server bundle
- * imports @pierre/diffs once, lazily, and takes nothing but parsePatchFiles from
- * it, and never imports Shiki itself. Loud on purpose: a runtime bump that
- * starts highlighting on the server must keep them instead.
+ * Pruning Shiki's grammars and themes is safe only while the server never
+ * imports Shiki itself and, when it loads @pierre/diffs from node_modules,
+ * imports it once, lazily, and takes nothing but parsePatchFiles from it.
+ * Since Synara 1.6.8 the bundle inlines @pierre/diffs with Shiki tree-shaken
+ * away, so then only the Shiki imports are checked. Loud on purpose: a runtime
+ * bump that starts highlighting on the server must keep them instead.
  */
 function assertServerNeverHighlights(distRoot) {
   const bundles = readdirSync(distRoot)
     .filter((entry) => entry.endsWith(".mjs") && entry !== "runtimeDependencySmoke.mjs")
     .map((entry) => readFileSync(join(distRoot, entry), "utf8"));
   const source = bundles.join("\n");
+  const importsShiki = /(?:from\s*|import\(\s*)"(?:shiki|@shikijs\/[^"]*)"/.test(source);
+  if (!source.includes('"@pierre/diffs"') && !importsShiki) return;
   const loader = /const (\w+) = lazyModule\(\(\) => import\("@pierre\/diffs"\)\);/.exec(source)?.[1];
   const calls = loader ? source.split(`${loader}()`).length - 1 : 0;
   const parses = loader ? source.split(`${loader}()), ({ parsePatchFiles }) =>`).length - 1 : 0;

@@ -43,7 +43,7 @@ Lattice 把它们放进同一个原生 Mac 窗口。
 
 ### 用你自己的智能体
 
-Agent 面板运行 [Claude Code](https://github.com/anthropics/claude-code) 或 [Codex](https://github.com/openai/codex)，也可以是 Mac 上的其他智能体命令行工具，比如 Cursor、OpenCode 或 Droid，都用你自己的账号登录。
+Agent 面板运行 [Claude Code](https://github.com/anthropics/claude-code) 或 [Codex](https://github.com/openai/codex)，也可以是 Mac 上的其他智能体命令行工具，比如 Cursor、Antigravity（`agy`）、OpenCode 或 Droid，都用你自己的账号登录。
 Lattice 不自带模型，也没有自己的 AI 订阅。
 智能体能读项目和文献、修复编译错误、编辑文件；每处改动都以差异显示，可以审阅或撤销。
 它也能用你给这个命令行工具添加的 MCP 服务器，比如 Zotero 或 Heptabase：见 [Zotero, Heptabase and the Agent panel](docs/zotero-and-notes.md)。

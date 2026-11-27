@@ -1,103 +1,21 @@
-import { EventEmitter } from "node:events";
-import { runInNewContext } from "node:vm";
-import { expect, it, vi } from "vitest";
-import { patchCodexHostProcess } from "./synara-codex-host.mjs";
+import { expect, it } from "vitest";
+import { verifyCodexHostProcess } from "./synara-codex-host.mjs";
 
-// The pinned bundle's relevant branches. Staging also rejects any drift in
-// these anchors against the actual bundle, including its logger symbol.
-const source = `
-const log$2 = createLogger("codex");
-function spawnCodexAppServer(input) {
-	const latticeBibGuard = ACTIVE_AGENT_HOST_PROFILE.id === "lattice" && process.platform === "darwin";
-	return spawnProcess(latticeBibGuard ? "/usr/bin/sandbox-exec" : input.binaryPath,
-		latticeBibGuard ? ["-p", "bib-profile", input.binaryPath, "app-server"] : ["app-server"], { env: input.env });
-}
-class Manager {
-	attachProcessListeners(context) {
-		context.child.stdout.once("end", () => this.handleTransportFailure(context));
-		context.child.stderr.on("data", (chunk) => {
-			if (context.stopping) return;
-			const lines = chunk.toString().split(/\\r?\\n/g);
-			for (const rawLine of lines) {
-				const classified = classifyCodexStderrLine(rawLine);
-				if (!classified) continue;
-				if (classified.configWarning) {
-					this.handleServerNotification(context, { method: "configWarning", params: { summary: classified.message, details: null } });
-					continue;
-				}
-				this.emitErrorEvent(context, "process/stderr", classified.message);
-			}
-		});
-		context.child.on("exit", (code, signal) => {
-			if (context.stopping && context.failureStopping !== true) return;
-			const message = \`codex app-server exited (code=\${code ?? "null"}, signal=\${signal ?? "null"}).\`;
-			this.updateSession(context, { lastError: message });
-		});
-	}
-}
-({ spawnCodexAppServer, Manager });
-`;
+// A minified fork bundle keeps the literals the fixes add, whatever it names the code around
+// them. Upstream's own exit message is in every bundle and must not stand in for the fork's log.
+const upstream = 'const k=`codex app-server exited (code=${l??"null"}, signal=${m??"null"}).`;';
+const bundle = `${upstream}const a=b("codex");function c(d){const e=f.id==="lattice"&&process.platform==="darwin"&&process.env.LATTICE_BIBLIOGRAPHY_SANDBOX!=="1";}g.on("data",h=>{a.warn(\`codex app-server stderr\`,{});});g.on("exit",(i,j)=>{a.info("codex app-server exit",{});});`;
 
-function load({ platform = "darwin", host = "lattice", marker, patched = true } = {}) {
-  const log = { warn: vi.fn(), info: vi.fn() };
-  const exports = runInNewContext(patched ? patchCodexHostProcess(source) : source, {
-    process: { platform, env: { LATTICE_BIBLIOGRAPHY_SANDBOX: marker } },
-    ACTIVE_AGENT_HOST_PROFILE: { id: host },
-    spawnProcess: (binary, args, options) => ({ binary, args, options }),
-    classifyCodexStderrLine: (line) => line.trim() ? { message: line.trim() } : null,
-    createLogger: () => log,
-  });
-  return { ...exports, log };
-}
+it("accepts a bundle that carries every Codex host fix", () => {
+  expect(() => verifyCodexHostProcess(bundle)).not.toThrow();
+});
 
 it.each([
-  [{ marker: "1" }, "/codex"],
-  [{ marker: undefined }, "/usr/bin/sandbox-exec"],
-  [{ marker: "0" }, "/usr/bin/sandbox-exec"],
-  [{ marker: "true" }, "/usr/bin/sandbox-exec"],
-  [{ platform: "linux" }, "/codex"],
-  [{ host: "synara" }, "/codex"],
-])("avoids only the inherited host's duplicate sandbox: %j", (config, binary) => {
-  const { spawnCodexAppServer } = load(config);
-  const result = spawnCodexAppServer({ binaryPath: "/codex", env: { KEEP: "value" } });
-  expect(result.binary).toBe(binary);
-  expect(result.options.env).toEqual({ KEEP: "value" });
-  expect(result.args.at(-1)).toBe("app-server");
-});
-
-it("reports stderr to an active thread, then captures stderr and exit after stdout EOF without resurrecting it", () => {
-  const { Manager, log } = load();
-  const manager = new Manager();
-  const context = { session: { threadId: "thread-test" }, stopping: false,
-    child: Object.assign(new EventEmitter(), { stdout: new EventEmitter(), stderr: new EventEmitter() }) };
-  manager.emitErrorEvent = vi.fn();
-  manager.updateSession = vi.fn();
-  manager.handleTransportFailure = () => { context.stopping = true; };
-  manager.attachProcessListeners(context);
-  context.child.stderr.emit("data", Buffer.from("\nactual failure\n"));
-  expect(manager.emitErrorEvent).toHaveBeenCalledExactlyOnceWith(context, "process/stderr", "actual failure");
-  expect(log.warn).toHaveBeenCalledOnce();
-  context.child.stdout.emit("end");
-  context.child.stderr.emit("data", Buffer.from("sandbox-exec: sandbox_apply: Operation not permitted\n"));
-  context.child.emit("exit", 71, null);
-  expect(log.warn).toHaveBeenLastCalledWith("codex app-server stderr", {
-    threadId: "thread-test", message: "sandbox-exec: sandbox_apply: Operation not permitted",
-  });
-  expect(log.info).toHaveBeenCalledWith("codex app-server exit", {
-    threadId: "thread-test", code: 71, signal: null, stopping: true,
-  });
-  expect(manager.emitErrorEvent).toHaveBeenCalledOnce();
-  expect(manager.updateSession).not.toHaveBeenCalled();
-});
-
-it("rejects upstream drift and double patching", () => {
-  expect(() => patchCodexHostProcess("changed upstream")).toThrow();
-  expect(() => patchCodexHostProcess(patchCodexHostProcess(source))).toThrow();
-});
-
-it("resolves the Codex logger after bundler symbol ordering changes", () => {
-  const patched = patchCodexHostProcess(source.replaceAll("log$2", "log$4"));
-  expect(patched).toContain('log$4.warn("codex app-server stderr"');
-  expect(patched).toContain('log$4.info("codex app-server exit"');
-  expect(patched).not.toContain("log$2");
+  ["LATTICE_BIBLIOGRAPHY_SANDBOX", "LATTICE_BIBLIOGRAPHY_SANDBOX"],
+  ["codex app-server stderr", "`codex app-server stderr`"],
+  ["codex app-server exit", '"codex app-server exit"'],
+])("fails closed when the bundle lost %s", (marker, literal) => {
+  const lost = bundle.replace(literal, '"x"');
+  expect(lost).toContain("codex app-server exited");
+  expect(() => verifyCodexHostProcess(lost)).toThrow(marker);
 });

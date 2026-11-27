@@ -8,18 +8,19 @@ measurements; re-run the commands rather than quoting them.
 
 ## The current pin
 
-The fork as a whole is **not** small. Measured on 2026-11-24 against upstream
-`v1.6.2` (`47f8f39979a61fc16e86b214c65bf56c46284061`), the current integration changes
-**925 files, +94,180 / −7,950 lines** (about 6,700 of the added lines are the zh-CN catalogs,
+The fork as a whole is **not** small. Measured on 2026-11-27 against upstream
+main `557533309` (1.6.8 plus a label-automation chore), the current integration changes
+**933 files, +94,259 / −7,960 lines** (about 6,900 of the added lines are the zh-CN catalogs,
 which upstream no longer ships). It carries embedded-workspace UI, a skills manager,
 source-control and provider-health surfaces, spreadsheet and canvas tool brokers, and their
 contracts. Treat "keep it in the seam" as the goal for new work. Re-measure after each sync:
 
 ```bash
-git diff --shortstat v1.6.2 HEAD
+git diff --shortstat v1.6.8 HEAD
 ```
 
-The current pin is the upstream **1.6.2 stable release** (see [its entry](#synara-162-compatibility)), merged with the complete previous
+The current pin is the upstream **1.6.8 stable release** (see [its entry](#synara-168-compatibility)), merged with the complete previous
+`amp/lattice-v1.6.2-sync` history (see the [1.6.2 entry](#synara-162-compatibility)), which carries the
 `amp/lattice-v1.5.2-sync` history (which carries the earlier `amp/lattice-v1.5.1-sync`, `amp/lattice-v1.1.0-sync`, `amp/lattice-v1.0.9-sync`, `amp/lattice-v1.0.8-sync`, `amp/lattice-v1.0.7-sync`, `amp/lattice-v1.0.6-sync`, `amp/lattice-v1.0.5-sync`, `amp/lattice-v1.0.4-sync`, `amp/lattice-v1.0.3-sync`, `amp/lattice-v1.0.1-sync` and `amp/lattice-v1.0.0-sync` histories). Upstream's account-aware provider configuration and standalone
 Code review inbox remain available. The embedded **Pull requests** view now uses that inbox,
 waits for the open Lattice workspace to bind, and fixes its project filter to that workspace.
@@ -456,6 +457,30 @@ Three upstream behaviours are kept as they are, on the captain's call:
 The server adds migration 143 (usage analytics deleted tokens), which runs once after the pre-migration backup on a 1.5.1-era database; a Lattice that pins 1.5.1 again would meet the newer database. Upstream's macOS update and shutdown, Linux ARM64 and CI changes have no embedded surface. Its simulator control reached the embed's device dock until the current pin, which stops Lattice granting it (see [the current pin](#the-current-pin)). Pi stays at 1.4.0.
 
 The staged runtime is 175.2 MB (1.5.1: 175.0 MB); the lab bundle installs at 342.3 MiB (342.1 MiB with the 1.5.1 runtime) against the 400 MiB ceiling.
+
+## Synara 1.6.8 compatibility
+
+The pin is upstream main `557533309` (the 1.6.8 release and a label-automation chore) merged with the whole `amp/lattice-v1.6.2-sync` history through fork PR 48 ([fork PR 50](https://github.com/leo1oel/synara/pull/50)). `amp/lattice-v1.6.8-sync` started at the previous pin `29c3621cf`, and the upgrade reaches it through that one pull request with a merge commit. 1.6.3 to 1.6.7 come in with it. 32 files conflicted (about 60 hunks), each resolved by hand.
+
+**Antigravity (lattice-writer/lattice#1374).** The Agent panel already listed Antigravity (`agy`), but 1.6.2 drove it through `agy -p` print mode. 1.6.8 runs it through `agy acp`, so Lattice's tools reach it over MCP like the other agents, and it gains native approvals, questions, planners, subagents, steering, multi-folder projects and its quota under Usage & limits. Lattice keeps no provider list of its own: Settings › Agent › Providers and the model picker are the fork's pages, and Antigravity sits there between Cursor and Grok. The fork adds three things for it:
+
+- Its ACP client announces the host profile's name (`Lattice`), as Cursor, Droid and Grok already do.
+- A signed-out `agy` (`agy models` exits 1 with "Please sign in to view available models") is reported as not signed in, with "Antigravity CLI is not signed in. Run `agy` and sign in, then try again.", rather than "could not verify login". The model picker then offers **Sign in**, which starts only on click.
+- The fork's print-mode helpers and their two tests are gone with upstream's rewrite. Images a tool returns are still kept under the chat row, and image attachments are sent once, as ACP image blocks.
+
+**Kept out.** Upstream 1.6.8 ends every pull request Synara creates with "Created with Synara", on by default and switched off only in Synara's Git settings, which the embed doesn't have. Under the Lattice profile the server never adds the footer (`pullRequestAttributionUnavailableInHost`), and the embed hides the switch. Upstream's product-analytics notice and its Remote announcement stay hidden in the embed. The new dithered empty-chat backdrops (Temple, Gradient) never render there, since the embed has no centred landing.
+
+**Codex host fixes move into the fork.** 1.6.8 minifies the server bundle, so the staging-time string patch `scripts/synara-codex-host.mjs` applied could no longer find its targets. The three behaviours now live in the fork's `codexAppServerManager.ts`: no nested `sandbox-exec` under `LATTICE_BIBLIOGRAPHY_SANDBOX=1`, classified Codex stderr logged after teardown began, and every app-server exit logged. The two logs now run under every host profile, standalone Synara included, where the patch reached only Lattice's bundle. The script now only fails staging when the bundle lacks the literals those fixes add (each matched up to its closing quote, since upstream's own "codex app-server exited" message starts with the exit log's), and `check-codex-host.mjs` runs Codex inside the host sandbox directly instead of lifting the spawn function out of the bundle.
+
+**Staging.** 1.6.8 inlines `@pierre/diffs` (with Shiki tree-shaken away) and `@opencode/client` into the bundle, so the Shiki prune check accepts a bundle that imports neither `@pierre/diffs` nor Shiki. Upstream's dependency smoke imported `@opencode-ai/sdk` statically; the fork now loads it through `providerRuntimes` and skips that check where OpenCode isn't installed, as Lattice's runtime ships it on demand.
+
+**Smaller fixes.** zh-CN strings for everything 1.6.8 adds, including the subagent card's new "Status unknown". Usage analytics says This Device instead of This Mac off macOS, in both languages. A wiki-link fix the 1.6.2 merge had dropped (`$` inside `[[…]]` was read as math) is back.
+
+**Protocol.** Nothing changes between Lattice and the fork. Migrations 145 (thread session steering) and 146 (agent-gateway operation waves) run once after the pre-migration backup.
+
+**Environment and keys.** No new variable carries a credential. Antigravity's probes set `NO_BROWSER=true` and `AGY_CLI_DISABLE_AUTO_UPDATE=true`, so a status check never opens a sign-in page or starts `agy`'s updater.
+
+`pnpm prepare:synara` stages 165.2 MB on the Mac mini (1.6.2 at `29c3621cf`: 183.1 MB). Most of the drop is `@pierre/diffs` and `@opencode/client` moving into the bundle.
 
 ## Synara 1.6.2 compatibility
 

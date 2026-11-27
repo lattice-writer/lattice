@@ -99,9 +99,10 @@ The guard needs the system's `bwrap`, `/dev/fuse` with `fusermount3` (or `fuserm
 In the sandbox's own process table the service is always process 2, which is the `pid` Lattice expects in `server-runtime.json` there. The fork's database lifecycle lock names its owner by process ID, so a lock left by a killed service would look held by the next service itself. The guard therefore holds an exclusive `flock` on the service's folder for as long as it runs (a second Lattice on the same data folder is refused), and under that lock removes leftover `userdata/*.lifecycle-lock*` entries before it starts the service.
 
 The host sets `LATTICE_BIBLIOGRAPHY_SANDBOX=1` only when launching the service through its bibliography guard, on macOS and on Linux.
-`scripts/synara-codex-host.mjs` makes Codex inherit that protection instead of running a second `sandbox-exec`, which can fail before Codex starts on older macOS.
+The fork's `codexAppServerManager.ts` then makes Codex inherit that protection instead of running a second `sandbox-exec`, which can fail before Codex starts on older macOS.
 The standalone Lattice-profile Codex guard remains in place when the marker is absent.
-The staging patch resolves the Codex logger from its unique declaration, so upstream bundle-symbol reordering cannot send these events to a different provider logger. It records classified Codex stderr and process exit even after stdout EOF has begun teardown; it does not relax process-tree exit verification or unblock failed threads automatically.
+The same file records classified Codex stderr and process exit in the `codex` log even after stdout EOF has begun teardown; it does not relax process-tree exit verification or unblock failed threads automatically.
+These were a staging-time patch on the compiled bundle until Synara 1.6.8 began minifying it. `scripts/synara-codex-host.mjs` now only fails staging when the pinned bundle lacks the literals those fixes add.
 After staging, run `node scripts/check-codex-host.mjs /absolute/path/to/codex` on macOS to check a real initialize/thread/start/command/exec cycle, inherited `.bib` denial, permitted `.tex` writes, and clean exit in a disposable home, without sending model requests.
 For the packaged JavaScript engine, run the same script with the staged `src-tauri/synara-runtime/bin/node`.
 Settings → Logs → Export can collect bounded tails of `lattice.log`, `sidecar.log`, `sidecar-error.log`, and `server.log` after explicit consent, with known credential redaction and a preview before copying or downloading.

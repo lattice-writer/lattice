@@ -1,36 +1,22 @@
-// Keep these host integration fixes fail-closed against the pinned bundle until
-// the fork incorporates them. Do not remove the standalone bibliography guard.
-export function patchCodexHostProcess(source) {
-  // Bundler ordering changes this identifier between upstream releases. Resolve it
-  // from its logger declaration, and fail closed if that declaration is ambiguous.
-  const codexLoggers = [...source.matchAll(/const ([A-Za-z_$][\w$]*) = createLogger\("codex"\);/g)];
-  if (codexLoggers.length !== 1) {
-    throw new Error("Expected one Codex logger declaration; re-check the pinned Synara bundle");
+// The fork carries Lattice's Codex host fixes in its source (codexAppServerManager.ts):
+// Codex inherits the host's bibliography sandbox when LATTICE_BIBLIOGRAPHY_SANDBOX=1
+// instead of running a second sandbox-exec, and classified stderr and every app-server
+// exit are logged even after teardown began. Since Synara 1.6.8 the server bundle is
+// minified, so staging no longer patches it; it only fails closed when a pin lost them.
+// String literals survive minification, so each fix is found by the literal it adds,
+// closing quote included: upstream's own "codex app-server exited (…)" must not count.
+// Do not remove the standalone bibliography guard.
+const CODEX_HOST_MARKERS = [
+  ["LATTICE_BIBLIOGRAPHY_SANDBOX", /LATTICE_BIBLIOGRAPHY_SANDBOX/],
+  ["codex app-server stderr", /codex app-server stderr["'`]/],
+  ["codex app-server exit", /codex app-server exit["'`]/],
+];
+
+export function verifyCodexHostProcess(source) {
+  const missing = CODEX_HOST_MARKERS.filter(([, pattern]) => !pattern.test(source)).map(([name]) => name);
+  if (missing.length > 0) {
+    throw new Error(
+      `The pinned Synara bundle lacks Lattice's Codex host fixes (${missing.join(", ")}); re-check the fork's codexAppServerManager.ts`,
+    );
   }
-  const codexLogger = codexLoggers[0][1];
-  const replacements = [
-    [
-      'const latticeBibGuard = ACTIVE_AGENT_HOST_PROFILE.id === "lattice" && process.platform === "darwin";',
-      'const latticeBibGuard = ACTIVE_AGENT_HOST_PROFILE.id === "lattice" && process.platform === "darwin" && process.env.LATTICE_BIBLIOGRAPHY_SANDBOX !== "1";',
-    ],
-    [
-      '\t\tcontext.child.stderr.on("data", (chunk) => {\n\t\t\tif (context.stopping) return;\n\t\t\tconst lines = chunk.toString().split(/\\r?\\n/g);',
-      '\t\tcontext.child.stderr.on("data", (chunk) => {\n\t\t\tconst lines = chunk.toString().split(/\\r?\\n/g);',
-    ],
-    [
-      '\t\t\t\tif (!classified) continue;\n\t\t\t\tif (classified.configWarning) {',
-      '\t\t\t\tif (!classified) continue;\n\t\t\t\tlog$2.warn("codex app-server stderr", { threadId: context.session.threadId, message: classified.message });\n\t\t\t\tif (context.stopping) continue;\n\t\t\t\tif (classified.configWarning) {',
-    ],
-    [
-      '\t\tcontext.child.on("exit", (code, signal) => {\n\t\t\tif (context.stopping && context.failureStopping !== true) return;\n\t\t\tconst message = `codex app-server exited (code=${code ?? "null"}, signal=${signal ?? "null"}).`;',
-      '\t\tcontext.child.on("exit", (code, signal) => {\n\t\t\tlog$2.info("codex app-server exit", { threadId: context.session.threadId, code, signal, stopping: context.stopping });\n\t\t\tif (context.stopping && context.failureStopping !== true) return;\n\t\t\tconst message = `codex app-server exited (code=${code ?? "null"}, signal=${signal ?? "null"}).`;',
-    ],
-  ];
-  for (const [before, after] of replacements) {
-    if (source.split(before).length !== 2) {
-      throw new Error("Expected one Codex host process patch target; re-check the pinned Synara bundle");
-    }
-    source = source.replace(before, after.replaceAll("log$2.", `${codexLogger}.`));
-  }
-  return source;
 }
