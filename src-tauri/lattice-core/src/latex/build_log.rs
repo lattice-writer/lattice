@@ -286,7 +286,18 @@ pub(super) fn parse_format_diagnostics(preamble_output: &str, log: &str) -> Vec<
     diagnostics
 }
 
+/// From where the last engine run starts. TeX's banner opens each run in its
+/// own output. latexmk before 4.8x (Ubuntu 22.04's 4.76) prints its
+/// `Running '…'` headers to stderr, which reaches the combined output after
+/// all of TeX's, so slicing at the last header there found no TeX output at
+/// all, and a failed build reported no error.
 fn last_typeset_pass(log: &str) -> &str {
+    static ENGINE_BANNER: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
+        Regex::new(r"(?m)^This is (?:pdf|Xe|Lua|LuaHB|e-|e?u?p)?TeX, Version").unwrap()
+    });
+    if let Some(banner) = ENGINE_BANNER.find_iter(log).last() {
+        return &log[banner.start()..];
+    }
     let start = ["pdflatex", "xelatex", "lualatex", "latex"]
         .iter()
         .filter_map(|engine| log.rfind(&format!("Running '{engine}")))
@@ -549,6 +560,25 @@ Latexmk: Missing input file 'nosuchfile.tex' message in .log file:
 
     /// latexmk's startup banner, before its first pass.
     const BANNER: &str = "Rc files read:\n  NONE\nLatexmk: This is Latexmk, John Collins, 31 Jan. 2024. Version 4.83.\n";
+
+    /// latexmk 4.76 prints its `Running '…'` headers to stderr, after all of
+    /// TeX's output in the combined log; the error in the last pass is still
+    /// found, and the first pass's noise still left out.
+    #[test]
+    fn finds_the_last_pass_when_latexmk_headers_come_after_it() {
+        let tex = "This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian)\n";
+        let log = format!(
+            "{tex}LaTeX Warning: Label(s) may have changed. Rerun to get cross-references right.\n\
+             {tex}(./chapters/intro.tex\n./chapters/intro.tex:7: Undefined control sequence.\nl.7 \\emhp\n)\n\
+             Latexmk: Errors, in force_mode: so I tried finishing targets\n\
+             ------------\nRunning 'pdflatex  -interaction=nonstopmode \"main.tex\"'\n------------\n\
+             ------------\nRunning 'pdflatex  -interaction=nonstopmode \"main.tex\"'\n------------\n"
+        );
+        let diagnostics = parse_diagnostics(&log);
+        assert_eq!(diagnostics.len(), 1, "{diagnostics:?}");
+        assert_eq!(diagnostics[0].message, "Undefined control sequence.");
+        assert_eq!(diagnostics[0].line, Some(7));
+    }
 
     /// Logs whose every message is noise or terminal boilerplate.
     #[test]
