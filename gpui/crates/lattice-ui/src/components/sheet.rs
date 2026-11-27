@@ -482,10 +482,10 @@ impl ModalLayer {
                             let answer = CLOSING.with(|closing| {
                                 let mut closing = closing.borrow_mut();
                                 let Some(leaving) = closing.get(&key) else {
-                                    return Some(false);
+                                    return Some(None);
                                 };
                                 if leaving.started != started {
-                                    return Some(false);
+                                    return Some(None);
                                 }
                                 if leaving.drawn.is_none() && waited < LATE_FRAME && !framed.get() {
                                     return None;
@@ -494,7 +494,7 @@ impl ModalLayer {
                                     closing
                                         .remove(&key)
                                         .and_then(|leaving| leaving.drawn)
-                                        .is_some_and(|drawn| drawn.upgrade().is_some()),
+                                        .and_then(|drawn| drawn.upgrade()),
                                 )
                             });
                             match answer {
@@ -507,9 +507,36 @@ impl ModalLayer {
                                     window.refresh();
                                     true
                                 }
-                                Some(answer) => {
-                                    if answer && let Some(then) = then.take() {
+                                Some(layer) => {
+                                    if let Some(layer) = layer
+                                        && let Some(then) = then.take()
+                                    {
+                                        // A surface that opened during the exit and took the
+                                        // keyboard keeps it: the owner's answer usually hands
+                                        // focus to the document (Shell::focus_front), which
+                                        // would leave the newer surface without its trap.
+                                        // Focus back in what this layer returns it to is the
+                                        // ordinary close and is left to the answer. The check
+                                        // is deferred because an answer that emits an event
+                                        // reaches its owner's subscription only when the
+                                        // update's effects flush, after `then` returns.
+                                        let (own, previous) = layer.read(cx).clone();
+                                        let newer = super::focus_trap_holding(window, cx)
+                                            .filter(|trap| *trap != own)
+                                            .filter(|_| {
+                                                !previous.as_ref().is_some_and(|previous| {
+                                                    previous.contains_focused(window, cx)
+                                                })
+                                            })
+                                            .and_then(|_| window.focused(cx));
                                         then(window, cx);
+                                        if let Some(focused) = newer {
+                                            window.defer(cx, move |window, cx| {
+                                                if window.focused(cx).as_ref() != Some(&focused) {
+                                                    focused.focus(window, cx);
+                                                }
+                                            });
+                                        }
                                         window.refresh();
                                     }
                                     false
