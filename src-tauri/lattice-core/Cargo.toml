@@ -140,7 +140,7 @@ rustix = { version = "1", features = ["fs"] }
 fuser = { version = "0.18", default-features = false }
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem", "Win32_Foundation", "Win32_System_Threading", "Win32_System_Diagnostics_ToolHelp", "Win32_System_ProcessStatus", "Win32_System_JobObjects", "Win32_Security"] }
+windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem", "Win32_Foundation", "Win32_System_Threading", "Win32_System_Diagnostics_ToolHelp", "Win32_System_ProcessStatus", "Win32_System_JobObjects", "Win32_Security", "Win32_System_SystemInformation", "Wdk_System_SystemServices"] }
 keyring = { version = "3", features = ["windows-native"] }
 cap-std = "3"
 portable-pty = "0.9"
