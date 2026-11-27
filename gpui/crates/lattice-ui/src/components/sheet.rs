@@ -24,7 +24,7 @@
 //! `--scrim-surface` behind a drawer.
 
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     collections::HashMap,
     rc::Rc,
     time::{Duration, Instant},
@@ -468,9 +468,14 @@ impl ModalLayer {
                 // let the whole exit pass without drawing a frame, so the
                 // layer has not yet said whether it still draws under its id.
                 // Its answer waits for that frame, up to LATE_FRAME, rather
-                // than being dropped and leaving the layer stuck open.
+                // than being dropped and leaving the layer stuck open. A frame
+                // that draws without the layer settles it as gone, so a layer
+                // its owner replaced is let go as soon as before and a reopen
+                // under the same id never hears the old close.
                 let mut then = Some(then);
                 let mut waited = Duration::ZERO;
+                let framed = Rc::new(Cell::new(false));
+                let mut asked = false;
                 loop {
                     let pending = cx
                         .update(|window, cx| {
@@ -482,7 +487,7 @@ impl ModalLayer {
                                 if leaving.started != started {
                                     return Some(false);
                                 }
-                                if leaving.drawn.is_none() && waited < LATE_FRAME {
+                                if leaving.drawn.is_none() && waited < LATE_FRAME && !framed.get() {
                                     return None;
                                 }
                                 Some(
@@ -494,6 +499,11 @@ impl ModalLayer {
                             });
                             match answer {
                                 None => {
+                                    if !asked {
+                                        asked = true;
+                                        let framed = framed.clone();
+                                        window.on_next_frame(move |_, _| framed.set(true));
+                                    }
                                     window.refresh();
                                     true
                                 }
