@@ -40,6 +40,25 @@ const SUGGESTIONS_REFRESH: Duration = Duration::from_millis(1500);
 pub struct DocReview {
     pub comments: Vec<CommentRange>,
     pub changes: Vec<TrackedChange>,
+    /// Threads our own edits detached since the document was joined.
+    detached: Vec<Detached>,
+}
+
+/// A thread whose whole passage an edit of ours deleted, which Overleaf
+/// keeps detached (an empty quote). Overleaf's editor re-attaches such a
+/// thread when Undo or a paste brings the passage back
+/// (`track-detached-comments.ts`); so does this, more strictly: only the
+/// exact text, back where it was, while the document stays joined, and once
+/// per detach.
+#[derive(Clone, Debug)]
+struct Detached {
+    thread_id: String,
+    /// Where the passage was, carried across every edit since.
+    position: i64,
+    /// The passage, exactly as the thread quoted it.
+    text: String,
+    /// It is back: re-attach once nothing of ours is in flight.
+    restored: bool,
 }
 
 #[derive(Default)]
@@ -221,9 +240,16 @@ impl OverleafBridge {
         comments: Vec<CommentRange>,
         changes: Vec<TrackedChange>,
     ) {
-        self.review
-            .docs
-            .insert(doc_id.to_string(), DocReview { comments, changes });
+        // A fresh join forgets what this one detached: positions carried
+        // across a gap are no proof the passage came back where it was.
+        self.review.docs.insert(
+            doc_id.to_string(),
+            DocReview {
+                comments,
+                changes,
+                ..DocReview::default()
+            },
+        );
     }
 
     /// A document was let go.
@@ -249,14 +275,104 @@ impl OverleafBridge {
         } else {
             by
         };
+        let text = own
+            .then(|| self.path_of_doc(doc_id))
+            .flatten()
+            .and_then(|path| self.live_text(&path).map(str::to_string));
+        // Threads still open on Overleaf: never a resolved or deleted one.
+        let open: Vec<String> = self
+            .review
+            .threads
+            .iter()
+            .filter(|thread| !thread.resolved)
+            .map(|thread| thread.id.clone())
+            .collect();
         let Some(review) = self.review.docs.get_mut(doc_id) else {
             return;
         };
         let now = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
-        review.comments = tracked::comments_after(&review.comments, ops);
+        let before = std::mem::take(&mut review.comments);
+        review.comments = tracked::comments_after(&before, ops);
+        for detached in &mut review.detached {
+            detached.position = point_after(detached.position, ops);
+        }
+        if own {
+            for (was, is) in before.iter().zip(&review.comments) {
+                if was.quote.is_empty() || !is.quote.is_empty() {
+                    continue;
+                }
+                review
+                    .detached
+                    .retain(|detached| detached.thread_id != is.thread_id);
+                review.detached.push(Detached {
+                    thread_id: is.thread_id.clone(),
+                    position: is.position,
+                    text: was.quote.clone(),
+                    restored: false,
+                });
+            }
+        }
+        if let Some(text) = &text {
+            for detached in &mut review.detached {
+                detached.restored = open.contains(&detached.thread_id)
+                    && still_detached(&review.comments, &detached.thread_id)
+                    && back_in_place(text, detached);
+            }
+        }
         review.changes = tracked::changes_after(&review.changes, ops, by.as_ref(), &now);
         if review.changes.iter().any(tracked::is_provisional) {
             self.refresh_suggestions_later(doc_id.to_string(), cx);
+        }
+    }
+
+    /// Our edits to `doc_id` are all with Overleaf: re-attach each thread
+    /// whose passage came back, checked again against the text as it is now.
+    /// One anchor goes out per detach, whatever comes of it.
+    pub(super) fn reattach_restored(&mut self, doc_id: &str, cx: &mut Context<Self>) {
+        let Some(path) = self.path_of_doc(doc_id) else {
+            return;
+        };
+        let Some(text) = self.live_text(&path).map(str::to_string) else {
+            return;
+        };
+        let open = |thread_id: &str| {
+            self.review
+                .threads
+                .iter()
+                .any(|thread| thread.id == thread_id && !thread.resolved)
+        };
+        let Some(review) = self.review.docs.get(doc_id) else {
+            return;
+        };
+        let Some(detached) = review
+            .detached
+            .iter()
+            .find(|detached| detached.restored)
+            .cloned()
+        else {
+            return;
+        };
+        let due = open(&detached.thread_id)
+            && still_detached(&review.comments, &detached.thread_id)
+            && back_in_place(&text, &detached);
+        if due
+            && self
+                .anchor_comment(
+                    doc_id,
+                    &detached.thread_id,
+                    detached.position,
+                    &detached.text,
+                    cx,
+                )
+                .is_err()
+        {
+            // The wire is taken again: the next acknowledgement retries.
+            return;
+        }
+        if let Some(review) = self.review.docs.get_mut(doc_id) {
+            review
+                .detached
+                .retain(|other| other.thread_id != detached.thread_id);
         }
     }
 
@@ -272,13 +388,21 @@ impl OverleafBridge {
         match event {
             RealtimeEvent::ThreadsChanged => self.reread_threads(REREAD_AFTER, cx),
             RealtimeEvent::CommentAnchored { doc_id, range } => {
-                if let Some(review) = self.review.docs.get_mut(&doc_id)
-                    && !review
+                // An anchor for a thread the document already has moves it,
+                // as Overleaf's ranges tracker does (`moveCommentId`): how a
+                // detached thread is attached again.
+                if let Some(review) = self.review.docs.get_mut(&doc_id) {
+                    review
+                        .detached
+                        .retain(|detached| detached.thread_id != range.thread_id);
+                    match review
                         .comments
-                        .iter()
-                        .any(|comment| comment.thread_id == range.thread_id)
-                {
-                    review.comments.push(range);
+                        .iter_mut()
+                        .find(|comment| comment.thread_id == range.thread_id)
+                    {
+                        Some(comment) => *comment = range,
+                        None => review.comments.push(range),
+                    }
                 }
                 self.reread_threads(REREAD_AFTER, cx);
             }
@@ -418,6 +542,47 @@ impl OverleafBridge {
     }
 }
 
+/// Where a detached thread's point ends up after `ops`: text typed before
+/// it pushes it along, text typed at it lands after it (where its passage
+/// comes back), and a deletion over it pulls it to where the deletion began.
+fn point_after(mut at: i64, ops: &[OtOp]) -> i64 {
+    let units = |text: &str| text.encode_utf16().count() as i64;
+    for op in ops {
+        let p = op.p as i64;
+        if let Some(inserted) = &op.i {
+            if p < at {
+                at += units(inserted);
+            }
+        } else if let Some(deleted) = &op.d {
+            let end = p + units(deleted);
+            if end <= at {
+                at -= units(deleted);
+            } else if p < at {
+                at = p;
+            }
+        }
+    }
+    at
+}
+
+/// Overleaf still has `thread_id` here, detached.
+fn still_detached(comments: &[CommentRange], thread_id: &str) -> bool {
+    comments
+        .iter()
+        .any(|comment| comment.thread_id == thread_id && comment.quote.is_empty())
+}
+
+/// `text` holds the detached passage exactly where it was.
+fn back_in_place(text: &str, detached: &Detached) -> bool {
+    let units: Vec<u16> = text.encode_utf16().collect();
+    let from = detached.position.max(0) as usize;
+    let to = from + detached.text.encode_utf16().count();
+    !detached.text.is_empty()
+        && units
+            .get(from..to)
+            .is_some_and(|slice| String::from_utf16_lossy(slice) == detached.text)
+}
+
 /// `[{id, email, first_name, last_name}]`, or the same under `users`.
 fn parse_authors(body: &serde_json::Value) -> HashMap<String, String> {
     let users = body
@@ -451,7 +616,54 @@ fn parse_authors(body: &serde_json::Value) -> HashMap<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lattice_core::overleaf_rt::ot::{apply_ops, delete, insert};
     use serde_json::json;
+
+    /// "quick " detached from "The quick brown fox" at 4, then `ops`: is it
+    /// back where it was?
+    fn back_after(ops: &[OtOp]) -> bool {
+        let text = apply_ops("The brown fox", ops).expect("ops fit the text");
+        let detached = Detached {
+            thread_id: "t".into(),
+            position: point_after(4, ops),
+            text: "quick ".into(),
+            restored: false,
+        };
+        back_in_place(&text, &detached)
+    }
+
+    #[test]
+    fn a_detached_passage_is_back_only_exactly_where_it_was() {
+        // Undo, or pasting it back in place.
+        assert!(back_after(&[insert(4, "quick ")]));
+        // The same, after an edit before it moved everything along.
+        assert!(back_after(&[insert(0, "So "), insert(7, "quick ")]));
+        // An edit after it changes nothing.
+        assert!(back_after(&[insert(13, "!"), insert(4, "quick ")]));
+        // Pasted elsewhere, or with anything more or less, it is not back.
+        assert!(!back_after(&[insert(10, "quick ")]));
+        assert!(!back_after(&[insert(4, "quick")]));
+        assert!(!back_after(&[insert(4, "quickly ")]));
+        assert!(!back_after(&[]));
+        // A deletion across its point pulls the point to where it began.
+        assert!(!back_after(&[delete(2, "e br"), insert(4, "quick ")]));
+        assert!(back_after(&[delete(2, "e br"), insert(2, "quick ")]));
+    }
+
+    #[test]
+    fn a_detached_point_counts_utf16_units() {
+        // "bé " detached before "c" of "a 𝛼 c", at 5: "𝛼" is two units.
+        let ops = [insert(0, "𝛼"), insert(7, "bé ")];
+        let text = apply_ops("a 𝛼 c", &ops).expect("ops fit the text");
+        let detached = Detached {
+            thread_id: "t".into(),
+            position: point_after(5, &ops),
+            text: "bé ".into(),
+            restored: false,
+        };
+        assert_eq!((text.as_str(), detached.position), ("𝛼a 𝛼 bé c", 7));
+        assert!(back_in_place(&text, &detached));
+    }
 
     #[test]
     fn suggestion_authors_parse_in_both_shapes_overleaf_uses() {

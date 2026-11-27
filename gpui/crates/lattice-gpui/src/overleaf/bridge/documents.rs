@@ -473,6 +473,8 @@ impl OverleafBridge {
                             self.send_ops(&doc_id, send, Vec::new(), cx);
                         } else if draining && settled {
                             self.finish_leaving(&doc_id, cx);
+                        } else if settled {
+                            self.reattach_restored(&doc_id, cx);
                         }
                     }
                     Err(desync) => self.drop_live(&doc_id, Some(drift_notice(&desync)), cx),
