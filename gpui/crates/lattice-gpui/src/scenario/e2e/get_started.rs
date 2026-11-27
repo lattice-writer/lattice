@@ -176,14 +176,21 @@ impl Run {
             );
             return Ok(());
         }
-        // The jump above builds the fixture, and leaving a project while it
-        // builds asks first (`confirm_leaving`), so the tutorial would wait
-        // on that question. On a slow runner (Linux CI) the build is still
-        // going here; the switch waits for it, as the switch back does.
-        let fixture_building = cx.update(|cx| self.shell.read(cx).building());
-        let fixture_built = self
+        // Leaving a project while its build or a terminal command runs asks
+        // first (`confirm_leaving`), so the tutorial would wait on that
+        // question. The jump above builds the fixture, and the terminal
+        // module before this one can leave a command running; on a slow
+        // runner (Linux CI) either can still be going here, so the switch
+        // waits for both, as the switch back waits for the build.
+        let running = |shell: &gpui::Entity<crate::shell::Shell>, cx: &gpui::App| {
+            let shell = shell.read(cx);
+            (shell.building(), shell.terminal.read(cx).running(None, cx))
+        };
+        let (fixture_building, commands) = cx.update(|cx| running(&self.shell, cx));
+        let fixture_settled = self
             .wait_for(cx, Duration::from_secs(60), |shell, cx| {
-                !shell.read(cx).building()
+                let (building, commands) = running(shell, cx);
+                !building && commands.is_empty()
             })
             .await;
         self.with_window(cx, |shell, window, cx| {
@@ -201,9 +208,9 @@ impl Run {
         let asked = cx.update(|cx| crate::confirm::is_pending(cx));
         steps_run.check(
             "opening the tutorial shows the checklist with the sample",
-            fixture_built && tutorial,
+            fixture_settled && tutorial,
             json!({
-                "fixture_build": { "running": fixture_building, "finished": fixture_built },
+                "before": { "building": fixture_building, "commands": commands, "settled": fixture_settled },
                 "question_left_open": asked,
             }),
         );
