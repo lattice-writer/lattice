@@ -159,7 +159,10 @@ impl Run {
             let reloaded = self
                 .wait_for(cx, Duration::from_secs(5), |_, cx| {
                     let editor = editor.read(cx);
-                    washed = crate::editor_panel::attention::change_wash::washed_rows(editor.editor().read(cx), cx);
+                    washed = crate::editor_panel::attention::change_wash::washed_rows(
+                        editor.editor().read(cx),
+                        cx,
+                    );
                     editor.text(cx) == named && !washed.is_empty()
                 })
                 .await;

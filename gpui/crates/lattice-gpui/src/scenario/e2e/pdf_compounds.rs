@@ -8,7 +8,9 @@
 use std::{path::Path, time::Duration};
 
 use anyhow::Result;
-use gpui::{AsyncApp, Modifiers, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, PlatformInput};
+use gpui::{
+    AsyncApp, Modifiers, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, PlatformInput,
+};
 use serde_json::json;
 
 use super::Steps;
@@ -27,14 +29,20 @@ impl Run {
         let shown = self
             .wait_for(cx, Duration::from_secs(60), |shell, cx| {
                 let shell = shell.read(cx);
-                shell.live_document() == Some("chem-check.tex") && shell.pdf().read(cx).page_count(cx) > 0
+                shell.live_document() == Some("chem-check.tex")
+                    && shell.pdf().read(cx).page_count(cx) > 0
             })
             .await;
         let view = cx.update(|cx| self.shell.read(cx).pdf().read(cx).live_view().clone());
-        let found = self.find_word_in(cx, &root.join("chem-check.pdf"), "2.").await?;
+        let found = self
+            .find_word_in(cx, &root.join("chem-check.pdf"), "2.")
+            .await?;
         let point = |cx: &mut AsyncApp| {
             found.as_ref().and_then(|&(page, (x, y), _)| {
-                cx.update(|cx| view.read(cx).page_point_on_window(page as usize - 1, x as f32, y as f32))
+                cx.update(|cx| {
+                    view.read(cx)
+                        .page_point_on_window(page as usize - 1, x as f32, y as f32)
+                })
             })
         };
         let mut at = point(cx);
@@ -53,7 +61,14 @@ impl Run {
             'hover: for _ in 0..15 {
                 at = point(cx);
                 let Some(position) = at else { break };
-                send(cx, PlatformInput::MouseMove(MouseMoveEvent { position, pressed_button: None, modifiers: Modifiers::default() }))?;
+                send(
+                    cx,
+                    PlatformInput::MouseMove(MouseMoveEvent {
+                        position,
+                        pressed_button: None,
+                        modifiers: Modifiers::default(),
+                    }),
+                )?;
                 for _ in 0..4 {
                     self.pause(cx, Duration::from_millis(200)).await;
                     card = cx.update(|cx| view.read(cx).compound_card());
@@ -65,23 +80,32 @@ impl Run {
         }
         if let Some(at) = at {
             self.snapshot(cx, "pdf-compound-card").await;
-            send(cx, PlatformInput::MouseDown(MouseDownEvent {
-                button: MouseButton::Left,
-                position: at,
-                modifiers: Modifiers::default(),
-                click_count: 1,
-                first_mouse: false,
-            }))?;
-            send(cx, PlatformInput::MouseUp(MouseUpEvent {
-                button: MouseButton::Left,
-                position: at,
-                modifiers: Modifiers::default(),
-                click_count: 1,
-            }))?;
+            send(
+                cx,
+                PlatformInput::MouseDown(MouseDownEvent {
+                    button: MouseButton::Left,
+                    position: at,
+                    modifiers: Modifiers::default(),
+                    click_count: 1,
+                    first_mouse: false,
+                }),
+            )?;
+            send(
+                cx,
+                PlatformInput::MouseUp(MouseUpEvent {
+                    button: MouseButton::Left,
+                    position: at,
+                    modifiers: Modifiers::default(),
+                    click_count: 1,
+                }),
+            )?;
             // The copy waits out a double-click, and a busy runner's main
             // thread runs it later than that (LEO-144: 560 ms on Linux).
             self.wait_for(cx, Duration::from_secs(5), |_, cx| {
-                cx.read_from_clipboard().and_then(|item| item.text()).as_deref() == Some("\\cmpd{alcohol}")
+                cx.read_from_clipboard()
+                    .and_then(|item| item.text())
+                    .as_deref()
+                    == Some("\\cmpd{alcohol}")
             })
             .await;
             copied = cx.update(|cx| cx.read_from_clipboard().and_then(|item| item.text()));
@@ -102,14 +126,24 @@ impl Run {
         self.open(cx, &document, Some(4))?;
         self.pause(cx, Duration::from_millis(300)).await;
         let (live, root_tabs) = self.with_window(cx, |shell, window, cx| {
-            shell.update(cx, |shell, cx| shell.forward_sync(&crate::shell::ForwardSync, window, cx));
+            shell.update(cx, |shell, cx| {
+                shell.forward_sync(&crate::shell::ForwardSync, window, cx)
+            });
             let shell = shell.read(cx);
             let root_tabs: Vec<(String, bool)> = shell
                 .root_pdf_tabs()
                 .iter()
-                .map(|(document, panel)| (document.clone(), panel.read(cx).live_view().read(cx).reveal_state().1))
+                .map(|(document, panel)| {
+                    (
+                        document.clone(),
+                        panel.read(cx).live_view().read(cx).reveal_state().1,
+                    )
+                })
                 .collect();
-            (shell.pdf().read(cx).live_view().read(cx).reveal_state().1, root_tabs)
+            (
+                shell.pdf().read(cx).live_view().read(cx).reveal_state().1,
+                root_tabs,
+            )
         })?;
         steps.check(
             "PDF: a jump to the live PDF spins its locate button, never a root document's tab's",
@@ -118,7 +152,14 @@ impl Run {
             json!({ "live_locating": live, "root_tabs": root_tabs }),
         );
         self.wait_for(cx, Duration::from_secs(20), |shell, cx| {
-            !shell.read(cx).pdf().read(cx).live_view().read(cx).reveal_state().1
+            !shell
+                .read(cx)
+                .pdf()
+                .read(cx)
+                .live_view()
+                .read(cx)
+                .reveal_state()
+                .1
         })
         .await;
 
@@ -126,8 +167,10 @@ impl Run {
         self.open(cx, &root.join("main.tex"), Some(1))?;
         self.pause(cx, Duration::from_millis(300)).await;
         self.build(cx).await?;
-        self.wait_for(cx, Duration::from_secs(20), |shell, cx| shell.read(cx).live_document() == Some("main.tex"))
-            .await;
+        self.wait_for(cx, Duration::from_secs(20), |shell, cx| {
+            shell.read(cx).live_document() == Some("main.tex")
+        })
+        .await;
         // main.tex taking the live PDF back leaves chem-check.tex in a root tab of its
         // own. Close it so later modules (manuscripts, dock) find only the PDFs
         // they open themselves.

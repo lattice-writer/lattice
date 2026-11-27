@@ -42,7 +42,12 @@ impl Run {
         steps.check(
             "the stack keeps four notices, the newest in front, and lets the oldest go",
             titles
-                == ["Stack check 2", "Stack check 3", "Stack check 4", "Stack check 5"],
+                == [
+                    "Stack check 2",
+                    "Stack check 3",
+                    "Stack check 4",
+                    "Stack check 5",
+                ],
             json!({ "titles": titles }),
         );
         show(
@@ -101,14 +106,26 @@ impl Run {
             cx,
         );
         self.pause(cx, Duration::from_millis(1500)).await;
-        let held = cx.update(|cx| stack.read(cx).titles().iter().any(|t| &**t == "Stack check held"));
+        let held = cx.update(|cx| {
+            stack
+                .read(cx)
+                .titles()
+                .iter()
+                .any(|t| &**t == "Stack check held")
+        });
         native::send_mouse(native, native::Mouse::Moved, point(px(40.), px(120.)))?;
         let collapsed = self
-            .wait_for(cx, Duration::from_secs(1), |_, cx| !stack.read(cx).expanded())
+            .wait_for(cx, Duration::from_secs(1), |_, cx| {
+                !stack.read(cx).expanded()
+            })
             .await;
         let expired = self
             .wait_for(cx, Duration::from_secs(3), |_, cx| {
-                !stack.read(cx).titles().iter().any(|t| &**t == "Stack check held")
+                !stack
+                    .read(cx)
+                    .titles()
+                    .iter()
+                    .any(|t| &**t == "Stack check held")
             })
             .await;
         steps.check(
@@ -136,7 +153,9 @@ impl Run {
         }
         native::send_mouse(native, native::Mouse::Up, point(start.x + px(80.), start.y))?;
         let leaving = self
-            .wait_for(cx, Duration::from_millis(300), |_, cx| stack.read(cx).leaving() > 0)
+            .wait_for(cx, Duration::from_millis(300), |_, cx| {
+                stack.read(cx).leaving() > 0
+            })
             .await;
         self.pause(cx, SETTLE).await;
         let titles = cx.update(|cx| stack.read(cx).titles());
@@ -162,7 +181,9 @@ impl Run {
                 .key("stack-check-run"),
             cx,
         );
-        cx.update(|cx| notices::update_progress("stack-check-run", ToastProgress::Fraction(0.6), cx));
+        cx.update(|cx| {
+            notices::update_progress("stack-check-run", ToastProgress::Fraction(0.6), cx)
+        });
         self.pause(cx, SETTLE).await;
         let cards = cx.update(|cx| stack.read(cx).cards());
         let copy = cards
@@ -194,7 +215,12 @@ impl Run {
 
     /// The daily check's reminder, its Update and the notice that follows
     /// the update to its end (on the stand-in installer).
-    async fn tex_reminder(&self, cx: &mut AsyncApp, steps: &mut Steps, fixture: &Fixture) -> Result<()> {
+    async fn tex_reminder(
+        &self,
+        cx: &mut AsyncApp,
+        steps: &mut Steps,
+        fixture: &Fixture,
+    ) -> Result<()> {
         let stack = cx.update(notices::install);
         fixture.stub.set_packages_outdated();
         let center = cx.update(crate::build::tex_setup::center::install);
@@ -215,7 +241,9 @@ impl Run {
             .find(|card| card.title == title)
             .map(|card| card.actions.clone());
         let answered = self.with_window(cx, |_, window, cx| {
-            stack.update(cx, |stack, cx| stack.answer(title, "Update TeX packages", window, cx))
+            stack.update(cx, |stack, cx| {
+                stack.answer(title, "Update TeX packages", window, cx)
+            })
         })?;
         let updated = self
             .wait_for(cx, Duration::from_secs(10), |_, cx| {

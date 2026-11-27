@@ -41,7 +41,9 @@ impl Run {
         let editor = self.open(cx, &chapter, Some(1))?;
         self.select_text(cx, &editor, WORD)?;
         let shown = self
-            .wait_for(cx, Duration::from_secs(5), |_, cx| editor.read(cx).selection_toolbar_shown())
+            .wait_for(cx, Duration::from_secs(5), |_, cx| {
+                editor.read(cx).selection_toolbar_shown()
+            })
             .await;
         self.adapter_shot(cx, "selection-toolbar-latex").await;
         steps.check(
@@ -52,7 +54,9 @@ impl Run {
 
         // Bold on, pressed; Bold again, off.
         self.toolbar(cx, &editor, ToolbarStep::Bold)?;
-        let bold = self.editor_text(cx, &editor).contains(&format!("\\textbf{{{WORD}}}"));
+        let bold = self
+            .editor_text(cx, &editor)
+            .contains(&format!("\\textbf{{{WORD}}}"));
         let pressed = cx.update(|cx| editor.read(cx).toolbar_pressed_bold(cx));
         self.toolbar(cx, &editor, ToolbarStep::Bold)?;
         let off = self.editor_text(cx, &editor) == original;
@@ -96,13 +100,19 @@ impl Run {
             })
             .await;
         let picker = cx.update(|cx| editor.read(cx).custom_picker());
-        let field = picker.as_ref().and_then(|picker| cx.update(|cx| picker.read(cx).field_bounds()));
-        self.adapter_shot(cx, "selection-toolbar-custom-colour").await;
+        let field = picker
+            .as_ref()
+            .and_then(|picker| cx.update(|cx| picker.read(cx).field_bounds()));
+        self.adapter_shot(cx, "selection-toolbar-custom-colour")
+            .await;
         let mut dragged = None;
         let mut applied = false;
         if let (Some(picker), Some(field)) = (picker, field) {
             let at = |x: f32, y: f32| {
-                gpui::point(field.left() + field.size.width * x, field.top() + field.size.height * y)
+                gpui::point(
+                    field.left() + field.size.width * x,
+                    field.top() + field.size.height * y,
+                )
             };
             let (start, end) = (at(0.1, 0.5), at(0.3, 0.05));
             self.with_window(cx, |_, window, cx| {
@@ -152,7 +162,8 @@ impl Run {
             .as_ref()
             .is_some_and(|(s, v, _)| (s - 30.).abs() < 0.5 && (v - 95.).abs() < 0.5);
         let custom_swatch = self.swatch(cx, &editor).await;
-        self.adapter_shot(cx, "selection-toolbar-custom-highlight").await;
+        self.adapter_shot(cx, "selection-toolbar-custom-highlight")
+            .await;
         self.toolbar(cx, &editor, ToolbarStep::Unhighlight)?;
         let custom_removed = self.editor_text(cx, &editor) == original;
         steps.check(
@@ -166,7 +177,8 @@ impl Run {
                 "removed": custom_removed,
             }),
         );
-        self.save_and_restore(cx, &editor, &chapter, &original).await?;
+        self.save_and_restore(cx, &editor, &chapter, &original)
+            .await?;
 
         // A Markdown selection: the Markdown toolbar's formats and blocks.
         let notes = root.join("notes.md");
@@ -174,19 +186,26 @@ impl Run {
         let markdown = self.open(cx, &notes, Some(1))?;
         self.select_text(cx, &markdown, "plain")?;
         let md_shown = self
-            .wait_for(cx, Duration::from_secs(5), |_, cx| markdown.read(cx).selection_toolbar_shown())
+            .wait_for(cx, Duration::from_secs(5), |_, cx| {
+                markdown.read(cx).selection_toolbar_shown()
+            })
             .await;
         self.toolbar(cx, &markdown, ToolbarStep::Bold)?;
-        let md_bold = self.editor_text(cx, &markdown).starts_with("**plain** words");
+        let md_bold = self
+            .editor_text(cx, &markdown)
+            .starts_with("**plain** words");
         self.toolbar(cx, &markdown, ToolbarStep::Heading)?;
-        let md_heading = self.editor_text(cx, &markdown).starts_with("# **plain** words");
+        let md_heading = self
+            .editor_text(cx, &markdown)
+            .starts_with("# **plain** words");
         self.adapter_shot(cx, "selection-toolbar-markdown").await;
         steps.check(
             "a Markdown selection shows the Markdown toolbar; Bold writes **…** and the block menu makes the line a heading",
             md_shown && md_bold && md_heading,
             json!({ "shown": md_shown, "bold": md_bold, "heading": md_heading, "text": self.editor_text(cx, &markdown) }),
         );
-        self.save_and_restore(cx, &markdown, &notes, "plain words\n").await?;
+        self.save_and_restore(cx, &markdown, &notes, "plain words\n")
+            .await?;
         let _ = std::fs::remove_file(&notes);
         self.short_file_palette(cx, steps, root).await
     }
@@ -207,7 +226,9 @@ impl Run {
         let editor = self.open(cx, &short, Some(1))?;
         self.select_text(cx, &editor, "palette")?;
         let shown = self
-            .wait_for(cx, Duration::from_secs(5), |_, cx| editor.read(cx).selection_toolbar_shown())
+            .wait_for(cx, Duration::from_secs(5), |_, cx| {
+                editor.read(cx).selection_toolbar_shown()
+            })
             .await;
         self.toolbar(cx, &editor, ToolbarStep::Palette)?;
         let drawn = self
@@ -244,7 +265,8 @@ impl Run {
             }
             _ => false,
         };
-        self.adapter_shot(cx, "selection-toolbar-palette-short-file").await;
+        self.adapter_shot(cx, "selection-toolbar-palette-short-file")
+            .await;
         steps.check(
             "in a short file the highlighter palette opens whole inside the window, centred on its caret, over the toolbar or flipped under it as the Tauri app's popover is, never past the editor's top edge",
             shown && drawn && placed,
@@ -260,7 +282,12 @@ impl Run {
         Ok(())
     }
 
-    fn select_text(&self, cx: &mut AsyncApp, editor: &Entity<EditorPanel>, quote: &str) -> Result<()> {
+    fn select_text(
+        &self,
+        cx: &mut AsyncApp,
+        editor: &Entity<EditorPanel>,
+        quote: &str,
+    ) -> Result<()> {
         let text = self.editor_text(cx, editor);
         let start = text.find(quote).unwrap_or(0);
         let zed = cx.update(|cx| editor.read(cx).editor().clone());
@@ -277,7 +304,11 @@ impl Run {
 
     /// The swatch painted before the one `\\colorbox` in `editor`, once it
     /// is: square, smaller than a line, standing where the wrapper starts.
-    async fn swatch(&self, cx: &mut AsyncApp, editor: &Entity<EditorPanel>) -> Option<gpui::Bounds<gpui::Pixels>> {
+    async fn swatch(
+        &self,
+        cx: &mut AsyncApp,
+        editor: &Entity<EditorPanel>,
+    ) -> Option<gpui::Bounds<gpui::Pixels>> {
         let lattice = cx.update(|cx| editor.read(cx).lattice_editor().clone());
         let wrapper = self.editor_text(cx, editor).find("\\colorbox[HTML]")?;
         let found = |cx: &gpui::App| {
@@ -295,13 +326,21 @@ impl Run {
                 })
                 .map(|(_, _, bounds)| *bounds)
         };
-        self.wait_for(cx, Duration::from_secs(3), |_, cx| found(cx).is_some()).await;
+        self.wait_for(cx, Duration::from_secs(3), |_, cx| found(cx).is_some())
+            .await;
         cx.update(|cx| found(cx))
     }
 
-    fn toolbar(&self, cx: &mut AsyncApp, editor: &Entity<EditorPanel>, step: ToolbarStep) -> Result<()> {
+    fn toolbar(
+        &self,
+        cx: &mut AsyncApp,
+        editor: &Entity<EditorPanel>,
+        step: ToolbarStep,
+    ) -> Result<()> {
         self.with_window(cx, |_, window, cx| {
-            editor.update(cx, |editor, cx| editor.scripted_toolbar(step.name(), window, cx))
+            editor.update(cx, |editor, cx| {
+                editor.scripted_toolbar(step.name(), window, cx)
+            })
         })
     }
 

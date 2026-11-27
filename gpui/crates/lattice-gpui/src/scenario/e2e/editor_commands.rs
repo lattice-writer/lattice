@@ -121,7 +121,9 @@ impl Run {
         self.pause(cx, Duration::from_millis(300)).await;
         self.select(cx, &panel, 2, 2)?;
         let ctrl_l = Keystroke::parse("ctrl-l").map_err(|error| anyhow::anyhow!("{error}"))?;
-        self.with_window(cx, move |_, window, cx| window.dispatch_keystroke(ctrl_l, cx))?;
+        self.with_window(cx, move |_, window, cx| {
+            window.dispatch_keystroke(ctrl_l, cx)
+        })?;
         self.pause(cx, Duration::from_millis(150)).await;
         let (_, selected) = self.text_and_selection(cx, &panel);
         cx.update(|cx| crate::settings::update_appearance(cx, |a| a.editor_keymap = keymap));
@@ -135,7 +137,12 @@ impl Run {
     }
 
     /// Vim's `:` line closes on Escape and when focus leaves it.
-    async fn vim_line_closes(&self, cx: &mut AsyncApp, steps: &mut Steps, main: &Path) -> Result<()> {
+    async fn vim_line_closes(
+        &self,
+        cx: &mut AsyncApp,
+        steps: &mut Steps,
+        main: &Path,
+    ) -> Result<()> {
         let keymap = cx.update(|cx| crate::settings::get(cx).appearance.editor_keymap);
         cx.update(|cx| {
             crate::settings::update_appearance(cx, |a| a.editor_keymap = EditorKeymap::Vim)

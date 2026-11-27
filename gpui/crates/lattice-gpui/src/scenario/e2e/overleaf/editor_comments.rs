@@ -49,7 +49,8 @@ impl Run {
         mock: &MockOverleaf,
         editor: &Entity<EditorPanel>,
     ) -> Result<()> {
-        self.overleaf_toolbar_comment(cx, steps, mock, editor).await?;
+        self.overleaf_toolbar_comment(cx, steps, mock, editor)
+            .await?;
         self.overleaf_share_note(cx, steps, mock, editor).await
     }
 
@@ -178,7 +179,9 @@ impl Run {
             }
         }
         let anchored = self
-            .wait_for(cx, Duration::from_secs(15), |_, _| anchored(mock, SHARED, NOTE))
+            .wait_for(cx, Duration::from_secs(15), |_, _| {
+                anchored(mock, SHARED, NOTE)
+            })
             .await;
         let resolved = self
             .wait_for(cx, Duration::from_secs(5), |_, cx| {

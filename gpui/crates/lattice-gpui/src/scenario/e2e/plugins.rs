@@ -141,7 +141,9 @@ impl Run {
     }
 
     async fn install_fixture_plugin(&self, cx: &mut AsyncApp, steps: &mut Steps) -> Result<bool> {
-        let home = std::env::var_os("HOME").map(std::path::PathBuf::from).unwrap_or_default();
+        let home = std::env::var_os("HOME")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_default();
         let folder = home.join("plugin-fixture");
         std::fs::create_dir_all(&folder)?;
         std::fs::write(folder.join("lattice-plugin.toml"), MANIFEST)?;
@@ -153,7 +155,11 @@ impl Run {
         })?;
         let drawn = self
             .wait_for(cx, Duration::from_secs(5), |shell, cx| {
-                let pane = shell.read(cx).settings.as_ref().and_then(|s| s.read(cx).plugins_pane());
+                let pane = shell
+                    .read(cx)
+                    .settings
+                    .as_ref()
+                    .and_then(|s| s.read(cx).plugins_pane());
                 pane.is_some_and(|pane| !pane.read(cx).is_busy())
             })
             .await;
@@ -233,11 +239,18 @@ impl Run {
             enabled && commands,
             json!({ "enabled": enabled, "commands": commands }),
         );
-        self.with_window(cx, |shell, _, cx| shell.update(cx, |shell, cx| shell.close_settings(cx)))?;
+        self.with_window(cx, |shell, _, cx| {
+            shell.update(cx, |shell, cx| shell.close_settings(cx))
+        })?;
         Ok(enabled && commands)
     }
 
-    async fn plugins_checks(&self, cx: &mut AsyncApp, steps: &mut Steps, root: &Path) -> Result<()> {
+    async fn plugins_checks(
+        &self,
+        cx: &mut AsyncApp,
+        steps: &mut Steps,
+        root: &Path,
+    ) -> Result<()> {
         if !self.install_fixture_plugin(cx, steps).await? {
             return Ok(());
         }
@@ -247,8 +260,10 @@ impl Run {
         // The palette's Plugins section.
         self.open_palette_now(cx)?;
         let rows = self.palette_rows_now(cx);
-        let plugin_rows: Vec<&(String, String, Option<String>)> =
-            rows.iter().filter(|(group, _, _)| group == "Plugins").collect();
+        let plugin_rows: Vec<&(String, String, Option<String>)> = rows
+            .iter()
+            .filter(|(group, _, _)| group == "Plugins")
+            .collect();
         steps.check(
             "an empty palette lists the plugin's commands last, under Plugins, with their descriptions",
             plugin_rows.len() == 5
@@ -261,7 +276,9 @@ impl Run {
         let found = self.palette_rows_now(cx);
         steps.check(
             "a typed query finds a plugin command",
-            found.first().is_some_and(|(_, label, _)| label == "Fixture: Check bibliography"),
+            found
+                .first()
+                .is_some_and(|(_, label, _)| label == "Fixture: Check bibliography"),
             json!({ "found": found }),
         );
         self.palette_type(cx, "Fixture")?;
@@ -308,9 +325,13 @@ impl Run {
         );
 
         // Diagnostics, grouped, and Return on one.
-        self.run_plugin_row(cx, "Fixture: Check bibliography").await?;
+        self.run_plugin_row(cx, "Fixture: Check bibliography")
+            .await?;
         let diagnostics = self.plugin_done(cx).await;
-        let shown: Vec<(String, String)> = diagnostics.clone().map(|(_, rows)| rows).unwrap_or_default();
+        let shown: Vec<(String, String)> = diagnostics
+            .clone()
+            .map(|(_, rows)| rows)
+            .unwrap_or_default();
         let expected = [
             ("file", "references.bib"),
             ("diagnostic", "Entry has no year"),
@@ -321,7 +342,10 @@ impl Run {
         steps.check(
             "diagnostics are grouped by file, in the order the files first appear",
             shown.len() == expected.len()
-                && shown.iter().zip(expected).all(|((kind, text), (k, t))| kind == k && text == t),
+                && shown
+                    .iter()
+                    .zip(expected)
+                    .all(|((kind, text), (k, t))| kind == k && text == t),
             json!({ "rows": shown }),
         );
         self.plugin_shot(cx, "plugins-diagnostics").await;
@@ -341,7 +365,10 @@ impl Run {
         });
         steps.check(
             "Return on a diagnostic opens its file at its line",
-            acted && place.as_ref().is_some_and(|(file, line)| file == "main.tex" && *line == 4),
+            acted
+                && place
+                    .as_ref()
+                    .is_some_and(|(file, line)| file == "main.tex" && *line == 4),
             json!({ "place": place }),
         );
 
@@ -351,7 +378,8 @@ impl Run {
         steps.check(
             "a message result renders its Markdown",
             message.as_ref().is_some_and(|(_, rows)| {
-                rows.first().is_some_and(|(kind, text)| kind == "message" && text.contains("# Notes"))
+                rows.first()
+                    .is_some_and(|(kind, text)| kind == "message" && text.contains("# Notes"))
             }),
             json!({ "message": message }),
         );
@@ -361,7 +389,8 @@ impl Run {
         steps.check(
             "a plugin's own error shows inline in the palette, in its words",
             failed.as_ref().is_some_and(|(_, rows)| {
-                rows.first().is_some_and(|(kind, text)| kind == "error" && text == "Zotero is not running")
+                rows.first()
+                    .is_some_and(|(kind, text)| kind == "error" && text == "Zotero is not running")
             }),
             json!({ "failed": failed }),
         );
@@ -370,7 +399,8 @@ impl Run {
         // A bibliography entry is written only once the writer confirms it.
         let bib = root.join("references.bib");
         let before = std::fs::read_to_string(&bib).unwrap_or_default();
-        self.run_plugin_row(cx, "Fixture: Suggest a reference").await?;
+        self.run_plugin_row(cx, "Fixture: Suggest a reference")
+            .await?;
         self.plugin_done(cx).await;
         self.with_window(cx, |shell, window, cx| {
             if let Some(palette) = shell.read(cx).palette_view() {
@@ -417,7 +447,9 @@ impl Run {
             json!({ "asked": asked, "question": question, "untouched": untouched, "written": written, "closed": closed }),
         );
         std::fs::write(&bib, &before)?;
-        self.with_window(cx, |shell, window, cx| shell.update(cx, |shell, cx| shell.close_overlays(window, cx)))?;
+        self.with_window(cx, |shell, window, cx| {
+            shell.update(cx, |shell, cx| shell.close_overlays(window, cx))
+        })?;
         if std::env::var_os("LATTICE_E2E_SHOTS").is_some() {
             self.plugin_parity_shots(cx, root).await?;
         }

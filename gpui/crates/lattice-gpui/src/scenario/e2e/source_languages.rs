@@ -23,7 +23,8 @@ const PAGE: &str = "e2e-page.html";
 const PAGE_TEXT: &str = "<!DOCTYPE html>\n<p class=\"lead\">Hi</p>\n\
 <style>.note { color: red; }</style>\n<script>let count = 2;</script>\n";
 const NOTES: &str = "e2e-fence.md";
-const NOTES_TEXT: &str = "# Notes\n\n```css\n.note { margin: 0; }\n```\n\n```python\nimport math\n```\n";
+const NOTES_TEXT: &str =
+    "# Notes\n\n```css\n.note { margin: 0; }\n```\n\n```python\nimport math\n```\n";
 const SCRIPT: &str = "e2e-script.py";
 const SCRIPT_TEXT: &str = "# Fit\ndef area(r):\n    return math.pi * r ** 2\n";
 
@@ -170,7 +171,8 @@ impl Run {
             self.pause(cx, Duration::from_millis(200)).await;
             (language, found) = highlights(cx, &panel, &needles);
         }
-        self.completion_shot(cx, "source-language-markdown-css").await;
+        self.completion_shot(cx, "source-language-markdown-css")
+            .await;
         steps.check(
             "a Markdown file's fenced css block is highlighted as CSS, and its python block as Python once Python has loaded, with no edit",
             language.as_deref() == Some("Markdown")

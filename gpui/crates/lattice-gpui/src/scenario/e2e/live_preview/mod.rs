@@ -376,7 +376,9 @@ impl Run {
         // still land; let it.
         self.wait_for(cx, Duration::from_secs(10), |_, cx| {
             let layer = view.read(cx).live_layer();
-            tiled_page(cx).zip(layer).is_some_and(|(page, layer)| layer.settled(page))
+            tiled_page(cx)
+                .zip(layer)
+                .is_some_and(|(page, layer)| layer.settled(page))
         })
         .await;
         let tile_before = cx.update(|cx| tile(cx));
@@ -384,8 +386,12 @@ impl Run {
         let tile_redrawn = self
             .wait_for(cx, Duration::from_secs(10), |_, cx| {
                 let layer = view.read(cx).live_layer();
-                tile(cx).zip(tile_before.clone()).is_some_and(|(tile, old)| !Arc::ptr_eq(&tile, &old))
-                    && tiled_page(cx).zip(layer).is_some_and(|(page, layer)| layer.settled(page))
+                tile(cx)
+                    .zip(tile_before.clone())
+                    .is_some_and(|(tile, old)| !Arc::ptr_eq(&tile, &old))
+                    && tiled_page(cx)
+                        .zip(layer)
+                        .is_some_and(|(page, layer)| layer.settled(page))
             })
             .await;
         // Painted under it: nothing, or an image drawn for the same change
@@ -463,7 +469,8 @@ impl Run {
             }),
         );
 
-        self.live_preview_in_window(cx, steps, &chapter, &editor).await?;
+        self.live_preview_in_window(cx, steps, &chapter, &editor)
+            .await?;
 
         // rtex killed mid-session, as macOS does to a process under memory
         // pressure: Lattice starts a new session by itself (its phase passes
@@ -510,7 +517,11 @@ impl Run {
         let main_text = std::fs::read_to_string(&main)?;
         std::fs::write(
             &main,
-            main_text.replacen("\\begin{document}", "\\begin{document}\\loop\\iftrue\\repeat", 1),
+            main_text.replacen(
+                "\\begin{document}",
+                "\\begin{document}\\loop\\iftrue\\repeat",
+                1,
+            ),
         )?;
         let bound = cx.update(|cx| preview.read(cx).first_layout_timeout);
         cx.update(|cx| {
@@ -540,7 +551,9 @@ impl Run {
         // and what queued behind it, so no LuaLaTeX outlives the scenario.
         self.dispatch_to_shell(cx, &StopBuild)?;
         let build_stopped = self
-            .wait_for(cx, Duration::from_secs(20), |shell, cx| !shell.read(cx).building())
+            .wait_for(cx, Duration::from_secs(20), |shell, cx| {
+                !shell.read(cx).building()
+            })
             .await;
         cx.update(|cx| {
             preview.update(cx, |preview, cx| {

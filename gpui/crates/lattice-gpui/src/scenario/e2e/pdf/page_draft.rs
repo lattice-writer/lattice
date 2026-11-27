@@ -48,19 +48,27 @@ impl Run {
     /// last page and ⌘↑ the first.
     async fn page_keys(&self, cx: &mut AsyncApp, steps: &mut Steps) -> Result<()> {
         let fit = cx.update(|cx| self.live_view_of(cx).read(cx).fit());
-        self.with_view(cx, |view, window, cx| view.edit_draft_to(false, "", window, cx))?;
+        self.with_view(cx, |view, window, cx| {
+            view.edit_draft_to(false, "", window, cx)
+        })?;
         self.pause(cx, Duration::from_millis(200)).await;
         for key in ['x', '3', '\n'] {
             self.press(cx, key, false).await?;
         }
-        let digits = self.wait_view(cx, 5, |view, _| view.current_page() == 2).await;
+        let digits = self
+            .wait_view(cx, 5, |view, _| view.current_page() == 2)
+            .await;
 
-        self.with_view(cx, |view, window, cx| view.edit_draft_to(true, "100", window, cx))?;
+        self.with_view(cx, |view, window, cx| {
+            view.edit_draft_to(true, "100", window, cx)
+        })?;
         self.pause(cx, Duration::from_millis(200)).await;
         self.press(cx, '\n', false).await?;
         self.pause(cx, Duration::from_millis(300)).await;
         let hundred = cx.update(|cx| self.live_view_of(cx).read(cx).scale());
-        self.with_view(cx, |view, window, cx| view.edit_draft_to(true, "150", window, cx))?;
+        self.with_view(cx, |view, window, cx| {
+            view.edit_draft_to(true, "150", window, cx)
+        })?;
         self.pause(cx, Duration::from_millis(200)).await;
         self.press(cx, '\u{1b}', false).await?;
         self.pause(cx, Duration::from_millis(300)).await;
@@ -84,7 +92,9 @@ impl Run {
                 pages = count;
             }
         }
-        let first = self.wait_view(cx, 5, |view, _| view.current_page() == 0).await;
+        let first = self
+            .wait_view(cx, 5, |view, _| view.current_page() == 0)
+            .await;
         steps.check(
             "PDF: the page value takes digits only, Escape keeps a typed zoom, and ⌘↓/⌘↑ go to the last and first page",
             digits && zoom_kept && reached_last && first,

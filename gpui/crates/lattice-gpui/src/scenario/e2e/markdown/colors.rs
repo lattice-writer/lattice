@@ -43,7 +43,10 @@ const CARET_IN_NAVY: &str = "(() => { const span = document.querySelector('.lx-m
     const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range); return 'placed'; })()";
 
 fn run_of<'a>(page: &'a Value, text: &str) -> Option<&'a Value> {
-    page["runs"].as_array()?.iter().find(|run| run["text"] == text)
+    page["runs"]
+        .as_array()?
+        .iter()
+        .find(|run| run["text"] == text)
 }
 
 fn painted(page: &Value, text: &str) -> Option<String> {
@@ -92,7 +95,9 @@ impl Run {
         while started.elapsed() < Duration::from_secs(3) {
             self.pause(cx, Duration::from_millis(150)).await;
             dark = self.evaluate(cx, &island, READ).await;
-            if dark["theme"] == "dark" && painted(&dark, "navy note") != painted(&light, "navy note") {
+            if dark["theme"] == "dark"
+                && painted(&dark, "navy note") != painted(&light, "navy note")
+            {
                 break;
             }
         }
@@ -137,8 +142,10 @@ impl Run {
             .map(|(x, y)| bounds.origin + gpui::point(gpui::px(x as f32), gpui::px(y as f32)))
             .unwrap_or_else(|| bounds.center());
         native::send_click(native, at)?;
-        self.wait_for(cx, Duration::from_secs(3), |_, cx| island.read(cx).page_focused())
-            .await;
+        self.wait_for(cx, Duration::from_secs(3), |_, cx| {
+            island.read(cx).page_focused()
+        })
+        .await;
         let placed = self.evaluate(cx, &island, CARET_IN_NAVY).await;
         self.pause(cx, Duration::from_millis(150)).await;
         for character in "ish".chars() {

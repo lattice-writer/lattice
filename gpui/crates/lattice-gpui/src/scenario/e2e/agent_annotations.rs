@@ -103,12 +103,16 @@ impl Run {
             );
             return Ok(());
         };
-        self.wait_for(cx, Duration::from_secs(20), |_, cx| surface.read(cx).is_drawn())
-            .await;
+        self.wait_for(cx, Duration::from_secs(20), |_, cx| {
+            surface.read(cx).is_drawn()
+        })
+        .await;
         let listening = self.evaluate(cx, &island, LISTEN).await == Value::Bool(true);
         let store = cx.update(store::store);
-        self.wait_for(cx, Duration::from_secs(10), |_, cx| store.read(cx).loaded(root))
-            .await;
+        self.wait_for(cx, Duration::from_secs(10), |_, cx| {
+            store.read(cx).loaded(root)
+        })
+        .await;
 
         // The page reads what the store holds.
         let read = self
@@ -123,7 +127,13 @@ impl Run {
             store
                 .read(cx)
                 .notes(root)
-                .map(|notes| notes.annotations.iter().map(|note| note.id.clone()).collect())
+                .map(|notes| {
+                    notes
+                        .annotations
+                        .iter()
+                        .map(|note| note.id.clone())
+                        .collect()
+                })
                 .unwrap_or_default()
         });
         steps.check(
@@ -135,7 +145,11 @@ impl Run {
         // A note written natively, after the page read the list.
         let added = cx.update(|cx| {
             store.update(cx, |store, cx| {
-                store.add(root, note("e2e-native", "written in the Annotations panel"), cx)
+                store.add(
+                    root,
+                    note("e2e-native", "written in the Annotations panel"),
+                    cx,
+                )
             })
         });
         let mut heard = Value::Null;
@@ -185,7 +199,11 @@ impl Run {
             read.annotations
                 .iter()
                 .find(|note| note.id == id)
-                .and_then(|note| note.revision.as_ref().map(|revision| (revision.state.clone(), revision.round)))
+                .and_then(|note| {
+                    note.revision
+                        .as_ref()
+                        .map(|revision| (revision.state.clone(), revision.round))
+                })
         };
         let recorded = self
             .wait_for(cx, Duration::from_secs(5), |_, _| {
@@ -230,7 +248,10 @@ impl Run {
                 "window.__TAURI_INTERNALS__.invoke('{command}', Object.assign({args}, {{ projectRoot: {} }}))",
                 json!(root.to_string_lossy())
             );
-            refused.push(self.agent_call(cx, &island, &script, Duration::from_secs(10)).await);
+            refused.push(
+                self.agent_call(cx, &island, &script, Duration::from_secs(10))
+                    .await,
+            );
         }
         let kept = project::read_annotations(root)
             .is_ok_and(|read| read.annotations.iter().any(|note| note.id == "e2e-native"));

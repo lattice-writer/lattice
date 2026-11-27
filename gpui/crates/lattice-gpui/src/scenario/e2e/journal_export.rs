@@ -20,11 +20,11 @@ use crate::scenario::Run;
 
 /// The figure's entry file, as an editable figure writes one: its first line
 /// names the drawing, the rest is what the paper sets.
-const ENTRY: &str = "% editable-figure source: journal-check.drawio\n\\fbox{\\rule{0pt}{2cm}\\rule{3cm}{0pt}}\n";
+const ENTRY: &str =
+    "% editable-figure source: journal-check.drawio\n\\fbox{\\rule{0pt}{2cm}\\rule{3cm}{0pt}}\n";
 
 /// The float the editor puts in the paper, unsaved.
-const FLOAT: &str =
-    "\\begin{figure}[h]\n\\centering\n\\input{figures/journal-check}\n\\caption{A scheme.}\n\\end{figure}\n";
+const FLOAT: &str = "\\begin{figure}[h]\n\\centering\n\\input{figures/journal-check}\n\\caption{A scheme.}\n\\end{figure}\n";
 
 /// What lattice-core says when the paper sets no figure made from a drawing.
 const NO_FIGURE: [&str; 2] = [
@@ -33,7 +33,12 @@ const NO_FIGURE: [&str; 2] = [
 ];
 
 impl Run {
-    async fn journal_export(&self, cx: &mut AsyncApp, steps: &mut Steps, root: &Path) -> Result<()> {
+    async fn journal_export(
+        &self,
+        cx: &mut AsyncApp,
+        steps: &mut Steps,
+        root: &Path,
+    ) -> Result<()> {
         let ids: Vec<String> = cx.update(|cx| {
             let context = self.shell.read(cx).command_context(cx);
             crate::shell::commands::commands(&context)
@@ -94,7 +99,8 @@ impl Run {
         let parent = tempfile::tempdir()?;
         // A second run while this one is under way starts nothing.
         let second = tempfile::tempdir()?;
-        self.export_into_twice(cx, parent.path(), second.path()).await?;
+        self.export_into_twice(cx, parent.path(), second.path())
+            .await?;
         let doubled = std::fs::read_dir(second.path())?.count();
         let said = titles(cx);
         let saved = std::fs::read_to_string(&main)?.contains(FLOAT);
@@ -153,7 +159,12 @@ impl Run {
     }
 
     /// Run the export into `first`, then at once again into `second`.
-    async fn export_into_twice(&self, cx: &mut AsyncApp, first: &Path, second: &Path) -> Result<()> {
+    async fn export_into_twice(
+        &self,
+        cx: &mut AsyncApp,
+        first: &Path,
+        second: &Path,
+    ) -> Result<()> {
         self.export_runs(cx, &[first, second]).await
     }
 

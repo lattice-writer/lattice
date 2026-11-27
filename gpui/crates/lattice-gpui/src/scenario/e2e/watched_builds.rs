@@ -17,7 +17,12 @@ use crate::{build::watched, scenario::Run};
 
 impl Run {
     /// Whether a build starts within `within`, and how long after now.
-    async fn build_starts(&self, cx: &mut AsyncApp, before: usize, within: Duration) -> Option<Duration> {
+    async fn build_starts(
+        &self,
+        cx: &mut AsyncApp,
+        before: usize,
+        within: Duration,
+    ) -> Option<Duration> {
         let started = Instant::now();
         self.wait_for(cx, within, |shell, cx| {
             let shell = shell.read(cx);
@@ -27,10 +32,17 @@ impl Run {
         .then(|| started.elapsed())
     }
 
-    async fn watched_builds(&self, cx: &mut AsyncApp, steps: &mut Steps, root: &Path) -> Result<()> {
+    async fn watched_builds(
+        &self,
+        cx: &mut AsyncApp,
+        steps: &mut Steps,
+        root: &Path,
+    ) -> Result<()> {
         // Settle whatever the repair left running.
-        self.wait_for(cx, Duration::from_secs(60), |shell, cx| !shell.read(cx).building())
-            .await;
+        self.wait_for(cx, Duration::from_secs(60), |shell, cx| {
+            !shell.read(cx).building()
+        })
+        .await;
         let appendix = root.join("chapters/appendix.tex");
         let before = self.builds(cx);
         std::fs::write(&appendix, "% An appendix written outside Lattice.\n")?;
@@ -38,7 +50,8 @@ impl Run {
         let built = self.built_after(cx, before).await;
         steps.check(
             "a write to a file no editor has open builds once the writes pause",
-            built && started.is_some_and(|after| after >= watched::IDLE - Duration::from_millis(300)),
+            built
+                && started.is_some_and(|after| after >= watched::IDLE - Duration::from_millis(300)),
             json!({ "started_after_ms": started.map(|after| after.as_millis()) }),
         );
 
@@ -54,7 +67,11 @@ impl Run {
         std::fs::remove_file(&output).ok();
         let before = self.builds(cx);
         std::fs::remove_file(&appendix).ok();
-        if self.build_starts(cx, before, Duration::from_secs(10)).await.is_some() {
+        if self
+            .build_starts(cx, before, Duration::from_secs(10))
+            .await
+            .is_some()
+        {
             self.built_after(cx, before).await;
         }
 
@@ -68,7 +85,9 @@ impl Run {
         let started = self.build_starts(cx, before, Duration::from_secs(15)).await;
         let built = self.built_after(cx, before).await;
         let after_first = self.builds(cx);
-        let again = self.build_starts(cx, after_first, Duration::from_secs(4)).await;
+        let again = self
+            .build_starts(cx, after_first, Duration::from_secs(4))
+            .await;
         steps.check(
             "a burst of outside writes builds once, after the last of them pauses",
             built
@@ -93,7 +112,8 @@ impl Run {
         let built = self.built_after(cx, before).await;
         steps.check(
             "an outside edit of an open file builds once the writes pause, not at once",
-            built && started.is_some_and(|after| after >= watched::IDLE - Duration::from_millis(300)),
+            built
+                && started.is_some_and(|after| after >= watched::IDLE - Duration::from_millis(300)),
             json!({ "started_after_ms": started.map(|after| after.as_millis()) }),
         );
         self.close_tab(cx, editor)?;
@@ -117,7 +137,12 @@ impl Run {
         std::fs::write(&output, "This is pdfTeX, second run\n")?;
         let reloaded = self
             .wait_for(cx, Duration::from_secs(5), |_, cx| {
-                editor.read(cx).editor().read(cx).text(cx).contains("second run")
+                editor
+                    .read(cx)
+                    .editor()
+                    .read(cx)
+                    .text(cx)
+                    .contains("second run")
             })
             .await;
         let started = self.build_starts(cx, before, Duration::from_secs(4)).await;
@@ -135,7 +160,11 @@ impl Run {
         std::fs::remove_file(&output).ok();
         let before = self.builds(cx);
         std::fs::remove_file(&appendix).ok();
-        if self.build_starts(cx, before, Duration::from_secs(10)).await.is_some() {
+        if self
+            .build_starts(cx, before, Duration::from_secs(10))
+            .await
+            .is_some()
+        {
             self.built_after(cx, before).await;
         }
 

@@ -105,7 +105,10 @@ impl Run {
             // (`shell/tab_policy.rs`): the four stay to crowd the strip.
             if let Ok(key) = path.strip_prefix(root) {
                 let key = key.to_string_lossy().into_owned();
-                cx.update(|cx| self.shell.update(cx, |shell, cx| shell.pin_document(&key, true, cx)));
+                cx.update(|cx| {
+                    self.shell
+                        .update(cx, |shell, cx| shell.pin_document(&key, true, cx))
+                });
             }
             self.pause(cx, Duration::from_millis(200)).await;
         }

@@ -25,7 +25,12 @@ const PART: &str = "== Included part\nThe included sentence sits here, on a line
 const NOTES: &str = "#set page(width: 12cm, height: 9cm)\n#set heading(numbering: \"1.\")\n= Typst notes <notes>\nSee @notes, and $integral_0^1 x dif x = 1/2$.\n\n#lorem(120)\n";
 
 impl Run {
-    async fn typst(&self, cx: &mut AsyncApp, steps: &mut Steps, root: &std::path::Path) -> Result<()> {
+    async fn typst(
+        &self,
+        cx: &mut AsyncApp,
+        steps: &mut Steps,
+        root: &std::path::Path,
+    ) -> Result<()> {
         let source = root.join("notes.typ");
         let pdf = root.join("notes.pdf");
         std::fs::write(&source, NOTES)?;
@@ -33,7 +38,9 @@ impl Run {
         self.pause(cx, Duration::from_millis(200)).await;
 
         let release = std::env::var_os("LATTICE_E2E_TYPST_RELEASE").map(std::path::PathBuf::from);
-        let archive = release.as_ref().map(|release| release.join("lattice-typst.tar.gz"));
+        let archive = release
+            .as_ref()
+            .map(|release| release.join("lattice-typst.tar.gz"));
         let public_key = release
             .as_ref()
             .and_then(|release| std::fs::read_to_string(release.join("key.pub")).ok());
@@ -55,16 +62,25 @@ impl Run {
             )
         });
         let question = |cx: &mut AsyncApp| {
-            cx.update(|cx| crate::confirm::install(cx).read(cx).question().map(|question| question.to_string()))
+            cx.update(|cx| {
+                crate::confirm::install(cx)
+                    .read(cx)
+                    .question()
+                    .map(|question| question.to_string())
+            })
         };
 
         // Not installed: Build asks, and Not now leaves everything as it was.
         let (declined_build, _) = self.build(cx).await?;
         let asked = self
-            .wait_for(cx, Duration::from_secs(10), |_, cx| crate::confirm::install(cx).read(cx).is_open())
+            .wait_for(cx, Duration::from_secs(10), |_, cx| {
+                crate::confirm::install(cx).read(cx).is_open()
+            })
             .await;
         let asked_title = question(cx);
-        self.with_window(cx, |_, _, cx| crate::confirm::install(cx).update(cx, |host, cx| host.dismiss(cx)))?;
+        self.with_window(cx, |_, _, cx| {
+            crate::confirm::install(cx).update(cx, |host, cx| host.dismiss(cx))
+        })?;
         let reported = cx.update(|cx| {
             self.shell
                 .read(cx)
@@ -75,9 +91,15 @@ impl Run {
                 .any(|diagnostic| diagnostic.message.contains("Typst support"))
         });
         let buffer = cx.update(|cx| editor.read(cx).lattice_editor().read(cx).buffer().clone());
-        cx.update(|cx| buffer.update(cx, |buffer, cx| buffer.edit([(0..0, "// typed\n")], None, cx)));
+        cx.update(|cx| {
+            buffer.update(cx, |buffer, cx| {
+                buffer.edit([(0..0, "// typed\n")], None, cx)
+            })
+        });
         self.pause(cx, Duration::from_millis(600)).await;
-        let typing_quiet = cx.update(|cx| !self.shell.read(cx).building() && !crate::confirm::install(cx).read(cx).is_open());
+        let typing_quiet = cx.update(|cx| {
+            !self.shell.read(cx).building() && !crate::confirm::install(cx).read(cx).is_open()
+        });
         cx.update(|cx| buffer.update(cx, |buffer, cx| buffer.undo(cx)));
         steps.check(
             "the first Typst build asks to download Typst support, with its size, and Not now keeps the project as it was",
@@ -93,16 +115,22 @@ impl Run {
         // Build asks again; Download installs the helper and runs the build.
         let started = Instant::now();
         self.with_window(cx, |shell, window, cx| {
-            shell.update(cx, |shell, cx| shell.build(&crate::shell::Build, window, cx))
+            shell.update(cx, |shell, cx| {
+                shell.build(&crate::shell::Build, window, cx)
+            })
         })?;
         let asked_again = self
-            .wait_for(cx, Duration::from_secs(10), |_, cx| crate::confirm::install(cx).read(cx).is_open())
+            .wait_for(cx, Duration::from_secs(10), |_, cx| {
+                crate::confirm::install(cx).read(cx).is_open()
+            })
             .await;
         self.with_window(cx, |_, window, cx| {
             crate::confirm::install(cx).update(cx, |host, cx| host.accept(window, cx))
         })?;
         let installed = self
-            .wait_for(cx, Duration::from_secs(60), |_, cx| crate::typst::binary(cx).is_some())
+            .wait_for(cx, Duration::from_secs(60), |_, cx| {
+                crate::typst::binary(cx).is_some()
+            })
             .await;
         let installed_at = Instant::now();
         let rebuilt = self
@@ -121,7 +149,13 @@ impl Run {
                 .build_panel()
                 .read(cx)
                 .outcome()
-                .map(|outcome| outcome.steps.iter().filter_map(|step| step.duration_ms).sum::<u64>())
+                .map(|outcome| {
+                    outcome
+                        .steps
+                        .iter()
+                        .filter_map(|step| step.duration_ms)
+                        .sum::<u64>()
+                })
         });
         let took = match pill {
             crate::build_panel::ChipState::Succeeded(took) => Some(took),
@@ -149,8 +183,14 @@ impl Run {
         let (built, took) = self.build(cx).await?;
         let (document, one_off) = cx.update(|cx| {
             let shell = self.shell.read(cx);
-            let main = shell.project().map(|project| project.read(cx).main_document().map(str::to_string));
-            let last = shell.build_panel().read(cx).last().map(|last| last.root_document.clone());
+            let main = shell
+                .project()
+                .map(|project| project.read(cx).main_document().map(str::to_string));
+            let last = shell
+                .build_panel()
+                .read(cx)
+                .last()
+                .map(|last| last.root_document.clone());
             (last, main)
         });
         let pages = cx.update(|cx| self.shell.read(cx).pdf().read(cx).page_count(cx));
@@ -173,9 +213,17 @@ impl Run {
         };
         let before = shown(cx);
         let buffer = cx.update(|cx| editor.read(cx).lattice_editor().read(cx).buffer().clone());
-        let line_four = NOTES.match_indices('\n').nth(2).map(|(at, _)| at + 1).context("four lines")?;
+        let line_four = NOTES
+            .match_indices('\n')
+            .nth(2)
+            .map(|(at, _)| at + 1)
+            .context("four lines")?;
         let edited = Instant::now();
-        cx.update(|cx| buffer.update(cx, |buffer, cx| buffer.edit([(line_four..line_four, "#nonexistent-call()\n")], None, cx)));
+        cx.update(|cx| {
+            buffer.update(cx, |buffer, cx| {
+                buffer.edit([(line_four..line_four, "#nonexistent-call()\n")], None, cx)
+            })
+        });
         let reported = self
             .wait_for(cx, Duration::from_secs(10), |shell, cx| {
                 let panel = shell.read(cx).build_panel().read(cx);
@@ -194,7 +242,9 @@ impl Run {
             panel
                 .diagnostics()
                 .iter()
-                .find(|diagnostic| diagnostic.level == "error" && diagnostic.message.contains("nonexistent-call"))
+                .find(|diagnostic| {
+                    diagnostic.level == "error" && diagnostic.message.contains("nonexistent-call")
+                })
                 .map(|diagnostic| (diagnostic.message.clone(), panel.location(diagnostic)))
         });
         steps.check(
@@ -202,16 +252,25 @@ impl Run {
             reported && unsaved,
             json!({ "ms": to_diagnostic.as_millis(), "unsaved": unsaved, "error": error.as_ref().map(|(message, _)| message.clone()) }),
         );
-        log::info!("typst e2e: edit to diagnostic {} ms", to_diagnostic.as_millis());
+        log::info!(
+            "typst e2e: edit to diagnostic {} ms",
+            to_diagnostic.as_millis()
+        );
 
         if let Some((_, Some(location))) = error {
             self.with_window(cx, |shell, window, cx| {
-                shell.update(cx, |shell, cx| shell.open_path(location.path.clone(), location.line, window, cx));
+                shell.update(cx, |shell, cx| {
+                    shell.open_path(location.path.clone(), location.line, window, cx)
+                });
             })?;
             self.pause(cx, Duration::from_millis(200)).await;
         }
         let row = self.cursor_row(cx, &editor);
-        steps.check("following the Typst error puts the cursor on its line", row == 3, json!({ "row": row + 1 }));
+        steps.check(
+            "following the Typst error puts the cursor on its line",
+            row == 3,
+            json!({ "row": row + 1 }),
+        );
 
         // Fixed, the live build writes the PDF again and the pane redraws it
         // in place. The fix is new text rather than an undo: an undo gives
@@ -219,7 +278,15 @@ impl Run {
         // already shows.
         let fixed = Instant::now();
         let call = "#nonexistent-call()\n";
-        cx.update(|cx| buffer.update(cx, |buffer, cx| buffer.edit([(line_four..line_four + call.len(), "Typed live.\n")], None, cx)));
+        cx.update(|cx| {
+            buffer.update(cx, |buffer, cx| {
+                buffer.edit(
+                    [(line_four..line_four + call.len(), "Typed live.\n")],
+                    None,
+                    cx,
+                )
+            })
+        });
         let redrawn = self
             .wait_for(cx, Duration::from_secs(10), |shell, cx| {
                 let panel = shell.read(cx).pdf().read(cx);
@@ -238,7 +305,8 @@ impl Run {
         log::info!("typst e2e: edit to pixels {} ms", to_pixels.as_millis());
         self.snapshot(cx, "typst-live").await;
 
-        self.typst_jumps(cx, steps, root, &source, &editor, &buffer).await?;
+        self.typst_jumps(cx, steps, root, &source, &editor, &buffer)
+            .await?;
 
         self.close_panel(cx, &editor).await?;
         std::fs::remove_file(&source).ok();
@@ -285,18 +353,27 @@ impl Run {
         self.pause(cx, Duration::from_millis(500)).await;
         let settled = settled
             && self
-                .wait_for(cx, Duration::from_secs(20), |shell, cx| !shell.read(cx).building())
+                .wait_for(cx, Duration::from_secs(20), |shell, cx| {
+                    !shell.read(cx).building()
+                })
                 .await;
 
         let part_editor = self.open(cx, &part, Some(2))?;
         self.pause(cx, Duration::from_millis(300)).await;
         // What ⌘⇧J, Jump to PDF and the PDF toolbar's locate button run.
         self.with_window(cx, |shell, window, cx| {
-            shell.update(cx, |shell, cx| shell.forward_sync(&crate::shell::ForwardSync, window, cx))
+            shell.update(cx, |shell, cx| {
+                shell.forward_sync(&crate::shell::ForwardSync, window, cx)
+            })
         })?;
         let marked = self
             .wait_for(cx, Duration::from_secs(20), |shell, cx| {
-                shell.read(cx).pdf().read(cx).sync_mark(cx).is_some_and(|(_, scroll)| !scroll)
+                shell
+                    .read(cx)
+                    .pdf()
+                    .read(cx)
+                    .sync_mark(cx)
+                    .is_some_and(|(_, scroll)| !scroll)
             })
             .await;
         let (mark, pages) = cx.update(|cx| {
@@ -340,14 +417,23 @@ impl Run {
         // replaced the notes' pages.
         let part_pdf = root.join("notes-part.pdf");
         let builds = cx.update(|cx| self.shell.read(cx).build_panel().read(cx).builds());
-        let part_buffer = cx.update(|cx| part_editor.read(cx).lattice_editor().read(cx).buffer().clone());
+        let part_buffer = cx.update(|cx| {
+            part_editor
+                .read(cx)
+                .lattice_editor()
+                .read(cx)
+                .buffer()
+                .clone()
+        });
         cx.update(|cx| {
             part_buffer.update(cx, |buffer, cx| {
                 let end = buffer.len();
                 buffer.edit([(end..end, "Saved with the part in front.\n")], None, cx)
             })
         });
-        self.with_window(cx, |_, window, cx| window.dispatch_action(Box::new(crate::shell::Save), cx))?;
+        self.with_window(cx, |_, window, cx| {
+            window.dispatch_action(Box::new(crate::shell::Save), cx)
+        })?;
         let saved_build = self
             .wait_for(cx, Duration::from_secs(20), |shell, cx| {
                 let shell = shell.read(cx);
@@ -356,7 +442,12 @@ impl Run {
             })
             .await;
         let document = cx.update(|cx| {
-            self.shell.read(cx).build_panel().read(cx).last().map(|last| last.root_document.clone())
+            self.shell
+                .read(cx)
+                .build_panel()
+                .read(cx)
+                .last()
+                .map(|last| last.root_document.clone())
         });
         steps.check(
             "Typst: saving an included part with no main document builds the document that includes it",

@@ -66,7 +66,13 @@ impl Run {
 
     /// The app log's newest entry, to tell the entries logged after it.
     fn newest_log_id(&self, cx: &mut AsyncApp) -> Option<String> {
-        cx.update(|cx| crate::app_log::global(cx).read(cx).entries().first().map(|entry| entry.id.clone()))
+        cx.update(|cx| {
+            crate::app_log::global(cx)
+                .read(cx)
+                .entries()
+                .first()
+                .map(|entry| entry.id.clone())
+        })
     }
 
     /// The titles the app log took after the entry `since`, newest first: a

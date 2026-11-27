@@ -18,8 +18,7 @@ use serde_json::json;
 use super::Steps;
 use crate::{
     app_log::{self, Level},
-    crash,
-    notices,
+    crash, notices,
     scenario::Run,
 };
 
@@ -169,15 +168,16 @@ impl Run {
         let stack = cx.update(notices::install);
         let titles = cx.update(|cx| stack.read(cx).titles());
         let logged = cx.update(|cx| {
-            app_log::global(cx)
-                .read(cx)
-                .entries()
-                .iter()
-                .any(|entry| entry.title == "Lattice UI crashed" && entry.detail.contains("E2E crash"))
+            app_log::global(cx).read(cx).entries().iter().any(|entry| {
+                entry.title == "Lattice UI crashed" && entry.detail.contains("E2E crash")
+            })
         });
         steps.check(
             "the launch after a crash says so, and logs the error's details",
-            titles.iter().any(|title| title == "Lattice quit unexpectedly") && logged,
+            titles
+                .iter()
+                .any(|title| title == "Lattice quit unexpectedly")
+                && logged,
             json!({ "titles": titles, "logged": logged }),
         );
         cx.update(|cx| notices::dismiss("lattice-crash", cx));

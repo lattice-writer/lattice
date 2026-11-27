@@ -45,7 +45,9 @@ impl Run {
         let original = std::fs::read_to_string(&chapter)?;
         let editor = self.open(cx, &chapter, Some(1))?;
         self.with_window(cx, |_, _, cx| {
-            editor.update(cx, |editor, _| editor.script_proofread_reply(Some(REPLY.into())))
+            editor.update(cx, |editor, _| {
+                editor.script_proofread_reply(Some(REPLY.into()))
+            })
         })?;
 
         // ⌘⌥P opens the card, which offers the reply's two edits.
@@ -63,7 +65,9 @@ impl Run {
         // Keep the first edit's original; ⌘↵ applies the other, alone, as
         // one undo step.
         self.with_window(cx, |_, window, cx| {
-            editor.update(cx, |editor, cx| editor.scripted_proofread("keep-first", window, cx))
+            editor.update(cx, |editor, cx| {
+                editor.scripted_proofread("keep-first", window, cx)
+            })
         })?;
         let kept = self.card_reads(cx, &editor, "ready", 2, 1).await;
         let accepted = {
@@ -83,8 +87,10 @@ impl Run {
         let undone = {
             let _front = self.focused(cx, "editor").await?;
             self.press(cx, 'z', true).await?;
-            self.wait_for(cx, Duration::from_secs(2), |_, cx| editor.read(cx).text(cx) == original)
-                .await
+            self.wait_for(cx, Duration::from_secs(2), |_, cx| {
+                editor.read(cx).text(cx) == original
+            })
+            .await
         };
         steps.check(
             "kept edits stay as they were; ⌘↵ applies the rest in one undo step that ⌘Z takes back, its replaced words folding away",
@@ -96,7 +102,11 @@ impl Run {
         self.select_sentence(cx, &editor)?;
         self.with_window(cx, |_, window, cx| {
             editor.update(cx, |editor, cx| {
-                editor.proofread_action(Some(lattice_editor::proofread::Ask::Proofread), window, cx);
+                editor.proofread_action(
+                    Some(lattice_editor::proofread::Ask::Proofread),
+                    window,
+                    cx,
+                );
                 editor.scripted_proofread("polish", window, cx);
             })
         })?;
@@ -104,8 +114,10 @@ impl Run {
         let discarded = {
             let _front = self.focused(cx, "proofread card").await?;
             self.press(cx, '\u{1b}', false).await?;
-            self.wait_for(cx, Duration::from_secs(2), |_, cx| editor.read(cx).proofread_card(cx).is_none())
-                .await
+            self.wait_for(cx, Duration::from_secs(2), |_, cx| {
+                editor.read(cx).proofread_card(cx).is_none()
+            })
+            .await
         };
         let untouched = self.editor_text(cx, &editor) == original;
         steps.check(
@@ -130,7 +142,9 @@ impl Run {
             .await;
         self.adapter_shot(cx, "proofread-error").await;
         self.with_window(cx, |_, window, cx| {
-            editor.update(cx, |editor, cx| editor.scripted_proofread("dismiss", window, cx))
+            editor.update(cx, |editor, cx| {
+                editor.scripted_proofread("dismiss", window, cx)
+            })
         })?;
         steps.check(
             "without an agent to answer, the card says it could not proofread",
@@ -141,12 +155,16 @@ impl Run {
         // The palette's Rewrite selection… opens the Rewrite menu; an
         // instruction from it asks with the writer's words.
         self.with_window(cx, |_, _, cx| {
-            editor.update(cx, |editor, _| editor.script_proofread_reply(Some(REPLY.into())))
+            editor.update(cx, |editor, _| {
+                editor.script_proofread_reply(Some(REPLY.into()))
+            })
         })?;
         self.select_sentence(cx, &editor)?;
         self.dispatch_to_shell(cx, &crate::editor_panel::proofread::RewriteSelection)?;
         let menu = self
-            .wait_for(cx, Duration::from_secs(3), |_, cx| editor.read(cx).rewrite_menu_open())
+            .wait_for(cx, Duration::from_secs(3), |_, cx| {
+                editor.read(cx).rewrite_menu_open()
+            })
             .await;
         self.adapter_shot(cx, "proofread-rewrite-menu").await;
         self.with_window(cx, |_, window, cx| {
@@ -157,7 +175,9 @@ impl Run {
         let rewritten = self.card_reads(cx, &editor, "ready", 2, 2).await;
         let instruction = cx.update(|cx| editor.read(cx).proofread_instruction(cx));
         self.with_window(cx, |_, window, cx| {
-            editor.update(cx, |editor, cx| editor.scripted_proofread("dismiss", window, cx))
+            editor.update(cx, |editor, cx| {
+                editor.scripted_proofread("dismiss", window, cx)
+            })
         })?;
         steps.check(
             "Rewrite selection… opens the Rewrite menu, whose instruction asks the agent in the writer's words",
@@ -173,7 +193,11 @@ impl Run {
 
     /// The widths an accepted edit's replaced words took, in the order
     /// they were painted, until they are gone (or 1.5 s pass).
-    async fn ghost_widths(&self, cx: &mut AsyncApp, editor: &Entity<EditorPanel>) -> Vec<gpui::Pixels> {
+    async fn ghost_widths(
+        &self,
+        cx: &mut AsyncApp,
+        editor: &Entity<EditorPanel>,
+    ) -> Vec<gpui::Pixels> {
         let lattice = cx.update(|cx| editor.read(cx).lattice_editor().clone());
         let start = std::time::Instant::now();
         let mut widths: Vec<gpui::Pixels> = Vec::new();
@@ -193,7 +217,9 @@ impl Run {
                 None if !widths.is_empty() => break,
                 _ => {}
             }
-            cx.background_executor().timer(Duration::from_millis(8)).await;
+            cx.background_executor()
+                .timer(Duration::from_millis(8))
+                .await;
         }
         widths
     }
@@ -232,8 +258,7 @@ impl Run {
         kept: usize,
     ) -> bool {
         self.wait_for(cx, Duration::from_secs(5), |_, cx| {
-            editor.read(cx).proofread_card(cx)
-                == Some((status.to_string(), offered, kept))
+            editor.read(cx).proofread_card(cx) == Some((status.to_string(), offered, kept))
         })
         .await
     }

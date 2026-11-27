@@ -59,7 +59,10 @@ impl Run {
         // editor adapter's completion step does), so count them in the
         // text rather than assume the fixture's one; only the cite added
         // here names a page, in its own section, last.
-        let cites = cx.update(|cx| panel.read(cx).text_and_caret(cx).0).matches("{knuth1984}").count();
+        let cites = cx
+            .update(|cx| panel.read(cx).text_and_caret(cx).0)
+            .matches("{knuth1984}")
+            .count();
         let (earlier, last) = uses.split_at(uses.len().saturating_sub(1));
         steps.check(
             "a citation card lists the key's uses here, each in its section with the page its note names",

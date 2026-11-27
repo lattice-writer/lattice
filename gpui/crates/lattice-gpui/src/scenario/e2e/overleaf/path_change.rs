@@ -41,13 +41,15 @@ impl Run {
                 .map(|editor| editor.read(cx).overleaf_text(cx));
             live && text.is_some() && text == mock.file("main.tex")
         };
-        let not_live =
-            |shell: &gpui::Entity<crate::shell::Shell>, cx: &mut gpui::App| {
-                shell.read(cx).overleaf.read(cx).channel() != ChannelStatus::Live
-            };
+        let not_live = |shell: &gpui::Entity<crate::shell::Shell>, cx: &mut gpui::App| {
+            shell.read(cx).overleaf.read(cx).channel() != ChannelStatus::Live
+        };
         let upgrades = || {
             let requests = mock.socket_requests();
-            requests.iter().filter(|line| line.contains("/socket.io/1/websocket/")).count()
+            requests
+                .iter()
+                .filter(|line| line.contains("/socket.io/1/websocket/"))
+                .count()
         };
         // A switch is several callbacks over a moment; returns when the last
         // one was told.
@@ -69,7 +71,9 @@ impl Run {
         mock.mute_heartbeats(true);
         let asked_before = mock.rosters_asked();
         burst(cx).await;
-        let dropped = self.wait_for(cx, probed + Duration::from_secs(2), &not_live).await;
+        let dropped = self
+            .wait_for(cx, probed + Duration::from_secs(2), &not_live)
+            .await;
         let probes = mock.rosters_asked() - asked_before;
         mock.mute_heartbeats(false);
         let joins = upgrades() - joins_before;
@@ -85,7 +89,9 @@ impl Run {
         mock.go_silent();
         self.type_text(cx, "Shannon ").await?;
         let last = burst(cx).await;
-        let left = self.wait_for(cx, probed + Duration::from_secs(3), &not_live).await;
+        let left = self
+            .wait_for(cx, probed + Duration::from_secs(3), &not_live)
+            .await;
         // Measured from the last callback: the settle restarts with each.
         let left_after = last.elapsed();
         let back = self.wait_for(cx, Duration::from_secs(10), &settled).await;

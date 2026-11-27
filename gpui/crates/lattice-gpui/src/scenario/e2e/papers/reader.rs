@@ -141,7 +141,11 @@ impl Run {
     }
 
     /// Maximize the reader's panel, or restore it.
-    fn toggle_reader_maximized(&self, cx: &mut AsyncApp, reader: &Entity<PaperReader>) -> Result<()> {
+    fn toggle_reader_maximized(
+        &self,
+        cx: &mut AsyncApp,
+        reader: &Entity<PaperReader>,
+    ) -> Result<()> {
         let reader = reader.entity_id();
         self.with_window(cx, move |shell, _, cx| {
             shell.update(cx, |shell, cx| {
@@ -374,7 +378,8 @@ impl Run {
         let Some(view) = cx.update(|cx| reader.read(cx).pdf_view()) else {
             return Ok(());
         };
-        let state = |cx: &mut AsyncApp| cx.update(|cx| (view.read(cx).fit(), view.read(cx).scale()));
+        let state =
+            |cx: &mut AsyncApp| cx.update(|cx| (view.read(cx).fit(), view.read(cx).scale()));
         cx.update(|cx| view.update(cx, |view, cx| view.apply_fit(FitMode::Width, cx)));
         self.pause(cx, Duration::from_millis(300)).await;
         let fitted = state(cx);

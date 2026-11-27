@@ -177,9 +177,12 @@ impl Run {
         // Hidden past the hibernation delay, the page stays while a turn
         // runs, as the page reports it.
         let turn = |presence: &str| {
-            format!("(() => {{ window.latticeHost.post('agent:turn', {{ presence: {presence} }}); return 'true'; }})()")
+            format!(
+                "(() => {{ window.latticeHost.post('agent:turn', {{ presence: {presence} }}); return 'true'; }})()"
+            )
         };
-        self.evaluate(cx, &island, &turn("{ state: 'running' }")).await;
+        self.evaluate(cx, &island, &turn("{ state: 'running' }"))
+            .await;
         self.with_window(cx, |shell, window, cx| {
             shell.update(cx, |shell, cx| shell.toggle_view("agent", window, cx))
         })?;

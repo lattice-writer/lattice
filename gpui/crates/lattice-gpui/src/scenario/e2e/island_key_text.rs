@@ -28,12 +28,18 @@ impl Run {
         island: &Entity<lattice_webview::Island>,
     ) -> Result<()> {
         let Some(bounds) = cx.update(|cx| island.read(cx).bounds(cx)) else {
-            steps.check("an input method's arrow and End characters never reach the page", false, json!({}));
+            steps.check(
+                "an input method's arrow and End characters never reach the page",
+                false,
+                json!({}),
+            );
             return Ok(());
         };
         native::send_click(self.native(cx)?, bounds.center())?;
         let focused = self
-            .wait_for(cx, Duration::from_secs(3), |_, cx| island.read(cx).page_focused())
+            .wait_for(cx, Duration::from_secs(3), |_, cx| {
+                island.read(cx).page_focused()
+            })
             .await;
         self.evaluate(
             cx,
@@ -42,7 +48,11 @@ impl Run {
              document.body.append(field); field.focus(); return document.activeElement === field; })()",
         )
         .await;
-        cx.update(|cx| island.read(cx).insert_text("a\u{F700}\u{F701}b\u{F72B}", cx));
+        cx.update(|cx| {
+            island
+                .read(cx)
+                .insert_text("a\u{F700}\u{F701}b\u{F72B}", cx)
+        });
         for arrow in ["\u{F702}", "\u{F703}"] {
             cx.update(|cx| island.read(cx).insert_text(arrow, cx));
         }
@@ -62,5 +72,4 @@ impl Run {
         );
         Ok(())
     }
-
 }

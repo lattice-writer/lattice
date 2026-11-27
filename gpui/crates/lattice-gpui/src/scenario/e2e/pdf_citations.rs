@@ -26,7 +26,8 @@ impl Run {
         let shown = self
             .wait_for(cx, Duration::from_secs(60), |shell, cx| {
                 let shell = shell.read(cx);
-                shell.live_document() == Some("cite-check.tex") && shell.pdf().read(cx).page_count(cx) > 0
+                shell.live_document() == Some("cite-check.tex")
+                    && shell.pdf().read(cx).page_count(cx) > 0
             })
             .await;
         let view = cx.update(|cx| self.shell.read(cx).pdf().read(cx).live_view().clone());
@@ -38,7 +39,8 @@ impl Run {
             }
             self.pause(cx, Duration::from_millis(200)).await;
         }
-        let card = |cx: &mut AsyncApp| cx.update(|cx| view.read(cx).citation_card().map(str::to_string));
+        let card =
+            |cx: &mut AsyncApp| cx.update(|cx| view.read(cx).citation_card().map(str::to_string));
         let move_to = |cx: &mut AsyncApp, position: gpui::Point<gpui::Pixels>| {
             self.with_window(cx, move |_, window, cx| {
                 window.dispatch_event(
@@ -74,7 +76,8 @@ impl Run {
         // The document's listeners: a pointer leaving the pages straight
         // from the link closes the card, and Escape closes it with the focus
         // off the PDF.
-        let (mut left_open, mut left_closed, mut escape_open, mut escape_closed) = (None, None, None, None);
+        let (mut left_open, mut left_closed, mut escape_open, mut escape_closed) =
+            (None, None, None, None);
         let pages = cx.update(|cx| view.read(cx).pages_bounds());
         if let Some(at) = at {
             move_to(cx, at)?;
@@ -103,8 +106,10 @@ impl Run {
         self.open(cx, &root.join("main.tex"), Some(1))?;
         self.pause(cx, Duration::from_millis(300)).await;
         self.build(cx).await?;
-        self.wait_for(cx, Duration::from_secs(20), |shell, cx| shell.read(cx).live_document() == Some("main.tex"))
-            .await;
+        self.wait_for(cx, Duration::from_secs(20), |shell, cx| {
+            shell.read(cx).live_document() == Some("main.tex")
+        })
+        .await;
         // main.tex taking the live PDF back leaves cite-check.tex in a root tab of its
         // own. Close it so later modules (manuscripts, dock) find only the PDFs
         // they open themselves.

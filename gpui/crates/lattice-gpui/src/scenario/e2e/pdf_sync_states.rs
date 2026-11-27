@@ -16,9 +16,22 @@ use super::Steps;
 use crate::{pdf::PdfViewEvent, scenario::Run, shell::ForwardSync};
 
 impl Run {
-    pub(super) async fn pdf_states(&self, cx: &mut AsyncApp, steps: &mut Steps, root: &Path) -> Result<()> {
+    pub(super) async fn pdf_states(
+        &self,
+        cx: &mut AsyncApp,
+        steps: &mut Steps,
+        root: &Path,
+    ) -> Result<()> {
         let reveal = |cx: &mut AsyncApp| {
-            cx.update(|cx| self.shell.read(cx).pdf().read(cx).live_view().read(cx).reveal_state())
+            cx.update(|cx| {
+                self.shell
+                    .read(cx)
+                    .pdf()
+                    .read(cx)
+                    .live_view()
+                    .read(cx)
+                    .reveal_state()
+            })
         };
         let chapter = root.join("chapters/intro.tex");
 
@@ -29,12 +42,25 @@ impl Run {
         let before = reveal(cx);
         let during = self.with_window(cx, |shell, window, cx| {
             shell.update(cx, |shell, cx| shell.forward_sync(&ForwardSync, window, cx));
-            shell.read(cx).pdf().read(cx).live_view().read(cx).reveal_state()
+            shell
+                .read(cx)
+                .pdf()
+                .read(cx)
+                .live_view()
+                .read(cx)
+                .reveal_state()
         })?;
         self.snapshot(cx, "pdf-locating").await;
         let ended = self
             .wait_for(cx, Duration::from_secs(20), |shell, cx| {
-                shell.read(cx).pdf().read(cx).live_view().read(cx).reveal_state() == (false, false)
+                shell
+                    .read(cx)
+                    .pdf()
+                    .read(cx)
+                    .live_view()
+                    .read(cx)
+                    .reveal_state()
+                    == (false, false)
             })
             .await;
         steps.check(
@@ -59,11 +85,24 @@ impl Run {
         let window_tex = reveal(cx);
         let window_during = self.with_window(cx, |shell, window, cx| {
             shell.update(cx, |shell, cx| shell.forward_sync(&ForwardSync, window, cx));
-            shell.read(cx).pdf().read(cx).live_view().read(cx).reveal_state()
+            shell
+                .read(cx)
+                .pdf()
+                .read(cx)
+                .live_view()
+                .read(cx)
+                .reveal_state()
         })?;
         let window_ended = self
             .wait_for(cx, Duration::from_secs(20), |shell, cx| {
-                shell.read(cx).pdf().read(cx).live_view().read(cx).reveal_state() == (false, false)
+                shell
+                    .read(cx)
+                    .pdf()
+                    .read(cx)
+                    .live_view()
+                    .read(cx)
+                    .reveal_state()
+                    == (false, false)
             })
             .await;
         self.with_window(cx, |shell, window, cx| {
@@ -86,7 +125,8 @@ impl Run {
     /// Focus mode with the PDF beside the document: its own window takes it
     /// out of focus mode's layout, and Return brings it back there.
     async fn focus_detach(&self, cx: &mut AsyncApp, steps: &mut Steps) -> Result<()> {
-        let pdf_before = cx.update(|cx| crate::shell::workspaces::Workspaces::global(cx).focus_pdf());
+        let pdf_before =
+            cx.update(|cx| crate::shell::workspaces::Workspaces::global(cx).focus_pdf());
         let shown = |cx: &mut AsyncApp| {
             cx.update(|cx| {
                 let shell = self.shell.read(cx);
@@ -123,7 +163,9 @@ impl Run {
             shell.update(cx, |shell, cx| shell.set_focus_mode(false, window, cx))
         })?;
         cx.update(|cx| {
-            crate::shell::workspaces::Workspaces::update(cx, |library| library.set_focus_pdf(pdf_before))
+            crate::shell::workspaces::Workspaces::update(cx, |library| {
+                library.set_focus_pdf(pdf_before)
+            })
         });
         self.pause(cx, Duration::from_millis(400)).await;
         steps.check(
@@ -141,7 +183,15 @@ impl Run {
     async fn zoom_wheel(&self, cx: &mut AsyncApp, steps: &mut Steps) -> Result<()> {
         lattice_ui::parity::enable();
         // The fit the wheel leaves, put back after for the modules that follow.
-        let fit_before = cx.update(|cx| self.shell.read(cx).pdf().read(cx).live_view().read(cx).fit());
+        let fit_before = cx.update(|cx| {
+            self.shell
+                .read(cx)
+                .pdf()
+                .read(cx)
+                .live_view()
+                .read(cx)
+                .fit()
+        });
         self.with_window(cx, |shell, window, cx| {
             let pdf = shell.read(cx).pdf().clone();
             pdf.update(cx, |pdf, cx| pdf.detach(window, cx));
@@ -163,12 +213,24 @@ impl Run {
             lattice_ui::parity::forget("pdf/zoom");
             draw(cx);
             self.pause(cx, Duration::from_millis(200)).await;
-            zoom = lattice_ui::parity::regions().get("pdf/zoom").and_then(|region| region.bounds);
+            zoom = lattice_ui::parity::regions()
+                .get("pdf/zoom")
+                .and_then(|region| region.bounds);
             if zoom.is_some() {
                 break;
             }
         }
-        let scale = |cx: &mut AsyncApp| cx.update(|cx| self.shell.read(cx).pdf().read(cx).live_view().read(cx).scale());
+        let scale = |cx: &mut AsyncApp| {
+            cx.update(|cx| {
+                self.shell
+                    .read(cx)
+                    .pdf()
+                    .read(cx)
+                    .live_view()
+                    .read(cx)
+                    .scale()
+            })
+        };
         let start = scale(cx);
         let wheel = |cx: &mut AsyncApp, at: gpui::Point<gpui::Pixels>, dy: f32| {
             if let Some(handle) = handle {
@@ -177,7 +239,10 @@ impl Run {
                         window.dispatch_event(
                             gpui::PlatformInput::Scroll(gpui::ScrollEvent {
                                 position: at,
-                                delta: gpui::ScrollDelta::Pixels(gpui::point(gpui::px(0.), gpui::px(dy))),
+                                delta: gpui::ScrollDelta::Pixels(gpui::point(
+                                    gpui::px(0.),
+                                    gpui::px(dy),
+                                )),
                                 modifiers: gpui::Modifiers::default(),
                                 touch_phase: gpui::TouchPhase::Moved,
                                 source: gpui::ScrollSource::Pointer,
@@ -225,13 +290,22 @@ impl Run {
     /// A PDF of the project that does not load says so without "Try
     /// building the project again", which only a compiled PDF offers
     /// (`loadErrorHint`).
-    async fn file_pdf_failure(&self, cx: &mut AsyncApp, steps: &mut Steps, root: &Path) -> Result<()> {
+    async fn file_pdf_failure(
+        &self,
+        cx: &mut AsyncApp,
+        steps: &mut Steps,
+        root: &Path,
+    ) -> Result<()> {
         let broken = root.join("broken-check.pdf");
         std::fs::write(&broken, b"%PDF-1.4\nthis is not a PDF\n")?;
         self.open(cx, &broken, None).ok();
         let failed = self
             .wait_for(cx, Duration::from_secs(10), |shell, cx| {
-                shell.read(cx).file_pdf_tabs().iter().any(|tab| tab.read(cx).live_view().read(cx).load_failure().0.is_some())
+                shell
+                    .read(cx)
+                    .file_pdf_tabs()
+                    .iter()
+                    .any(|tab| tab.read(cx).live_view().read(cx).load_failure().0.is_some())
             })
             .await;
         self.snapshot(cx, "pdf-file-load-failure").await;
@@ -243,7 +317,16 @@ impl Run {
                 .map(|tab| tab.read(cx).live_view().read(cx).load_failure())
                 .find(|failure| failure.0.is_some())
         });
-        let live = cx.update(|cx| self.shell.read(cx).pdf().read(cx).live_view().read(cx).load_failure().1);
+        let live = cx.update(|cx| {
+            self.shell
+                .read(cx)
+                .pdf()
+                .read(cx)
+                .live_view()
+                .read(cx)
+                .load_failure()
+                .1
+        });
         steps.check(
             "PDF: a project PDF that fails to load names the failure without the build hint, which the compiled PDF keeps",
             failed && failure.as_ref().is_some_and(|failure| !failure.1) && live,
@@ -257,15 +340,26 @@ impl Run {
     /// line, SyncTeX names the `.pdf_tex` beside it, and a ⌘-double-click
     /// on it asks before opening the SVG; it is not answered here, so
     /// nothing outside the app opens.
-    async fn figure_svg_asks(&self, cx: &mut AsyncApp, steps: &mut Steps, root: &Path) -> Result<()> {
+    async fn figure_svg_asks(
+        &self,
+        cx: &mut AsyncApp,
+        steps: &mut Steps,
+        root: &Path,
+    ) -> Result<()> {
         let figures = root.join("figures-check");
         std::fs::create_dir_all(&figures)?;
-        std::fs::write(figures.join("plot.svg"), "<svg xmlns=\"http://www.w3.org/2000/svg\"/>\n")?;
+        std::fs::write(
+            figures.join("plot.svg"),
+            "<svg xmlns=\"http://www.w3.org/2000/svg\"/>\n",
+        )?;
         std::fs::write(
             figures.join("plot.tex"),
             "% editable-figure source: plot.svg\n\\input{figures-check/plot.pdf_tex}\n",
         )?;
-        std::fs::write(figures.join("plot.pdf_tex"), "Figurewords drawn in the plot.\n")?;
+        std::fs::write(
+            figures.join("plot.pdf_tex"),
+            "Figurewords drawn in the plot.\n",
+        )?;
         let document = root.join("figure-check.tex");
         std::fs::write(
             &document,
@@ -277,17 +371,30 @@ impl Run {
         let shown = self
             .wait_for(cx, Duration::from_secs(30), |shell, cx| {
                 let shell = shell.read(cx);
-                shell.live_document() == Some("figure-check.tex") && shell.pdf().read(cx).page_count(cx) > 0
+                shell.live_document() == Some("figure-check.tex")
+                    && shell.pdf().read(cx).page_count(cx) > 0
             })
             .await;
         let pdf = root.join("figure-check.pdf");
-        let found = if pdf.is_file() { self.find_word_in(cx, &pdf, "Figurewords").await? } else { None };
+        let found = if pdf.is_file() {
+            self.find_word_in(cx, &pdf, "Figurewords").await?
+        } else {
+            None
+        };
         let host = cx.update(crate::confirm::install);
         let mut question = None;
         if let Some((page, (x, y), word)) = found.clone() {
             self.with_window(cx, move |shell, _, cx| {
                 let view = shell.read(cx).pdf().read(cx).live_view().clone();
-                view.update(cx, |_, cx| cx.emit(PdfViewEvent::SourceAt { page, x, y, word, figure: true }));
+                view.update(cx, |_, cx| {
+                    cx.emit(PdfViewEvent::SourceAt {
+                        page,
+                        x,
+                        y,
+                        word,
+                        figure: true,
+                    })
+                });
             })?;
             for _ in 0..25 {
                 self.pause(cx, Duration::from_millis(200)).await;
@@ -315,8 +422,10 @@ impl Run {
         self.open(cx, &root.join("main.tex"), Some(1))?;
         self.pause(cx, Duration::from_millis(300)).await;
         self.build(cx).await?;
-        self.wait_for(cx, Duration::from_secs(20), |shell, cx| shell.read(cx).live_document() == Some("main.tex"))
-            .await;
+        self.wait_for(cx, Duration::from_secs(20), |shell, cx| {
+            shell.read(cx).live_document() == Some("main.tex")
+        })
+        .await;
         Ok(())
     }
 }

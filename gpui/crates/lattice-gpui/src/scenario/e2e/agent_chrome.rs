@@ -70,7 +70,9 @@ impl Run {
             (surface.is_drawn(), surface.awaiting_page().is_some())
         });
         let drawn = self
-            .wait_for(cx, Duration::from_secs(20), |_, cx| surface.read(cx).is_drawn())
+            .wait_for(cx, Duration::from_secs(20), |_, cx| {
+                surface.read(cx).is_drawn()
+            })
             .await;
         let awaiting_after = cx.update(|cx| surface.read(cx).awaiting_page().is_some());
         steps.check(
@@ -111,9 +113,9 @@ impl Run {
         });
         let heard = self
             .heard(cx, &island, |heard| {
-                heard["modes"]
-                    .as_array()
-                    .is_some_and(|modes| modes.iter().any(|mode| mode["mode"] == "approval-required"))
+                heard["modes"].as_array().is_some_and(|modes| {
+                    modes.iter().any(|mode| mode["mode"] == "approval-required")
+                })
             })
             .await;
         steps.check(
@@ -194,7 +196,10 @@ impl Run {
             cx.update(|cx| {
                 let shell = self.shell.read(cx);
                 binaries.iter().any(|path| {
-                    let name = Path::new(path).file_name().unwrap_or_default().to_string_lossy();
+                    let name = Path::new(path)
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy();
                     shell.view_of_document(path, cx).is_some()
                         || shell.view_of_document(&name, cx).is_some()
                 })
@@ -273,7 +278,10 @@ impl Run {
         .await;
         let forged = self
             .wait_for(cx, Duration::from_secs(3), |_, cx| {
-                surface.read(cx).drop_read().is_some_and(|read| read.as_ref().is_ok_and(|files| files.len() == 2))
+                surface
+                    .read(cx)
+                    .drop_read()
+                    .is_some_and(|read| read.as_ref().is_ok_and(|files| files.len() == 2))
             })
             .await;
         steps.check(
@@ -353,11 +361,7 @@ fn project_entries(root: &Path) -> Vec<std::ffi::OsString> {
 /// (`lattice-webview`'s `island/file_drops.rs`).
 fn drag(cx: &mut AsyncApp, island: &Entity<Island>, phase: &str, paths: &[&str]) {
     let payload = json!({ "phase": phase, "paths": paths, "x": 40., "y": 40. });
-    cx.update(|cx| {
-        island.update(cx, |_, cx| {
-            cx.emit(IslandEvent::FileDrop(payload))
-        })
-    });
+    cx.update(|cx| island.update(cx, |_, cx| cx.emit(IslandEvent::FileDrop(payload))));
 }
 
 pub(super) const MODULE: super::registry::Module = super::registry::Module {

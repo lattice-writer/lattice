@@ -218,7 +218,8 @@ impl Run {
             cx.update(|cx| sheet.update(cx, |sheet, cx| sheet.close_for_scenario(cx)));
         }
         cx.update(|cx| store.update(cx, |store, cx| store.delete(&project, &id, cx)));
-        self.pdf_review_elsewhere(cx, steps, root, &text, start).await
+        self.pdf_review_elsewhere(cx, steps, root, &text, start)
+            .await
     }
 
     /// With another root's PDF live, the sheet says which root typesets the
@@ -344,7 +345,15 @@ impl Run {
                 workspace.close(&[crate::shell::views::root_pdf_id("review-other.tex")], cx)
             });
         });
-        for extension in ["tex", "pdf", "aux", "log", "synctex.gz", "fls", "fdb_latexmk"] {
+        for extension in [
+            "tex",
+            "pdf",
+            "aux",
+            "log",
+            "synctex.gz",
+            "fls",
+            "fdb_latexmk",
+        ] {
             std::fs::remove_file(other.with_extension(extension)).ok();
         }
         std::fs::write(&manifest, &manifest_before)?;

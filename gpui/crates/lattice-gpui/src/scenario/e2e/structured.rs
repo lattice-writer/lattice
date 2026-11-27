@@ -400,7 +400,10 @@ impl Run {
         let ground = |cx: &mut AsyncApp| {
             cx.update(|cx| {
                 use lattice_ui::ActiveLattice as _;
-                (lattice_board::theme::dark(), lattice_board::theme::canvas() == cx.palette().editor)
+                (
+                    lattice_board::theme::dark(),
+                    lattice_board::theme::canvas() == cx.palette().editor,
+                )
             })
         };
         let light = ground(cx);

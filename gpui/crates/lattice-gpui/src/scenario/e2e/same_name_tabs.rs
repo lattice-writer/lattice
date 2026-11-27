@@ -20,15 +20,26 @@ use super::Steps;
 use crate::{native, scenario::Run, shell::tab_names::tab_text};
 
 impl Run {
-    async fn same_name_tabs(&self, cx: &mut AsyncApp, steps: &mut Steps, root: &Path) -> Result<()> {
+    async fn same_name_tabs(
+        &self,
+        cx: &mut AsyncApp,
+        steps: &mut Steps,
+        root: &Path,
+    ) -> Result<()> {
         std::fs::create_dir_all(root.join("appendix"))?;
         std::fs::write(root.join("appendix/intro.tex"), "\\section{Appendix}\n")?;
         let result = self.same_name_tabs_steps(cx, steps, root).await;
         if let Ok(path) = root.join("appendix/intro.tex").canonicalize() {
             cx.update(|cx| {
                 self.shell.update(cx, |shell, cx| {
-                    let views: Vec<String> = shell.view_of_document("appendix/intro.tex", cx).into_iter().collect();
-                    shell.workspace().clone().update(cx, |workspace, cx| workspace.close(&views, cx));
+                    let views: Vec<String> = shell
+                        .view_of_document("appendix/intro.tex", cx)
+                        .into_iter()
+                        .collect();
+                    shell
+                        .workspace()
+                        .clone()
+                        .update(cx, |workspace, cx| workspace.close(&views, cx));
                 })
             });
             self.pause(cx, Duration::from_millis(300)).await;
@@ -38,7 +49,12 @@ impl Run {
         result
     }
 
-    async fn same_name_tabs_steps(&self, cx: &mut AsyncApp, steps: &mut Steps, root: &Path) -> Result<()> {
+    async fn same_name_tabs_steps(
+        &self,
+        cx: &mut AsyncApp,
+        steps: &mut Steps,
+        root: &Path,
+    ) -> Result<()> {
         self.open(cx, &root.join("chapters/intro.tex"), None)?;
         self.pause(cx, Duration::from_millis(300)).await;
         self.open(cx, &root.join("appendix/intro.tex"), None)?;
@@ -84,7 +100,9 @@ impl Run {
         let (appendix, chapters) = cx.update(|cx| {
             let shell = self.shell.read(cx);
             let state = |key: &str| shell.tab_state(key, cx);
-            let panel = state("appendix/intro.tex").map(|(panel, ..)| panel).unwrap_or_default();
+            let panel = state("appendix/intro.tex")
+                .map(|(panel, ..)| panel)
+                .unwrap_or_default();
             let bounds = shell.workspace().read(cx).tab_bounds(&panel);
             let of = |key: &str| {
                 let view = shell.view_of_document(key, cx)?;
@@ -105,7 +123,10 @@ impl Run {
         self.pause(cx, Duration::from_millis(600)).await;
         self.same_name_shot(cx, "same-name-tabs-menu").await;
         // A press below the strip, in the editor, closes the menu.
-        let away = gpui::point(chapters.left() + gpui::px(4.), chapters.bottom() + gpui::px(400.));
+        let away = gpui::point(
+            chapters.left() + gpui::px(4.),
+            chapters.bottom() + gpui::px(400.),
+        );
         native::send_click(native, away)?;
         self.pause(cx, Duration::from_millis(300)).await;
         Ok(())

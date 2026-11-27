@@ -72,7 +72,9 @@ impl Run {
                 let workspace = surface.read(cx).workspace();
                 workspace["activeSurface"] == "pdf"
                     && workspace["selectionSource"] == "pdf"
-                    && workspace["selection"].as_str().is_some_and(|text| !text.is_empty())
+                    && workspace["selection"]
+                        .as_str()
+                        .is_some_and(|text| !text.is_empty())
             })
             .await;
         steps.check(
@@ -291,9 +293,10 @@ impl Run {
             let started = std::time::Instant::now();
             while started.elapsed() < Duration::from_secs(5) {
                 lit = self.evaluate(cx, island, heard).await;
-                if lit.as_array().is_some_and(|told| {
-                    told.last().is_some_and(|last| last["state"] == "running")
-                }) {
+                if lit
+                    .as_array()
+                    .is_some_and(|told| told.last().is_some_and(|last| last["state"] == "running"))
+                {
                     break;
                 }
                 self.pause(cx, Duration::from_millis(100)).await;
@@ -310,7 +313,10 @@ impl Run {
         // Switching project mid-turn asks first, and stays put.
         let other = root.with_file_name("agent-other-project");
         std::fs::create_dir_all(&other)?;
-        std::fs::write(other.join("main.tex"), "\\documentclass{article}\\begin{document}x\\end{document}\n")?;
+        std::fs::write(
+            other.join("main.tex"),
+            "\\documentclass{article}\\begin{document}x\\end{document}\n",
+        )?;
         let before = cx.update(|cx| self.shell.read(cx).root(cx));
         self.with_window(cx, |shell, window, cx| {
             let other = other.clone();
@@ -327,7 +333,10 @@ impl Run {
         });
         // Answer it away without switching.
         self.with_window(cx, |_, window, cx| {
-            crate::confirm::ask(crate::confirm::Confirm::new("e2e").on_confirm(|_, _| {}), cx);
+            crate::confirm::ask(
+                crate::confirm::Confirm::new("e2e").on_confirm(|_, _| {}),
+                cx,
+            );
             crate::confirm::install(cx).update(cx, |host, cx| host.accept(window, cx));
         })?;
         steps.check(
@@ -347,7 +356,10 @@ impl Run {
             let started = std::time::Instant::now();
             while started.elapsed() < Duration::from_secs(5) {
                 ended = self.evaluate(cx, island, heard).await;
-                if ended.as_array().is_some_and(|told| told.last().is_some_and(Value::is_null)) {
+                if ended
+                    .as_array()
+                    .is_some_and(|told| told.last().is_some_and(Value::is_null))
+                {
                     break;
                 }
                 self.pause(cx, Duration::from_millis(100)).await;
@@ -360,7 +372,9 @@ impl Run {
         );
         steps.check(
             "the turn over, the deck's page hears its presence cleared",
-            ended.as_array().is_some_and(|told| told.last().is_some_and(Value::is_null)),
+            ended
+                .as_array()
+                .is_some_and(|told| told.last().is_some_and(Value::is_null)),
             json!({ "heard": ended }),
         );
         if let Some((panel, _)) = &opened {
@@ -389,7 +403,10 @@ impl Run {
             )
         });
         self.with_window(cx, |_, window, cx| {
-            crate::confirm::ask(crate::confirm::Confirm::new("e2e").on_confirm(|_, _| {}), cx);
+            crate::confirm::ask(
+                crate::confirm::Confirm::new("e2e").on_confirm(|_, _| {}),
+                cx,
+            );
             crate::confirm::install(cx).update(cx, |host, cx| host.accept(window, cx));
         })?;
         settled.await;

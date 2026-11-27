@@ -168,7 +168,9 @@ impl Run {
             }
         })?;
         let refused = self
-            .wait_for(cx, Duration::from_secs(5), |_, cx| !again.read(cx).clash().is_empty())
+            .wait_for(cx, Duration::from_secs(5), |_, cx| {
+                !again.read(cx).clash().is_empty()
+            })
             .await;
         let clash = cx.update(|cx| again.read(cx).clash().to_vec());
         self.manuscript_shot(cx, "en-new-manuscript-clash").await;

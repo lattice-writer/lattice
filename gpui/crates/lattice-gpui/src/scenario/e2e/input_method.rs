@@ -107,7 +107,12 @@ impl Run {
     }
 
     /// The chapter as it was, for the modules after.
-    fn put_back(&self, cx: &mut AsyncApp, editor: &Entity<EditorPanel>, original: &str) -> Result<()> {
+    fn put_back(
+        &self,
+        cx: &mut AsyncApp,
+        editor: &Entity<EditorPanel>,
+        original: &str,
+    ) -> Result<()> {
         self.with_window(cx, |_, window, cx| {
             editor.update(cx, |editor, cx| {
                 let len = editor.text_and_caret(cx).0.len();

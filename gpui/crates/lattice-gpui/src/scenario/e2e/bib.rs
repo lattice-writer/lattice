@@ -189,11 +189,20 @@ impl Run {
             })
         };
         let keys_are = |keys: &'static [&'static str]| {
-            move |_: &gpui::Entity<crate::shell::Shell>, cx: &mut gpui::App| bib.read(cx).keys() == keys
+            move |_: &gpui::Entity<crate::shell::Shell>, cx: &mut gpui::App| {
+                bib.read(cx).keys() == keys
+            }
         };
-        set_text(format!("{before}\n@misc{{second,\n  title = {{Second}}\n}}\n"), cx);
+        set_text(
+            format!("{before}\n@misc{{second,\n  title = {{Second}}\n}}\n"),
+            cx,
+        );
         let both = self
-            .wait_for(cx, Duration::from_secs(5), keys_are(&["knuth1984", "second"]))
+            .wait_for(
+                cx,
+                Duration::from_secs(5),
+                keys_are(&["knuth1984", "second"]),
+            )
             .await;
         cx.update(|cx| bib.update(cx, |bib, cx| bib.pick("second", cx)));
         self.pause(cx, Duration::from_millis(200)).await;
@@ -206,7 +215,11 @@ impl Run {
         })?;
         self.press(cx, 'z', true).await?;
         let back = self
-            .wait_for(cx, Duration::from_secs(2), keys_are(&["knuth1984", "second"]))
+            .wait_for(
+                cx,
+                Duration::from_secs(2),
+                keys_are(&["knuth1984", "second"]),
+            )
             .await;
         self.pause(cx, Duration::from_millis(300)).await;
         let key_box = cx.update(|cx| bib.read(cx).key_focus(cx));

@@ -82,20 +82,32 @@ impl Run {
 
         // Match case drops "Alpha"; Whole word, with case off, "alphabet".
         let bar = cx.update(|cx| editor.read(cx).find_bar().clone());
-        self.set_find_options(cx, &bar, FindOptions {
-            match_case: true,
-            ..FindOptions::default()
-        })?;
+        self.set_find_options(
+            cx,
+            &bar,
+            FindOptions {
+                match_case: true,
+                ..FindOptions::default()
+            },
+        )?;
         let case = self.find_count(cx, &editor, 3).await;
-        self.set_find_options(cx, &bar, FindOptions {
-            whole_word: true,
-            ..FindOptions::default()
-        })?;
+        self.set_find_options(
+            cx,
+            &bar,
+            FindOptions {
+                whole_word: true,
+                ..FindOptions::default()
+            },
+        )?;
         let word = self.find_count(cx, &editor, 3).await;
-        self.set_find_options(cx, &bar, FindOptions {
-            regexp: true,
-            ..FindOptions::default()
-        })?;
+        self.set_find_options(
+            cx,
+            &bar,
+            FindOptions {
+                regexp: true,
+                ..FindOptions::default()
+            },
+        )?;
         let regexp = {
             let bar = bar.clone();
             self.with_window(cx, move |_, window, cx| {
@@ -131,7 +143,14 @@ impl Run {
         let one = self
             .wait_for(cx, Duration::from_secs(5), {
                 let editor = editor.clone();
-                move |_, cx| editor.read(cx).editor().read(cx).text(cx).starts_with("[p] beta")
+                move |_, cx| {
+                    editor
+                        .read(cx)
+                        .editor()
+                        .read(cx)
+                        .text(cx)
+                        .starts_with("[p] beta")
+                }
             })
             .await;
         let moved_on = self.find_settled(cx, &editor, "1/2").await;
@@ -292,13 +311,22 @@ impl Run {
         let editor = editor.clone();
         self.with_window(cx, move |_, window, cx| {
             let bar = editor.read(cx).find_bar().read(cx);
-            let focused = bar.query_input().read(cx).focus_handle(cx).is_focused(window);
+            let focused = bar
+                .query_input()
+                .read(cx)
+                .focus_handle(cx)
+                .is_focused(window);
             (bar.is_open(), focused)
         })
     }
 
     /// Wait until no search is under way and the counter reads `label`.
-    async fn find_settled(&self, cx: &mut AsyncApp, editor: &Entity<EditorPanel>, label: &str) -> bool {
+    async fn find_settled(
+        &self,
+        cx: &mut AsyncApp,
+        editor: &Entity<EditorPanel>,
+        label: &str,
+    ) -> bool {
         let editor = editor.clone();
         let label = label.to_string();
         self.wait_for(cx, Duration::from_secs(5), move |_, cx| {
@@ -308,7 +336,12 @@ impl Run {
         .await
     }
 
-    async fn find_count(&self, cx: &mut AsyncApp, editor: &Entity<EditorPanel>, count: usize) -> bool {
+    async fn find_count(
+        &self,
+        cx: &mut AsyncApp,
+        editor: &Entity<EditorPanel>,
+        count: usize,
+    ) -> bool {
         let editor = editor.clone();
         self.wait_for(cx, Duration::from_secs(5), move |_, cx| {
             let bar = editor.read(cx).find_bar().read(cx);
@@ -334,7 +367,9 @@ impl Run {
             let editor = editor.read(cx).editor().read(cx);
             let snapshot = editor.buffer().read(cx).snapshot(cx);
             let selection = editor.selections.newest_anchor();
-            snapshot.text_for_range(selection.start..selection.end).collect()
+            snapshot
+                .text_for_range(selection.start..selection.end)
+                .collect()
         })
     }
 }

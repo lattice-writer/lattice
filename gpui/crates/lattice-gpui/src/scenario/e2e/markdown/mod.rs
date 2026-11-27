@@ -357,7 +357,11 @@ impl Run {
         // An input method that answers ↑ ↓ ← → with `insertText:` of each
         // key's character (U+F700–U+F703) mid-word adds nothing to the file.
         let placed = self.markdown_type(cx, island, " quo").await?;
-        cx.update(|cx| island.read(cx).insert_text("\u{F700}\u{F701}\u{F702}\u{F703}", cx));
+        cx.update(|cx| {
+            island
+                .read(cx)
+                .insert_text("\u{F700}\u{F701}\u{F702}\u{F703}", cx)
+        });
         // A pause past the page's 200 ms publication delay: the word reaches
         // the buffer as two edits over 300 ms apart, which the buffer's own
         // grouping would split, and ⌘Z below undoes it at once only as the

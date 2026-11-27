@@ -12,11 +12,17 @@ use super::Steps;
 use crate::scenario::Run;
 
 impl Run {
-    async fn build_marks(&self, cx: &mut AsyncApp, steps: &mut Steps, root: &std::path::Path) -> Result<()> {
+    async fn build_marks(
+        &self,
+        cx: &mut AsyncApp,
+        steps: &mut Steps,
+        root: &std::path::Path,
+    ) -> Result<()> {
         let chapter = root.join("chapters/intro.tex");
         let editor = self.open(cx, &chapter, None)?;
         let id = editor.entity_id();
-        let shown = |cx: &mut AsyncApp| cx.update(|cx| self.shell.read(cx).build_marks_shown(id, cx));
+        let shown =
+            |cx: &mut AsyncApp| cx.update(|cx| self.shell.read(cx).build_marks_shown(id, cx));
         let marked = self
             .wait_for(cx, Duration::from_secs(5), |shell, cx| {
                 shell.read(cx).build_marks_shown(id, cx) > 0

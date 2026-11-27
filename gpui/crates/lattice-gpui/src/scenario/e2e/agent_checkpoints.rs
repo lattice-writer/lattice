@@ -143,7 +143,13 @@ impl Run {
                 })
             });
             self.pause(cx, Duration::from_millis(800)).await;
-            let theme = cx.update(|cx| if cx.palette().is_dark() { "dark" } else { "light" });
+            let theme = cx.update(|cx| {
+                if cx.palette().is_dark() {
+                    "dark"
+                } else {
+                    "light"
+                }
+            });
             if let Err(error) = self
                 .capture(cx, &format!("{dir}/agent-checkpoints-{theme}.png"))
                 .await
@@ -164,8 +170,18 @@ impl Run {
             &second,
             "<<<<<<< current\nTheir edit.\n=======\nThe agent's text.\n>>>>>>> before agent\n",
         )?;
-        let d = entry("d", "two", "2026-11-14T10:03:00.000Z", "chapters/agent-undo.tex");
-        let e = entry("e", "two", "2026-11-14T10:03:00.000Z", "chapters/agent-undo-2.tex");
+        let d = entry(
+            "d",
+            "two",
+            "2026-11-14T10:03:00.000Z",
+            "chapters/agent-undo.tex",
+        );
+        let e = entry(
+            "e",
+            "two",
+            "2026-11-14T10:03:00.000Z",
+            "chapters/agent-undo-2.tex",
+        );
         self.agent_snapshot(cx, snapshot("two", vec![c.clone(), d, e]));
         self.agent_snapshot(cx, snapshot("two", vec![c]));
         let opened = self

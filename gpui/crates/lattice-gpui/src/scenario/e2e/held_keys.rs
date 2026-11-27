@@ -97,7 +97,10 @@ impl Run {
                     .iter()
                     .filter_map(|name| shell.view_of_document(name, cx))
                     .collect();
-                shell.workspace().clone().update(cx, |workspace, cx| workspace.close(&views, cx));
+                shell
+                    .workspace()
+                    .clone()
+                    .update(cx, |workspace, cx| workspace.close(&views, cx));
             })
         });
         self.pause(cx, Duration::from_millis(300)).await;
@@ -120,7 +123,10 @@ impl Run {
             self.pause(cx, Duration::from_millis(200)).await;
             // Kept, so the next file opens a tab of its own rather than
             // taking this preview's place.
-            cx.update(|cx| self.shell.update(cx, |shell, cx| shell.pin_document(name, true, cx)));
+            cx.update(|cx| {
+                self.shell
+                    .update(cx, |shell, cx| shell.pin_document(name, true, cx))
+            });
         }
         let typed_before = self.editor_text(cx, &editors[2]);
 
@@ -131,9 +137,14 @@ impl Run {
         self.pause(cx, Duration::from_millis(200)).await;
         let shell = self.shell.clone();
         let palette = self
-            .hold_key(cx, 'k', |cx| cx.update(|cx| shell.read(cx).palette_view().is_some()))
+            .hold_key(cx, 'k', |cx| {
+                cx.update(|cx| shell.read(cx).palette_view().is_some())
+            })
             .await?;
-        let opened = palette.windows(2).filter(|pair| !pair[0] && pair[1]).count()
+        let opened = palette
+            .windows(2)
+            .filter(|pair| !pair[0] && pair[1])
+            .count()
             + usize::from(palette.first() == Some(&true));
         steps.check(
             "⌘K held for a second opens the palette once, and it stays open",

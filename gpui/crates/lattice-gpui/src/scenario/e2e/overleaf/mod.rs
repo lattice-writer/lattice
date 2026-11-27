@@ -331,8 +331,14 @@ impl Run {
             })
             .await;
         linked.snapshot(cx, "overleaf-refused-name").await;
-        let titles: Vec<String> =
-            cx.update(|cx| stack.read(cx).titles().iter().map(ToString::to_string).collect());
+        let titles: Vec<String> = cx.update(|cx| {
+            stack
+                .read(cx)
+                .titles()
+                .iter()
+                .map(ToString::to_string)
+                .collect()
+        });
         steps.check(
             "a file whose name Overleaf refuses stays here, named with why, while the rest syncs",
             kept && named && mock.file(r"refs/\paperbib.bib").is_none(),
@@ -412,9 +418,8 @@ impl Run {
             );
             let uploaded = linked
                 .wait_for(cx, Duration::from_secs(45), |_, _| {
-                    mock.file("main.tex").is_some_and(|text| {
-                        !text.contains("<<<<<<<") && text.contains("Our paper")
-                    })
+                    mock.file("main.tex")
+                        .is_some_and(|text| !text.contains("<<<<<<<") && text.contains("Our paper"))
                 })
                 .await;
             steps.check(
@@ -491,10 +496,11 @@ impl Run {
         linked.overleaf_project_history(cx, steps, &mock).await?;
         linked.overleaf_polish(cx, steps, &mock).await?;
         let root = linked.root(cx).await?;
-        linked.overleaf_margin_walk(cx, steps, &mock, &root)
-            .await?;
+        linked.overleaf_margin_walk(cx, steps, &mock, &root).await?;
         linked.overleaf_pause_resume(cx, steps, &mock).await?;
-        linked.overleaf_resume_from_settings(cx, steps, &mock).await?;
+        linked
+            .overleaf_resume_from_settings(cx, steps, &mock)
+            .await?;
         linked.overleaf_rate_limit(cx, steps, &mock).await?;
 
         // Settings › Overleaf.

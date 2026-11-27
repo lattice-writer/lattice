@@ -14,16 +14,27 @@ use super::Steps;
 use crate::scenario::Run;
 
 impl Run {
-    async fn pdf_viewer_polish(&self, cx: &mut AsyncApp, steps: &mut Steps, root: &Path) -> Result<()> {
+    async fn pdf_viewer_polish(
+        &self,
+        cx: &mut AsyncApp,
+        steps: &mut Steps,
+        root: &Path,
+    ) -> Result<()> {
         let copy = root.join("loading-check.pdf");
         std::fs::copy(root.join("main.pdf"), &copy)?;
         // The tab opens and starts reading the file in the same turn.
         self.open(cx, &copy, None).ok();
-        let tab = cx.update(|cx| self.shell.read(cx).file_pdf_tabs().into_iter().find(|tab| {
-            tab.read(cx).source() == Some(copy.as_path())
-        }));
+        let tab = cx.update(|cx| {
+            self.shell
+                .read(cx)
+                .file_pdf_tabs()
+                .into_iter()
+                .find(|tab| tab.read(cx).source() == Some(copy.as_path()))
+        });
         let indicator = |cx: &mut AsyncApp| {
-            tab.as_ref().and_then(|tab| cx.update(|cx| tab.read(cx).live_view().read(cx).loading_indicator()))
+            tab.as_ref().and_then(|tab| {
+                cx.update(|cx| tab.read(cx).live_view().read(cx).loading_indicator())
+            })
         };
         let first = indicator(cx);
         let loaded = self
@@ -51,7 +62,13 @@ impl Run {
             json!({ "tab": tab.is_some(), "first": first, "loaded": loaded, "refresh": refresh }),
         );
         self.wait_for(cx, Duration::from_secs(10), |_, cx| {
-            tab.as_ref().is_none_or(|tab| tab.read(cx).live_view().read(cx).loading_indicator().is_none())
+            tab.as_ref().is_none_or(|tab| {
+                tab.read(cx)
+                    .live_view()
+                    .read(cx)
+                    .loading_indicator()
+                    .is_none()
+            })
         })
         .await;
         std::fs::remove_file(root.join("loading-check.pdf")).ok();
@@ -62,7 +79,10 @@ impl Run {
     /// pointer below the press scrolls the pages down, and a left press
     /// stops it without selecting or following anything.
     async fn middle_autoscroll(&self, cx: &mut AsyncApp, steps: &mut Steps) -> Result<()> {
-        use gpui::{Modifiers, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, PlatformInput, point, px};
+        use gpui::{
+            Modifiers, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, PlatformInput,
+            point, px,
+        };
         let view = cx.update(|cx| self.shell.read(cx).pdf().read(cx).live_view().clone());
         let fit = cx.update(|cx| view.read(cx).fit());
         for _ in 0..6 {
@@ -78,41 +98,56 @@ impl Run {
                 window.dispatch_event(input, cx);
             })
         };
-        send(cx, PlatformInput::MouseDown(MouseDownEvent {
-            button: MouseButton::Middle,
-            position: center,
-            modifiers: Modifiers::default(),
-            click_count: 1,
-            first_mouse: false,
-        }))?;
-        send(cx, PlatformInput::MouseUp(MouseUpEvent {
-            button: MouseButton::Middle,
-            position: center,
-            modifiers: Modifiers::default(),
-            click_count: 1,
-        }))?;
+        send(
+            cx,
+            PlatformInput::MouseDown(MouseDownEvent {
+                button: MouseButton::Middle,
+                position: center,
+                modifiers: Modifiers::default(),
+                click_count: 1,
+                first_mouse: false,
+            }),
+        )?;
+        send(
+            cx,
+            PlatformInput::MouseUp(MouseUpEvent {
+                button: MouseButton::Middle,
+                position: center,
+                modifiers: Modifiers::default(),
+                click_count: 1,
+            }),
+        )?;
         let started = cx.update(|cx| view.read(cx).autoscrolling());
         let before = cx.update(|cx| view.read(cx).scroll_top());
-        send(cx, PlatformInput::MouseMove(MouseMoveEvent {
-            position: point(center.x, center.y + px(120.)),
-            pressed_button: None,
-            modifiers: Modifiers::default(),
-        }))?;
+        send(
+            cx,
+            PlatformInput::MouseMove(MouseMoveEvent {
+                position: point(center.x, center.y + px(120.)),
+                pressed_button: None,
+                modifiers: Modifiers::default(),
+            }),
+        )?;
         self.pause(cx, Duration::from_millis(500)).await;
         let moved = cx.update(|cx| view.read(cx).scroll_top());
-        send(cx, PlatformInput::MouseDown(MouseDownEvent {
-            button: MouseButton::Left,
-            position: center,
-            modifiers: Modifiers::default(),
-            click_count: 1,
-            first_mouse: false,
-        }))?;
-        send(cx, PlatformInput::MouseUp(MouseUpEvent {
-            button: MouseButton::Left,
-            position: center,
-            modifiers: Modifiers::default(),
-            click_count: 1,
-        }))?;
+        send(
+            cx,
+            PlatformInput::MouseDown(MouseDownEvent {
+                button: MouseButton::Left,
+                position: center,
+                modifiers: Modifiers::default(),
+                click_count: 1,
+                first_mouse: false,
+            }),
+        )?;
+        send(
+            cx,
+            PlatformInput::MouseUp(MouseUpEvent {
+                button: MouseButton::Left,
+                position: center,
+                modifiers: Modifiers::default(),
+                click_count: 1,
+            }),
+        )?;
         let stopped = cx.update(|cx| !view.read(cx).autoscrolling());
         let at_stop = cx.update(|cx| view.read(cx).scroll_top());
         self.pause(cx, Duration::from_millis(300)).await;
@@ -155,21 +190,28 @@ impl Run {
         self.pause(cx, Duration::from_millis(100)).await;
         // Left of the PDF panel, over the editor.
         let pages = cx.update(|cx| view.read(cx).pages_bounds());
-        let off_pages = (pages.left() > px(240.)).then(|| point(pages.left() - px(200.), pages.center().y));
+        let off_pages =
+            (pages.left() > px(240.)).then(|| point(pages.left() - px(200.), pages.center().y));
         if let Some(position) = off_pages {
-            send(cx, PlatformInput::MouseDown(MouseDownEvent {
-                button: MouseButton::Left,
-                position,
-                modifiers: Modifiers::default(),
-                click_count: 1,
-                first_mouse: false,
-            }))?;
-            send(cx, PlatformInput::MouseUp(MouseUpEvent {
-                button: MouseButton::Left,
-                position,
-                modifiers: Modifiers::default(),
-                click_count: 1,
-            }))?;
+            send(
+                cx,
+                PlatformInput::MouseDown(MouseDownEvent {
+                    button: MouseButton::Left,
+                    position,
+                    modifiers: Modifiers::default(),
+                    click_count: 1,
+                    first_mouse: false,
+                }),
+            )?;
+            send(
+                cx,
+                PlatformInput::MouseUp(MouseUpEvent {
+                    button: MouseButton::Left,
+                    position,
+                    modifiers: Modifiers::default(),
+                    click_count: 1,
+                }),
+            )?;
         }
         let press_stopped = cx.update(|cx| !view.read(cx).autoscrolling());
         steps.check(
@@ -179,7 +221,9 @@ impl Run {
         );
         // The fit it had, for the modules after this one.
         if let Some(mode) = fit {
-            self.with_window(cx, move |_, _, cx| view.update(cx, |view, cx| view.apply_fit(mode, cx)))?;
+            self.with_window(cx, move |_, _, cx| {
+                view.update(cx, |view, cx| view.apply_fit(mode, cx))
+            })?;
             self.pause(cx, Duration::from_millis(300)).await;
         }
         Ok(())

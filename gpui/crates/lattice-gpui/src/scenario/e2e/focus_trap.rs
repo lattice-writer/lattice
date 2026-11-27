@@ -85,7 +85,13 @@ impl Run {
             {
                 let slug: String = name
                     .chars()
-                    .map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '-' })
+                    .map(|c| {
+                        if c.is_ascii_alphanumeric() {
+                            c.to_ascii_lowercase()
+                        } else {
+                            '-'
+                        }
+                    })
                     .collect();
                 let out = std::path::Path::new(&dir).join(format!("{slug}.png"));
                 self.focus_shot(cx, &out).await?;
@@ -108,11 +114,16 @@ impl Run {
         // the table generator opens about 100ms after its Escape, inside Go
         // to line's exit, and must keep its trap when Go to line's close
         // answer hands focus to the document (LEO-155).
-        self.wait_for(cx, Duration::from_secs(2), |shell, cx| !shell.read(cx).dialog_open(cx))
-            .await;
+        self.wait_for(cx, Duration::from_secs(2), |shell, cx| {
+            !shell.read(cx).dialog_open(cx)
+        })
+        .await;
         let check = document.clone();
         let (open_after, returned) = self.with_window(cx, move |shell, window, cx| {
-            (shell.read(cx).dialog_open(cx), check.contains_focused(window, cx))
+            (
+                shell.read(cx).dialog_open(cx),
+                check.contains_focused(window, cx),
+            )
         })?;
         steps.check(
             &format!("Escape closes {name} and the keyboard goes back to the document"),
@@ -132,27 +143,48 @@ impl Run {
         self.pause(cx, Duration::from_millis(400)).await;
         let document = cx.update(|cx| editor.read(cx).editor().focus_handle(cx));
         let surfaces: [(&str, Open); 13] = [
-            ("Settings", |shell, window, cx| shell.open_settings(None, window, cx)),
-            ("the command palette", |shell, window, cx| shell.open_palette(window, cx)),
-            ("the shortcut sheet", |shell, window, cx| shell.open_shortcuts(window, cx)),
-            ("quick open", |shell, window, cx| shell.toggle_quick_open(window, cx)),
-            ("Find in project", |shell, window, cx| shell.open_find(window, cx)),
-            ("Go to line", |shell, window, cx| shell.open_goto_line(window, cx)),
+            ("Settings", |shell, window, cx| {
+                shell.open_settings(None, window, cx)
+            }),
+            ("the command palette", |shell, window, cx| {
+                shell.open_palette(window, cx)
+            }),
+            ("the shortcut sheet", |shell, window, cx| {
+                shell.open_shortcuts(window, cx)
+            }),
+            ("quick open", |shell, window, cx| {
+                shell.toggle_quick_open(window, cx)
+            }),
+            ("Find in project", |shell, window, cx| {
+                shell.open_find(window, cx)
+            }),
+            ("Go to line", |shell, window, cx| {
+                shell.open_goto_line(window, cx)
+            }),
             ("the table generator", |shell, window, cx| {
                 shell.open_table_generator(window, cx)
             }),
             ("Open from Overleaf", |shell, window, cx| {
                 shell.open_overleaf_picker(window, cx)
             }),
-            ("the arXiv export", |shell, window, cx| shell.open_arxiv_export(window, cx)),
+            ("the arXiv export", |shell, window, cx| {
+                shell.open_arxiv_export(window, cx)
+            }),
             // The wizard opens only when something is missing; the doctor's
             // sheet, where the administrator prompt for an update is asked
             // from, stands on the same layer.
             ("the TeX doctor", |shell, _, cx| {
-                shell.tex_setup().clone().update(cx, |center, cx| center.open_doctor(cx))
+                shell
+                    .tex_setup()
+                    .clone()
+                    .update(cx, |center, cx| center.open_doctor(cx))
             }),
-            ("New project", |shell, window, cx| shell.open_new_project(window, cx)),
-            ("Clone repository", |shell, window, cx| shell.open_clone(window, cx)),
+            ("New project", |shell, window, cx| {
+                shell.open_new_project(window, cx)
+            }),
+            ("Clone repository", |shell, window, cx| {
+                shell.open_clone(window, cx)
+            }),
             ("a plugin's confirmation", |_, _, cx| {
                 confirm::ask(
                     Confirm::new("Turn on Example?")
@@ -182,7 +214,8 @@ impl Run {
         for index in 0..PRESSES {
             self.trap_key(cx, "tab")?;
             self.pause(cx, Duration::from_millis(30)).await;
-            held &= self.with_window(cx, |_, window, cx| focus_trap_holding(window, cx))? == question;
+            held &=
+                self.with_window(cx, |_, window, cx| focus_trap_holding(window, cx))? == question;
             if index == 0
                 && let Some(dir) = std::env::var_os("LATTICE_FOCUS_SHOTS")
             {

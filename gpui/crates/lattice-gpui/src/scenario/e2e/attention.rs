@@ -16,7 +16,12 @@ use crate::{
 };
 
 impl Run {
-    async fn attention(&self, cx: &mut AsyncApp, steps: &mut Steps, fixture: &Fixture) -> Result<()> {
+    async fn attention(
+        &self,
+        cx: &mut AsyncApp,
+        steps: &mut Steps,
+        fixture: &Fixture,
+    ) -> Result<()> {
         let editor = self.open(cx, &fixture.root.join("main.tex"), Some(6))?;
         self.pause(cx, Duration::from_millis(300)).await;
         let rows = |editor: &Entity<EditorPanel>, cx: &mut AsyncApp| {

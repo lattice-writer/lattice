@@ -65,16 +65,31 @@ impl Run {
         quote: &str,
     ) -> Result<()> {
         let root = path.parent().unwrap_or(Path::new("/"));
-        let relative = path.file_name().and_then(|name| name.to_str()).unwrap_or_default();
+        let relative = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or_default();
         let text = std::fs::read_to_string(path)?;
         let start = text.find(quote).unwrap_or(0);
         let id = cx.update(|cx| {
             let author = store::author(root, cx);
-            let note = model::new_note(relative, &text, start, start + quote.len(), "Check this.", None, &author)?;
+            let note = model::new_note(
+                relative,
+                &text,
+                start,
+                start + quote.len(),
+                "Check this.",
+                None,
+                &author,
+            )?;
             store::store(cx).update(cx, |store, cx| store.add(root, note, cx))
         });
         let Some(id) = id else {
-            steps.check("a local annotation is added to the Visual page's file", false, json!({ "added": false }));
+            steps.check(
+                "a local annotation is added to the Visual page's file",
+                false,
+                json!({ "added": false }),
+            );
             return Ok(());
         };
         let probe = format!(
@@ -86,7 +101,11 @@ impl Run {
         let started = std::time::Instant::now();
         while started.elapsed() < Duration::from_secs(10) {
             facts = self.evaluate(cx, island, &probe).await;
-            if facts["mark"].is_string() && facts["pins"].as_array().is_some_and(|pins| !pins.is_empty()) {
+            if facts["mark"].is_string()
+                && facts["pins"]
+                    .as_array()
+                    .is_some_and(|pins| !pins.is_empty())
+            {
                 break;
             }
             self.pause(cx, Duration::from_millis(200)).await;

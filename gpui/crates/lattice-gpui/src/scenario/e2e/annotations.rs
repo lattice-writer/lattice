@@ -67,7 +67,9 @@ impl Run {
         let selected = select(self, cx, QUOTE)?;
         self.dispatch_to_shell(cx, &crate::shell::AnnotateSelection)?;
         let composing = self
-            .wait_for(cx, Duration::from_secs(5), |_, cx| editor.read(cx).composing_annotation())
+            .wait_for(cx, Duration::from_secs(5), |_, cx| {
+                editor.read(cx).composing_annotation()
+            })
             .await;
         steps.check(
             "Annotate selection opens the note's composer on the selected passage",
@@ -85,7 +87,8 @@ impl Run {
         }
         let saved = self
             .wait_for(cx, Duration::from_secs(10), |_, _| {
-                std::fs::read_to_string(&file).is_ok_and(|text| text.contains(NOTE) && text.contains(QUOTE))
+                std::fs::read_to_string(&file)
+                    .is_ok_and(|text| text.contains(NOTE) && text.contains(QUOTE))
             })
             .await;
         let closed = cx.update(|cx| !editor.read(cx).composing_annotation());
@@ -169,8 +172,8 @@ impl Run {
             })
             .await;
         self.pause(cx, Duration::from_millis(100)).await;
-        let toolbar_offers = !toolbar_shown
-            || cx.update(|cx| editor.read(cx).toolbar_overleaf_button().is_some());
+        let toolbar_offers =
+            !toolbar_shown || cx.update(|cx| editor.read(cx).toolbar_overleaf_button().is_some());
         steps.check(
             "a note's words in its card are selected with a drag and copied with ⌘C; unlinked, neither the selection toolbar nor the card offers Overleaf",
             copied.as_deref() == Some(NOTE) && shared == Some(false) && !toolbar_offers,
@@ -237,7 +240,12 @@ impl Run {
             .wait_for(cx, Duration::from_secs(10), |shell, cx| {
                 crate::status_counters::counts(root, "chapters/intro.tex", None, cx).annotations
                     == 0
-                    && shell.read(cx).annotations_panel().read(cx).listed(cx).is_empty()
+                    && shell
+                        .read(cx)
+                        .annotations_panel()
+                        .read(cx)
+                        .listed(cx)
+                        .is_empty()
             })
             .await;
         steps.check(
@@ -285,7 +293,11 @@ impl Run {
             .text_point(cx, editor, &lattice, quote, quote.len() / 2)
             .await?;
         self.hover_at(cx, at.center()).await?;
-        if self.wait_for_card(cx, &lattice, "annotation").await.is_none() {
+        if self
+            .wait_for_card(cx, &lattice, "annotation")
+            .await
+            .is_none()
+        {
             return Ok(None);
         }
         let watched = editor.clone();
@@ -348,7 +360,9 @@ impl Run {
             while selected.is_empty() && started.elapsed() < Duration::from_secs(2) {
                 self.pause(cx, Duration::from_millis(100)).await;
                 selected = self.with_window(cx, |_, window, cx| {
-                    gpui_kit::base::TextSelection::selected_text(window, cx).trim().to_string()
+                    gpui_kit::base::TextSelection::selected_text(window, cx)
+                        .trim()
+                        .to_string()
                 })?;
             }
         }

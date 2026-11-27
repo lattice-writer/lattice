@@ -192,7 +192,12 @@ impl Run {
         // Tauri palette does (`textEditor`, `latexSource`), and each row
         // opens its own dialog.
         let mut ran = Vec::new();
-        for label in ["Insert citation", "Insert reference", "Go to symbol", "Go to line"] {
+        for label in [
+            "Insert citation",
+            "Insert reference",
+            "Go to symbol",
+            "Go to line",
+        ] {
             let label_owned = label.to_string();
             let found = self.with_window(cx, move |shell, window, cx| {
                 shell.update(cx, |shell, cx| {
@@ -219,9 +224,21 @@ impl Run {
         }
         self.close_pickers(cx)?;
         let wanted = [
-            ("Insert citation", true, (false, Some("Some(InsertCitation)".to_string()))),
-            ("Insert reference", true, (false, Some("Some(InsertReference)".to_string()))),
-            ("Go to symbol", true, (false, Some("Some(GoToSymbol)".to_string()))),
+            (
+                "Insert citation",
+                true,
+                (false, Some("Some(InsertCitation)".to_string())),
+            ),
+            (
+                "Insert reference",
+                true,
+                (false, Some("Some(InsertReference)".to_string())),
+            ),
+            (
+                "Go to symbol",
+                true,
+                (false, Some("Some(GoToSymbol)".to_string())),
+            ),
             ("Go to line", true, (true, None)),
         ];
         steps.check(
@@ -240,8 +257,12 @@ impl Run {
             shell.update(cx, |shell, cx| shell.open_palette(window, cx));
             shell.read(cx).palette_view().map(|palette| {
                 palette.update(cx, |palette, cx| palette.type_query("Go to", window, cx));
-                let mut labels: Vec<String> =
-                    palette.read(cx).rows().into_iter().map(|row| row.1).collect();
+                let mut labels: Vec<String> = palette
+                    .read(cx)
+                    .rows()
+                    .into_iter()
+                    .map(|row| row.1)
+                    .collect();
                 palette.update(cx, |palette, cx| palette.type_query("Insert", window, cx));
                 labels.extend(palette.read(cx).rows().into_iter().map(|row| row.1));
                 labels
@@ -320,7 +341,9 @@ impl Run {
 
     fn caret_at(&self, cx: &mut AsyncApp, editor: &Entity<EditorPanel>, at: usize) -> Result<()> {
         self.with_window(cx, |_, window, cx| {
-            editor.update(cx, |editor, cx| editor.replace_range(at, at, "", at, window, cx))
+            editor.update(cx, |editor, cx| {
+                editor.replace_range(at, at, "", at, window, cx)
+            })
         })
     }
 

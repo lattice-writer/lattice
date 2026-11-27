@@ -16,7 +16,8 @@ use crate::scenario::Run;
 
 impl Run {
     async fn drawing_drop(&self, cx: &mut AsyncApp, steps: &mut Steps, root: &Path) -> Result<()> {
-        let finder = std::env::temp_dir().join(format!("lattice-e2e-drawing-{}", std::process::id()));
+        let finder =
+            std::env::temp_dir().join(format!("lattice-e2e-drawing-{}", std::process::id()));
         std::fs::create_dir_all(&finder)?;
         let drawing = finder.join("flow.drawio");
         std::fs::write(
@@ -33,7 +34,8 @@ impl Run {
                 editor.update(cx, |editor, cx| editor.point_before(1, window, cx))
             })?
             .context("main.tex's first line is on screen")?;
-        self.file_drag(cx, at, std::slice::from_ref(&drawing)).await?;
+        self.file_drag(cx, at, std::slice::from_ref(&drawing))
+            .await?;
         self.file_drop(cx, at).await?;
         let copied = self
             .wait_for(cx, Duration::from_secs(8), |_, _| {
@@ -87,10 +89,20 @@ impl Run {
             .iter()
             .all(|name| root.join(name).is_file());
         let pair_titles: Vec<String> = cx.update(|cx| {
-            notices.read(cx).titles().into_iter().map(|title| title.to_string()).collect()
+            notices
+                .read(cx)
+                .titles()
+                .into_iter()
+                .map(|title| title.to_string())
+                .collect()
         });
         let pair_details: Vec<String> = cx.update(|cx| {
-            notices.read(cx).details().into_iter().map(|detail| detail.to_string()).collect()
+            notices
+                .read(cx)
+                .details()
+                .into_iter()
+                .map(|detail| detail.to_string())
+                .collect()
         });
         steps.check(
             "two drawings dropped on a LaTeX editor take the usual figure path (Insert figure dialog), not the editable figure one",
@@ -102,7 +114,12 @@ impl Run {
         );
         // Closed as its Cancel does, which hands the keyboard back.
         let open = cx.update(|cx| {
-            self.shell.read(cx).inserts.figure.as_ref().map(|open| open.dialog.clone())
+            self.shell
+                .read(cx)
+                .inserts
+                .figure
+                .as_ref()
+                .map(|open| open.dialog.clone())
         });
         if let Some(open) = open {
             cx.update(|cx| {

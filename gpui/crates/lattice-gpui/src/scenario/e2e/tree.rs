@@ -169,7 +169,11 @@ impl Run {
         .await;
 
         // Delete: asked first; the tab closes with the file.
-        cx.update(|cx| tree.update(cx, |tree, cx| tree.ask_delete(vec!["results.tex".into()], cx)));
+        cx.update(|cx| {
+            tree.update(cx, |tree, cx| {
+                tree.ask_delete(vec!["results.tex".into()], cx)
+            })
+        });
         self.pause(cx, Duration::from_millis(200)).await;
         let question = cx.update(|cx| self.shell.read(cx).confirm().read(cx).question());
         let confirm = cx.update(|cx| self.shell.read(cx).confirm().clone());
@@ -292,7 +296,9 @@ impl Run {
         // New folder from chapters/'s menu, chapters/ closed.
         cx.update(|cx| tree.update(cx, |tree, cx| tree.close_folders(cx)));
         self.with_window(cx, |_, window, cx| {
-            tree.update(cx, |tree, cx| tree.begin_create("chapters", true, window, cx))
+            tree.update(cx, |tree, cx| {
+                tree.begin_create("chapters", true, window, cx)
+            })
         })?;
         self.pause(cx, Duration::from_millis(300)).await;
         let naming = self.naming_state(cx, tree)?;

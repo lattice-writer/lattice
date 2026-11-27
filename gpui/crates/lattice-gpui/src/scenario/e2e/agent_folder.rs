@@ -57,12 +57,17 @@ impl Run {
             None,
         )
         .map_err(anyhow::Error::msg)?;
-        let history_before = project::history(&manuscript).map_err(anyhow::Error::msg)?.len();
+        let history_before = project::history(&manuscript)
+            .map_err(anyhow::Error::msg)?
+            .len();
 
         // A window of its own takes the front, so the whole module runs in a
         // foreground section (`input_lock.rs`).
         let _foreground = self
-            .foreground(cx, "a study folder around a project, in a window of its own")
+            .foreground(
+                cx,
+                "a study folder around a project, in a window of its own",
+            )
             .await?;
         let (window, shell) = cx.update(|cx| Shell::open_window(None, cx))?;
         let second = self.for_window(shell, window);
@@ -71,7 +76,9 @@ impl Run {
         second.with_window(cx, {
             let study = study.clone();
             move |shell, window, cx| {
-                shell.update(cx, |shell, cx| shell.open_picked_folder(study, true, window, cx))
+                shell.update(cx, |shell, cx| {
+                    shell.open_picked_folder(study, true, window, cx)
+                })
             }
         })?;
         let asked = second
@@ -91,7 +98,9 @@ impl Run {
             json!({ "question": question, "body": body }),
         );
 
-        second.with_window(cx, |_, window, cx| host.update(cx, |host, cx| host.accept(window, cx)))?;
+        second.with_window(cx, |_, window, cx| {
+            host.update(cx, |host, cx| host.accept(window, cx))
+        })?;
         let opened = second
             .wait_for(cx, Duration::from_secs(15), |shell, cx| {
                 let shell = shell.read(cx);
@@ -152,7 +161,9 @@ impl Run {
             second.settle_builds(cx).await;
             second.with_window(cx, {
                 let root = root.clone();
-                move |shell, window, cx| shell.update(cx, |shell, cx| shell.open_project(root, window, cx))
+                move |shell, window, cx| {
+                    shell.update(cx, |shell, cx| shell.open_project(root, window, cx))
+                }
             })?;
             second
                 .wait_for(cx, Duration::from_secs(15), |shell, cx| {
@@ -177,7 +188,9 @@ impl Run {
         second.with_window(cx, {
             let study = study.clone();
             move |shell, window, cx| {
-                shell.update(cx, |shell, cx| shell.open_picked_folder(study, true, window, cx))
+                shell.update(cx, |shell, cx| {
+                    shell.open_picked_folder(study, true, window, cx)
+                })
             }
         })?;
         // `holds()` answers later: a question would come within this wait.
@@ -233,7 +246,9 @@ impl Run {
         second.with_window(cx, {
             let study = study.clone();
             move |shell, window, cx| {
-                shell.update(cx, |shell, cx| shell.open_picked_folder(study, true, window, cx))
+                shell.update(cx, |shell, cx| {
+                    shell.open_picked_folder(study, true, window, cx)
+                })
             }
         })?;
         let several = second
@@ -256,7 +271,9 @@ impl Run {
         second.with_window(cx, {
             let other = other.clone();
             move |shell, window, cx| {
-                shell.update(cx, |shell, cx| shell.open_picked_folder(other, true, window, cx))
+                shell.update(cx, |shell, cx| {
+                    shell.open_picked_folder(other, true, window, cx)
+                })
             }
         })?;
         second
@@ -295,7 +312,9 @@ impl Run {
             second.with_window(cx, {
                 let zh = zh.clone();
                 move |shell, window, cx| {
-                    shell.update(cx, |shell, cx| shell.open_picked_folder(zh, true, window, cx))
+                    shell.update(cx, |shell, cx| {
+                        shell.open_picked_folder(zh, true, window, cx)
+                    })
                 }
             })?;
             second
@@ -319,8 +338,10 @@ impl Run {
     /// `ask_before_leaving`), with the question these steps answer: each
     /// switch waits for the build instead.
     async fn settle_builds(&self, cx: &mut AsyncApp) {
-        self.wait_for(cx, Duration::from_secs(60), |shell, cx| !shell.read(cx).building())
-            .await;
+        self.wait_for(cx, Duration::from_secs(60), |shell, cx| {
+            !shell.read(cx).building()
+        })
+        .await;
     }
 
     async fn agent_folder_shot(&self, cx: &mut AsyncApp, name: &str) {

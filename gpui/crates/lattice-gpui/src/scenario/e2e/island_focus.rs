@@ -55,7 +55,10 @@ impl Run {
                 (
                     panel.read(cx).editor().focus_handle(cx).is_focused(window),
                     island.read(cx).page_focused()
-                        && island.read(cx).focus_handle(cx).contains_focused(window, cx),
+                        && island
+                            .read(cx)
+                            .focus_handle(cx)
+                            .contains_focused(window, cx),
                 )
             })
         };
@@ -85,12 +88,13 @@ impl Run {
             }));
         }
         let presses = cx.update(|cx| island.read(cx).stats().presses) - presses;
-        let passed = presses == 0 && rounds.iter().all(|round| {
-            round["in_page"] == true
-                && round["at_page"] == json!([false, true])
-                && round["left"] == true
-                && round["at_source"] == json!([true, false])
-        });
+        let passed = presses == 0
+            && rounds.iter().all(|round| {
+                round["in_page"] == true
+                    && round["at_page"] == json!([false, true])
+                    && round["left"] == true
+                    && round["at_source"] == json!([true, false])
+            });
         steps.check(
             "in Split, a click moves the keyboard between the source and the page's child frame, one of them focused at a time",
             passed,
@@ -130,10 +134,17 @@ impl Run {
             .as_ref()
             .and_then(|agent| cx.update(|cx| agent.read(cx).bounds(cx)));
         let preview_now = cx.update(|cx| preview.read(cx).bounds(cx));
-        let (Some(agent), Some(agent_bounds), Some(preview_bounds), true) =
-            (agent, agent_bounds, preview_now.or(Some(preview_bounds)), drawn)
-        else {
-            steps.check(STEP, false, json!({ "drawn": drawn, "agent_bounds": format!("{agent_bounds:?}") }));
+        let (Some(agent), Some(agent_bounds), Some(preview_bounds), true) = (
+            agent,
+            agent_bounds,
+            preview_now.or(Some(preview_bounds)),
+            drawn,
+        ) else {
+            steps.check(
+                STEP,
+                false,
+                json!({ "drawn": drawn, "agent_bounds": format!("{agent_bounds:?}") }),
+            );
             return Ok(());
         };
         // A frame of the page's own origin, over it, with a field, whose
@@ -190,7 +201,9 @@ impl Run {
             native::send_click(self.native(cx)?, at)?;
             self.pause(cx, Duration::from_millis(600)).await;
             let now = state(cx)?;
-            seen.push(json!({ "clicked": owner_name, "ok": owner(&now, owner_name), "state": now }));
+            seen.push(
+                json!({ "clicked": owner_name, "ok": owner(&now, owner_name), "state": now }),
+            );
         }
         self.with_window(cx, |shell, window, cx| {
             shell.update(cx, |shell, cx| shell.show_view("agent", false, window, cx))

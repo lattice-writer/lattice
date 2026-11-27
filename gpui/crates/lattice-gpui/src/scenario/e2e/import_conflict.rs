@@ -14,7 +14,12 @@ use super::{Fixture, Steps};
 use crate::{notices, scenario::Run, shell::import_conflict};
 
 impl Run {
-    async fn import_conflict(&self, cx: &mut AsyncApp, steps: &mut Steps, fixture: &Fixture) -> Result<()> {
+    async fn import_conflict(
+        &self,
+        cx: &mut AsyncApp,
+        steps: &mut Steps,
+        fixture: &Fixture,
+    ) -> Result<()> {
         let outside = tempfile_dir()?;
         let name = "conflict-check.txt";
         let source = outside.join(name);
@@ -39,7 +44,9 @@ impl Run {
                 })
             })?;
             let asked = self
-                .wait_for(cx, Duration::from_secs(5), |_, cx| host.read(cx).asking().is_some())
+                .wait_for(cx, Duration::from_secs(5), |_, cx| {
+                    host.read(cx).asking().is_some()
+                })
                 .await;
             let question = cx.update(|cx| host.read(cx).asking());
             self.with_window(cx, |_, window, cx| {
@@ -47,11 +54,9 @@ impl Run {
             })?;
             let done = self
                 .wait_for(cx, Duration::from_secs(5), |_, cx| {
-                    stack
-                        .read(cx)
-                        .cards()
-                        .iter()
-                        .any(|card| card.title.starts_with("Imported") || card.title == "Nothing imported")
+                    stack.read(cx).cards().iter().any(|card| {
+                        card.title.starts_with("Imported") || card.title == "Nothing imported"
+                    })
                 })
                 .await;
             let cards = cx.update(|cx| stack.read(cx).cards());

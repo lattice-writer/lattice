@@ -157,8 +157,8 @@ impl Run {
             std::fs::read_to_string(&saved).is_ok_and(|text| text.contains("\\cmpd{ketx"))
         })
         .await;
-        let on_disk = std::fs::read_to_string(&scratch)
-            .is_ok_and(|text| text.contains("\\cmpd{ketx"));
+        let on_disk =
+            std::fs::read_to_string(&scratch).is_ok_and(|text| text.contains("\\cmpd{ketx"));
         // The project read the save sets off.
         self.pause(cx, Duration::from_millis(1500)).await;
         let caret = self.editor_text(cx, &panel).rfind('}');
@@ -185,7 +185,11 @@ impl Run {
             deleted
         };
         self.press(cx, '\u{1b}', false).await?;
-        let line = self.editor_text(cx, &panel).lines().last().map(str::to_owned);
+        let line = self
+            .editor_text(cx, &panel)
+            .lines()
+            .last()
+            .map(str::to_owned);
         steps.check(
             "a half-typed \\cmpd{ key the autosave wrote is not listed after Backspace deletes into it",
             on_disk

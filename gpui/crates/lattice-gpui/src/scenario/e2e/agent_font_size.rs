@@ -29,7 +29,12 @@ const PAGE_TEXT: &str = "(() => JSON.stringify({ inner: window.innerWidth, \
 const LARGER: f32 = 18.;
 
 impl Run {
-    async fn agent_font_size(&self, cx: &mut AsyncApp, steps: &mut Steps, root: &Path) -> Result<()> {
+    async fn agent_font_size(
+        &self,
+        cx: &mut AsyncApp,
+        steps: &mut Steps,
+        root: &Path,
+    ) -> Result<()> {
         let before = cx.update(|cx| settings::get(cx).appearance.agent_font_size);
         cx.update(|cx| settings::update_appearance(cx, |a| a.agent_font_size = AGENT_FONT_SIZE));
         self.open(cx, &root.join("main.tex"), Some(1))?;
@@ -46,8 +51,10 @@ impl Run {
             );
             return Ok(());
         };
-        self.wait_for(cx, Duration::from_secs(20), |_, cx| surface.read(cx).is_drawn())
-            .await;
+        self.wait_for(cx, Duration::from_secs(20), |_, cx| {
+            surface.read(cx).is_drawn()
+        })
+        .await;
         let home = self.window;
         let natural = self.drawn_text(cx, &island).await;
 
@@ -68,7 +75,9 @@ impl Run {
         let row_drawn = rows.as_ref().is_some_and(|(tab, rows)| {
             *tab == SettingsTab::AgentDisplay && rows.contains(&"agent-font-size")
         });
-        self.with_window(cx, |shell, _, cx| shell.update(cx, |shell, cx| shell.close_settings(cx)))?;
+        self.with_window(cx, |shell, _, cx| {
+            shell.update(cx, |shell, cx| shell.close_settings(cx))
+        })?;
         steps.check(
             "Agent font size: Settings › Agent › Display draws its row",
             row_drawn,
@@ -123,7 +132,9 @@ impl Run {
         );
 
         // In its own window: the same page, at the same size.
-        let _foreground = self.foreground(cx, "the Agent's font size in its own window").await?;
+        let _foreground = self
+            .foreground(cx, "the Agent's font size in its own window")
+            .await?;
         let windows = cx.update(|cx| cx.windows().len());
         cx.update(|cx| panel.update(cx, |panel, cx| panel.detach(cx)));
         let opened = self
@@ -135,7 +146,9 @@ impl Run {
             .await;
         self.pause(cx, Duration::from_millis(400)).await;
         let windowed = self.drawn_text(cx, &island).await;
-        self.with_window(cx, |_, _, cx| panel.update(cx, |panel, cx| panel.dock(true, cx)))?;
+        self.with_window(cx, |_, _, cx| {
+            panel.update(cx, |panel, cx| panel.dock(true, cx))
+        })?;
         let docked = self
             .wait_for(cx, Duration::from_secs(10), |_, cx| {
                 cx.windows().len() == windows
@@ -168,7 +181,9 @@ impl Run {
         let (frame, window): (Option<f32>, AnyWindowHandle) = cx.update(|cx| {
             let island = island.read(cx);
             (
-                island.native_frame(cx).map(|frame| f32::from(frame.size.width)),
+                island
+                    .native_frame(cx)
+                    .map(|frame| f32::from(frame.size.width)),
                 island.window(),
             )
         });

@@ -41,7 +41,9 @@ impl Run {
             .context("New project is up")?;
         // The run's own store, read: empty, so no list.
         let loaded = self
-            .wait_until(cx, Duration::from_secs(5), |cx| dialog.read(cx).templates_loaded())
+            .wait_until(cx, Duration::from_secs(5), |cx| {
+                dialog.read(cx).templates_loaded()
+            })
             .await;
         let (listed, _) = cx.update(|cx| dialog.read(cx).local_templates());
         let store = crate::welcome::local_templates::store();
@@ -57,7 +59,9 @@ impl Run {
         // Save a local template from the open project.
         self.with_window(cx, {
             let dialog = dialog.clone();
-            move |_, window, cx| dialog.update(cx, |dialog, cx| dialog.open_save_template(window, cx))
+            move |_, window, cx| {
+                dialog.update(cx, |dialog, cx| dialog.open_save_template(window, cx))
+            }
         })?;
         let saving = cx
             .update(|cx| dialog.read(cx).save_template_dialog().cloned())
@@ -65,7 +69,9 @@ impl Run {
         self.with_window(cx, {
             let saving = saving.clone();
             let root = root.clone();
-            move |_, window, cx| saving.update(cx, |saving, cx| saving.read_source(root, window, cx))
+            move |_, window, cx| {
+                saving.update(cx, |saving, cx| saving.read_source(root, window, cx))
+            }
         })?;
         let read = self
             .wait_until(cx, Duration::from_secs(10), |cx| {
@@ -73,7 +79,9 @@ impl Run {
                 !saving.is_busy() && (saving.source_files().is_some() || saving.error().is_some())
             })
             .await;
-        let files = cx.update(|cx| saving.read(cx).source_files()).unwrap_or_default();
+        let files = cx
+            .update(|cx| saving.read(cx).source_files())
+            .unwrap_or_default();
         let held = cx.update(|cx| saving.read(cx).saveable(cx));
         self.with_window(cx, {
             let saving = saving.clone();

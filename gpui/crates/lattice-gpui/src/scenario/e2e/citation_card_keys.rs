@@ -258,7 +258,9 @@ impl Run {
         let lattice = cx.update(|cx| panel.read(cx).lattice_editor().clone());
         let key_at = body.find("knuth1984").context("the long \\cite")? + 3;
         let zed = cx.update(|cx| panel.read(cx).editor().clone());
-        let top = move |cx: &mut AsyncApp| cx.update(|cx| zed.update(cx, |zed, cx| zed.scroll_position(cx).y));
+        let top = move |cx: &mut AsyncApp| {
+            cx.update(|cx| zed.update(cx, |zed, cx| zed.scroll_position(cx).y))
+        };
         let wheel_at = |cx: &mut AsyncApp| -> Result<gpui::Point<gpui::Pixels>> {
             let bounds = cx
                 .update(|cx| lattice.read(cx).painted().bounds)
@@ -280,7 +282,8 @@ impl Run {
         let scrolled = top(cx);
         self.option_command_k(cx, native).await?;
         let (shown, keyboard, caret, in_text, _) = self.card_state(cx, &panel)?;
-        self.completion_shot(cx, "citation-card-offscreen-no-card").await;
+        self.completion_shot(cx, "citation-card-offscreen-no-card")
+            .await;
         steps.check(
             "⌥⌘K on a citation key scrolled out of the editor opens no card and the text keeps the keyboard",
             scrolled > before + 5. && shown.is_empty() && !keyboard && caret == key_at && in_text,
@@ -295,7 +298,8 @@ impl Run {
         self.pause(cx, Duration::from_millis(300)).await;
         self.option_command_k(cx, native).await?;
         let (opened, held, ..) = self.card_state(cx, &panel)?;
-        self.completion_shot(cx, "citation-card-before-scroll-out").await;
+        self.completion_shot(cx, "citation-card-before-scroll-out")
+            .await;
         let at = wheel_at(cx)?;
         for _ in 0..6 {
             native::send_wheel(native, at, -400)?;

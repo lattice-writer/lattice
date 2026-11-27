@@ -70,7 +70,9 @@ impl Run {
 
         // Review: the card under the passage; ⌘↵ writes it and settles the
         // round; ⌘Z takes it back.
-        self.with_window(cx, |_, _, cx| rounds.update(cx, |rounds, cx| rounds.open_review(&first, cx)))?;
+        self.with_window(cx, |_, _, cx| {
+            rounds.update(cx, |rounds, cx| rounds.open_review(&first, cx))
+        })?;
         let shown = self
             .wait_for(cx, Duration::from_secs(5), |_, cx| {
                 editor.read(cx).reviewing_annotation() == Some(first.as_str())
@@ -81,7 +83,8 @@ impl Run {
             let _front = self.focused(cx, "review card").await?;
             self.press(cx, '\n', true).await?;
             self.wait_for(cx, Duration::from_secs(3), |_, cx| {
-                editor.read(cx).text(cx).contains(REVISED) && editor.read(cx).reviewing_annotation().is_none()
+                editor.read(cx).text(cx).contains(REVISED)
+                    && editor.read(cx).reviewing_annotation().is_none()
             })
             .await
         };
@@ -91,15 +94,20 @@ impl Run {
                 store::try_store(cx)
                     .and_then(|store| store.read(cx).notes(root).cloned())
                     .is_some_and(|notes| {
-                        notes.rounds.iter().any(|round| round.number == 1 && round.settled_at.is_some())
+                        notes
+                            .rounds
+                            .iter()
+                            .any(|round| round.number == 1 && round.settled_at.is_some())
                     })
             })
             .await;
         let undone = {
             let _front = self.focused(cx, "editor").await?;
             self.press(cx, 'z', true).await?;
-            self.wait_for(cx, Duration::from_secs(2), |_, cx| editor.read(cx).text(cx) == original)
-                .await
+            self.wait_for(cx, Duration::from_secs(2), |_, cx| {
+                editor.read(cx).text(cx) == original
+            })
+            .await
         };
         steps.check(
             "the proposal's card opens under its passage; ⌘↵ writes it, resolves the note and saves the round as a version; ⌘Z takes it back",
@@ -117,7 +125,8 @@ impl Run {
 
         // The round, compared and opened in History from the rounds sheet.
         self.rounds_sheet(cx, steps, &rounds, &first, root).await?;
-        self.rounds_restore(cx, steps, &rounds, &editor, &chapter, &original, root).await?;
+        self.rounds_restore(cx, steps, &rounds, &editor, &chapter, &original, root)
+            .await?;
 
         // A question, the writer's answer, then ⌫ rejects the proposal.
         self.script_rounds(cx, &rounds, QUESTION)?;
@@ -128,21 +137,29 @@ impl Run {
         // The answer goes in through the note's field in the panel, which
         // leaves with the question once sent.
         let field = self
-            .wait_for(cx, Duration::from_secs(5), |_, cx| panel.read(cx).answer_draft(&second, cx).is_some())
+            .wait_for(cx, Duration::from_secs(5), |_, cx| {
+                panel.read(cx).answer_draft(&second, cx).is_some()
+            })
             .await;
         let sent = self.with_window(cx, |_, window, cx| {
-            panel.update(cx, |panel, cx| panel.scripted_answer(&second, "The first line", window, cx))
+            panel.update(cx, |panel, cx| {
+                panel.scripted_answer(&second, "The first line", window, cx)
+            })
         })?;
         let answered = self.wait_state(cx, root, &second, "proposed").await;
         let cleared = cx.update(|cx| panel.read(cx).answer_draft(&second, cx).is_none());
-        self.with_window(cx, |_, _, cx| rounds.update(cx, |rounds, cx| rounds.open_review(&second, cx)))?;
+        self.with_window(cx, |_, _, cx| {
+            rounds.update(cx, |rounds, cx| rounds.open_review(&second, cx))
+        })?;
         let reviewing = self
             .wait_for(cx, Duration::from_secs(5), |_, cx| {
                 editor.read(cx).reviewing_annotation() == Some(second.as_str())
             })
             .await;
         // ⌘↵ with every edit kept writes nothing and decides nothing.
-        self.with_window(cx, |_, _, cx| editor.update(cx, |editor, cx| editor.scripted_review_keep_all(cx)))?;
+        self.with_window(cx, |_, _, cx| {
+            editor.update(cx, |editor, cx| editor.scripted_review_keep_all(cx))
+        })?;
         {
             let _front = self.focused(cx, "review card").await?;
             self.press(cx, '\n', true).await?;
@@ -174,7 +191,9 @@ impl Run {
                 store.commit(
                     root,
                     |notes| {
-                        notes.annotations.retain(|note| note.id != first && note.id != second);
+                        notes
+                            .annotations
+                            .retain(|note| note.id != first && note.id != second);
                         notes.rounds.clear();
                         true
                     },
@@ -189,9 +208,16 @@ impl Run {
         Ok(())
     }
 
-    fn script_rounds(&self, cx: &mut AsyncApp, rounds: &Entity<AnnotationRounds>, reply: &str) -> Result<()> {
+    fn script_rounds(
+        &self,
+        cx: &mut AsyncApp,
+        rounds: &Entity<AnnotationRounds>,
+        reply: &str,
+    ) -> Result<()> {
         let reply = reply.to_string();
-        self.with_window(cx, |_, _, cx| rounds.update(cx, |rounds, _| rounds.script_reply(Some(reply))))
+        self.with_window(cx, |_, _, cx| {
+            rounds.update(cx, |rounds, _| rounds.script_reply(Some(reply)))
+        })
     }
 
     /// Annotate the passage with a note and save it with Save and revise
@@ -216,8 +242,10 @@ impl Run {
         })?;
         let before: Vec<String> = cx.update(|cx| Self::note_ids(root, cx));
         self.dispatch_to_shell(cx, &crate::shell::AnnotateSelection)?;
-        self.wait_for(cx, Duration::from_secs(5), |_, cx| editor.read(cx).composing_annotation())
-            .await;
+        self.wait_for(cx, Duration::from_secs(5), |_, cx| {
+            editor.read(cx).composing_annotation()
+        })
+        .await;
         {
             let _front = self.focused(cx, "annotation composer").await?;
             self.pause(cx, Duration::from_millis(300)).await;
@@ -226,8 +254,10 @@ impl Run {
         self.with_window(cx, |_, window, cx| {
             editor.update(cx, |editor, cx| editor.scripted_save_and_revise(window, cx))
         })?;
-        self.wait_for(cx, Duration::from_secs(5), |_, cx| Self::note_ids(root, cx).len() > before.len())
-            .await;
+        self.wait_for(cx, Duration::from_secs(5), |_, cx| {
+            Self::note_ids(root, cx).len() > before.len()
+        })
+        .await;
         Ok(cx
             .update(|cx| Self::note_ids(root, cx))
             .into_iter()
@@ -253,17 +283,28 @@ impl Run {
         });
         // The round saved notice's Compare opens the sheet.
         let stack = cx.update(crate::notices::install);
-        let notice_titles: Vec<String> =
-            cx.update(|cx| stack.read(cx).titles()).into_iter().map(|title| title.to_string()).collect();
+        let notice_titles: Vec<String> = cx
+            .update(|cx| stack.read(cx).titles())
+            .into_iter()
+            .map(|title| title.to_string())
+            .collect();
         let via_notice = self.with_window(cx, |_, window, cx| {
-            stack.update(cx, |stack, cx| stack.answer("Annotations", "Compare", window, cx))
+            stack.update(cx, |stack, cx| {
+                stack.answer("Annotations", "Compare", window, cx)
+            })
         })?;
         if !via_notice {
-            self.with_window(cx, |_, _, cx| rounds.update(cx, |_, cx| cx.emit(crate::annotations::rounds::RoundsEvent::OpenRounds)))?;
+            self.with_window(cx, |_, _, cx| {
+                rounds.update(cx, |_, cx| {
+                    cx.emit(crate::annotations::rounds::RoundsEvent::OpenRounds)
+                })
+            })?;
         }
         let from_notice = via_notice
             && self
-                .wait_for(cx, Duration::from_secs(3), |shell, cx| shell.read(cx).rounds_sheet_entity().is_some())
+                .wait_for(cx, Duration::from_secs(3), |shell, cx| {
+                    shell.read(cx).rounds_sheet_entity().is_some()
+                })
                 .await;
         steps.check(
             "the Round 1 saved notice's Compare opens the Revision rounds sheet",
@@ -278,21 +319,29 @@ impl Run {
                     .rounds_sheet_entity()
                     .and_then(|sheet| sheet.read(cx).shown_changes());
                 shown.as_ref().is_some_and(|changes| {
-                    changes
-                        .iter()
-                        .any(|(newer, numbers)| newer.contains(REVISED) && numbers.contains(&number))
+                    changes.iter().any(|(newer, numbers)| {
+                        newer.contains(REVISED) && numbers.contains(&number)
+                    })
                 })
             })
             .await;
         self.shots(cx, "revision-rounds").await;
         let sheet = cx.update(|cx| self.shell.read(cx).rounds_sheet_entity());
         if let Some(sheet) = &sheet {
-            self.with_window(cx, |_, _, cx| sheet.update(cx, |sheet, cx| sheet.open_in_history(cx)))?;
+            self.with_window(cx, |_, _, cx| {
+                sheet.update(cx, |sheet, cx| sheet.open_in_history(cx))
+            })?;
         }
         let history_id = cx.update(|cx| {
             store::try_store(cx)
                 .and_then(|store| store.read(cx).notes(root).cloned())
-                .and_then(|notes| notes.rounds.iter().find(|round| round.number == 1).and_then(|round| round.history_id.clone()))
+                .and_then(|notes| {
+                    notes
+                        .rounds
+                        .iter()
+                        .find(|round| round.number == 1)
+                        .and_then(|round| round.history_id.clone())
+                })
         });
         let opened = match &history_id {
             Some(id) => {
@@ -308,7 +357,11 @@ impl Run {
         };
         // History opened as a tab over the editor: close it, for the steps
         // after annotate the editor's passage again.
-        self.with_window(cx, |shell, _, cx| shell.update(cx, |shell, cx| shell.engine_do(cx, |engine| engine.close("history"))))?;
+        self.with_window(cx, |shell, _, cx| {
+            shell.update(cx, |shell, cx| {
+                shell.engine_do(cx, |engine| engine.close("history"))
+            })
+        })?;
         steps.check(
             "the Revision rounds sheet compares round 1 with the text before it, the revised paragraph tagged with its note; Open in History shows the round's entry, opened",
             compared && opened,
@@ -337,12 +390,21 @@ impl Run {
         use crate::annotations::rounds_sheet::{RoundsSheet, compare::Version};
         let open = |this: &Self, cx: &mut AsyncApp| {
             this.with_window(cx, |_, _, cx| {
-                rounds.update(cx, |_, cx| cx.emit(crate::annotations::rounds::RoundsEvent::OpenRounds))
+                rounds.update(cx, |_, cx| {
+                    cx.emit(crate::annotations::rounds::RoundsEvent::OpenRounds)
+                })
             })
         };
-        let sheet = |this: &Self, cx: &mut AsyncApp| cx.update(|cx| this.shell.read(cx).rounds_sheet_entity());
+        let sheet = |this: &Self, cx: &mut AsyncApp| {
+            cx.update(|cx| this.shell.read(cx).rounds_sheet_entity())
+        };
         let question = |cx: &mut AsyncApp| {
-            cx.update(|cx| crate::confirm::install(cx).read(cx).question().map(|question| question.to_string()))
+            cx.update(|cx| {
+                crate::confirm::install(cx)
+                    .read(cx)
+                    .question()
+                    .map(|question| question.to_string())
+            })
         };
         let accept = |this: &Self, cx: &mut AsyncApp| {
             this.with_window(cx, |_, window, cx| {
@@ -361,11 +423,14 @@ impl Run {
             })
             .await;
         if let Some(sheet) = sheet(self, cx) {
-            self.with_window(cx, |_, _, cx| sheet.update(cx, |sheet, cx| sheet.ask_to_restore(cx)))?;
+            self.with_window(cx, |_, _, cx| {
+                sheet.update(cx, |sheet, cx| sheet.ask_to_restore(cx))
+            })?;
         }
         self.pause(cx, Duration::from_millis(300)).await;
         let asked = question(cx);
-        self.adapter_shot(cx, "revision-rounds-restore-confirm").await;
+        self.adapter_shot(cx, "revision-rounds-restore-confirm")
+            .await;
         let accepted = accept(self, cx)?;
         let written = self
             .wait_for(cx, Duration::from_secs(10), |_, _| {
@@ -374,7 +439,8 @@ impl Run {
             .await;
         let reloaded = self
             .wait_for(cx, Duration::from_secs(5), |shell, cx| {
-                editor.read(cx).text(cx).contains(REVISED) && shell.read(cx).rounds_sheet_entity().is_none()
+                editor.read(cx).text(cx).contains(REVISED)
+                    && shell.read(cx).rounds_sheet_entity().is_none()
             })
             .await;
         self.adapter_shot(cx, "revision-rounds-restored").await;
@@ -401,17 +467,20 @@ impl Run {
         let before_again = std::fs::read_to_string(chapter).ok();
         let current = sheet(self, cx);
         if let Some(sheet) = &current {
-            self.with_window(cx, |_, _, cx| sheet.update(cx, |sheet, cx| sheet.ask_to_restore(cx)))?;
+            self.with_window(cx, |_, _, cx| {
+                sheet.update(cx, |sheet, cx| sheet.ask_to_restore(cx))
+            })?;
         }
         self.pause(cx, Duration::from_millis(300)).await;
         let accepted = accept(self, cx)?;
         self.pause(cx, Duration::from_millis(500)).await;
-        let error = current
-            .as_ref()
-            .and_then(|sheet| cx.update(|cx| sheet.read(cx).shown_error().map(|error| error.to_string())));
+        let error = current.as_ref().and_then(|sheet| {
+            cx.update(|cx| sheet.read(cx).shown_error().map(|error| error.to_string()))
+        });
         let still_open = sheet(self, cx).is_some();
         let unchanged = std::fs::read_to_string(chapter).ok() == before_again;
-        self.adapter_shot(cx, "revision-rounds-already-restored").await;
+        self.adapter_shot(cx, "revision-rounds-already-restored")
+            .await;
         steps.check(
             "restoring Round 1 again says the files already read as Round 1, keeps the sheet and writes nothing",
             loaded
@@ -448,16 +517,29 @@ impl Run {
         );
 
         // A project linked to Overleaf: the question says what syncing does.
-        let notes = cx.update(|cx| store::try_store(cx).and_then(|store| store.read(cx).notes(root).cloned()));
+        let notes = cx.update(|cx| {
+            store::try_store(cx).and_then(|store| store.read(cx).notes(root).cloned())
+        });
         let linked_question = match notes {
             Some(notes) => {
                 let root = root.to_path_buf();
                 let linked = cx.update(|cx| {
-                    gpui::AppContext::new(cx, |cx| RoundsSheet::new(root, &notes.rounds, notes.annotations.clone(), true, |_, _| None, cx))
+                    gpui::AppContext::new(cx, |cx| {
+                        RoundsSheet::new(
+                            root,
+                            &notes.rounds,
+                            notes.annotations.clone(),
+                            true,
+                            |_, _| None,
+                            cx,
+                        )
+                    })
                 });
                 cx.update(|cx| linked.update(cx, |sheet, cx| sheet.ask_to_restore(cx)));
                 let asked = question(cx);
-                self.with_window(cx, |_, _, cx| crate::confirm::install(cx).update(cx, |host, cx| host.dismiss(cx)))?;
+                self.with_window(cx, |_, _, cx| {
+                    crate::confirm::install(cx).update(cx, |host, cx| host.dismiss(cx))
+                })?;
                 asked
             }
             None => None,
@@ -487,12 +569,23 @@ impl Run {
 
     fn note_ids(root: &Path, cx: &gpui::App) -> Vec<String> {
         store::try_store(cx).map_or_else(Vec::new, |store| {
-            store.read(cx).annotations(root).into_iter().map(|note| note.id.clone()).collect()
+            store
+                .read(cx)
+                .annotations(root)
+                .into_iter()
+                .map(|note| note.id.clone())
+                .collect()
         })
     }
 
     /// Wait for note `id`'s revision to read `state`.
-    async fn wait_state(&self, cx: &mut AsyncApp, root: &Path, id: &str, state: &'static str) -> bool {
+    async fn wait_state(
+        &self,
+        cx: &mut AsyncApp,
+        root: &Path,
+        id: &str,
+        state: &'static str,
+    ) -> bool {
         let id = id.to_string();
         let root = root.to_path_buf();
         self.wait_for(cx, Duration::from_secs(5), move |_, cx| {

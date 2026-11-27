@@ -254,7 +254,8 @@ impl Run {
         self.overleaf_pdf_note(cx, steps, mock).await?;
         // The selection toolbar's Comment on Overleaf, and a local note
         // shared from its card.
-        self.overleaf_editor_comments(cx, steps, mock, &editor).await?;
+        self.overleaf_editor_comments(cx, steps, mock, &editor)
+            .await?;
 
         // Track changes on: typing goes out as a suggestion.
         mock.set_track_changes(true);
