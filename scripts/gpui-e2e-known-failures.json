@@ -491,10 +491,9 @@
     {
       "step": "an editor tab drags from the center into the right dock",
       "platforms": [
-        "windows",
-        "linux"
+        "windows"
       ],
-      "reason": "Windows: failed in every main run (44162980527, 44213516921); observed {\"presented\":true,\"frames_drawn_by_window\":\"27/27\",\"dragging\":false,\"from\":[300,66],\"to\":[810.9449462890625,377],\"strip\":{\"tabs\":\"[(\\\"file-83b2meu\\\", Bounds { origin: Point { x: 208px, y: 52px }, size: Size { 69px × 28px… | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"presented\":true,\"frames_drawn_by_window\":\"0/27\",\"dragging\":false,\"from\":[402,66],\"to\":[1185.2784423828125,467],\"strip\":{\"tabs\":\"[(\\\"file-0psbjgv\\\", Bounds { origin: Point { x: 294px, y: 52px }, size: Size { 85px × 28px } }), (\\\"file-v8vq13\\\", Bounds { origin: Point { x: 381px, y: 52px }, size: Siz…",
+      "reason": "Windows: failed in every main run (44162980527, 44213516921); observed {\"presented\":true,\"frames_drawn_by_window\":\"27/27\",\"dragging\":false,\"from\":[300,66],\"to\":[810.9449462890625,377],\"strip\":{\"tabs\":\"[(\\\"file-83b2meu\\\", Bounds { origin: Point { x: 208px, y: 52px }, size: Size { 69px × 28px…",
       "followup": "LEO-14"
     },
     {
@@ -542,34 +541,9 @@
       "step": "a citation card lists the key's uses here, each in its section with the page its note names",
       "platforms": [
         "macos",
-        "windows",
-        "linux"
+        "windows"
       ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"shown\":false,\"cites\":3,\"uses\":\"[CitationUse { path: \\\"main.tex\\\", line: 8, range: Some(226..235), section: Some(\\\"§1 Method\\\"), page: None, reason: None }, CitationUse { path: \\\"main.tex\\\", line: 8, range: Some(281..29… | Windows: failed in every main run (44162980527, 44213516921); observed {\"shown\":true,\"cites\":3,\"uses\":\"[CitationUse { path: \\\"main.tex\\\", line: 8, range: Some(228..237), section: Some(\\\"§1 Method\\\"), page: None, reason: None }, CitationUse { path: \\\"main.tex\\\", line: 8, range: Some(285..294… | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"shown\":false,\"cites\":3,\"uses\":\"[CitationUse { path: \\\"main.tex\\\", line: 8, range: Some(226..235), section: Some(\\\"§1 Method\\\"), page: None, reason: None }, CitationUse { path: \\\"main.tex\\\", line: 8, range: Some(281..290), section: Some(\\\"§1 Method\\\"), page: None, reason: None }, CitationUse { path…",
-      "followup": "LEO-14"
-    },
-    {
-      "step": "\"Why cited\" from the card files the reason, and the card's row then says why",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"opened\":null,\"hidden\":true,\"filed\":false}",
-      "followup": "LEO-14"
-    },
-    {
-      "step": "a right-click on a citation key opens \"Why cited\" there",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {}",
-      "followup": "LEO-14"
-    },
-    {
-      "step": "a reason whose cite is deleted joins the notes in the Annotations panel and the titlebar's count",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"listed\":false,\"counted\":0}",
+      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"shown\":false,\"cites\":3,\"uses\":\"[CitationUse { path: \\\"main.tex\\\", line: 8, range: Some(226..235), section: Some(\\\"§1 Method\\\"), page: None, reason: None }, CitationUse { path: \\\"main.tex\\\", line: 8, range: Some(281..29… | Windows: failed in every main run (44162980527, 44213516921); observed {\"shown\":true,\"cites\":3,\"uses\":\"[CitationUse { path: \\\"main.tex\\\", line: 8, range: Some(228..237), section: Some(\\\"§1 Method\\\"), page: None, reason: None }, CitationUse { path: \\\"main.tex\\\", line: 8, range: Some(285..294…",
       "followup": "LEO-14"
     },
     {
@@ -1479,22 +1453,6 @@
         "linux"
       ],
       "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"bytes\":0}",
-      "followup": "LEO-129"
-    },
-    {
-      "step": "Split shows the .bib source beside its list",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"alone\":648,\"beside\":349}",
-      "followup": "LEO-129"
-    },
-    {
-      "step": "Acknowledgements opens the third-party notices over Settings, and Escape closes them first",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"sheet\":true,\"closed\":false,\"settings_open\":true}",
       "followup": "LEO-129"
     },
     {
