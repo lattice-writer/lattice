@@ -8,7 +8,8 @@
 //!   on Overleaf with one comment op, as Overleaf's own editor does;
 //! - the same text pasted anywhere else leaves it detached;
 //! - pasted back in place after that near miss, it is re-attached;
-//! - Undo after the document was joined again in between leaves it detached.
+//! - pasted back after the document was joined again in between, it stays
+//!   detached.
 
 use std::time::Duration;
 
@@ -175,7 +176,8 @@ impl Run {
         );
 
         // A join in between: cut, leave main.tex for another file and come
-        // back, then Undo. What the first join detached is forgotten.
+        // back, then paste the passage back where it was. What the first
+        // join detached is forgotten.
         self.select_quote(cx, editor, PASSAGE)?;
         self.cut_keys(cx, &[('x', true)]).await?;
         let detached = self
@@ -184,9 +186,9 @@ impl Run {
             })
             .await;
         let rejoined = self.rejoin_main(cx, &root).await?;
-        let zed = cx.update(|cx| editor.read(cx).editor().clone());
-        self.writer_in(cx, &zed).await?;
-        self.cut_keys(cx, &[('z', true)]).await?;
+        // Pasted back where it was: the cut is still on the clipboard.
+        let home = self.caret_to(cx, editor, 0)?;
+        self.cut_keys(cx, &[('v', true)]).await?;
         let back = self
             .wait_for(cx, Duration::from_secs(15), |shell, cx| {
                 mock.file("main.tex")
@@ -202,9 +204,9 @@ impl Run {
             && anchors_sent(mock, &thread) == 3
             && cx.update(|cx| !drawn(&self.shell, editor, &thread, cx));
         steps.check(
-            "Undo after the document was joined again in between leaves the thread detached, with no comment op",
-            detached && rejoined && back && stayed && mock.rejected().is_empty(),
-            json!({ "detached": detached, "rejoined": rejoined, "back": back, "stayed": stayed, "sent": anchors_sent(mock, &thread), "comments": mock.comments("main.tex"), "overleaf": mock.file("main.tex") }),
+            "the passage pasted back after the document was joined again in between leaves the thread detached, with no comment op",
+            detached && rejoined && home && back && stayed && mock.rejected().is_empty(),
+            json!({ "detached": detached, "rejoined": rejoined, "home": home, "back": back, "stayed": stayed, "sent": anchors_sent(mock, &thread), "comments": mock.comments("main.tex"), "overleaf": mock.file("main.tex") }),
         );
 
         // Leave main.tex and the threads as the next steps expect them.

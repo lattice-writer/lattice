@@ -275,104 +275,146 @@ impl OverleafBridge {
         } else {
             by
         };
-        let text = own
-            .then(|| self.path_of_doc(doc_id))
-            .flatten()
-            .and_then(|path| self.live_text(&path).map(str::to_string));
-        // Threads still open on Overleaf: never a resolved or deleted one.
-        let open: Vec<String> = self
-            .review
-            .threads
-            .iter()
-            .filter(|thread| !thread.resolved)
-            .map(|thread| thread.id.clone())
-            .collect();
         let Some(review) = self.review.docs.get_mut(doc_id) else {
             return;
         };
         let now = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
-        let before = std::mem::take(&mut review.comments);
-        review.comments = tracked::comments_after(&before, ops);
-        for detached in &mut review.detached {
-            detached.position = point_after(detached.position, ops);
-        }
-        if own {
-            for (was, is) in before.iter().zip(&review.comments) {
-                if was.quote.is_empty() || !is.quote.is_empty() {
-                    continue;
-                }
-                review
-                    .detached
-                    .retain(|detached| detached.thread_id != is.thread_id);
-                review.detached.push(Detached {
-                    thread_id: is.thread_id.clone(),
-                    position: is.position,
-                    text: was.quote.clone(),
-                    restored: false,
-                });
-            }
-        }
-        if let Some(text) = &text {
+        // Op by op, so a detach is placed where its op left the passage's
+        // point, and an insertion later in the same batch can bring it back.
+        let mut comments = std::mem::take(&mut review.comments);
+        let mut touched: Vec<String> = Vec::new();
+        for op in ops {
+            let op = std::slice::from_ref(op);
+            let next = tracked::comments_after(&comments, op);
             for detached in &mut review.detached {
-                detached.restored = open.contains(&detached.thread_id)
-                    && still_detached(&review.comments, &detached.thread_id)
-                    && back_in_place(text, detached);
+                if own && touches(&op[0], detached) {
+                    touched.push(detached.thread_id.clone());
+                }
+                detached.position = point_after(detached.position, op);
+            }
+            if own {
+                for (was, is) in comments.iter().zip(&next) {
+                    if was.quote.is_empty() || !is.quote.is_empty() {
+                        continue;
+                    }
+                    review
+                        .detached
+                        .retain(|detached| detached.thread_id != is.thread_id);
+                    review.detached.push(Detached {
+                        thread_id: is.thread_id.clone(),
+                        position: is.position,
+                        text: was.quote.clone(),
+                        restored: false,
+                    });
+                }
+            }
+            comments = next;
+        }
+        review.comments = comments;
+        // Only our own edits at a detached passage's place can bring it back
+        // (or take it away again): never a co-author's.
+        if !touched.is_empty() {
+            let text = self
+                .path_of_doc(doc_id)
+                .and_then(|path| self.live_text(&path).map(str::to_string));
+            let open: Vec<&str> = self
+                .review
+                .threads
+                .iter()
+                .filter(|thread| !thread.resolved)
+                .map(|thread| thread.id.as_str())
+                .collect();
+            let decided: Vec<(String, bool)> = self
+                .review
+                .docs
+                .get(doc_id)
+                .into_iter()
+                .flat_map(|review| {
+                    review
+                        .detached
+                        .iter()
+                        .filter(|detached| touched.contains(&detached.thread_id))
+                        .map(|detached| {
+                            let back = text.as_deref().is_some_and(|text| {
+                                open.contains(&detached.thread_id.as_str())
+                                    && still_detached(&review.comments, &detached.thread_id)
+                                    && back_in_place(text, detached)
+                            });
+                            (detached.thread_id.clone(), back)
+                        })
+                })
+                .collect();
+            let Some(review) = self.review.docs.get_mut(doc_id) else {
+                return;
+            };
+            for detached in &mut review.detached {
+                if let Some((_, back)) = decided.iter().find(|(id, _)| *id == detached.thread_id) {
+                    detached.restored = *back;
+                }
             }
         }
+        let Some(review) = self.review.docs.get_mut(doc_id) else {
+            return;
+        };
         review.changes = tracked::changes_after(&review.changes, ops, by.as_ref(), &now);
         if review.changes.iter().any(tracked::is_provisional) {
             self.refresh_suggestions_later(doc_id.to_string(), cx);
         }
     }
 
-    /// Our edits to `doc_id` are all with Overleaf: re-attach each thread
-    /// whose passage came back, checked again against the text as it is now.
-    /// One anchor goes out per detach, whatever comes of it.
+    /// Our edits to `doc_id` are all with Overleaf: re-attach the threads
+    /// whose passages came back, each checked again against the text as it
+    /// is now. One anchor goes out per detach, whatever comes of it, and one
+    /// per acknowledgement, since an anchor takes the wire.
     pub(super) fn reattach_restored(&mut self, doc_id: &str, cx: &mut Context<Self>) {
-        let Some(path) = self.path_of_doc(doc_id) else {
-            return;
-        };
-        let Some(text) = self.live_text(&path).map(str::to_string) else {
-            return;
-        };
-        let open = |thread_id: &str| {
-            self.review
+        loop {
+            let Some(detached) = self.review.docs.get(doc_id).and_then(|review| {
+                review
+                    .detached
+                    .iter()
+                    .find(|detached| detached.restored)
+                    .cloned()
+            }) else {
+                return;
+            };
+            let Some(text) = self
+                .path_of_doc(doc_id)
+                .and_then(|path| self.live_text(&path).map(str::to_string))
+            else {
+                return;
+            };
+            let open = self
+                .review
                 .threads
                 .iter()
-                .any(|thread| thread.id == thread_id && !thread.resolved)
-        };
-        let Some(review) = self.review.docs.get(doc_id) else {
-            return;
-        };
-        let Some(detached) = review
-            .detached
-            .iter()
-            .find(|detached| detached.restored)
-            .cloned()
-        else {
-            return;
-        };
-        let due = open(&detached.thread_id)
-            && still_detached(&review.comments, &detached.thread_id)
-            && back_in_place(&text, &detached);
-        if due
-            && self
-                .anchor_comment(
+                .any(|thread| thread.id == detached.thread_id && !thread.resolved);
+            let due = open
+                && self
+                    .review
+                    .docs
+                    .get(doc_id)
+                    .is_some_and(|review| still_detached(&review.comments, &detached.thread_id))
+                && back_in_place(&text, &detached);
+            let sent = due
+                && match self.anchor_comment(
                     doc_id,
                     &detached.thread_id,
                     detached.position,
                     &detached.text,
                     cx,
-                )
-                .is_err()
-        {
-            // The wire is taken again: the next acknowledgement retries.
-            return;
-        }
-        if let Some(review) = self.review.docs.get_mut(doc_id) {
-            review
-                .detached
-                .retain(|other| other.thread_id != detached.thread_id);
+                ) {
+                    Ok(()) => true,
+                    // The wire is taken again: the next acknowledgement retries.
+                    Err(_) => return,
+                };
+            if let Some(review) = self.review.docs.get_mut(doc_id) {
+                review
+                    .detached
+                    .retain(|other| other.thread_id != detached.thread_id);
+            }
+            if sent {
+                return;
+            }
         }
     }
 
@@ -565,6 +607,22 @@ fn point_after(mut at: i64, ops: &[OtOp]) -> i64 {
     at
 }
 
+/// `op` edits where `detached`'s passage was: inserts there or into what
+/// of it is back already, as Undo or a paste putting it back does, or
+/// deletes from that span, which can make it no longer back.
+fn touches(op: &OtOp, detached: &Detached) -> bool {
+    let p = op.p as i64;
+    let length = detached.text.encode_utf16().count() as i64;
+    match (&op.i, &op.d) {
+        (Some(_), _) => p >= detached.position && p <= detached.position + length,
+        (None, Some(deleted)) => {
+            p < detached.position + length
+                && p + deleted.encode_utf16().count() as i64 > detached.position
+        }
+        _ => false,
+    }
+}
+
 /// Overleaf still has `thread_id` here, detached.
 fn still_detached(comments: &[CommentRange], thread_id: &str) -> bool {
     comments
@@ -648,6 +706,28 @@ mod tests {
         // A deletion across its point pulls the point to where it began.
         assert!(!back_after(&[delete(2, "e br"), insert(4, "quick ")]));
         assert!(back_after(&[delete(2, "e br"), insert(2, "quick ")]));
+    }
+
+    #[test]
+    fn only_edits_at_a_detached_passage_decide_whether_it_is_back() {
+        let detached = Detached {
+            thread_id: "t".into(),
+            position: 4,
+            text: "quick ".into(),
+            restored: false,
+        };
+        // At its point, or inside what of it is back (a diff can split it).
+        assert!(touches(&insert(4, "quick "), &detached));
+        assert!(touches(&insert(7, "ck "), &detached));
+        assert!(touches(&insert(10, "x"), &detached));
+        // Elsewhere, or no insertion at all.
+        assert!(!touches(&insert(3, "quick "), &detached));
+        assert!(!touches(&insert(11, "quick "), &detached));
+        // A deletion from the span it is back in, but none past it.
+        assert!(touches(&delete(6, "ic"), &detached));
+        assert!(touches(&delete(2, "e q"), &detached));
+        assert!(!touches(&delete(10, "brown "), &detached));
+        assert!(!touches(&delete(0, "The "), &detached));
     }
 
     #[test]
