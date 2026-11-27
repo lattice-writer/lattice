@@ -3,7 +3,11 @@
 //! GTK cannot embed into a Wayland surface it does not own, so the GPUI application must
 //! run on X11 (natively or through XWayland).
 
-use std::{cell::Cell, rc::Rc, time::Duration};
+use std::{
+    cell::{Cell, RefCell},
+    rc::{Rc, Weak},
+    time::Duration,
+};
 
 use gpui::{
     App, Bounds, Global, Modifiers, MouseButton, MouseDownEvent, MouseUpEvent, Pixels,
@@ -17,8 +21,11 @@ use wry::raw_window_handle::{
 /// How often pending GTK events are dispatched between GPUI frames.
 const GTK_POLL_INTERVAL: Duration = Duration::from_millis(16);
 
-/// Marks that GTK is initialized and its main loop is driven by GPUI.
-struct GtkMainLoop;
+/// Marks that GTK is initialized and its main loop is driven by GPUI, and holds every webview
+/// built since, to take out of GPUI's windows before the application quits.
+struct GtkMainLoop {
+    webviews: RefCell<Vec<Weak<wry::WebView>>>,
+}
 
 impl Global for GtkMainLoop {}
 
@@ -34,7 +41,22 @@ pub(crate) fn ensure_gtk(cx: &mut App) -> wry::Result<()> {
         gtk::init().map_err(|error| wry::Error::Io(std::io::Error::other(error)))?;
     }
 
-    cx.set_global(GtkMainLoop);
+    cx.set_global(GtkMainLoop {
+        webviews: RefCell::new(Vec::new()),
+    });
+    // GPUI destroys its windows, and every X11 window inside them, as it quits; Wry's views
+    // live on past that until the application is torn down, and GTK's next request for one
+    // (a resize, its destruction) names a window that no longer exists, which GDK aborts the
+    // process on. Quit observers run before the windows are destroyed.
+    cx.on_app_quit(|cx| {
+        if let Some(gtk) = cx.try_global::<GtkMainLoop>() {
+            for webview in gtk.webviews.borrow().iter().filter_map(Weak::upgrade) {
+                detach_from_surface(&webview);
+            }
+        }
+        async {}
+    })
+    .detach();
     cx.spawn(async move |cx| {
         loop {
             while gtk::events_pending() {
@@ -46,6 +68,15 @@ pub(crate) fn ensure_gtk(cx: &mut App) -> wry::Result<()> {
     .detach();
 
     Ok(())
+}
+
+/// Remember `webview` so it is taken out of GPUI's windows before the application quits.
+pub(crate) fn track(webview: &Rc<wry::WebView>, cx: &App) {
+    if let Some(gtk) = cx.try_global::<GtkMainLoop>() {
+        let mut webviews = gtk.webviews.borrow_mut();
+        webviews.retain(|webview| webview.strong_count() > 0);
+        webviews.push(Rc::downgrade(webview));
+    }
 }
 
 /// WebKitGTK answers `prefers-color-scheme` from GTK's preference, which GTK 3 does not
@@ -265,14 +296,13 @@ impl NativeWebViewSurface {
 }
 
 /// Move Wry's X11 window out of the composition surface window, unmapped, before the surface
-/// is removed.
+/// is removed, or out of the GPUI window it was built in before the application quits.
 ///
 /// GPUI removes the surface window through its own X11 connection, which also destroys every
 /// window inside it. GTK sends its requests for Wry's windows through another connection, so
 /// requests it makes after that (destroying them when the webview is dropped, possibly later
 /// through a `WebViewHandle`) name windows that no longer exist, and GDK aborts the process on
 /// that X11 error. Outside the surface, Wry's windows stay valid until Wry destroys them.
-#[cfg(feature = "gpui-fast")]
 fn detach_from_surface(webview: &wry::WebView) {
     use gdkx11::{X11Display, X11Window};
     use gtk::{glib::translate::ToGlibPtr as _, prelude::*};
