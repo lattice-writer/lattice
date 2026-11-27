@@ -113,8 +113,14 @@ pub fn paper(
             text,
         })
     };
-    let near_start = reach_back(source, from) == 0;
-    let near_end = reach_forward(source, to) == source.len();
+    // An include between the passage and the file's edge is what TeX reads
+    // next to it, and the window already shows its line: the files beyond
+    // are not what joins the passage.
+    let includes = commands(&blank_comments(source), false);
+    let near_start =
+        reach_back(source, from) == 0 && includes.iter().all(|command| command.end > from);
+    let near_end = reach_forward(source, to) == source.len()
+        && includes.iter().all(|command| command.start < to);
     if main == path || !(near_start || near_end) {
         return Paper {
             preamble,
@@ -320,6 +326,10 @@ fn head(text: &str, units: usize) -> String {
     for (at, ch) in text.char_indices() {
         count += ch.len_utf16();
         if count > units {
+            // A line that fits exactly ends here.
+            if ch == '\n' {
+                return text[..at].to_string();
+            }
             return text[..at]
                 .rfind('\n')
                 .map_or_else(String::new, |line| text[..line].to_string());
@@ -335,6 +345,9 @@ fn tail(text: &str, units: usize) -> String {
     for (at, ch) in text.char_indices().rev() {
         count += ch.len_utf16();
         if count > units {
+            if ch == '\n' {
+                return text[start..].to_string();
+            }
             return text[start..]
                 .find('\n')
                 .map_or_else(String::new, |line| text[start + line + 1..].to_string());

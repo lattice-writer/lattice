@@ -210,6 +210,63 @@ fn keeps_each_side_within_its_budget_in_whole_lines() {
 }
 
 #[test]
+fn keeps_a_line_that_fits_the_budget_exactly() {
+    let mut files = fixture();
+    let line = "z".repeat(NEIGHBOUR_LENGTH);
+    files.insert("sections/results.tex", format!("{line}\nnext"));
+    files.insert("sections/intro.tex", format!("first\n{line}"));
+    let source = method();
+    let end = source.len();
+    let after = paper(
+        Some("main.tex"),
+        "sections/method.tex",
+        &source,
+        end,
+        end,
+        read(&files),
+    );
+    assert_eq!(
+        after.following,
+        vec![excerpt("sections/results.tex", &line)]
+    );
+    let mut files = files;
+    files.insert(
+        "main.tex",
+        files["main.tex"].replace("\\section{Method}\n", ""),
+    );
+    let before = paper(
+        Some("main.tex"),
+        "sections/method.tex",
+        &source,
+        0,
+        0,
+        read(&files),
+    );
+    assert_eq!(before.preceding, vec![excerpt("sections/intro.tex", &line)]);
+}
+
+#[test]
+fn an_include_beside_the_passage_stands_for_what_follows_it() {
+    let files = fixture();
+    let source = "Opening.\n\\input{sections/results}\nClosing.";
+    let paper = paper(
+        Some("main.tex"),
+        "sections/method.tex",
+        source,
+        0,
+        8,
+        read(&files),
+    );
+    // Before the include: what joins the passage at the end is the
+    // included file, which the window's \input line already names.
+    assert!(paper.following.is_empty());
+    assert_eq!(
+        paper.preceding.last(),
+        Some(&excerpt("main.tex", "\\section{Method}"))
+    );
+}
+
+#[test]
 fn cuts_a_long_preamble_to_whole_lines() {
     let mut files = fixture();
     let macros = (0..400)
