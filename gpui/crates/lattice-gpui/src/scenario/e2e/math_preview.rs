@@ -67,6 +67,18 @@ impl Run {
         steps: &mut Steps,
         root: &Path,
     ) -> Result<()> {
+        // KaTeX's pictures come from the app's math page, a WKWebView
+        // photographed off screen (`card_previews/math_page.rs`), so far on
+        // macOS only; elsewhere the card keeps the equation's source and none
+        // of these steps can show (LEO-157).
+        if !cfg!(target_os = "macos") {
+            steps.check(
+                "the math preview's KaTeX pictures are macOS only (skipped)",
+                true,
+                json!({ "followup": "LEO-157" }),
+            );
+            return Ok(());
+        }
         let _front = self.focused(cx, "math_preview").await?;
         std::fs::write(root.join(CHAPTER), SOURCE)?;
         let result = self.math_preview_checks(cx, steps, root).await;
