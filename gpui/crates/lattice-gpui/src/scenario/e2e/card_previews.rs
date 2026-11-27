@@ -292,8 +292,20 @@ impl Run {
             color: cx.palette().text,
             macros: macros.clone(),
         };
-        // Set as a card would, timed cold (the page loads) and again (kept).
         let area = r"\area = \int_0^1 x^2\,dx = \frac{1}{3} \label{eq:area}";
+        // KaTeX's pictures come from the macOS math page only
+        // (`card_previews/math_page.rs`); elsewhere an equation card keeps
+        // its source (LEO-157).
+        let katex = cfg!(target_os = "macos");
+        if !katex {
+            steps.check(
+                "KaTeX's pictures in an equation card are macOS only (skipped)",
+                true,
+                json!({ "followup": "LEO-157" }),
+            );
+        }
+        if katex {
+        // Set as a card would, timed cold (the page loads) and again (kept).
         let started = Instant::now();
         let mut picture = None;
         self.wait_for(cx, Duration::from_secs(15), |_, cx| {
@@ -329,6 +341,7 @@ impl Run {
             picture.is_some() && kept && ink > 0.01 && size.is_some_and(|[w, h]| w > h && h > 10.),
             json!({ "first_ms": first.as_millis(), "kept_us": again.as_micros(), "ink": ink, "size": size }),
         );
+        }
 
         // KaTeX refuses an unknown macro and half-typed math: the card keeps
         // the source (`equationHtml` is null), as without the macros read.
@@ -356,6 +369,7 @@ impl Run {
                 refused(r"\frac{1", macros.clone()),
             )
             .await;
+        if katex {
         // In the dark appearance the card's ink is light, and so is the picture's.
         let mut inks = Vec::new();
         for appearance in [lattice_ui::Appearance::Light, lattice_ui::Appearance::Dark] {
@@ -384,6 +398,7 @@ impl Run {
             follows,
             json!({ "inks": inks }),
         );
+        }
         steps.check(
             "math KaTeX cannot set (an unknown macro, half-typed) keeps its source",
             unknown && half,
