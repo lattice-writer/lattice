@@ -14,7 +14,7 @@ has already been reported.
 
 For a bug, include:
 
-- the Lattice version and your macOS version;
+- the Lattice version, your operating system and its version;
 - clear steps to reproduce the problem;
 - what you expected and what happened instead;
 - relevant logs or screenshots, with private project content and credentials

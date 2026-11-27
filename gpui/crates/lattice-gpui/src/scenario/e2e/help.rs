@@ -204,6 +204,13 @@ impl Run {
             Err(_) => (String::new(), String::new()),
         };
         let exported: serde_json::Value = serde_json::from_str(&contents).unwrap_or_default();
+        let os = if cfg!(target_os = "macos") {
+            "macOS"
+        } else if cfg!(target_os = "windows") {
+            "Windows"
+        } else {
+            "Linux"
+        };
         steps.check(
             "Report a problem saves the redacted export and opens a form that carries only versions",
             exported["includes_raw_diagnostic"] == false
@@ -211,13 +218,10 @@ impl Run {
                 && !contents.contains("secret-paper")
                 && url.starts_with("https://github.com/lattice-writer/lattice/issues/new?template=bug_report.yml")
                 && url.contains(&format!("lattice-version={RUNNING_VERSION}"))
-                && url.contains(if cfg!(target_os = "macos") {
-                    "macos-version=macOS+"
-                } else if cfg!(target_os = "windows") {
-                    "macos-version=Windows+"
-                } else {
-                    "macos-version=Linux+"
-                })
+                && url.contains(&format!("macos-version={os}+"))
+                // The field names the version too: a bare "Linux (x86_64)"
+                // means the host's version was not read.
+                && !url.contains(&format!("macos-version={os}+%28"))
                 && !url.contains("secret")
                 && !url.contains("E2E"),
             json!({ "saved": saved.as_ref().map(|saved| saved.path.display().to_string()).map_err(Clone::clone), "url": url }),

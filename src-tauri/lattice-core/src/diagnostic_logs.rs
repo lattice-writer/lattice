@@ -57,7 +57,8 @@ pub fn collect(log_root: &Path, data_root: &Path, home: Option<&Path>) -> Diagno
 pub struct ProblemReport {
     /// The operating system (`macOS`, `Windows`, `Linux`).
     os_name: &'static str,
-    /// Its version (`15.1`), or `None` where it is unknown.
+    /// Its version (`15.1`, `10.0.26100`, `Ubuntu 24.04.1 LTS`), or `None`
+    /// where it is unknown.
     os_version: Option<String>,
     arch: String,
 }
@@ -68,8 +69,8 @@ impl ProblemReport {
         self.os_name
     }
 
-    /// Its version (`15.1`), where it is known: only `sw_vers` is asked, so
-    /// Windows and Linux leave it for the reporter to fill in.
+    /// Its version, where it is known: the macOS version, the Windows build,
+    /// or the Linux distribution and its version.
     pub fn os_version(&self) -> Option<&str> {
         self.os_version.as_deref()
     }
@@ -130,9 +131,60 @@ fn os_version() -> Option<String> {
     (output.status.success() && !version.is_empty()).then_some(version)
 }
 
-#[cfg(not(target_os = "macos"))]
+/// `RtlGetVersion` rather than `GetVersionExW`: the latter answers the
+/// version the executable's manifest declares it supports, so an app without
+/// one is told Windows 8. Windows 11 still reports 10.0; its build (22000 and
+/// up) is what tells the two apart, so the build stays in the answer.
+#[cfg(windows)]
 fn os_version() -> Option<String> {
-    None
+    use windows_sys::Wdk::System::SystemServices::RtlGetVersion;
+    use windows_sys::Win32::System::SystemInformation::OSVERSIONINFOW;
+    // SAFETY: OSVERSIONINFOW is plain data, and RtlGetVersion only fills in
+    // the struct whose size it is told.
+    let mut info: OSVERSIONINFOW = unsafe { std::mem::zeroed() };
+    info.dwOSVersionInfoSize = std::mem::size_of::<OSVERSIONINFOW>() as u32;
+    let status = unsafe { RtlGetVersion(&mut info) };
+    (status == 0)
+        .then(|| format!("{}.{}.{}", info.dwMajorVersion, info.dwMinorVersion, info.dwBuildNumber))
+}
+
+/// The distribution from os-release(5), `/usr/lib/os-release` being where it
+/// lives when `/etc` has no copy.
+#[cfg(not(any(target_os = "macos", windows)))]
+fn os_version() -> Option<String> {
+    ["/etc/os-release", "/usr/lib/os-release"]
+        .iter()
+        .find_map(|path| std::fs::read_to_string(path).ok())
+        .and_then(|contents| distribution(&contents))
+}
+
+/// `PRETTY_NAME` (`Ubuntu 24.04.1 LTS`), else `NAME` and `VERSION_ID`.
+/// Values are shell-quoted, and a backslash escapes the next character.
+#[cfg_attr(any(target_os = "macos", windows), allow(dead_code))]
+fn distribution(os_release: &str) -> Option<String> {
+    let field = |key: &str| {
+        os_release.lines().find_map(|line| {
+            let value = line.trim().strip_prefix(key)?.strip_prefix('=')?;
+            let value = ['"', '\'']
+                .iter()
+                .find_map(|quote| value.strip_prefix(*quote)?.strip_suffix(*quote))
+                .unwrap_or(value);
+            let mut unescaped = String::new();
+            let mut chars = value.chars();
+            while let Some(c) = chars.next() {
+                unescaped.push(if c == '\\' { chars.next().unwrap_or(c) } else { c });
+            }
+            let unescaped = unescaped.trim().to_string();
+            (!unescaped.is_empty()).then_some(unescaped)
+        })
+    };
+    field("PRETTY_NAME").or_else(|| {
+        let name = field("NAME")?;
+        Some(match field("VERSION_ID") {
+            Some(version) => format!("{name} {version}"),
+            None => name,
+        })
+    })
 }
 
 fn collect_file(
@@ -282,6 +334,37 @@ pub(crate) mod tests {
     fn names_the_macos_version() {
         let version = os_version().expect("sw_vers answers on macOS");
         assert!(version.split('.').all(|part| part.parse::<u32>().is_ok()), "{version}");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn names_the_windows_build() {
+        let version = os_version().expect("RtlGetVersion answers on Windows");
+        let parts: Vec<u32> = version.split('.').map(|part| part.parse().unwrap()).collect();
+        assert!(parts.len() == 3 && parts[0] >= 10 && parts[2] > 0, "{version}");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn names_the_linux_distribution() {
+        let version = os_version().expect("the runners have an os-release");
+        assert!(!version.is_empty() && !version.contains('"'), "{version}");
+    }
+
+    #[test]
+    fn reads_the_distribution_from_os_release() {
+        let ubuntu = "NAME=\"Ubuntu\"\nVERSION_ID=\"24.04\"\nPRETTY_NAME=\"Ubuntu 24.04.1 LTS\"\nID=ubuntu\n";
+        assert_eq!(distribution(ubuntu).as_deref(), Some("Ubuntu 24.04.1 LTS"));
+        assert_eq!(
+            distribution("NAME='Fedora Linux'\nVERSION_ID=41\n").as_deref(),
+            Some("Fedora Linux 41")
+        );
+        assert_eq!(
+            distribution("NAME=\"Arch Linux\"\nPRETTY_NAME=\"\"\n").as_deref(),
+            Some("Arch Linux")
+        );
+        assert_eq!(distribution("PRETTY_NAME=\"Say \\\"hi\\\"\"\n").as_deref(), Some("Say \"hi\""));
+        assert_eq!(distribution("ID=nixos\n"), None);
     }
 
     #[test]

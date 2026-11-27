@@ -14,7 +14,7 @@ afterEach(() => {
 });
 
 describe("Help ▸ Report a Problem…", () => {
-  it("prefills only the Lattice version, the macOS version and the architecture", () => {
+  it("prefills only the Lattice version, the operating system and its version, and the architecture", () => {
     const url = new URL(newIssueUrl({ osName: "macOS", osVersion: "15.1", arch: "aarch64" }, "0.16.1"));
     expect(url.origin + url.pathname).toBe("https://github.com/lattice-writer/lattice/issues/new");
     expect(Object.fromEntries(url.searchParams)).toEqual({
