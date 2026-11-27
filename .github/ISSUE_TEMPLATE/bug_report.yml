@@ -45,11 +45,16 @@ body:
     validations:
       required: true
 
+  # The id is from when Lattice ran only on a Mac; Help → Report a Problem…
+  # in older releases fills the field in by it, so it stays.
   - type: input
     id: macos-version
     attributes:
-      label: macOS version
-      description: "Apple menu → About This Mac. Include the chip if you know it."
+      label: Operating system and version
+      description: >-
+        On a Mac: Apple menu → About This Mac, and the chip if you know it.
+        On Windows: Settings → System → About. On Linux: the distribution
+        and its version.
       placeholder: "macOS 15.3 (Apple M2 Pro)"
     validations:
       required: true

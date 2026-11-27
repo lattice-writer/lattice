@@ -2,7 +2,8 @@
 //! Tauri app files one (`src/app/report-problem.ts`): save the log export
 //! Settings › Logs › Export makes by default (redacted: operation metadata
 //! and counts only) in the log folder's `reports/`, show it in Finder, and
-//! open a new bug report with the Lattice and macOS versions filled in.
+//! open a new bug report with the Lattice and operating system versions
+//! filled in.
 //!
 //! The issue page is public and its address travels through the browser's
 //! history, so the address carries the versions and the architecture and
@@ -39,14 +40,24 @@ fn form_encode(value: &str) -> String {
 }
 
 /// The bug report form (`.github/ISSUE_TEMPLATE/bug_report.yml`), its
-/// version fields filled in.
-pub fn new_issue_url(os_version: Option<&str>, arch: &str, lattice_version: &str) -> String {
-    let macos = format!("macOS {} ({arch})", os_version.unwrap_or("unknown"));
+/// version fields filled in. The operating system field keeps its
+/// `macos-version` id from when Lattice ran only on a Mac, so the links older
+/// releases open still fill it in.
+pub fn new_issue_url(
+    os_name: &str,
+    os_version: Option<&str>,
+    arch: &str,
+    lattice_version: &str,
+) -> String {
+    let os = match os_version {
+        Some(version) => format!("{os_name} {version} ({arch})"),
+        None => format!("{os_name} ({arch})"),
+    };
     format!(
         "https://github.com/lattice-writer/lattice/issues/new?template={}&lattice-version={}&macos-version={}",
         form_encode("bug_report.yml"),
         form_encode(lattice_version),
-        form_encode(&macos)
+        form_encode(&os)
     )
 }
 
@@ -78,7 +89,12 @@ pub fn save_report(cx: &mut App) -> gpui::Task<Result<Saved, String>> {
         )?;
         Ok(Saved {
             path,
-            issue_url: new_issue_url(report.os_version(), report.arch(), lattice_core::VERSION),
+            issue_url: new_issue_url(
+                report.os_name(),
+                report.os_version(),
+                report.arch(),
+                lattice_core::VERSION,
+            ),
         })
     })
 }
@@ -153,11 +169,14 @@ mod tests {
     #[test]
     fn the_form_carries_only_the_versions_and_the_architecture() {
         // The Tauri app's `report-problem.test.ts` expectations.
-        let url = new_issue_url(Some("15.1"), "aarch64", "0.16.1");
+        let url = new_issue_url("macOS", Some("15.1"), "aarch64", "0.16.1");
         assert_eq!(
             url,
             "https://github.com/lattice-writer/lattice/issues/new?template=bug_report.yml&lattice-version=0.16.1&macos-version=macOS+15.1+%28aarch64%29"
         );
-        assert!(new_issue_url(None, "x86_64", "1.0.0").ends_with("macOS+unknown+%28x86_64%29"));
+        assert!(
+            new_issue_url("Linux", None, "x86_64", "1.0.0")
+                .ends_with("&macos-version=Linux+%28x86_64%29")
+        );
     }
 }

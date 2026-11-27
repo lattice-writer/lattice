@@ -141,7 +141,7 @@ describe("Report a Problem on an old release", () => {
     const updateNow = vi.fn(async () => {});
     known(updateNow);
     render(<ToastStack />);
-    tauri.invoke.mockResolvedValue({ osVersion: "15.1", arch: "aarch64" });
+    tauri.invoke.mockResolvedValue({ osName: "macOS", osVersion: "15.1", arch: "aarch64" });
     await act(async () => { await reportProblem(); });
     expect(tauri.openUrl).not.toHaveBeenCalled();
     await waitFor(() => expect(screen.getByText(`You’re on v${RUNNING}; v${LATEST} is available`)).toBeInTheDocument());
@@ -153,7 +153,7 @@ describe("Report a Problem on an old release", () => {
   });
 
   it("opens the issue page straight away on the latest release", async () => {
-    tauri.invoke.mockResolvedValue({ osVersion: "15.1", arch: "aarch64" });
+    tauri.invoke.mockResolvedValue({ osName: "macOS", osVersion: "15.1", arch: "aarch64" });
     await reportProblem();
     expect(tauri.openUrl).toHaveBeenCalledTimes(1);
   });

@@ -15,7 +15,7 @@ afterEach(() => {
 
 describe("Help ▸ Report a Problem…", () => {
   it("prefills only the Lattice version, the macOS version and the architecture", () => {
-    const url = new URL(newIssueUrl({ osVersion: "15.1", arch: "aarch64" }, "0.16.1"));
+    const url = new URL(newIssueUrl({ osName: "macOS", osVersion: "15.1", arch: "aarch64" }, "0.16.1"));
     expect(url.origin + url.pathname).toBe("https://github.com/lattice-writer/lattice/issues/new");
     expect(Object.fromEntries(url.searchParams)).toEqual({
       template: "bug_report.yml",
@@ -24,9 +24,17 @@ describe("Help ▸ Report a Problem…", () => {
     });
   });
 
+  it("names the operating system the report came from, and leaves out a version it does not know", () => {
+    const osField = (osName: string, osVersion: string | null) =>
+      new URL(newIssueUrl({ osName, osVersion, arch: "x86_64" }, "0.16.1")).searchParams.get("macos-version");
+    expect(osField("Windows", null)).toBe("Windows (x86_64)");
+    expect(osField("Linux", null)).toBe("Linux (x86_64)");
+    expect(osField("macOS", null)).toBe("macOS (x86_64)");
+  });
+
   it("saves the redacted export Settings › Logs makes, then opens the issue without any log text", async () => {
     addAppLog({ level: "error", source: "Build", title: "Build failed", detail: "Undefined control sequence in /Users/me/secret-paper.tex", toast: false });
-    tauri.invoke.mockResolvedValue({ osVersion: "15.1", arch: "aarch64" });
+    tauri.invoke.mockResolvedValue({ osName: "macOS", osVersion: "15.1", arch: "aarch64" });
     await reportProblem();
 
     const [command, args] = tauri.invoke.mock.calls[0] as [string, { contents: string }];
@@ -47,7 +55,7 @@ describe("Help ▸ Report a Problem…", () => {
 
   it("names Finder only on a Mac when it says where the saved log is", async () => {
     const userAgent = vi.spyOn(navigator, "userAgent", "get");
-    tauri.invoke.mockResolvedValue({ osVersion: "15.1", arch: "aarch64" });
+    tauri.invoke.mockResolvedValue({ osName: "macOS", osVersion: "15.1", arch: "aarch64" });
     const savedDetail = async (agent: string) => {
       userAgent.mockReturnValue(agent);
       clearAppLogs();

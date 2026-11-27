@@ -51,17 +51,25 @@ pub fn collect(log_root: &Path, data_root: &Path, home: Option<&Path>) -> Diagno
     }
 }
 
-/// What a problem report's new-issue page names: the Mac it came from.
+/// What a problem report's new-issue page names: the computer it came from.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProblemReport {
-    /// The macOS version (`15.1`), or `None` where it is unknown.
+    /// The operating system (`macOS`, `Windows`, `Linux`).
+    os_name: &'static str,
+    /// Its version (`15.1`), or `None` where it is unknown.
     os_version: Option<String>,
     arch: String,
 }
 
 impl ProblemReport {
-    /// The macOS version (`15.1`), where it is known.
+    /// The operating system (`macOS`, `Windows`, `Linux`).
+    pub fn os_name(&self) -> &'static str {
+        self.os_name
+    }
+
+    /// Its version (`15.1`), where it is known: only `sw_vers` is asked, so
+    /// Windows and Linux leave it for the reporter to fill in.
     pub fn os_version(&self) -> Option<&str> {
         self.os_version.as_deref()
     }
@@ -84,8 +92,24 @@ pub fn save_problem_report(
         return Err("The diagnostic log is too large to save.".to_string());
     }
     let path = write_report(folder, &redact(contents, home), chrono::Local::now())?;
-    Ok((path, ProblemReport { os_version: os_version(), arch: std::env::consts::ARCH.to_string() }))
+    Ok((
+        path,
+        ProblemReport {
+            os_name: OS_NAME,
+            os_version: os_version(),
+            arch: std::env::consts::ARCH.to_string(),
+        },
+    ))
 }
+
+/// The name the bug report form shows for this build's operating system.
+const OS_NAME: &str = if cfg!(target_os = "macos") {
+    "macOS"
+} else if cfg!(target_os = "windows") {
+    "Windows"
+} else {
+    "Linux"
+};
 
 fn write_report(
     folder: &Path, contents: &str, now: chrono::DateTime<chrono::Local>,
@@ -237,6 +261,20 @@ pub(crate) mod tests {
         let name = path.file_name().unwrap().to_str().unwrap().to_string();
         assert_eq!(name, format!("lattice-diagnostics-{}.json", now.format("%Y-%m-%d-%H%M%S")));
         assert_eq!(std::fs::read_to_string(&path).unwrap(), "{}");
+    }
+
+    #[test]
+    fn a_problem_report_names_the_operating_system_it_ran_on() {
+        let expected = match std::env::consts::OS {
+            "macos" => "macOS",
+            "windows" => "Windows",
+            _ => "Linux",
+        };
+        let report = ProblemReport { os_name: OS_NAME, os_version: None, arch: "x86_64".into() };
+        assert_eq!(
+            serde_json::to_value(&report).unwrap(),
+            serde_json::json!({ "osName": expected, "osVersion": null, "arch": "x86_64" })
+        );
     }
 
     #[cfg(target_os = "macos")]

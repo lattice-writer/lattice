@@ -1,7 +1,7 @@
 // Help ▸ Report a Problem… (and the palette's "Report a problem"): save the
 // log export Settings › Logs › Export makes by default — redacted, operation
 // metadata and counts only — show it in the file manager, and open a new bug report
-// with the Lattice and macOS versions filled in.
+// with the Lattice and operating system versions filled in.
 //
 // The issue page is public and its address travels through the browser's
 // history, so the address carries the versions and the architecture and
@@ -31,14 +31,19 @@ const ATTACH_SAVED_LOG: Record<HostPlatform, MessageDescriptor> = {
 };
 
 /** What `save_problem_report` (diagnostic_logs.rs) answers. */
-type ProblemReport = { osVersion: string | null; arch: string };
+type ProblemReport = { osName: string; osVersion: string | null; arch: string };
 
-/** The bug report form, with its version fields (`.github/ISSUE_TEMPLATE/bug_report.yml`) filled in. */
+/**
+ * The bug report form, with its version fields (`.github/ISSUE_TEMPLATE/bug_report.yml`) filled in.
+ * The operating system field keeps its `macos-version` id from when Lattice ran only on a Mac, so
+ * the links older releases open still fill it in.
+ */
 export function newIssueUrl(report: ProblemReport, latticeVersion = version): string {
   const url = new URL("https://github.com/lattice-writer/lattice/issues/new");
   url.searchParams.set("template", "bug_report.yml");
   url.searchParams.set("lattice-version", latticeVersion);
-  url.searchParams.set("macos-version", `macOS ${report.osVersion ?? "unknown"} (${report.arch})`);
+  const os = report.osVersion ? `${report.osName} ${report.osVersion}` : report.osName;
+  url.searchParams.set("macos-version", `${os} (${report.arch})`);
   return url.toString();
 }
 
