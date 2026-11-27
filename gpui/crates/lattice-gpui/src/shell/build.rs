@@ -92,9 +92,12 @@ impl Shell {
             self.settle_builds(cx);
             return;
         }
-        // The last build stalled on these very inputs: only an ask, or a
-        // change, builds them again (`build::stall`).
-        if request.unattended && self.build_held(project.read(cx).input_revision()) {
+        // The last build stalled on these very inputs, or was stopped on
+        // them: only an ask, or a change, builds them again (`build::stall`).
+        // Not Typst's live preview, which compiles unsaved buffers: typing
+        // moves no input, so it would stay frozen until a save.
+        if request.unattended && !request.live && self.build_held(project.read(cx).input_revision())
+        {
             self.settle_builds(cx);
             return;
         }
@@ -473,7 +476,7 @@ impl Shell {
                     }
                     panel.finished(&result, wrote_pdf, request.requested, sources, cx)
                 });
-                self.build_pass_finished(&result, revision, cx);
+                self.build_pass_finished(&result, revision, request.live, cx);
                 project.update(cx, |project, cx| {
                     // A build may adopt the open document or switch the
                     // engine, which it writes to the manifest.

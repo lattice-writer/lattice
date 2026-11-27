@@ -1,8 +1,10 @@
 //! The stalled-build hold, as the Tauri app's `stalled-build.ts` keeps it.
 //!
 //! A build stopped because TeX made no progress (`build-stalled`) would only
-//! stall again on the same inputs, so automatic builds wait for any input to
-//! change: a save, or the Agent, Overleaf or another editor through the
+//! stall again on the same inputs, and so would one the writer stopped
+//! (`build-cancelled`): an automatic build that started after Stop, from a
+//! report of the same edit, ran the looping document again until the stall
+//! limit. So automatic builds wait for any input to change: a save, or the Agent, Overleaf or another editor through the
 //! watcher, in whichever file. Keyed on the project's input revision, which
 //! moves on each of those and on a project switch, not on the open file's
 //! text. Build still runs on request.
@@ -15,12 +17,12 @@ pub(crate) struct StallHold {
 }
 
 impl StallHold {
-    /// Remember the input revision a finished build stalled on, or forget it
-    /// after any other result.
+    /// Remember the input revision a finished build stalled on or was stopped
+    /// on, or forget it after any other result.
     pub(crate) fn note(&mut self, diagnostics: &[Diagnostic], revision: u64) {
         self.stalled_on = diagnostics
             .iter()
-            .any(|diagnostic| diagnostic.code == Some("build-stalled"))
+            .any(|diagnostic| matches!(diagnostic.code, Some("build-stalled" | "build-cancelled")))
             .then_some(revision);
     }
 
@@ -60,5 +62,13 @@ mod tests {
         assert!(!hold.holds(5));
         hold.note(&[coded(None)], 5);
         assert!(!hold.holds(4));
+    }
+
+    #[test]
+    fn a_stop_holds_automatic_builds_until_an_input_changes() {
+        let mut hold = StallHold::default();
+        hold.note(&[coded(Some("build-cancelled"))], 7);
+        assert!(hold.holds(7));
+        assert!(!hold.holds(8));
     }
 }

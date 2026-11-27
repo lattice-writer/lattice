@@ -192,11 +192,17 @@ impl Shell {
         &mut self,
         result: &BuildResult,
         revision: u64,
+        live: bool,
         cx: &mut Context<Self>,
     ) {
         self.note_repair_writable(cx);
         let watch = self.build_watch();
-        watch.stall.note(&result.diagnostics, revision);
+        // Typst's live preview builds the unsaved buffers at the same input
+        // revision, so its result says nothing about a stopped or stalled
+        // build of the saved inputs and must not release their hold.
+        if !live {
+            watch.stall.note(&result.diagnostics, revision);
+        }
         watch.watched.pass_wrote(&result.outputs);
         // Unlinked projects never get surprise versions in a repository
         // kept by hand.
