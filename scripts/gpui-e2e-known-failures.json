@@ -1337,38 +1337,6 @@
       "followup": "LEO-129"
     },
     {
-      "step": "Restore Round 1 asks first (no Overleaf wording when not linked), then writes the round's text, closes the sheet and reloads the open editor",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"loaded\":true,\"asked\":\"Restore the files the rounds touched to Round 1?\",\"accepted\":true,\"written\":false,\"reloaded\":false}",
-      "followup": "LEO-129"
-    },
-    {
-      "step": "restoring Round 1 again says the files already read as Round 1, keeps the sheet and writes nothing",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"loaded\":true,\"accepted\":true,\"error\":\"Save pending edits before restoring a round.\",\"still_open\":true,\"unchanged\":true}",
-      "followup": "LEO-129"
-    },
-    {
-      "step": "Restore Before revisions asks first, then puts the text before the rounds back on disk and in the editor",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"asked\":\"Restore the files the rounds touched to Before revisions?\",\"accepted\":true,\"back\":false}",
-      "followup": "LEO-129"
-    },
-    {
-      "step": "the agent's question waits on the note; the answer from its field asks again and clears it; ⌘↵ with every edit kept does nothing, and ⌫ rejects the proposal",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"asked\":false,\"field\":false,\"sent\":false,\"answered\":false,\"cleared\":true,\"reviewing\":false,\"held\":false,\"rejected\":false,\"untouched\":true}",
-      "followup": "LEO-129"
-    },
-    {
       "step": "Accept at the caret moves the change into the base, written to disk a moment later; ⌘Z takes the accept back and leaves the text",
       "platforms": [
         "linux"
@@ -1377,27 +1345,11 @@
       "followup": "LEO-129"
     },
     {
-      "step": "the stack keeps four notices, the newest in front, and lets the oldest go",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"titles\":[\"Stack check 3\",\"short-note.tex is no longer on disk\",\"Stack check 4\",\"Stack check 5\"]}",
-      "followup": "LEO-129"
-    },
-    {
       "step": "swiping a card to the right past 40px dismisses it with its exit",
       "platforms": [
         "linux"
       ],
       "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"front\":\"Stack check 5\",\"leaving\":false,\"titles\":[\"Stack check 4\",\"Stack check 5\"]}",
-      "followup": "LEO-129"
-    },
-    {
-      "step": "the word count popover, closed with Escape, plays its way out",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"exit_frames\":0}",
       "followup": "LEO-129"
     },
     {
@@ -1410,38 +1362,6 @@
     },
     {
       "step": "Escape closes the table generator and the keyboard goes back to the document",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"still_open\":true,\"document_focused\":true}",
-      "followup": "LEO-129"
-    },
-    {
-      "step": "Escape closes Open from Overleaf and the keyboard goes back to the document",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"still_open\":true,\"document_focused\":false}",
-      "followup": "LEO-129"
-    },
-    {
-      "step": "Escape closes the arXiv export and the keyboard goes back to the document",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"still_open\":true,\"document_focused\":true}",
-      "followup": "LEO-129"
-    },
-    {
-      "step": "Escape closes the TeX doctor and the keyboard goes back to the document",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"still_open\":true,\"document_focused\":true}",
-      "followup": "LEO-129"
-    },
-    {
-      "step": "Escape closes a plugin's confirmation and the keyboard goes back to the document",
       "platforms": [
         "linux"
       ],
@@ -1584,14 +1504,6 @@
         "linux"
       ],
       "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"alone\":648,\"beside\":349}",
-      "followup": "LEO-129"
-    },
-    {
-      "step": "Escape closes Settings",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {}",
       "followup": "LEO-129"
     },
     {
