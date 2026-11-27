@@ -111,6 +111,7 @@ pub struct AnnotationRounds {
 impl EventEmitter<RoundsEvent> for AnnotationRounds {}
 
 mod agent_tools;
+mod prompt_context;
 mod queries;
 mod review;
 
@@ -482,23 +483,6 @@ impl AnnotationRounds {
         self.record(root, id, revision, |_| {}, cx);
     }
 
-    /// The project's citation keys and titles, for the "Add a citation"
-    /// intent's prompt.
-    fn citations(root: &Path) -> Vec<revision::Citation> {
-        project::citations(root)
-            .map(|index| {
-                index
-                    .citations
-                    .into_iter()
-                    .map(|citation| revision::Citation {
-                        key: citation.key,
-                        title: Some(citation.title).filter(|title| !title.is_empty()),
-                    })
-                    .collect()
-            })
-            .unwrap_or_default()
-    }
-
     /// Ask the agent about one annotation in its round.
     fn ask(&mut self, job: Job, cx: &mut Context<Self>) -> Task<()> {
         let Job {
@@ -578,7 +562,7 @@ impl AnnotationRounds {
             let citations = if cites {
                 let project = root.clone();
                 Some(
-                    cx.background_spawn(async move { Self::citations(&project) })
+                    cx.background_spawn(async move { prompt_context::citations(&project) })
                         .await,
                 )
             } else {
