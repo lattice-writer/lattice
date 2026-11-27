@@ -64,6 +64,25 @@ impl Run {
             .and_then(|item| item.text())
     }
 
+    /// The app log's newest entry, to tell the entries logged after it.
+    fn newest_log_id(&self, cx: &mut AsyncApp) -> Option<String> {
+        cx.update(|cx| crate::app_log::global(cx).read(cx).entries().first().map(|entry| entry.id.clone()))
+    }
+
+    /// The titles the app log took after the entry `since`, newest first: a
+    /// notice's own entry, which outlives a card whose clock has run out.
+    fn logged_since(&self, since: Option<&str>, cx: &mut AsyncApp) -> Vec<String> {
+        cx.update(|cx| {
+            crate::app_log::global(cx)
+                .read(cx)
+                .entries()
+                .iter()
+                .take_while(|entry| Some(entry.id.as_str()) != since)
+                .map(|entry| entry.title.clone())
+                .collect()
+        })
+    }
+
     fn notice_titles(&self, cx: &mut AsyncApp) -> Vec<String> {
         let notices = cx.update(crate::notices::install);
         cx.update(|cx| {
@@ -135,6 +154,7 @@ impl Run {
                 );
                 return Ok(());
             };
+            let before = self.newest_log_id(cx);
             self.click_at(cx, at)?;
             let done = self
                 .wait_for(cx, Duration::from_secs(10), |_, cx| {
@@ -145,11 +165,15 @@ impl Run {
                 QuoteAction::Copy => {
                     let copied = self.clipboard_text(cx);
                     let titles = self.notice_titles(cx);
+                    // The notice's card shows for 1.8 s (notices::copied): a
+                    // slow runner can read the stack after it went (LEO-103),
+                    // so its entry in the app's log counts as well.
+                    let logged = self.logged_since(before.as_deref(), cx);
                     steps.check(
                         "the PDF's Copy source link copies the PDF at the passage's page, its words as the title",
                         done && copied.as_deref() == Some(expected_link.as_str())
-                            && titles.iter().any(|title| title == "Source link copied"),
-                        json!({ "copied": copied, "expected": expected_link, "notices": titles }),
+                            && titles.iter().chain(&logged).any(|title| title == "Source link copied"),
+                        json!({ "copied": copied, "expected": expected_link, "notices": titles, "logged": logged }),
                     );
                 }
                 QuoteAction::Note => {
