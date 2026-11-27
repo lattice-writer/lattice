@@ -316,6 +316,8 @@ jobs:
       # is restored until main saves the new one; a restored tree that no
       # longer runs falls back to a fresh install. v2 is the first to hold
       # MiKTeX's registry keys and the Computer Modern Type 1 fonts (below).
+      # LATA-112, dispatch-only: Windows clippy for lattice#1392's head.
+      - run: cargo clippy --release --locked --workspace --all-targets -- -D warnings
       - name: Restore MiKTeX
         id: miktex-cache
         uses: actions/cache/restore@v5
@@ -416,8 +418,6 @@ jobs:
           "save=$((-not $restored) -or $added -or $older)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
       # Not in a dispatch that names its e2e modules: it was started to see
       # those, and the unit tests run in ci.yml.
-      # LATA-112, dispatch-only: Windows clippy for lattice#1392's head.
-      - run: cargo clippy --release --locked --workspace --all-targets -- -D warnings
       - if: inputs.only == ''
         run: cargo test --release --locked --workspace -- --include-ignored
       # gpui-webview's own tests (the vendored crate is not a workspace
