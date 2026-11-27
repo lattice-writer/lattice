@@ -269,10 +269,11 @@ impl Run {
             })
             .unwrap_or_default();
         // The sheet takes the live PDF's review source once, when it opens,
-        // and places nothing without one: the view needs review-other.pdf
-        // loaded and the project's notes. A sheet opened before both arrive
-        // never places, which is what v0.20.2's hosted runs showed on macOS
-        // and Linux (before: null, elsewhere: []).
+        // and places nothing without one. live_document() names
+        // review-other.tex before the view has loaded review-other.pdf, and a
+        // sheet opened during that load never places: v0.20.2's GPUI tag run
+        // showed it on macOS and Linux (before: null, elsewhere: []). The
+        // Annotations panel's button waits for the same source (can_review).
         let view = cx.update(|cx| self.shell.read(cx).pdf().read(cx).live_view().clone());
         let source = self
             .wait_for(cx, Duration::from_secs(20), |_, cx| {
