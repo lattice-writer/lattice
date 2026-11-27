@@ -1353,22 +1353,6 @@
       "followup": "LEO-129"
     },
     {
-      "step": "Escape closes Settings and the keyboard goes back to the document",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"still_open\":true,\"document_focused\":false}",
-      "followup": "LEO-129"
-    },
-    {
-      "step": "Escape closes the table generator and the keyboard goes back to the document",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"still_open\":true,\"document_focused\":true}",
-      "followup": "LEO-129"
-    },
-    {
       "step": "a broken build reports the error at its file and line",
       "platforms": [
         "linux"
