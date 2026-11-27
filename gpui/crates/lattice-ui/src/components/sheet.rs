@@ -23,7 +23,12 @@
 //! with its surface: the dialog scrim behind a sheet, the lighter
 //! `--scrim-surface` behind a drawer.
 
-use std::{cell::RefCell, collections::HashMap, rc::Rc, time::Instant};
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    rc::Rc,
+    time::{Duration, Instant},
+};
 
 use gpui::{
     AnimationExt as _, AnyElement, App, ElementId, FocusHandle, Hsla, InteractiveElement as _,
@@ -41,6 +46,11 @@ use crate::{
 };
 
 type CloseHandler = Rc<dyn Fn(&mut Window, &mut App)>;
+
+/// How often a close whose exit drew no frame looks again for one, and how
+/// long it waits before taking the layer as gone (see [`ModalLayer::leave`]).
+const FRAME_POLL: Duration = Duration::from_millis(16);
+const LATE_FRAME: Duration = Duration::from_secs(2);
 
 /// The edge every sheet and drawer section keeps (`--drawer-content-inset`).
 pub const DRAWER_INSET: Pixels = px(14.);
@@ -454,23 +464,55 @@ impl ModalLayer {
                 cx.background_executor()
                     .timer(Exit::DIALOG.duration())
                     .await;
-                cx.update(|window, cx| {
-                    let answer = CLOSING.with(|closing| {
-                        let mut closing = closing.borrow_mut();
-                        let ours = closing
-                            .get(&key)
-                            .is_some_and(|leaving| leaving.started == started);
-                        ours && closing
-                            .remove(&key)
-                            .and_then(|leaving| leaving.drawn)
-                            .is_some_and(|drawn| drawn.upgrade().is_some())
-                    });
-                    if answer {
-                        then(window, cx);
-                        window.refresh();
+                // A slow renderer (lavapipe under Xvfb, a loaded machine) can
+                // let the whole exit pass without drawing a frame, so the
+                // layer has not yet said whether it still draws under its id.
+                // Its answer waits for that frame, up to LATE_FRAME, rather
+                // than being dropped and leaving the layer stuck open.
+                let mut then = Some(then);
+                let mut waited = Duration::ZERO;
+                loop {
+                    let pending = cx
+                        .update(|window, cx| {
+                            let answer = CLOSING.with(|closing| {
+                                let mut closing = closing.borrow_mut();
+                                let Some(leaving) = closing.get(&key) else {
+                                    return Some(false);
+                                };
+                                if leaving.started != started {
+                                    return Some(false);
+                                }
+                                if leaving.drawn.is_none() && waited < LATE_FRAME {
+                                    return None;
+                                }
+                                Some(
+                                    closing
+                                        .remove(&key)
+                                        .and_then(|leaving| leaving.drawn)
+                                        .is_some_and(|drawn| drawn.upgrade().is_some()),
+                                )
+                            });
+                            match answer {
+                                None => {
+                                    window.refresh();
+                                    true
+                                }
+                                Some(answer) => {
+                                    if answer && let Some(then) = then.take() {
+                                        then(window, cx);
+                                        window.refresh();
+                                    }
+                                    false
+                                }
+                            }
+                        })
+                        .unwrap_or(false);
+                    if !pending {
+                        break;
                     }
-                })
-                .ok();
+                    cx.background_executor().timer(FRAME_POLL).await;
+                    waited += FRAME_POLL;
+                }
             })
             .detach();
     }
