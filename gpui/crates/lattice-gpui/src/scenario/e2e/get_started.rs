@@ -187,6 +187,11 @@ impl Run {
             (shell.building(), shell.terminal.read(cx).running(None, cx))
         };
         let (fixture_building, commands) = cx.update(|cx| running(&self.shell, cx));
+        let asking = |cx: &mut gpui::App| {
+            let host = crate::confirm::install(cx).read(cx);
+            host.question().map(|title| (title, host.question_body()))
+        };
+        let asked_before = cx.update(asking);
         let fixture_settled = self
             .wait_for(cx, Duration::from_secs(60), |shell, cx| {
                 let (building, commands) = running(shell, cx);
@@ -205,12 +210,17 @@ impl Run {
                     && shell.view_on_screen("start", cx)
             })
             .await;
-        let asked = cx.update(|cx| crate::confirm::is_pending(cx));
+        let asked = cx.update(asking);
         steps_run.check(
             "opening the tutorial shows the checklist with the sample",
             fixture_settled && tutorial,
             json!({
-                "before": { "building": fixture_building, "commands": commands, "settled": fixture_settled },
+                "before": {
+                    "building": fixture_building,
+                    "commands": commands,
+                    "settled": fixture_settled,
+                    "question": asked_before,
+                },
                 "question_left_open": asked,
             }),
         );
