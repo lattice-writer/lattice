@@ -848,14 +848,6 @@
       "followup": "LEO-15"
     },
     {
-      "step": "a .bib file's Preview lists its references and brings one to the front with its fields",
-      "platforms": [
-        "windows"
-      ],
-      "reason": "Windows: failed in 1 of 2 main runs (44162980527), so intermittent; observed {\"listed\":true,\"front\":\"knuth1984\",\"fields\":[[\"title\",\"The TeXbook\"],[\"author\",\"Knuth, Donald E.\"],[\"publisher\",\"Addison-Wesley\"],[\"volume\",\"A\"],[\"pages\",\"1--483\"],[\"doi\",\"10.5555/1102013\"],[\"year\",\"1984\"]]}",
-      "followup": "LEO-15"
-    },
-    {
       "step": "in focus mode Escape in the PDF first clears its selection, then leaves focus mode",
       "platforms": [
         "windows",

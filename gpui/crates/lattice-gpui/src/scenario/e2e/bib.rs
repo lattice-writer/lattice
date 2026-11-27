@@ -277,6 +277,9 @@ impl Run {
         let front = cx.update(|cx| bib.read(cx).selected_key().map(str::to_string));
         // The form's boxes hold the entry as the fixture writes it.
         let fields = cx.update(|cx| bib.read(cx).form_fields(cx));
+        // The fixture's own fields; papers' audit runs earlier on the same
+        // fixture and its applied fix fills in the entry's volume, pages and
+        // DOI, so the form may show those too.
         let expected: Vec<(String, String)> = [
             ("title", "The TeXbook"),
             ("author", "Knuth, Donald E."),
@@ -288,7 +291,9 @@ impl Run {
         .collect();
         steps.check(
             "a .bib file's Preview lists its references and brings one to the front with its fields",
-            listed && front.as_deref() == Some("knuth1984") && fields == expected,
+            listed
+                && front.as_deref() == Some("knuth1984")
+                && expected.iter().all(|field| fields.contains(field)),
             json!({ "listed": listed, "front": front, "fields": fields }),
         );
         self.papers_shot(cx, "bib-1-preview").await;
