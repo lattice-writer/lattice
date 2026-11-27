@@ -1306,30 +1306,6 @@
       "followup": "LEO-129"
     },
     {
-      "step": "an unsaved edit to a .typ compiles live, and its error is reported at its file and line",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"ms\":3848,\"unsaved\":false,\"error\":\"unknown variable: nonexistent-call\\nhint: if you meant to use subtraction, try adding spaces around the minus sign: `nonexistent - call`\"}",
-      "followup": "LEO-129"
-    },
-    {
-      "step": "Typst: Jump to PDF from an included file's line marks it in the PDF, compiled from unsaved text",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"included\":true,\"settled\":true,\"mark\":2,\"pages\":0}",
-      "followup": "LEO-129"
-    },
-    {
-      "step": "Typst: a double-click in the PDF puts the cursor on its line in the included file",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"at\":null,\"row\":2}",
-      "followup": "LEO-129"
-    },
-    {
       "step": "a double click on a floating panel's strip reaches the float, not the docked strip beneath it",
       "platforms": [
         "linux"
@@ -1433,6 +1409,15 @@
       "tier": "flaky",
       "reason": "macOS: counted 2 live probes in its 8 s window ({\"live\":2,\"dropped\":true,\"hidden\":0,\"settled_ms\":7001}) in Mac mini local runs of #1323's and #1325's branches and of capy/overleaf-clock-skew (main b0ad7e14a plus lattice-core clock stamps, no GPUI poll change); passed on the rerun of the same code on #1323 and #1325 and in every #1315 and #1322 run",
       "followup": "LEO-14"
+    },
+    {
+      "step": "Stop ends a build that loops, which then reports nothing but that it stopped",
+      "platforms": [
+        "linux"
+      ],
+      "tier": "flaky",
+      "reason": "Linux: failed twice (its module rerun) in run 46057841857 at main 2afd622ac and passed in run 46062116036 on the same GPUI and lattice-core sources plus logging; observed {\"started\":true,\"stopped\":false,\"no_outcome\":true,\"cancelled\":true}, no build settled within 180 s of Stop",
+      "followup": "LEO-129"
     }
   ]
 }
