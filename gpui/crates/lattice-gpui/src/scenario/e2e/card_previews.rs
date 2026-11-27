@@ -305,38 +305,38 @@ impl Run {
             );
         }
         if katex {
-        // Set as a card would, timed cold (the page loads) and again (kept).
-        let started = Instant::now();
-        let mut picture = None;
-        self.wait_for(cx, Duration::from_secs(15), |_, cx| {
-            let wanted = request(area, &macros, cx);
-            match previews::math(&wanted, &editor, cx) {
-                Some(Preview::Ready(found)) => {
-                    picture = Some(found);
-                    true
+            // Set as a card would, timed cold (the page loads) and again (kept).
+            let started = Instant::now();
+            let mut picture = None;
+            self.wait_for(cx, Duration::from_secs(15), |_, cx| {
+                let wanted = request(area, &macros, cx);
+                match previews::math(&wanted, &editor, cx) {
+                    Some(Preview::Ready(found)) => {
+                        picture = Some(found);
+                        true
+                    }
+                    _ => false,
                 }
-                _ => false,
-            }
-        })
-        .await;
-        let first = started.elapsed();
-        let started = Instant::now();
-        let kept = cx.update(|cx| {
-            let wanted = request(area, &macros, cx);
-            matches!(
-                previews::math(&wanted, &editor, cx),
-                Some(Preview::Ready(Some(_)))
-            )
-        });
-        let again = started.elapsed();
-        let picture = picture.flatten();
-        let ink = picture
-            .as_ref()
-            .map_or(0., |picture| inked_share(&picture.image));
-        let size = picture
-            .as_ref()
-            .map(|picture| [f32::from(picture.width), f32::from(picture.height)]);
-        steps.check(
+            })
+            .await;
+            let first = started.elapsed();
+            let started = Instant::now();
+            let kept = cx.update(|cx| {
+                let wanted = request(area, &macros, cx);
+                matches!(
+                    previews::math(&wanted, &editor, cx),
+                    Some(Preview::Ready(Some(_)))
+                )
+            });
+            let again = started.elapsed();
+            let picture = picture.flatten();
+            let ink = picture
+                .as_ref()
+                .map_or(0., |picture| inked_share(&picture.image));
+            let size = picture
+                .as_ref()
+                .map(|picture| [f32::from(picture.width), f32::from(picture.height)]);
+            steps.check(
             "KaTeX sets an equation with the project's macros, as a picture with ink, kept once set",
             picture.is_some() && kept && ink > 0.01 && size.is_some_and(|[w, h]| w > h && h > 10.),
             json!({ "first_ms": first.as_millis(), "kept_us": again.as_micros(), "ink": ink, "size": size }),
@@ -370,30 +370,32 @@ impl Run {
             )
             .await;
         if katex {
-        // In the dark appearance the card's ink is light, and so is the picture's.
-        let mut inks = Vec::new();
-        for appearance in [lattice_ui::Appearance::Light, lattice_ui::Appearance::Dark] {
-            cx.update(|cx| lattice_ui::LatticeTheme::set_appearance(appearance, cx));
-            let mut drawn = None;
-            self.wait_for(cx, Duration::from_secs(5), |_, cx| {
-                let wanted = request(area, &macros, cx);
-                match previews::math(&wanted, &editor, cx) {
-                    Some(Preview::Ready(Some(picture))) => {
-                        drawn = Some((ink_lightness(&picture.image), wanted.color.l));
-                        true
+            // In the dark appearance the card's ink is light, and so is the picture's.
+            let mut inks = Vec::new();
+            for appearance in [lattice_ui::Appearance::Light, lattice_ui::Appearance::Dark] {
+                cx.update(|cx| lattice_ui::LatticeTheme::set_appearance(appearance, cx));
+                let mut drawn = None;
+                self.wait_for(cx, Duration::from_secs(5), |_, cx| {
+                    let wanted = request(area, &macros, cx);
+                    match previews::math(&wanted, &editor, cx) {
+                        Some(Preview::Ready(Some(picture))) => {
+                            drawn = Some((ink_lightness(&picture.image), wanted.color.l));
+                            true
+                        }
+                        _ => false,
                     }
-                    _ => false,
-                }
-            })
-            .await;
-            inks.push(drawn);
-        }
-        cx.update(|cx| lattice_ui::LatticeTheme::set_appearance(lattice_ui::Appearance::Light, cx));
-        let follows = matches!(
-            inks.as_slice(),
-            [Some((light, _)), Some((dark, _))] if *light < 0.35 && *dark > 0.65
-        );
-        steps.check(
+                })
+                .await;
+                inks.push(drawn);
+            }
+            cx.update(|cx| {
+                lattice_ui::LatticeTheme::set_appearance(lattice_ui::Appearance::Light, cx)
+            });
+            let follows = matches!(
+                inks.as_slice(),
+                [Some((light, _)), Some((dark, _))] if *light < 0.35 && *dark > 0.65
+            );
+            steps.check(
             "an equation is set in the card's ink: dark in the light appearance, light in the dark",
             follows,
             json!({ "inks": inks }),
