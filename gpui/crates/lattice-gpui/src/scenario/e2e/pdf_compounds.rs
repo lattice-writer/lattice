@@ -78,7 +78,12 @@ impl Run {
                 modifiers: Modifiers::default(),
                 click_count: 1,
             }))?;
-            self.pause(cx, Duration::from_millis(600)).await;
+            // The copy waits out a double-click, and a busy runner's main
+            // thread runs it later than that (LEO-144: 560 ms on Linux).
+            self.wait_for(cx, Duration::from_secs(5), |_, cx| {
+                cx.read_from_clipboard().and_then(|item| item.text()).as_deref() == Some("\\cmpd{alcohol}")
+            })
+            .await;
             copied = cx.update(|cx| cx.read_from_clipboard().and_then(|item| item.text()));
         }
         steps.check(

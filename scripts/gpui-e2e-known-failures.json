@@ -1705,14 +1705,6 @@
       "followup": "LEO-129"
     },
     {
-      "step": "PDF: resting on a compound's number shows its chemnum key, and a click on the number copies \\cmpd{key}",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed in branch run 45777036795 (gpui.yml full=true at 183f98d51, #1296's head, merged as 41dfb2672) and again in its module rerun, while macOS and Windows passed it in the same run; the step was first reached on Linux there, once chemnum was installed; observed {\"built\":true,\"shown\":true,\"card\":null}",
-      "followup": "LEO-144"
-    },
-    {
       "step": "live mode probes Overleaf every 45 s while the channel carries documents, and not at all from a window off screen",
       "platforms": [
         "macos"
