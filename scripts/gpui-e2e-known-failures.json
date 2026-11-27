@@ -156,10 +156,9 @@
     {
       "step": "the tab_policy module runs to its end",
       "platforms": [
-        "macos",
         "windows"
       ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); an earlier step of the tab_policy module failed, which stops the module | Windows: failed in every main run (44162980527, 44213516921); an earlier step of the tab_policy module failed, which stops the module",
+      "reason": "Windows: failed in every main run (44162980527, 44213516921); an earlier step of the tab_policy module failed, which stops the module",
       "followup": "LEO-14"
     },
     {
