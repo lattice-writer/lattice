@@ -54,10 +54,9 @@
     {
       "step": "a notice's clock holds while the stack is hovered and runs out once the pointer leaves",
       "platforms": [
-        "macos",
-        "linux"
+        "macos"
       ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"held\":true,\"collapsed\":true,\"expired\":false} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"held\":true,\"collapsed\":false,\"expired\":true}",
+      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"held\":true,\"collapsed\":true,\"expired\":false}",
       "followup": "LEO-14"
     },
     {
@@ -183,14 +182,6 @@
         "linux"
       ],
       "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"dialog\":false,\"copied\":true,\"titles\":[\"SVG insertion needs rsvg-convert or ImageMagick. The figure can still be previewed in Lattice.\"],\"details\":[\"\"]} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"dialog\":false,\"copied\":true,\"titles\":[\"SVG insertion needs rsvg-convert or ImageMagick. The figure can still be previewed in Lattice.\",\"short-note.tex is no longer on disk\"],\"details\":[\"\",\"It was deleted or moved outside Lattice. Your unsaved edits are still open: recreate the file, save them else…",
-      "followup": "LEO-14"
-    },
-    {
-      "step": "PDF: a middle press scrolls the pages towards the pointer, and a press stops it",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"started\":true,\"before\":207.22216796875,\"moved\":219.1106719970703,\"stopped\":true,\"at_stop\":219.1106719970703,\"after\":219.1106719970703}",
       "followup": "LEO-14"
     },
     {
@@ -361,14 +352,6 @@
       "followup": "LEO-14"
     },
     {
-      "step": "a wheel over a strip that overflows scrolls its tabs, with no \"Release to focus\" and the camera still",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"at\":[595.5,66],\"scroll_before\":1435,\"scroll_after\":1435,\"scroll_moved\":false,\"release_to_focus\":false,\"framed_before\":null,\"framed_after\":null,\"framed_kept\":true,\"scrolled\":false}",
-      "followup": "LEO-14"
-    },
-    {
       "step": "narrowing the window from 1015px to its least with four documents in a strip: the build chip keeps its mark alone before the strip drops it, and nothing in the titlebar overlaps on the way",
       "platforms": [
         "macos",
@@ -497,28 +480,11 @@
       "followup": "LEO-14"
     },
     {
-      "step": "the PDF dragged to the documents' left edge splits beside them",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"presented\":true,\"frames_drawn_by_window\":\"0/27\",\"dragging\":false,\"from\":[970,66],\"to\":[340.2864074707031,467],\"pdf_panel\":\"panel-pdf\",\"documents_panel\":\"panel-document-5eiipi8\",\"shape\":\"{\\\"root\\\":{\\\"x\\\":[{\\\"y\\\":[[\\\"project\\\",\\\"agent\\\"],[\\\"papers\\\"]],\\\"weights\\\":[620,380]},[\\\"slot\\\"],[\\\"pdf\\\"]],\\\"w…",
-      "followup": "LEO-14"
-    },
-    {
-      "step": "the PDF dragged into the documents' middle becomes their tab",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"presented\":true,\"frames_drawn_by_window\":\"0/27\",\"dragging\":false,\"from\":[970,66],\"to\":[612.496826171875,509.1000061035156],\"joined\":false,\"left_panel_gone\":true}",
-      "followup": "LEO-14"
-    },
-    {
       "step": "Export for arXiv checks the built paper, its .bbl and a clean build of the pack",
       "platforms": [
-        "macos",
-        "linux"
+        "macos"
       ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"rows\":[\"Every figure is included: Ok\",\"The bibliography has no .bbl: Fail\",\"The package does not build alone: Fail\",\"No comments in the source: Ok\",\"Under arXiv’s size limit: Ok\"]} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"rows\":[\"Every figure is included: Ok\",\"The bibliography has no .bbl: Fail\",\"The package does not build alone: Fail\",\"No comments in the source: Ok\",\"Under arXiv’s size limit: Ok\"]}",
+      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"rows\":[\"Every figure is included: Ok\",\"The bibliography has no .bbl: Fail\",\"The package does not build alone: Fail\",\"No comments in the source: Ok\",\"Under arXiv’s size limit: Ok\"]}",
       "followup": "LEO-14"
     },
     {
@@ -1274,14 +1240,6 @@
       "followup": "LEO-129"
     },
     {
-      "step": "Accept at the caret moves the change into the base, written to disk a moment later; ⌘Z takes the accept back and leaves the text",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"accepted\":true,\"saved\":false,\"undone\":true,\"kept\":true}",
-      "followup": "LEO-129"
-    },
-    {
       "step": "swiping a card to the right past 40px dismisses it with its exit",
       "platforms": [
         "linux"
@@ -1306,14 +1264,6 @@
       "followup": "LEO-129"
     },
     {
-      "step": "a double click on a floating panel's strip reaches the float, not the docked strip beneath it",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"float\":\"panel-frykpjq\",\"documents\":\"panel-document-dgdy8jm\",\"at\":[234.55999755859375,60],\"covered\":[\"panel-project\"],\"framed\":null,\"focused\":\"file-v8vq13\"}",
-      "followup": "LEO-129"
-    },
-    {
       "step": "a panel whose last tab closes (a split document, the PDF, the last document) goes at once, with no Empty panel drawn",
       "platforms": [
         "macos",
@@ -1322,22 +1272,6 @@
       ],
       "reason": "macOS: order-dependent on the Mac mini: fails when pdf runs before dock (pnpm ci:local full gate for #1368 at b57fccf45, and script/e2e --only design_calls,manuscripts,pdf,dock on both that branch and a main-equivalent tree at 7e617ea63, each observed {\"split_gone\":true,\"pdf_gone\":false}), while --only dock alone passes on both; tracked under LEO-129 | Windows: failed in main runs 45505984609 (a2d78773a) and 45507027636; observed {\"split_gone\":true,\"pdf_gone\":false} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"documents_closed\":6,\"docs_empty_in_update\":[],\"docs_empty_after_frame\":[],\"split\":\"panel-3csr4kp\",\"split_gone\":true,\"empty_in_update\":[],\"empty_after_frame\":[],\"pdf_gone\":false,\"pdf_empty_in_update\":[],\"pdf_empty_after_frame\":[]}",
       "followup": "LEO-15"
-    },
-    {
-      "step": "Export ZIP writes the checked pack and closes the sheet",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"bytes\":0}",
-      "followup": "LEO-129"
-    },
-    {
-      "step": "a saved or closed editor leaves nothing for a crash to write",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"open\":[\"crash-save-check.txt\"]}",
-      "followup": "LEO-129"
     },
     {
       "step": "a drag of a split's divider after a Finder drag left lights no folder of the tree and no editor",
@@ -1373,14 +1307,6 @@
       ],
       "tier": "flaky",
       "reason": "Linux: passed in branch runs 45483277041 and 45505858441 and failed twice (its module rerun) in branch run 45531114205, all on the same GPUI sources; observed {\"build\":{\"running\":false,\"finished\":true},\"back\":true,\"start_in_layout\":false,\"question_left_open\":true}",
-      "followup": "LEO-129"
-    },
-    {
-      "step": "after the manuscript steps the manifest is as it was and main.tex the live PDF again, with no tab of the manuscript's left",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed twice (its module rerun) in branch run 45603069391, main 979526541's GPUI sources plus the Linux input layer; observed {\"root_pdf_tabs\":[\"figure-check.tex\",\"cite-check.tex\"]}",
       "followup": "LEO-129"
     },
     {
