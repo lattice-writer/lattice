@@ -22,8 +22,13 @@ impl Run {
                 move |_, _, cx| live.update(cx, |view, cx| view.step_zoom(1., cx))
             })?;
         }
-        self.pause(cx, Duration::from_millis(400)).await;
+        // The zoom is laid out in the frames after it, and the runner's
+        // llvmpipe presents at 240–430 ms a frame, so a pause does not mean
+        // they have come: wait for the place to rest in a drawn frame.
+        self.settled(cx, |cx| format!("{:?}", live.read(cx).view_place()))
+            .await;
         let center = cx.update(|cx| live.read(cx).pages_center());
+        let zoomed = cx.update(|cx| live.read(cx).view_place());
         self.with_window(cx, move |_, window, cx| {
             window.dispatch_event(
                 PlatformInput::Scroll(ScrollEvent {
@@ -36,13 +41,37 @@ impl Run {
                 cx,
             );
         })?;
-        // It is kept once it has rested.
-        self.pause(cx, Duration::from_millis(900)).await;
+        let same = |a: &crate::pdf::ViewPlace, b: &crate::pdf::ViewPlace| {
+            a.page == b.page
+                && (a.scale - b.scale).abs() < 0.01
+                && a.top.0 == b.top.0
+                && (a.top.2 - b.top.2).abs() < 2.
+        };
+        let kept_place = || {
+            preferences::get()
+                .places
+                .values()
+                .find_map(|places| places.get("main.tex").copied())
+        };
+        // It is kept once it has rested, 250 ms after its last move. The
+        // wheel's offset is held inside the zoomed pages over the frames
+        // after it, which the runner's llvmpipe presents 240–430 ms apart,
+        // so a place on the way can be kept first and the resting one only
+        // 250 ms after the last of those frames: wait for the kept place to
+        // be where the view rests, not for a time.
+        self.wait_for(cx, Duration::from_secs(3), |_, cx| {
+            let now = live.read(cx).view_place();
+            !same(&now, &zoomed) && kept_place().is_some_and(|kept| same(&kept, &now))
+        })
+        .await;
+        // And that it stays there: between two frames the view can match a
+        // place on its way, which the next frame moves on from.
+        self.settled(cx, |cx| {
+            format!("{:?} {:?}", live.read(cx).view_place(), kept_place())
+        })
+        .await;
         let left = cx.update(|cx| live.read(cx).view_place());
-        let kept = preferences::get()
-            .places
-            .values()
-            .find_map(|places| places.get("main.tex").copied());
+        let kept = kept_place();
 
         let document = root.join("place-check.tex");
         std::fs::write(
@@ -73,12 +102,6 @@ impl Run {
                 .find(|(document, _)| document == "main.tex")
                 .map(|(_, panel)| panel.read(cx).live_view().read(cx).view_place())
         });
-        let same = |a: &crate::pdf::ViewPlace, b: &crate::pdf::ViewPlace| {
-            a.page == b.page
-                && (a.scale - b.scale).abs() < 0.01
-                && a.top.0 == b.top.0
-                && (a.top.2 - b.top.2).abs() < 2.
-        };
         steps.check(
             "PDF: each document's place is kept, and its own tab opens where it was left",
             kept.as_ref().is_some_and(|kept| same(kept, &left))

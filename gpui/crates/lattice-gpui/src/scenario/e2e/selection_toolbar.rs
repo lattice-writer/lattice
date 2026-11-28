@@ -100,9 +100,14 @@ impl Run {
             })
             .await;
         let picker = cx.update(|cx| editor.read(cx).custom_picker());
-        let field = picker
-            .as_ref()
-            .and_then(|picker| cx.update(|cx| picker.read(cx).field_bounds()));
+        // The picker slides in, and its field is pressed where it was last
+        // drawn: the runner's llvmpipe presents at 240–430 ms a frame, so
+        // being laid out once does not mean the entrance has landed. Wait
+        // for the field to rest in a drawn frame.
+        let field = match picker.as_ref() {
+            Some(picker) => self.settled(cx, |cx| picker.read(cx).field_bounds()).await,
+            None => None,
+        };
         self.adapter_shot(cx, "selection-toolbar-custom-colour")
             .await;
         let mut dragged = None;
@@ -236,9 +241,12 @@ impl Run {
                 editor.read(cx).selection_toolbar_areas().len() >= 2
             })
             .await;
-        // A frame for the menu to settle where it lands.
-        self.pause(cx, Duration::from_millis(200)).await;
-        let areas = cx.update(|cx| editor.read(cx).selection_toolbar_areas());
+        // The menu settles where it lands a frame after it opens, and the
+        // runner's llvmpipe presents at 240–430 ms a frame, so a pause does
+        // not mean that frame has come: wait for the areas to rest in two.
+        let areas = self
+            .settled(cx, |cx| editor.read(cx).selection_toolbar_areas())
+            .await;
         let trigger = cx.update(|cx| editor.read(cx).selection_toolbar_trigger());
         let window = self.with_window(cx, |_, window, _| window.viewport_size())?;
         let placed = match areas.as_slice() {
