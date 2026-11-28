@@ -686,22 +686,6 @@
       "followup": "LEO-129"
     },
     {
-      "step": "restoring the project to a version asks first, then puts its files back",
-      "platforms": [
-        "windows"
-      ],
-      "reason": "Windows: failed in every main run (44162980527, 44213516921); observed {\"hash\":\"4aee0a51099327bb17af6c7cc6eec8536e7e4219\"}",
-      "followup": "LEO-15"
-    },
-    {
-      "step": "after a restore the open file reloads with its landed line washed, and the paper builds",
-      "platforms": [
-        "windows"
-      ],
-      "reason": "Windows: failed in every main run (44162980527, 44213516921); observed {\"reloaded\":false,\"washed\":[],\"built\":true}",
-      "followup": "LEO-15"
-    },
-    {
       "step": "the paper reads in the visual editor's Preview, its page drawn",
       "platforms": [
         "windows"
