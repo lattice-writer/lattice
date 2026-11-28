@@ -35,10 +35,9 @@
     {
       "step": "a click on a menu item over another tree row runs the item alone: the path is copied, the menu closes, and no file opens",
       "platforms": [
-        "macos",
-        "windows"
+        "macos"
       ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"menu_on\":\"main.tex\",\"row_under_item\":\"menu-check-7.tex\",\"clipboard\":\"/Users/runner/work/_temp/e2e-project/main.tex\",\"closed\":true,\"documents\":[[[\"main.tex\",\"find-check.txt\"],\"find-check.txt\"],[[\"main.tex\"],null]],\"tree… | Windows: failed in every main run (44162980527, 44213516921); observed {\"menu_on\":\"main.tex\",\"row_under_item\":\"menu-check-7.tex\",\"clipboard\":\"\\\\\\\\?\\\\D:\\\\a\\\\_temp\\\\e2e-project\\\\main.tex\",\"closed\":true,\"documents\":[[[\"main.tex\",\"find-check.txt\"],\"find-check.txt\"],[[\"main.tex\"],null]],\"tree_li…",
+      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"menu_on\":\"main.tex\",\"row_under_item\":\"menu-check-7.tex\",\"clipboard\":\"/Users/runner/work/_temp/e2e-project/main.tex\",\"closed\":true,\"documents\":[[[\"main.tex\",\"find-check.txt\"],\"find-check.txt\"],[[\"main.tex\"],null]],\"tree…",
       "followup": "LEO-14"
     },
     {
@@ -107,10 +106,9 @@
     {
       "step": "PDF: of a ⌘-double-click and a newer plain double-click, only the newer jump lands",
       "platforms": [
-        "macos",
-        "windows"
+        "macos"
       ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"older\":[4,3],\"newer\":[3,16],\"caret\":[1,1]} | Windows: failed in every main run (44162980527, 44213516921); observed {\"older\":[4,3],\"newer\":[3,16],\"caret\":[1,1]}",
+      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"older\":[4,3],\"newer\":[3,16],\"caret\":[1,1]}",
       "followup": "LEO-14"
     },
     {
@@ -126,37 +124,26 @@
       "step": "PDF: resting on a citation link opens its entry's card after a moment, and leaving it closes the card",
       "platforms": [
         "macos",
-        "windows",
         "linux"
       ],
-      "reason": "macOS: failed in 2 of 3 main runs (44173099111, 44154544765), so intermittent; observed {\"built\":true,\"shown\":true,\"link\":\"Point { x: 806.9747px, y: 192.46867px }\",\"early\":null,\"opened\":null,\"closed\":null} | Windows: failed in main run 44454326816 on the hosted runner; observed {\"built\":true,\"shown\":true,\"link\":\"Point { x: 806.9747px, y: 192.46867px }\",\"early\":null,\"opened\":null,\"closed\":null} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"built\":true,\"shown\":true,\"link\":\"Point { x: 1080.2761px, y: 234.81546px }\",\"early\":null,\"opened\":\"knuth1984\",\"closed\":\"knuth1984\"}",
+      "reason": "macOS: failed in 2 of 3 main runs (44173099111, 44154544765), so intermittent; observed {\"built\":true,\"shown\":true,\"link\":\"Point { x: 806.9747px, y: 192.46867px }\",\"early\":null,\"opened\":null,\"closed\":null} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"built\":true,\"shown\":true,\"link\":\"Point { x: 1080.2761px, y: 234.81546px }\",\"early\":null,\"opened\":\"knuth1984\",\"closed\":\"knuth1984\"}",
       "followup": "LEO-14"
     },
     {
       "step": "PDF: a citation card closes when the pointer leaves the pages from its link, and on Escape without the PDF's focus",
       "platforms": [
         "macos",
-        "windows",
         "linux"
       ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"left_open\":null,\"left_closed\":null,\"escape_open\":null,\"escape_closed\":null} | Windows: failed in 1 of 2 main runs (44162980527), so intermittent; observed {\"left_open\":null,\"left_closed\":null,\"escape_open\":null,\"escape_closed\":null} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"left_open\":null,\"left_closed\":null,\"escape_open\":null,\"escape_closed\":null}",
+      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"left_open\":null,\"left_closed\":null,\"escape_open\":null,\"escape_closed\":null} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"left_open\":null,\"left_closed\":null,\"escape_open\":null,\"escape_closed\":null}",
       "followup": "LEO-14"
     },
     {
       "step": "a batch move that fails part-way still moves the open tab of what went first",
       "platforms": [
-        "macos",
-        "windows"
+        "macos"
       ],
-      "reason": "macOS: failed in 1 of 3 main runs (44173099111), so intermittent; observed {\"moved\":true,\"front\":\"dest/mv-a.tex\",\"notice\":\"the app became active outside a foreground section, after step \\\"switching projects keeps each project's open folders: B'…: the app became active outside a foreground secti… | Windows: failed in 1 of 2 main runs (44213516921), so intermittent; observed {\"moved\":true,\"front\":\"dest/mv-a.tex\",\"notice\":\"Build succeeded in 2.9 s: #4e53eb\"}",
-      "followup": "LEO-14"
-    },
-    {
-      "step": "the tab_policy module runs to its end",
-      "platforms": [
-        "windows"
-      ],
-      "reason": "Windows: failed in every main run (44162980527, 44213516921); an earlier step of the tab_policy module failed, which stops the module",
+      "reason": "macOS: failed in 1 of 3 main runs (44173099111), so intermittent; observed {\"moved\":true,\"front\":\"dest/mv-a.tex\",\"notice\":\"the app became active outside a foreground section, after step \\\"switching projects keeps each project's open folders: B'…: the app became active outside a foreground secti…",
       "followup": "LEO-14"
     },
     {
@@ -205,10 +192,9 @@
       "step": "PDF: two notes on one line stand their pins side by side, each pin opens its own card, a click off the pages closes it, and leaving the pages unlights the note",
       "platforms": [
         "macos",
-        "windows",
         "linux"
       ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"placed\":false,\"pins\":\"(None, None)\",\"beside\":false,\"opens_second\":false,\"opens_first\":false,\"off_closes\":false,\"lit\":false,\"unlit\":false} | Windows: failed once in run 44460622331 attempt 2 of #1148, which does not touch it, and passed in every main run since #1103, so intermittent; observed {\"placed\":false,\"pins\":\"(Some(Point { x: 689.3796px, y: 334.91077px }), None)\",\"beside\":false,\"opens_second\":false,\"opens_first\":false,\"off_closes\":false,\"lit\":false,\"unlit\":false} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"placed\":false,\"pins\":\"(Some(Point { x: 1040.5234px, y: 378.11176px }), None)\",\"beside\":false,\"opens_second\":false,\"opens_first\":false,\"off_closes\":false,\"lit\":false,\"unlit\":false}",
+      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"placed\":false,\"pins\":\"(None, None)\",\"beside\":false,\"opens_second\":false,\"opens_first\":false,\"off_closes\":false,\"lit\":false,\"unlit\":false} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"placed\":false,\"pins\":\"(Some(Point { x: 1040.5234px, y: 378.11176px }), None)\",\"beside\":false,\"opens_second\":false,\"opens_first\":false,\"off_closes\":false,\"lit\":false,\"unlit\":false}",
       "followup": "LEO-14"
     },
     {
@@ -225,30 +211,27 @@
       "step": "PDF: a note closed with Escape leaves, and a press on the pages takes Annotate away",
       "platforms": [
         "macos",
-        "windows",
         "linux"
       ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"offered\":false,\"opened\":false,\"closed\":true,\"again\":false,\"withdrawn\":true} | Windows: failed in every main run (44162980527, 44213516921); observed {\"offered\":true,\"opened\":false,\"closed\":true,\"again\":false,\"withdrawn\":true} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"offered\":false,\"drew\":true,\"opened\":false,\"closed\":true,\"again\":false,\"withdrawn\":true}",
+      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"offered\":false,\"opened\":false,\"closed\":true,\"again\":false,\"withdrawn\":true} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"offered\":false,\"drew\":true,\"opened\":false,\"closed\":true,\"again\":false,\"withdrawn\":true}",
       "followup": "LEO-14"
     },
     {
       "step": "PDF: on a narrow PDF the comment column is folded behind its count, a passage previews its note after a rest, and the opened column's card opens in place on a click and closes on Escape",
       "platforms": [
         "macos",
-        "windows",
         "linux"
       ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"placed\":false,\"folded\":true,\"previewed\":false,\"over\":\"None\",\"slot\":\"None\",\"opened\":false,\"closed\":true} | Windows: failed in every main run (44162980527, 44213516921); observed {\"placed\":false,\"folded\":true,\"previewed\":false,\"over\":\"None\",\"slot\":\"None\",\"opened\":false,\"closed\":true} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"placed\":false,\"folded\":true,\"previewed\":false,\"over\":\"None\",\"slot\":\"None\",\"opened\":false,\"closed\":true}",
+      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"placed\":false,\"folded\":true,\"previewed\":false,\"over\":\"None\",\"slot\":\"None\",\"opened\":false,\"closed\":true} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"placed\":false,\"folded\":true,\"previewed\":false,\"over\":\"None\",\"slot\":\"None\",\"opened\":false,\"closed\":true}",
       "followup": "LEO-14"
     },
     {
       "step": "PDF: a docked comment card keeps its passage lit while the pointer moves on it, and a press on the column's resize grip keeps its open card open",
       "platforms": [
         "macos",
-        "windows",
         "linux"
       ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"docked\":false} | Windows: failed in every main run (44162980527, 44213516921); observed {\"docked\":false} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"docked\":false}",
+      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"docked\":false} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"docked\":false}",
       "followup": "LEO-14"
     },
     {
@@ -264,11 +247,10 @@
     {
       "step": "PDF: Export review PDF places a note on its words as a highlight, ticked, and the copy carries it as a Highlight with its id and number, with the cover note on page 1, leaving the compiled PDF as it was",
       "platforms": [
-        "windows",
         "linux"
       ],
-      "reason": "Windows: failed in every main run (44162980527, 44213516921); observed {\"placed\":true,\"kinds\":[[\"697aa6f7-7c54-4eb3-9080-374fb1c7a628\",\"unplaced\"]],\"ticked\":[],\"closed\":false,\"failure\":null,\"annotations\":[],\"untouched\":true} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"placed\":true,\"kinds\":[[\"2ff01ae2-dd75-4248-aa38-aac4db8620ef\",\"unplaced\"]],\"ticked\":[],\"closed\":false,\"failure\":null,\"annotations\":[],\"untouched\":true}",
-      "followup": "LEO-15"
+      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"placed\":true,\"kinds\":[[\"2ff01ae2-dd75-4248-aa38-aac4db8620ef\",\"unplaced\"]],\"ticked\":[],\"closed\":false,\"failure\":null,\"annotations\":[],\"untouched\":true}",
+      "followup": "LEO-129"
     },
     {
       "step": "in Split, a click moves the keyboard between the source and the page's child frame, one of them focused at a time",
@@ -354,10 +336,9 @@
       "step": "narrowing the window from 1015px to its least with four documents in a strip: the build chip keeps its mark alone before the strip drops it, and nothing in the titlebar overlaps on the way",
       "platforms": [
         "macos",
-        "windows",
         "linux"
       ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"icon_only_at\":null,\"sweep\":[{\"width\":1015,\"build_chip\":null,\"icon_only\":false,\"documents_panel\":[334.558837890625,703.59130859375],\"overlaps\":[],\"outside\":[]},{\"width\":1000,\"build_chip\":null,\"icon_only\":false,\"document… | Windows: failed in every main run (44162980527, 44213516921); observed {\"icon_only_at\":null,\"sweep\":[{\"width\":1015,\"build_chip\":null,\"icon_only\":false,\"documents_panel\":[200.08180236816406,598.5408935546875],\"overlaps\":[],\"outside\":[]},{\"width\":1000,\"build_chip\":null,\"icon_only\":false,\"docu… | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"icon_only_at\":null,\"sweep\":[{\"width\":1015,\"build_chip\":null,\"icon_only\":false,\"documents_panel\":[216.8381805419922,651.3309326171875],\"overlaps\":[],\"outside\":[]},{\"width\":1000,\"build_chip\":null,\"icon_only\":false,\"documents_panel\":[213.75636291503906,641.621826171875],\"overlaps\":[],\"outside\":[]},{\"…",
+      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"icon_only_at\":null,\"sweep\":[{\"width\":1015,\"build_chip\":null,\"icon_only\":false,\"documents_panel\":[334.558837890625,703.59130859375],\"overlaps\":[],\"outside\":[]},{\"width\":1000,\"build_chip\":null,\"icon_only\":false,\"document… | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"icon_only_at\":null,\"sweep\":[{\"width\":1015,\"build_chip\":null,\"icon_only\":false,\"documents_panel\":[216.8381805419922,651.3309326171875],\"overlaps\":[],\"outside\":[]},{\"width\":1000,\"build_chip\":null,\"icon_only\":false,\"documents_panel\":[213.75636291503906,641.621826171875],\"overlaps\":[],\"outside\":[]},{\"…",
       "followup": "LEO-14"
     },
     {
@@ -404,10 +385,9 @@
       "step": "PDF: the pages' scrollbar is the editor's (a 4px thumb 5px off the edge of a 10px track) and hides within 0.8 s once the pages rest",
       "platforms": [
         "macos",
-        "windows",
         "linux"
       ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"bar\":{\"shown\":false,\"thumb\":null,\"track_width\":null,\"gap_to_edge\":null,\"hidden_after_ms\":null},\"frames\":{\"active\":false,\"visibility\":\"Visible\",\"drew\":true}} | Windows: failed in every main run (44162980527, 44213516921); observed {\"bar\":{\"shown\":true,\"thumb\":{\"x\":1003,\"y\":130,\"width\":4,\"height\":39.171852111816406},\"track_width\":10,\"gap_to_edge\":5,\"hidden_after_ms\":1030},\"frames\":{\"active\":true,\"visibility\":\"Visible\",\"drew\":true}} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"bar\":{\"shown\":true,\"thumb\":{\"x\":1419,\"y\":130,\"width\":4,\"height\":76.08332061767578},\"track_width\":10,\"gap_to_edge\":5,\"hidden_after_ms\":3805},\"frames\":{\"active\":true,\"visibility\":\"Visible\",\"drew\":true}}",
+      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"bar\":{\"shown\":false,\"thumb\":null,\"track_width\":null,\"gap_to_edge\":null,\"hidden_after_ms\":null},\"frames\":{\"active\":false,\"visibility\":\"Visible\",\"drew\":true}} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"bar\":{\"shown\":true,\"thumb\":{\"x\":1419,\"y\":130,\"width\":4,\"height\":76.08332061767578},\"track_width\":10,\"gap_to_edge\":5,\"hidden_after_ms\":3805},\"frames\":{\"active\":true,\"visibility\":\"Visible\",\"drew\":true}}",
       "followup": "LEO-14"
     },
     {
@@ -440,10 +420,9 @@
       "step": "PDF: a click on a section link jumps to it, Back returns, and the web link is read",
       "platforms": [
         "macos",
-        "windows",
         "linux"
       ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"links\":0,\"followed\":false,\"back\":false,\"web\":false,\"drawing\":{\"active\":false,\"visibility\":\"Visible\",\"drew\":true,\"pdf_panel\":{\"id\":\"panel-pdf\",\"views\":[\"root-pdf:place-check.tex\",\"pdf\",\"root-pdf:figure-check.tex\",\"root-… | Windows: failed in every main run (44162980527, 44213516921); observed {\"links\":2,\"followed\":false,\"back\":false,\"web\":true,\"drawing\":{\"active\":true,\"visibility\":\"Visible\",\"drew\":true,\"pdf_panel\":{\"id\":\"panel-pdf\",\"views\":[\"root-pdf:place-check.tex\",\"root-pdf:chem-check.tex\",\"root-pdf:main.t… | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"links\":1,\"followed\":false,\"back\":false,\"web\":true,\"drawing\":{\"active\":true,\"visibility\":\"Visible\",\"drew\":true,\"pdf_panel\":{\"id\":\"panel-pdf\",\"views\":[\"root-pdf:place-check.tex\",\"root-pdf:main.tex\",\"pdf\",\"root-pdf:figure-check.tex\",\"root-pdf:cite-check.tex\"],\"selected\":\"pdf\"}},\"frames\":{\"active\":tru…",
+      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"links\":0,\"followed\":false,\"back\":false,\"web\":false,\"drawing\":{\"active\":false,\"visibility\":\"Visible\",\"drew\":true,\"pdf_panel\":{\"id\":\"panel-pdf\",\"views\":[\"root-pdf:place-check.tex\",\"pdf\",\"root-pdf:figure-check.tex\",\"root-… | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"links\":1,\"followed\":false,\"back\":false,\"web\":true,\"drawing\":{\"active\":true,\"visibility\":\"Visible\",\"drew\":true,\"pdf_panel\":{\"id\":\"panel-pdf\",\"views\":[\"root-pdf:place-check.tex\",\"root-pdf:main.tex\",\"pdf\",\"root-pdf:figure-check.tex\",\"root-pdf:cite-check.tex\"],\"selected\":\"pdf\"}},\"frames\":{\"active\":tru…",
       "followup": "LEO-14"
     },
     {
@@ -538,8 +517,7 @@
     {
       "step": "typing in Settings' search finds a setting and Enter reveals its row",
       "platforms": [
-        "macos",
-        "windows"
+        "macos"
       ],
       "reason": "Flaky: one of the 8 steps behind 207 of 274 e2e failures over 265 runs (scripts/gpui-e2e-quarantine.json); it passed in these main runs but fails others at random | macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"results\":[],\"tab\":\"agent\",\"revealed\":null}",
       "followup": "LEO-14"
@@ -553,20 +531,11 @@
       "followup": "LEO-14"
     },
     {
-      "step": "Open in New Window with edits that cannot be saved keeps the window and opens none",
-      "platforms": [
-        "windows"
-      ],
-      "reason": "Windows: failed in 1 of 2 main runs (44213516921), so intermittent; observed {\"announced\":false,\"stayed\":false,\"before\":2,\"after\":2}",
-      "followup": "LEO-14"
-    },
-    {
       "step": "the saves module runs to its end",
       "platforms": [
-        "macos",
-        "windows"
+        "macos"
       ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); an earlier step of the saves module failed, which stops the module | Windows: failed in 1 of 2 main runs (44213516921), so intermittent; an earlier step of the saves module failed, which stops the module",
+      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); an earlier step of the saves module failed, which stops the module",
       "followup": "LEO-14"
     },
     {
@@ -747,11 +716,10 @@
     {
       "step": "PDF: a drag selects text and ⌘C / Ctrl+C copies it",
       "platforms": [
-        "windows",
         "linux"
       ],
-      "reason": "Windows: failed in every main run (44162980527, 44213516921); observed {\"selected\":false,\"clipboard\":\"abcdefghijklmnopqrstuvwxyz0123\",\"frames\":{\"active\":true,\"visibility\":\"Visible\",\"drew\":true}} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"selected\":false,\"clipboard\":\"abcdefghijklmnopqrstuvwxyz0123\",\"frames\":{\"active\":true,\"visibility\":\"Visible\",\"drew\":true}}",
-      "followup": "LEO-15"
+      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"selected\":false,\"clipboard\":\"abcdefghijklmnopqrstuvwxyz0123\",\"frames\":{\"active\":true,\"visibility\":\"Visible\",\"drew\":true}}",
+      "followup": "LEO-129"
     },
     {
       "step": "restoring the project to a version asks first, then puts its files back",
@@ -805,17 +773,15 @@
     {
       "step": "⌘C with several rows selected copies each one's path and says how many",
       "platforms": [
-        "windows",
         "macos"
       ],
-      "reason": "Windows: failed in 1 of 2 main runs (44213516921), so intermittent; observed {\"copied\":\"\\\\\\\\?\\\\D:\\\\a\\\\_temp\\\\e2e-project\\\\main.tex\\n\\\\\\\\?\\\\D:\\\\a\\\\_temp\\\\e2e-project\\\\references.bib\",\"notice\":\"▶ Build: #869781\"} | macOS: passed in every main run but failed in branch run 44226228810, whose GPUI sources equal main's, so intermittent",
+      "reason": "macOS: passed in every main run but failed in branch run 44226228810, whose GPUI sources equal main's, so intermittent",
       "followup": "LEO-14"
     },
     {
       "step": "PDF: Open in separate window shows the PDF in a window of its own at the same page, and Return to workspace brings it back",
       "platforms": [
-        "macos",
-        "windows"
+        "macos"
       ],
       "reason": "Flaky: one of the 8 steps behind 207 of 274 e2e failures over 265 runs (scripts/gpui-e2e-quarantine.json); it passed in these main runs but fails others at random",
       "followup": "LEO-14"
@@ -832,8 +798,7 @@
     {
       "step": "PDF: Build this document on a root tab while a build runs, then Stop: the next build compiles the document in front, not that tab's",
       "platforms": [
-        "macos",
-        "windows"
+        "macos"
       ],
       "reason": "Flaky: one of the 8 steps behind 207 of 274 e2e failures over 265 runs (scripts/gpui-e2e-quarantine.json); it passed in these main runs but fails others at random",
       "followup": "LEO-14"
@@ -841,8 +806,7 @@
     {
       "step": "⌘, opens Settings, on the page it was left on",
       "platforms": [
-        "macos",
-        "windows"
+        "macos"
       ],
       "reason": "Flaky: one of the 8 steps behind 207 of 274 e2e failures over 265 runs (scripts/gpui-e2e-quarantine.json); it passed in these main runs but fails others at random",
       "followup": "LEO-14"
@@ -881,22 +845,6 @@
       "followup": "LEO-129"
     },
     {
-      "step": "Manual only: an edit to the open file reloads it and does not build",
-      "platforms": [
-        "windows"
-      ],
-      "reason": "Windows: passed in every main run but failed in branch run 44226228810, whose GPUI sources equal main's, so intermittent",
-      "followup": "LEO-15"
-    },
-    {
-      "step": "what a Finder drop on the tree brings in is selected",
-      "platforms": [
-        "windows"
-      ],
-      "reason": "Windows: failed in 1 of 5 main runs (44276458780), so intermittent; observed {\"selected\":[\"cite-check.tex\"]}",
-      "followup": "LEO-15"
-    },
-    {
       "step": "the project_tab_drag module runs to its end",
       "platforms": [
         "macos"
@@ -928,38 +876,6 @@
       ],
       "reason": "macOS: failed in main run 44454343186 on the hosted runner; observed {\"built\":true,\"shown\":true,\"found\":true,\"question\":\"Open plot.svg in its default app? An SVG file often opens in a web browser, which runs any script it holds.\",\"dismissed\":false} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"built\":true,\"shown\":true,\"found\":true,\"question\":\"Open plot.svg in its default app? An SVG file often opens in a web browser, which runs any script it holds.\",\"dismissed\":false}",
       "followup": "LEO-14"
-    },
-    {
-      "step": "A applies the open fix into the .bib and moves on to the next finding",
-      "platforms": [
-        "windows"
-      ],
-      "reason": "Windows: failed in main run 44454326816 on the hosted runner; observed {\"applied\":false,\"open\":\"knuth1984\",\"written\":false}",
-      "followup": "LEO-15"
-    },
-    {
-      "step": "narrower than 800px, Check references drops the side pane and keeps the open finding under its row; wide again, the queue returns",
-      "platforms": [
-        "windows"
-      ],
-      "reason": "Windows: failed in main run 44454326816 on the hosted runner; observed {\"narrow\":{\"width\":720,\"queue\":false,\"open\":\"knuth1984\"},\"wide\":{\"width\":1024,\"queue\":true,\"open\":\"knuth1984\"}}",
-      "followup": "LEO-15"
-    },
-    {
-      "step": "applying the last fix settles the report: the queue opens nothing and shows the reading glass",
-      "platforms": [
-        "windows"
-      ],
-      "reason": "Windows: failed in main run 44454326816 on the hosted runner; observed {\"last\":\"knuth1984\",\"settled\":false,\"queue\":true,\"open\":\"knuth1984\"}",
-      "followup": "LEO-15"
-    },
-    {
-      "step": "the pointer crossing the next ⋯ menu row on its way to the Move … to submenu keeps it open, and New split below runs",
-      "platforms": [
-        "windows"
-      ],
-      "reason": "Windows: failed once in run 44460622331 attempt 1 of #1148, which does not touch it, and passed in every main run since #1103, so intermittent; observed {\"move_row\":\"Bounds { origin: Point { x: 416px, y: 549px }, size: Size { 251px × 32px } }\",\"crossing\":\"Point { x: 661px, y: 597px }\",\"target\":\"Point { x: 746px, y: 693px }\",\"panels_before\":4,\"panels_after\":4}",
-      "followup": "LEO-15"
     },
     {
       "step": "Add reference opens from Add papers' Enter manually",
