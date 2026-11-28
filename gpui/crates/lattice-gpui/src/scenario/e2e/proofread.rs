@@ -239,9 +239,15 @@ impl Run {
         })
     }
 
-    /// A key through the window's keymap, as a press dispatches it.
+    /// A key through the window's keymap, as a press dispatches it. `keys`
+    /// is spelled as on macOS; elsewhere ⌘ is Ctrl, as the editor binds it
+    /// there (`editor_panel::proofread::bindings`).
     fn keys(&self, cx: &mut AsyncApp, keys: &'static str) -> Result<()> {
-        let keystroke = Keystroke::parse(keys).map_err(|error| anyhow::anyhow!("{error}"))?;
+        let mut keystroke = Keystroke::parse(keys).map_err(|error| anyhow::anyhow!("{error}"))?;
+        if !cfg!(target_os = "macos") && keystroke.modifiers.platform {
+            keystroke.modifiers.platform = false;
+            keystroke.modifiers.control = true;
+        }
         self.with_window(cx, move |_, window, cx| {
             window.dispatch_keystroke(keystroke, cx);
         })

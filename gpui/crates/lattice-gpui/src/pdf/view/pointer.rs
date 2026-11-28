@@ -291,7 +291,6 @@ impl PdfView {
     }
 
     /// Select from caret `from` to caret `to` (page, caret), as a drag would.
-    #[cfg(target_os = "macos")]
     pub fn select(&mut self, from: (usize, usize), to: (usize, usize), cx: &mut Context<Self>) {
         self.selection = Some(Selection {
             anchor: from,
