@@ -7,7 +7,7 @@ The Agent panel runs a coding agent that reads your project and papers, fixes bu
 Open the **Agent** panel (`⌘⌥3`). Then use one of:
 
 - **Claude Code** or **Codex** on your Mac, signed in as you. Install the CLI, sign in once in Terminal (for example `claude auth login`), and pick it in the model menu under the message box.
-- **Another agent CLI** you have installed, such as Cursor, Antigravity (`agy`), OpenCode or Droid. One that isn't signed in shows **Sign in** in the model menu, which starts only when you click it.
+- **Another agent CLI** you have installed, such as Cursor, Antigravity (`agy`), OpenCode or Droid. A signed-out Antigravity shows **Sign in** in the model menu, which starts only when you click it.
 - **Your own API**: **Settings › Agent › Model endpoint** takes an **OpenAI-compatible** or **Anthropic-compatible** address (**More protocols** has others), a key (kept in your Keychain) and the **Models to offer**; **Test connection** checks it. The Agent runs it through Pi, a one-time download of about 150 MB that you install under **Settings › Agent › Providers**; no command-line tool is needed. Proofread, Polish and revision requests use the endpoint only once you choose one of its models as the proofreading model under **Providers**.
 
 The rest of **Settings › Agent**:

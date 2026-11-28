@@ -10,7 +10,7 @@
       },
       "body": {
         "en": "The bundled Agent runtime moves to Synara 1.6.8, which runs Antigravity (agy) over ACP like the other agent CLIs, so it gets Lattice's tools, approvals, questions and its quota under Usage & limits. A signed-out agy shows as not signed in, with a Sign in button that starts only when you click it. Antigravity models can also be chosen for Proofread, Polish, annotation revisions and Git writing; those tasks run read-only and never start a sign-in on their own.",
-        "zh": "内置的 AI 助手运行时升级到 Synara 1.6.8，它像其他智能体命令行工具一样通过 ACP 运行 Antigravity（agy），因此 Antigravity 也能使用 Lattice 的工具、审批和提问，并在「用量与限制」中显示它的额度。agy 未登录时会显示为未登录，并带有「登录」按钮，只有点击后才会开始登录。校对、润色、批注修改和撰写 Git 提交说明也可以选用 Antigravity 的模型；这些任务以只读方式运行，也不会自己发起登录。"
+        "zh": "内置的 AI 助手运行时升级到 Synara 1.6.8，它像其他智能体命令行工具一样通过 ACP 运行 Antigravity（agy），因此 Antigravity 也能使用 Lattice 的工具、审批和提问，并在「用量与限制」中显示它的额度。agy 未登录时会如实显示，并带有「登录」按钮，只有点击后才会开始登录。校对、润色、批注修改和撰写 Git 提交说明也可以选用 Antigravity 的模型；这些任务以只读方式运行，也不会自己发起登录。"
       }
     },
     {
@@ -69,8 +69,12 @@
       "zh": "「帮助 › 报告问题…」会写明操作系统及其版本，例如 Windows 10.0.26100 或 Ubuntu 22.04.5 LTS，在 Windows 和 Linux 上不再写成「macOS unknown」。"
     },
     {
+      "en": "On Windows, restoring a file or the whole project from History keeps the line endings the version saved, instead of writing them back as CRLF.",
+      "zh": "在 Windows 上，从历史中恢复一个文件或整个项目时，会保留那个版本保存时的换行符，不再写回成 CRLF。"
+    },
+    {
       "en": "On Linux, LaTeX builds with Ubuntu 22.04's latexmk 4.76 report their errors, hidden builds keep their files out of the document's folder, and a broken document built again unchanged is no longer reported as built.",
-      "zh": "在 Linux 上，使用 Ubuntu 22.04 自带的 latexmk 4.76 编译 LaTeX 时会报告错误，隐藏编译文件时不会再把文件留在文档所在的文件夹里，未改动的出错文档再次编译时也不会被报告为编译成功。"
+      "zh": "在 Linux 上，使用 Ubuntu 22.04 自带的 latexmk 4.76 编译 LaTeX 出错时，现在会正常显示错误；开启「隐藏临时文件」时，编译不会再把文件留在文档所在的文件夹里，未改动的出错文档再次编译时也不会被报告为编译成功。"
     }
   ]
 }
