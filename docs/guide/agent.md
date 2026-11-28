@@ -7,12 +7,12 @@ The Agent panel runs a coding agent that reads your project and papers, fixes bu
 Open the **Agent** panel (`⌘⌥3`). Then use one of:
 
 - **Claude Code** or **Codex** on your Mac, signed in as you. Install the CLI, sign in once in Terminal (for example `claude auth login`), and pick it in the model menu under the message box.
-- **Another agent CLI** you have installed, such as Cursor, Antigravity (`agy`), OpenCode or Droid.
+- **Another agent CLI** you have installed, such as Cursor, Antigravity (`agy`), OpenCode or Droid. A signed-out Antigravity shows **Sign in** in the model menu, which starts only when you click it.
 - **Your own API**: **Settings › Agent › Model endpoint** takes an **OpenAI-compatible** or **Anthropic-compatible** address (**More protocols** has others), a key (kept in your Keychain) and the **Models to offer**; **Test connection** checks it. The Agent runs it through Pi, a one-time download of about 150 MB that you install under **Settings › Agent › Providers**; no command-line tool is needed. Proofread, Polish and revision requests use the endpoint only once you choose one of its models as the proofreading model under **Providers**.
 
 The rest of **Settings › Agent**:
 
-- **Providers** sets the default provider and the models Lattice uses for its own small tasks (proofreading, commit messages, compile repair).
+- **Providers** sets the default provider and the models Lattice uses for its own small tasks (proofreading, commit messages, compile repair). An Antigravity model can do these too; it only reads the text it is given, and while `agy` is signed out its tasks answer that it isn't signed in instead of opening a sign-in.
 - **Display** sets the Agent's font size, from 11 to 20 px, apart from the editors' sizes.
 - **MCP** adds tools such as Zotero to the Agent; **Skills** manages the skills it can use; **Usage & limits** shows what you have used.
 - **Archived threads**: see [below](#threads).
@@ -28,7 +28,7 @@ Providers, MCP, Skills, Usage & limits and Archived threads need a project open.
 - To attach files to a message, choose **+ › Files and folders**, or drop them from the Finder on the Agent panel. Any kind of file works, such as a Word document or a spreadsheet; the Agent gets the file, and it isn't added to your project.
 - **Polish**, **Revise**, **Proofread** and **Check references** start common tasks. To work on one passage, select it in the editor first.
 - In the editor, select text to **Proofread** (`⌘⌥P`), **Polish** or **Rewrite with an instruction** in place (**Rewrite selection…** in the command palette), with a reason for each edit.
-- **Annotate** a passage (select it, choose **Annotate**, write what should change), then **Save and revise now**: the Agent proposes an edit for each annotation and you accept or reject it in place. **Revise from annotations** in the command palette does every open annotation in rounds.
+- **Annotate** a passage (select it, choose **Annotate**, write what should change), then **Save and revise now**: the Agent proposes an edit for each annotation and you accept or reject it in place. In a paper split into section files, the Agent also reads the main document's preamble and, near a file's start or end, the text that comes just before or after it in the paper, but it changes only the annotated passage. **Revise from annotations** in the command palette does every open annotation in rounds.
 - A failed build's **Ask the agent** sends that problem straight here.
 - The permission menu in the panel's header decides when the Agent asks first: **Never ask**, **Ask for risky actions**, or **Ask before outside edits and network**.
 - Long lines in the Agent's diffs wrap. The wrap button in a diff's toolbar, or `⌥Z`, turns wrapping off and on again, and Lattice remembers the choice.

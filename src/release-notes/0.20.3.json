@@ -1,0 +1,80 @@
+{
+  "version": "0.20.3",
+  "date": "2026-11-28",
+  "highlights": [
+    {
+      "icon": "bot",
+      "title": {
+        "en": "Antigravity joins the Agent's providers",
+        "zh": "Antigravity 加入 AI 助手的服务商"
+      },
+      "body": {
+        "en": "The bundled Agent runtime moves to Synara 1.6.8, which runs Antigravity (agy) over ACP like the other agent CLIs, so it gets Lattice's tools, approvals, questions and its quota under Usage & limits. A signed-out agy shows as not signed in, with a Sign in button that starts only when you click it. Antigravity models can also be chosen for Proofread, Polish, annotation revisions and Git writing; those tasks run read-only and never start a sign-in on their own.",
+        "zh": "内置的 AI 助手运行时升级到 Synara 1.6.8，它像其他智能体命令行工具一样通过 ACP 运行 Antigravity（agy），因此 Antigravity 也能使用 Lattice 的工具、审批和提问，并在「用量与限制」中显示它的额度。agy 未登录时会如实显示，并带有「登录」按钮，只有点击后才会开始登录。校对、润色、批注修改和撰写 Git 提交说明也可以选用 Antigravity 的模型；这些任务以只读方式运行，也不会自己发起登录。"
+      }
+    },
+    {
+      "icon": "message",
+      "title": {
+        "en": "Write an Overleaf comment beside its passage",
+        "zh": "在段落旁边写 Overleaf 评论"
+      },
+      "body": {
+        "en": "In the native Lattice, Comment on Overleaf in the source editor's selection toolbar opens a small composer beside the selection instead of the Overleaf panel, so the sentence stays in view while you write. ⌘↵ sends it and puts you back in the text with the passage selected. While the file isn't live, the composer says why and Send waits; a refused send keeps your text and shows the error.",
+        "zh": "在原生 Lattice 中，源码编辑器选区工具栏里的「评论到 Overleaf」现在会在选中文字旁边打开一个小的输入框，而不是打开 Overleaf 面板，写评论时原句一直看得见。按 ⌘↵ 发送后，光标回到正文，那段文字仍保持选中。文件不在实时同步时，输入框会说明原因，「发送」暂不可用；发送被拒绝时，你写的文字会保留，并显示错误信息。"
+      }
+    },
+    {
+      "icon": "undo",
+      "title": {
+        "en": "Overleaf comment markers stay on their own passage",
+        "zh": "Overleaf 评论标记留在它自己的段落上"
+      },
+      "body": {
+        "en": "In the native Lattice, cutting or deleting a commented passage no longer moves its marker onto the text that follows. The thread is detached, as on Overleaf, and the Comments panel lists it as \"(this comment's text was removed)\". Undo, or pasting the same text back in place, re-attaches the thread on Overleaf, as Overleaf's own editor does.",
+        "zh": "在原生 Lattice 中，剪切或删除一段带评论的文字后，它的标记不再挪到后面的文字上。评论会像在 Overleaf 上一样脱离原文，评论面板中显示为「（原文已被删除）」。撤销，或在原处粘贴回同样的文字，会在 Overleaf 上把评论重新挂回去，与 Overleaf 自己的编辑器一致。"
+      }
+    },
+    {
+      "icon": "feather",
+      "title": {
+        "en": "Annotation revisions read the paper around a section file",
+        "zh": "批注修改会读取章节文件前后的论文内容"
+      },
+      "body": {
+        "en": "In the native Lattice, when a paper is split into section files under its main document, a revision now also gives the Agent the main document's preamble (its macros, notation and theorem environments), and, near the start or end of a file, the text TeX reads just before or after it. The Agent still revises only the annotated passage.",
+        "zh": "在原生 Lattice 中，论文按章节拆成主文档下的多个文件时，批注修改现在还会把主文档的导言区（其中的宏、记号和定理环境）交给 AI 助手；批注靠近文件开头或结尾时，还会附上 TeX 在这个文件之前或之后读到的文字。AI 助手仍然只修改被批注的那段文字。"
+      }
+    }
+  ],
+  "fixes": [
+    {
+      "en": "Lists in embedded Agent settings, such as the Proofreading model list, scroll with the mouse wheel and trackpad, and their popups stay inside the visible part of the Settings sheet (#1379).",
+      "zh": "嵌入的 AI 助手设置里的列表（例如校对模型列表）可以用鼠标滚轮和触控板滚动，弹出的菜单也会留在设置面板的可见范围内（#1379）。"
+    },
+    {
+      "en": "In the native Lattice, the title bar's Overleaf dot turns amber while Overleaf's \"too many requests\" cool-down runs, instead of looking online, and live sync no longer sends an extra check right after the connection comes back.",
+      "zh": "在原生 Lattice 中，Overleaf 的「请求过多」冷却期间，标题栏 Overleaf 按钮上的圆点会变成琥珀色，不再看起来像已连接；连接恢复后，实时同步也不会马上多做一次检查。"
+    },
+    {
+      "en": "In the native Lattice, the PDF menu's Export review PDF… waits until the PDF on screen can be annotated, so it no longer opens a sheet that places no notes right after a build.",
+      "zh": "在原生 Lattice 中，PDF 菜单里的「导出评阅 PDF…」会等到屏幕上的 PDF 可以批注时才可用，编译刚结束时不会再打开一个放不上任何批注的面板。"
+    },
+    {
+      "en": "In the native Lattice, after you stop a build, automatic builds of the same files wait until you change one, so a document that loops is not built again on its own.",
+      "zh": "在原生 Lattice 中，停止一次编译后，同一组文件的自动编译会等到你修改其中某个文件才再开始，这样会陷入循环的文档不会自己又被编译一遍。"
+    },
+    {
+      "en": "Help › Report a Problem… names the operating system and its version, such as Windows 10.0.26100 or Ubuntu 22.04.5 LTS, instead of \"macOS unknown\" on Windows and Linux.",
+      "zh": "「帮助 › 报告问题…」会写明操作系统及其版本，例如 Windows 10.0.26100 或 Ubuntu 22.04.5 LTS，在 Windows 和 Linux 上不再写成「macOS unknown」。"
+    },
+    {
+      "en": "On Windows, restoring a file or the whole project from History keeps the line endings the version saved, instead of writing them back as CRLF.",
+      "zh": "在 Windows 上，从历史中恢复一个文件或整个项目时，会保留那个版本保存时的换行符，不再写回成 CRLF。"
+    },
+    {
+      "en": "On Linux, LaTeX builds with Ubuntu 22.04's latexmk 4.76 report their errors, hidden builds keep their files out of the document's folder, and a broken document built again unchanged is no longer reported as built.",
+      "zh": "在 Linux 上，使用 Ubuntu 22.04 自带的 latexmk 4.76 编译 LaTeX 出错时，现在会正常显示错误；开启「隐藏临时文件」时，编译不会再把文件留在文档所在的文件夹里，未改动的出错文档再次编译时也不会被报告为编译成功。"
+    }
+  ]
+}

@@ -8,7 +8,7 @@ From the command palette (`⌘K`):
 
 - **Clean rebuild** deletes the build's intermediate files and builds from scratch. Try it when a build behaves strangely.
 - **Clean aux files** only deletes them.
-- **Stop build** stops a build that is running.
+- **Stop build** stops a build that is running. Lattice then doesn't build those files on its own again until you change one of them; `⌘S` and the build button still build at once.
 
 The ⋯ menu above the editor has **Clean rebuild** and **Stop the build** too.
 

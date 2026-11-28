@@ -24,7 +24,7 @@
 
 **I lost text.** Open [History](history.md): every save, every Agent edit and every Overleaf change is there, and **Restore this file** puts a file back.
 
-**Something else is wrong.** **Help › Report a Problem…** saves a redacted log you can attach to an issue, and opens [GitHub Issues](https://github.com/lattice-writer/lattice/issues). **Settings › Logs** shows the log in the app, with **Export…**.
+**Something else is wrong.** **Help › Report a Problem…** saves a redacted log you can attach to an issue, and opens [GitHub Issues](https://github.com/lattice-writer/lattice/issues) with your Lattice version and operating system filled in. **Settings › Logs** shows the log in the app, with **Export…**.
 
 ## FAQ
 
