@@ -422,10 +422,15 @@ jobs:
       # member): the WebView2 cutouts' region arithmetic, on every platform.
       - run: cargo test --release --locked -p gpui-webview --lib
       # After the tests, so the packages and formats the documents fetched on
-      # first use are in it. Saved only from main (a tag's cache is visible to
-      # that tag alone) and only when the tree is new to the key.
+      # first use are in it. Saved only when the tree is new to the key, from
+      # main and, as the Rust cache is, from a run started by hand on a
+      # branch, which only that branch's later dispatches restore (a tag's
+      # cache is visible to that tag alone). With no main run saving it
+      # lately, the repository held no MiKTeX tree at all, so every dispatch
+      # installed MiKTeX from the network, where its setup's "Timeout was
+      # reached" outlasted all seven attempts (runs 46118268114, 46122202543).
       - name: Save MiKTeX
-        if: ${{ !cancelled() && steps.miktex.outputs.save == 'True' && github.ref == 'refs/heads/main' && inputs.only == '' }}
+        if: ${{ !cancelled() && steps.miktex.outputs.save == 'True' && (github.ref == 'refs/heads/main' && inputs.only == '' || github.event_name == 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/')) }}
         uses: actions/cache/save@v5
         with:
           path: |
