@@ -206,7 +206,13 @@ pub fn restore_file(root: &Path, rev: &str, path: &str) -> Result<(), String> {
     }
     // Saved only now: a restore refused above must not leave a version behind.
     auto_commit(root, AUTO_SAVED_MESSAGE, None)?;
-    git_run(root, &["restore", "--source", &rev, "--worktree", "--", &relative])
+    // The file comes back as the version saved it. Git for Windows turns
+    // `core.autocrlf` on machine-wide, which would write the LF the editor
+    // saved as CRLF; a repository's own `eol` attributes still apply.
+    git_run(
+        root,
+        &["-c", "core.autocrlf=false", "restore", "--source", &rev, "--worktree", "--", &relative],
+    )
 }
 
 /// Forward-only restore: save the project as a version, make the worktree
@@ -217,7 +223,11 @@ pub fn restore_project(root: &Path, rev: &str) -> Result<String, String> {
     let rev = validate_rev(rev)?;
     git_run(root, &["rev-parse", "--verify", &format!("{rev}^{{commit}}")])?;
     auto_commit(root, AUTO_SAVED_MESSAGE, None)?;
-    git_run(root, &["restore", "--source", &rev, "--worktree", "--", "."])?;
+    // As saved, line endings included (see `restore_file`).
+    git_run(
+        root,
+        &["-c", "core.autocrlf=false", "restore", "--source", &rev, "--worktree", "--", "."],
+    )?;
     // `git restore` never deletes, so drop tracked files that did not exist
     // at rev. Untracked files are absent from `ls-files` and stay intact.
     let at_rev = git_output(root, &["ls-tree", "-r", "--name-only", "-z", &rev])?;

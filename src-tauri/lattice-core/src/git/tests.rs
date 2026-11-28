@@ -247,6 +247,20 @@ fn restores_one_file_or_rewinds_the_project_and_rejects_unsafe_revisions() {
     assert_eq!(git(&root, &["rev-list", "--count", "HEAD"]), "4");
 }
 
+/// Git for Windows sets `core.autocrlf` machine-wide; a restore still
+/// writes the LF text the version saved, not CRLF.
+#[test]
+fn restores_keep_the_line_endings_the_version_saved() {
+    let Some(root) = repo("restore-eol") else { return };
+    git(&root, &["config", "core.autocrlf", "true"]);
+    let first = commit(&root, &[("a.tex", "one\ntwo\n"), ("b.tex", "b\n")], "first");
+    commit(&root, &[("a.tex", "three\n"), ("b.tex", "c\n")], "second");
+    restore_file(&root, &first, "a.tex").unwrap();
+    assert_eq!(fs::read(root.join("a.tex")).unwrap(), b"one\ntwo\n");
+    restore_project(&root, &first).unwrap();
+    assert_eq!(fs::read(root.join("b.tex")).unwrap(), b"b\n");
+}
+
 /// Only a `..` path segment is traversal; a file name that contains two
 /// dots is an ordinary project file whose history can be read and restored.
 #[test]
