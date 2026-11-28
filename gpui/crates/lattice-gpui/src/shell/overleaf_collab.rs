@@ -188,8 +188,7 @@ impl Shell {
             return answer(Err(error.into()), cx);
         }
         if bridge.review_busy().is_some() {
-            let error =
-                t!("Another comment is still on its way to Overleaf. Try again in a moment.");
+            let error = t!("Overleaf is still busy with the last change. Try again in a moment.");
             return answer(Err(error.into()), cx);
         }
         let (quote, body) = (quote.to_string(), body.to_string());

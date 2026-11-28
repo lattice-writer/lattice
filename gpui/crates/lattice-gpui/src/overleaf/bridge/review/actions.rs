@@ -38,7 +38,8 @@ impl OverleafBridge {
         cx: &mut Context<Self>,
     ) {
         let Some(root) = self.root.clone() else {
-            return;
+            let error = t!("The commented file is no longer open live with Overleaf. Try again.");
+            return failed(error.into(), cx);
         };
         self.review.busy = Some(busy);
         self.review.error = None;
@@ -201,7 +202,8 @@ impl OverleafBridge {
             }
         };
         if content.trim().is_empty() || quote.is_empty() {
-            return;
+            let error = t!("The selected text changed. Select it again before commenting.");
+            return done(Err(error.into()), cx);
         }
         let thread_id = object_id();
         let thread = thread_id.clone();

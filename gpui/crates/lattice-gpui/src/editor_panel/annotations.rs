@@ -506,6 +506,16 @@ impl EditorPanel {
     /// what it does there, so the editor does not take focus back from it. A
     /// note with words in it is offered back, in the file it was written on.
     pub fn dismiss_draft(&mut self, outside: bool, window: &mut Window, cx: &mut Context<Self>) {
+        // A comment on its way to Overleaf stays until Overleaf answers, so
+        // a refusal still finds its text to send again.
+        if self
+            .annotations
+            .draft
+            .as_ref()
+            .is_some_and(|draft| draft.sending)
+        {
+            return;
+        }
         let Some(draft) = self.annotations.draft.take() else {
             return;
         };
@@ -515,8 +525,7 @@ impl EditorPanel {
         }
         cx.notify();
         let body = draft.field.read(cx).value().to_string();
-        // A comment already on its way to Overleaf is not discarded.
-        if body.trim().is_empty() || draft.sending {
+        if body.trim().is_empty() {
             return;
         }
         let text = self.buffer.read(cx).text();

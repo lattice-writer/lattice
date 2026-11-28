@@ -164,11 +164,14 @@ impl Run {
                 let editor = watched.read(cx);
                 !editor.composing_overleaf_comment()
                     && wanted.as_ref().is_some_and(|(id, position)| {
-                        editor.overleaf_comment_marks().iter().any(|(mark, from, len)| {
-                            mark == id
-                                && from == position
-                                && *len == COMMENTED.encode_utf16().count() as i64
-                        })
+                        editor
+                            .overleaf_comment_marks()
+                            .iter()
+                            .any(|(mark, from, len)| {
+                                mark == id
+                                    && from == position
+                                    && *len == COMMENTED.encode_utf16().count() as i64
+                            })
                     })
             })
             .await;
