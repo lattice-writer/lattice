@@ -33,9 +33,9 @@ use windows::Win32::{
             VK_ESCAPE, VK_LCONTROL, VK_LSHIFT, VK_RETURN, VK_RIGHT, VK_SHIFT, VkKeyScanW,
         },
         WindowsAndMessaging::{
-            GetClientRect, PostMessageW, SendMessageW, SetForegroundWindow, WM_CLOSE, WM_KEYDOWN,
-            WM_KEYUP, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_RBUTTONDOWN,
-            WM_RBUTTONUP,
+            GetClientRect, PostMessageW, SendMessageW, SetCursorPos, SetForegroundWindow, WM_CLOSE,
+            WM_KEYDOWN, WM_KEYUP, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MOUSEMOVE, WM_MOUSEWHEEL,
+            WM_RBUTTONDOWN, WM_RBUTTONUP,
         },
     },
 };
@@ -168,7 +168,19 @@ pub fn send_mouse(native: Native, kind: Mouse, position: Point<Pixels>) -> Resul
     // Client coordinates in device pixels, packed as two signed 16-bit words.
     let x = (f32::from(position.x) * native.scale).round() as i16 as u16 as isize;
     let y = (f32::from(position.y) * native.scale).round() as i16 as u16 as isize;
+    // The system cursor goes there too. Windows sends a window a
+    // `WM_MOUSEMOVE` at the cursor's real place whenever a window appears or
+    // goes under it (a submenu opening), and a cursor left elsewhere would
+    // move GPUI's hover off the row just sent. Best effort: a locked console
+    // has no cursor to move, and the message below carries the position.
+    let mut screen = POINT {
+        x: x as i16 as i32,
+        y: y as i16 as i32,
+    };
     unsafe {
+        if ClientToScreen(native.hwnd, &mut screen).as_bool() {
+            let _ = SetCursorPos(screen.x, screen.y);
+        }
         SendMessageW(
             native.hwnd,
             message,
