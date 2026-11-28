@@ -5,11 +5,21 @@ import { decodeBridgeValue, encodeBridgeValue } from "./browser-runtime";
 const CHANNEL_PREFIX = "__CHANNEL__:";
 const IPC_SERIALIZE_KEY = "__TAURI_TO_IPC_KEY__";
 const UNLISTEN_COMMAND = "plugin:event|unlisten";
+/**
+ * What a headless host (`--browser-host --headless`) refuses from its tab:
+ * the system opener and the dialog plugin, which would start a browser or
+ * file manager, or show a panel, on a display nobody sees. The tab answers
+ * these itself (browser-headless.ts); this stops a raw bridge invoke that
+ * skips it. The host's own NO_DESKTOP_APPS (browser_host.rs).
+ */
+const NO_DESKTOP_COMMAND = /^plugin:(opener|dialog)\|/;
+const NO_DESKTOP = "This Lattice runs without a desktop, so it cannot open apps or folders on its computer.";
 /* eslint-enable lingui/no-unlocalized-strings */
 
 interface HostConfig {
   token: string;
   port: number;
+  headless?: boolean;
 }
 
 type InvokeMessage = {
@@ -91,6 +101,10 @@ export function startBrowserHostBridge(config: HostConfig): void {
   };
 
   const handleInvoke = async (message: InvokeMessage) => {
+    if (config.headless && NO_DESKTOP_COMMAND.test(message.command)) {
+      send({ type: "response", id: message.id, ok: false, error: encodeBridgeValue(NO_DESKTOP) });
+      return;
+    }
     const channelCallbackIds = new Set<number>();
     const args = reviveChannels(decodeBridgeValue(message.args as never), channelCallbackIds) as Record<string, unknown>;
     const options = decodeBridgeValue(message.options as never);

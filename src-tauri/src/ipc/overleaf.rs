@@ -188,6 +188,7 @@ pub async fn overleaf_status(app: AppHandle) -> Result<overleaf::OverleafStatus,
 pub async fn overleaf_begin_login(
     app: AppHandle, host: Option<String>, title: String, back_label: String,
 ) -> Result<(), String> {
+    crate::browser_host::require_desktop_for_sign_in()?;
     if let Some(existing) = app.get_webview_window(LOGIN_WINDOW) {
         let _ = existing.set_focus();
         return Ok(());

@@ -981,6 +981,11 @@ pub(super) static ENTRIES: &[Entry] = &[
         text: Text::Message("Could not open the log folder: {error}", &[("error", Arg::Param(0))]),
     },
     Entry {
+        file: "ipc/windows.rs",
+        literal: "This project is open in another browser tab. Close that tab, then open the project here.",
+        text: Text::Message("This project is open in another browser tab. Close that tab, then open the project here.", &[]),
+    },
+    Entry {
         file: "diagnostic_logs.rs",
         literal: "The diagnostic log is too large to save.",
         text: Text::Message("The diagnostic log is too large to save.", &[]),
@@ -1291,9 +1296,24 @@ pub(super) static ENTRIES: &[Entry] = &[
         text: Text::Message("This Lattice window is already opening in your browser.", &[]),
     },
     Entry {
+        file: "browser_host.rs",
+        literal: "This Lattice runs without a desktop, so the workspace stays in your browser.",
+        text: Text::Message("This Lattice runs without a desktop, so the workspace stays in your browser.", &[]),
+    },
+    Entry {
+        file: "browser_host.rs",
+        literal: "This Lattice runs without a desktop, so it cannot open apps or folders on its computer.",
+        text: Text::Message("This Lattice runs without a desktop, so it cannot open apps or folders on its computer.", &[]),
+    },
+    Entry {
         file: "browser_host/dialogs.rs",
         literal: "Browser dialogs are only available to a browser workspace.",
         text: Text::Message("Browser dialogs are only available to a browser workspace.", &[]),
+    },
+    Entry {
+        file: "browser_host/dialogs.rs",
+        literal: "This Lattice runs without a desktop, so it cannot show a file picker on its computer.",
+        text: Text::Message("This Lattice runs without a desktop, so it cannot show a file picker on its computer.", &[]),
     },
     Entry {
         file: "format_latex.rs",
@@ -1434,6 +1454,11 @@ pub(super) static ENTRIES: &[Entry] = &[
         file: "ipc/overleaf.rs",
         literal: "Could not open the Overleaf sign-in window: {error}",
         text: Text::Message("Could not open the Overleaf sign-in window: {error}", &[("error", Arg::Param(0))]),
+    },
+    Entry {
+        file: "browser_host.rs",
+        literal: "This Lattice runs without a desktop, so it cannot open the Overleaf sign-in window.",
+        text: Text::Message("This Lattice runs without a desktop, so it cannot open the Overleaf sign-in window.", &[]),
     },
     Entry {
         file: "overleaf_rt/codec.rs",

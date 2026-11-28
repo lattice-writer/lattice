@@ -26,6 +26,7 @@ export const OVERLEAF_HOST_ERRORS: readonly HostErrorEntry[] = [
   ["overleaf/account.rs", "That cookie did not open the Overleaf dashboard. Copy a fresh session cookie from a logged-in browser and try again.", () => t`That cookie did not open the Overleaf dashboard. Copy a fresh session cookie from a logged-in browser and try again.`],
   ["ipc/overleaf.rs", "Invalid Overleaf host: {error}", ([error]) => t`Invalid Overleaf host: ${error}`],
   ["ipc/overleaf.rs", "Could not open the Overleaf sign-in window: {error}", ([error]) => t`Could not open the Overleaf sign-in window: ${error}`],
+  ["browser_host.rs", "This Lattice runs without a desktop, so it cannot open the Overleaf sign-in window.", () => t`This Lattice runs without a desktop, so it cannot open the Overleaf sign-in window.`],
   ["overleaf_rt/codec.rs", "No Overleaf host configured.", () => t`No Overleaf host configured.`],
 
   // Linking and syncing (overleaf/link.rs, overleaf/sync.rs, overleaf/upload.rs)

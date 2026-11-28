@@ -252,7 +252,13 @@ export async function createAppSizeReport(workspace = process.cwd()) {
 // Raised by 1 KB for v0.19.3: its features (live preview's overdue pill and
 // reinstall, rtex verification) brought the local build to 1,472,085 bytes,
 // 718 under, and a release build can measure ~100 bytes above a local one.
-const EAGER_JS_BUDGET_BYTES = Math.floor(1.4 * 1024 * 1024) + 5_821;
+// Raised by 408 bytes for the headless browser host (#1190): its link,
+// folder and dialog commands and their text load on demand, in a headless
+// host's tab only; what stays eager is the tab's check of the session reply
+// and that lazy import, the lifecycle's answer to "open it in this tab", and
+// the flag the project tabs and the palette read (1,472,200 -> 1,472,608
+// bytes locally).
+const EAGER_JS_BUDGET_BYTES = Math.floor(1.4 * 1024 * 1024) + 6_229;
 // A perf-lab build (VITE_PERF_LAB=1, scripts/perf-lab.mjs) compiles in the
 // lab's hooks (~0.3 KB eager on 2026-11-04). They never ship, so they must not
 // spend the release budget: a release at its limit would fail every lab build.

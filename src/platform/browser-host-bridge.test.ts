@@ -64,3 +64,39 @@ describe("browser host bridge channels", () => {
     expect(unregisterCallback).toHaveBeenCalledWith(100);
   });
 });
+
+describe("a headless host's bridge", () => {
+  /** Start the hidden host's bridge and return what it answered to each invoke the tab sent. */
+  async function answers(headless: boolean, commands: string[]) {
+    vi.stubGlobal("WebSocket", FakeWebSocket);
+    const invoke = vi.fn(async () => "done");
+    (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {
+      invoke, transformCallback: () => 1, unregisterCallback: () => undefined,
+    };
+    startBrowserHostBridge({ token: "secret", port: 18_452, headless });
+    const socket = lastSocket();
+    socket.message({ type: "ready" });
+    commands.forEach((command, id) => socket.message({ type: "invoke", id, command, args: {}, options: null }));
+    const responses = () => socket.send.mock.calls
+      .map(([value]) => JSON.parse(String(value)) as { type: string; id: number; ok: boolean; error?: unknown })
+      .filter((message) => message.type === "response");
+    await vi.waitFor(() => expect(responses()).toHaveLength(commands.length));
+    return { invoke, responses: responses().sort((a, b) => a.id - b.id) };
+  }
+
+  const refused = ["plugin:opener|open_url", "plugin:opener|reveal_item_in_dir", "plugin:dialog|message", "plugin:dialog|open"];
+
+  it("refuses the opener and the dialog plugin, even from an invoke that skips the tab's own answers", async () => {
+    const { invoke, responses } = await answers(true, [...refused, "open_project_window"]);
+    expect(responses.map(({ ok }) => ok)).toEqual([false, false, false, false, true]);
+    expect(responses[0]?.error).toBe("This Lattice runs without a desktop, so it cannot open apps or folders on its computer.");
+    expect(invoke).toHaveBeenCalledOnce();
+    expect(invoke).toHaveBeenCalledWith("open_project_window", {}, null);
+  });
+
+  it("passes them on for a host with a desktop", async () => {
+    const { invoke, responses } = await answers(false, refused);
+    expect(responses.every(({ ok }) => ok)).toBe(true);
+    expect(invoke).toHaveBeenCalledTimes(refused.length);
+  });
+});

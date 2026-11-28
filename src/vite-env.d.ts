@@ -33,5 +33,7 @@ interface Window {
   __LATTICE_BROWSER_HOST_CONFIG__?: {
     token: string;
     port: number;
+    /** `--browser-host --headless`: see browser-host-bridge.ts. */
+    headless?: boolean;
   };
 }

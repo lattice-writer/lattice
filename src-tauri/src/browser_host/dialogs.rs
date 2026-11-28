@@ -2,7 +2,9 @@
 //!
 //! The dialog plugin always parents its panels to the invoking WebView. In a
 //! browser workspace that WebView is deliberately hidden, so these commands
-//! show unparented rfd panels instead.
+//! show unparented rfd panels instead. A headless host (`--browser-host
+//! --headless`) has no desktop to show one on: the panel would open on the
+//! virtual display and the tab would wait for it forever, so it refuses.
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -72,12 +74,29 @@ fn dialog_path(path: PathBuf) -> String {
 async fn run_browser_dialog<T: Send + 'static>(
     window: &tauri::WebviewWindow, kind: &str, pick: impl FnOnce() -> T + Send + 'static,
 ) -> Result<T, String> {
-    if !window.label().starts_with("browser-") {
-        return Err("Browser dialogs are only available to a browser workspace.".to_string());
+    if let Some(refusal) =
+        browser_dialog_refusal(window.label(), crate::browser_host::launched_headless())
+    {
+        return Err(refusal.to_string());
     }
     tauri::async_runtime::spawn_blocking(pick)
         .await
         .map_err(|error| format!("Browser {kind} dialog stopped unexpectedly: {error}"))
+}
+
+const NOT_A_BROWSER_WORKSPACE: &str = "Browser dialogs are only available to a browser workspace.";
+const NO_DESKTOP_FILE_PICKER: &str =
+    "This Lattice runs without a desktop, so it cannot show a file picker on its computer.";
+
+/// Why the window labelled `label` may not open a panel, if it may not.
+fn browser_dialog_refusal(label: &str, headless: bool) -> Option<&'static str> {
+    if !label.starts_with("browser-") {
+        Some(NOT_A_BROWSER_WORKSPACE)
+    } else if headless {
+        Some(NO_DESKTOP_FILE_PICKER)
+    } else {
+        None
+    }
 }
 
 #[tauri::command]
@@ -107,4 +126,17 @@ pub(crate) async fn browser_dialog_save(
         browser_dialog_builder(&options).save_file().map(dialog_path)
     })
     .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_headless_host_refuses_file_pickers_and_only_browser_workspaces_ask() {
+        assert_eq!(browser_dialog_refusal("browser-1", false), None);
+        assert_eq!(browser_dialog_refusal("browser-1", true), Some(NO_DESKTOP_FILE_PICKER));
+        assert_eq!(browser_dialog_refusal("project-1", false), Some(NOT_A_BROWSER_WORKSPACE));
+        assert_eq!(browser_dialog_refusal("project-1", true), Some(NOT_A_BROWSER_WORKSPACE));
+    }
 }
