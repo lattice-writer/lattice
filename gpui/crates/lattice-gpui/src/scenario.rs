@@ -318,6 +318,59 @@ impl Run {
         false
     }
 
+    /// Wait until the window's own frame clock has ticked `count` times
+    /// (`Window::on_next_frame`, which asks for a tick but draws nothing).
+    /// A tick runs these callbacks and then draws the window if it is dirty,
+    /// in one go, so once `count` ticks have run, up to `count` frames have
+    /// drawn since, each one that had anything to draw. A pause alone does
+    /// not mean a frame has landed: on Linux CI the window is drawn by
+    /// Mesa's llvmpipe, on the CPU, which takes 240–430 ms to present a
+    /// 1440×900 frame (LEO-129). Gives up after 3 s, and logs that it did.
+    async fn frame_ticks(&self, cx: &mut AsyncApp, count: usize) {
+        use std::{cell::Cell, rc::Rc};
+        fn tick(seen: Rc<Cell<usize>>, left: usize, window: &mut Window) {
+            window.on_next_frame(move |window, _| {
+                seen.set(seen.get() + 1);
+                if left > 1 {
+                    tick(seen, left - 1, window);
+                }
+            });
+        }
+        let seen = Rc::new(Cell::new(0));
+        let ticks = seen.clone();
+        if self
+            .with_window(cx, move |_, window, _| tick(ticks, count, window))
+            .is_ok()
+        {
+            let ticked = self
+                .wait_for(cx, Duration::from_secs(3), |_, _| seen.get() >= count)
+                .await;
+            if !ticked {
+                log::info!("the window ticked {} of {count} frames in 3 s", seen.get());
+            }
+        }
+    }
+
+    /// Wait for `read` to give the same answer in two frames running
+    /// (`Run::frame_ticks`): what a moving element reports once its motion has
+    /// landed and been drawn. Gives up after ten rounds of two ticks.
+    async fn settled<T: PartialEq>(
+        &self,
+        cx: &mut AsyncApp,
+        mut read: impl FnMut(&mut App) -> T,
+    ) -> T {
+        let mut last = cx.update(|cx| read(cx));
+        for _ in 0..10 {
+            self.frame_ticks(cx, 2).await;
+            let now = cx.update(|cx| read(cx));
+            if now == last {
+                return now;
+            }
+            last = now;
+        }
+        last
+    }
+
     /// Wait `duration`, drawing frames meanwhile (`pump_frame`).
     async fn pause(&self, cx: &mut AsyncApp, duration: Duration) {
         let started = Instant::now();
