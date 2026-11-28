@@ -1,3 +1,11 @@
+#: lattice-gpui/src/editor_panel/annotations/overleaf_draft.rs
+msgid "A sync with Overleaf is running. Send once it finishes."
+msgstr "正在与 Overleaf 同步，同步完成后再发送。"
+
+#: lattice-gpui/src/editor_panel/annotations.rs
+msgid "Comment discarded"
+msgstr "评论已舍弃"
+
 #: lattice-gpui/src/editor_panel/margin_review.rs
 msgid "Comment from {name}"
 msgstr "{name} 的评论"
@@ -46,9 +54,17 @@ msgstr "这是讨论中唯一的消息，因此会删除整个讨论。此操作
 msgid "Its span was deleted from the document."
 msgstr "它所在的文字已从文档中删除。"
 
+#: lattice-gpui/src/editor_panel/annotations/overleaf_draft.rs
+msgid "Not connected to Overleaf. The comment can be sent once it reconnects."
+msgstr "未连接到 Overleaf。重新连接后即可发送评论。"
+
 #: lattice-gpui/src/overleaf/bridge/finished.rs
 msgid "Overleaf asked to wait, retrying in {seconds} s"
 msgstr "Overleaf 要求稍候，{seconds} 秒后重试"
+
+#: lattice-gpui/src/shell/overleaf_collab.rs
+msgid "Overleaf is still busy with the last change. Try again in a moment."
+msgstr "Overleaf 仍在处理上一项更改，请稍后再试。"
 
 #: lattice-gpui/src/shell/commands/projects.rs
 #: lattice-gpui/src/titlebar/project_menu.rs
@@ -84,6 +100,10 @@ msgstr "已保存，同步已暂停"
 msgid "Share to Overleaf"
 msgstr "分享到 Overleaf"
 
+#: lattice-gpui/src/editor_panel/annotations/overleaf_draft.rs
+msgid "Sync with Overleaf is paused. Resume it in Settings › Overleaf to comment."
+msgstr "与 Overleaf 的同步已暂停。请在“设置 › Overleaf”中恢复同步后再评论。"
+
 #: lattice-gpui/src/overleaf/bridge/documents/reviewing.rs
 msgid "The file is no longer open live with Overleaf. Try again."
 msgstr "此文件已不再与 Overleaf 实时同步。请重试。"
@@ -91,6 +111,10 @@ msgstr "此文件已不再与 Overleaf 实时同步。请重试。"
 #: lattice-gpui/src/overleaf/bridge/documents/reviewing.rs
 msgid "This suggestion no longer matches the text. Try again in a moment."
 msgstr "此修订建议已与正文不符。请稍后重试。"
+
+#: lattice-gpui/src/editor_panel/annotations.rs
+msgid "Write a comment…"
+msgstr "写下评论…"
 
 #: lattice-gpui/src/overleaf/channel.rs
 msgid "connection closed"

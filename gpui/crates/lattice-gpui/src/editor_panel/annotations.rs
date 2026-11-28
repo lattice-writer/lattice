@@ -41,6 +41,7 @@ use lattice_ui::ActiveLattice as _;
 use super::{EditorPanel, EditorPanelEvent};
 
 mod composer;
+mod overleaf_draft;
 use crate::annotations::{
     AnnotationRequest,
     card::{self, CardEvent, GUTTER_PIN},
@@ -94,6 +95,10 @@ struct Draft {
     /// Which side of its passage it opened on, kept so scrolling cannot make
     /// it jump across the text.
     above: Option<bool>,
+    /// An Overleaf comment rather than a local note (`overleaf_draft`).
+    overleaf: bool,
+    /// The comment is on its way to Overleaf.
+    sending: bool,
     _field: Subscription,
 }
 
@@ -108,6 +113,7 @@ pub(crate) struct Discarded {
     suffix: String,
     body: String,
     intent: Option<Intent>,
+    overleaf: bool,
 }
 
 impl EditorPanel {
@@ -321,6 +327,17 @@ impl EditorPanel {
     /// Open the composer on the selection (the selection toolbar's Annotate,
     /// the palette's Annotate selection). Returns whether it opened.
     pub fn annotate_selection(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        self.open_on_selection(false, window, cx)
+    }
+
+    /// Open the composer on the selection, for a local note or, with
+    /// `overleaf`, a comment on Overleaf.
+    fn open_on_selection(
+        &mut self,
+        overleaf: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
         let Some(range) = self.selected_range(cx) else {
             return false;
         };
@@ -341,6 +358,7 @@ impl EditorPanel {
                 suffix,
                 body: String::new(),
                 intent: None,
+                overleaf,
             },
             window,
             cx,
@@ -365,7 +383,11 @@ impl EditorPanel {
         let line = text[..range.start].matches('\n').count() as u32 + 1;
         let field = cx.new(|cx| {
             TextareaState::new(window, cx)
-                .placeholder(t!("What should change here?"))
+                .placeholder(if note.overleaf {
+                    t!("Write a comment…")
+                } else {
+                    t!("What should change here?")
+                })
                 .auto_grow(2, 8)
                 .default_value(note.body.clone())
         });
@@ -373,9 +395,18 @@ impl EditorPanel {
         let subscription =
             cx.subscribe_in(&field, window, |this, _, event, window, cx| match event {
                 // ⌘↵ saves; ⇧⌘↵ saves and asks the agent about the note.
+                // An Overleaf comment has no agent to ask: both send it.
                 InputEvent::PressEnter {
                     secondary: true, ..
-                } => this.save_note(window.modifiers().shift, window, cx),
+                } => {
+                    let revise = window.modifiers().shift
+                        && this
+                            .annotations
+                            .draft
+                            .as_ref()
+                            .is_some_and(|draft| !draft.overleaf);
+                    this.save_note(revise, window, cx)
+                }
                 InputEvent::Change => cx.notify(),
                 _ => {}
             });
@@ -391,6 +422,8 @@ impl EditorPanel {
             intent: note.intent,
             error: None,
             above: None,
+            overleaf: note.overleaf,
+            sending: false,
             _field: subscription,
         });
         self.place_annotations(cx);
@@ -419,6 +452,9 @@ impl EditorPanel {
         let Some(draft) = &self.annotations.draft else {
             return;
         };
+        if draft.overleaf {
+            return self.send_overleaf_comment(cx);
+        }
         let body = draft.field.read(cx).value().to_string();
         if body.trim().is_empty() && draft.intent.is_none() {
             return;
@@ -470,6 +506,16 @@ impl EditorPanel {
     /// what it does there, so the editor does not take focus back from it. A
     /// note with words in it is offered back, in the file it was written on.
     pub fn dismiss_draft(&mut self, outside: bool, window: &mut Window, cx: &mut Context<Self>) {
+        // A comment on its way to Overleaf stays until Overleaf answers, so
+        // a refusal still finds its text to send again.
+        if self
+            .annotations
+            .draft
+            .as_ref()
+            .is_some_and(|draft| draft.sending)
+        {
+            return;
+        }
         let Some(draft) = self.annotations.draft.take() else {
             return;
         };
@@ -495,24 +541,27 @@ impl EditorPanel {
             suffix: draft.suffix,
             body,
             intent: draft.intent,
+            overleaf: draft.overleaf,
         };
         let panel = cx.weak_entity();
+        let (message, source) = if draft.overleaf {
+            (t!("Comment discarded"), t!("Overleaf"))
+        } else {
+            (t!("Note discarded"), t!("Annotations"))
+        };
         crate::notices::show(
-            crate::notices::Notice::new(
-                lattice_ui::components::ToastLevel::Info,
-                t!("Note discarded"),
-            )
-            .source(t!("Annotations"))
-            .key("annotation-draft-discarded")
-            .action(crate::notices::NoticeAction::new(
-                t!("Undo"),
-                move |window, cx| {
-                    let discarded = discarded.clone();
-                    panel
-                        .update(cx, |panel, cx| panel.reopen_draft(discarded, window, cx))
-                        .ok();
-                },
-            )),
+            crate::notices::Notice::new(lattice_ui::components::ToastLevel::Info, message)
+                .source(source)
+                .key("annotation-draft-discarded")
+                .action(crate::notices::NoticeAction::new(
+                    t!("Undo"),
+                    move |window, cx| {
+                        let discarded = discarded.clone();
+                        panel
+                            .update(cx, |panel, cx| panel.reopen_draft(discarded, window, cx))
+                            .ok();
+                    },
+                )),
             cx,
         );
     }

@@ -118,7 +118,8 @@ impl Shell {
     }
 
     /// Start a thread on `editor`'s selection, in a file live with Overleaf
-    /// (Annotate selection, and the selection toolbar's Comment on Overleaf).
+    /// (Annotate selection). The selection toolbar's Comment on Overleaf
+    /// writes beside the passage instead (`editor_panel/annotations/overleaf_draft.rs`).
     pub(crate) fn comment_on_overleaf(
         &mut self,
         editor: &gpui::Entity<crate::editor_panel::EditorPanel>,
@@ -146,6 +147,61 @@ impl Shell {
             panel.compose_comment(path, from, quote, window, cx)
         });
         self.reveal_tool("comments", window, cx);
+    }
+
+    /// Post the comment written in `editor`'s composer (`OverleafComment`)
+    /// through the same add-comment path the panel's composer uses, and
+    /// answer it: posted, its composer closes; refused, the text stays and
+    /// the composer says why. While another comment is on its way, nothing
+    /// is sent, so it cannot go twice.
+    pub(super) fn post_editor_comment(
+        &mut self,
+        editor: &gpui::Entity<crate::editor_panel::EditorPanel>,
+        id: u64,
+        from: i64,
+        quote: &str,
+        body: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let (handle, weak) = (window.window_handle(), editor.downgrade());
+        // The editor is told once this update is over, in its window, as
+        // the bridge may answer while either is still being updated.
+        let answer = move |answer: Result<(), gpui::SharedString>, cx: &mut gpui::App| {
+            cx.defer(move |cx| {
+                let Some(editor) = weak.upgrade() else {
+                    return;
+                };
+                handle
+                    .update(cx, |_, window, cx| {
+                        editor.update(cx, |editor, cx| {
+                            editor.answer_overleaf_comment(id, answer, window, cx)
+                        })
+                    })
+                    .ok();
+            });
+        };
+        let path = editor.read(cx).relative().to_string();
+        let bridge = self.overleaf.read(cx);
+        if bridge.link().is_none() || bridge.live_file() != Some(path.as_str()) {
+            let error = t!("Comments go to Overleaf once this file is open live with it.");
+            return answer(Err(error.into()), cx);
+        }
+        if bridge.review_busy().is_some() {
+            let error = t!("Overleaf is still busy with the last change. Try again in a moment.");
+            return answer(Err(error.into()), cx);
+        }
+        let (quote, body) = (quote.to_string(), body.to_string());
+        self.overleaf.update(cx, |bridge, cx| {
+            bridge.add_comment(
+                &path,
+                from,
+                quote,
+                body,
+                move |posted, cx| answer(posted.map(|_| ()), cx),
+                cx,
+            )
+        });
     }
 
     /// Post the local note `id` as an Overleaf comment on its passage, in a
@@ -207,7 +263,7 @@ impl Shell {
                 quote,
                 body,
                 move |anchored, cx| {
-                    if anchored {
+                    if anchored == Ok(true) {
                         let store = crate::annotations::store::store(cx);
                         store.update(cx, |store, cx| store.set_resolved(&root, &shared, true, cx));
                     }

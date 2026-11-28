@@ -25,8 +25,21 @@ impl OverleafBridge {
         after: impl FnOnce(&mut Self, &mut Context<Self>) + 'static,
         cx: &mut Context<Self>,
     ) {
+        self.review_rest_or(busy, work, after, |_, _| {}, cx);
+    }
+
+    /// `review_rest`, with `failed` told the failure as the panels say it.
+    fn review_rest_or(
+        &mut self,
+        busy: String,
+        work: impl FnOnce(&Path, &Path) -> Result<(), String> + Send + 'static,
+        after: impl FnOnce(&mut Self, &mut Context<Self>) + 'static,
+        failed: impl FnOnce(SharedString, &mut gpui::App) + 'static,
+        cx: &mut Context<Self>,
+    ) {
         let Some(root) = self.root.clone() else {
-            return;
+            let error = t!("The commented file is no longer open live with Overleaf. Try again.");
+            return failed(error.into(), cx);
         };
         self.review.busy = Some(busy);
         self.review.error = None;
@@ -42,6 +55,9 @@ impl OverleafBridge {
                     Err(error) => {
                         let (error, _) = super::super::super::settled::<()>(Err(error));
                         this.review.error = error.err().map(SharedString::from);
+                        if let Some(error) = this.review.error.clone() {
+                            failed(error, cx);
+                        }
                     }
                 }
                 this.reread_threads(Duration::ZERO, cx);
@@ -165,14 +181,15 @@ impl OverleafBridge {
 
     /// Start a thread on UTF-16 `from..to` of the live document `path`,
     /// saying `content`; `done` runs once Overleaf has its message, told
-    /// whether the thread was anchored on the passage too.
+    /// whether the thread was anchored on the passage too, or with why
+    /// nothing was posted.
     pub fn add_comment(
         &mut self,
         path: &str,
         from: i64,
         quote: String,
         content: String,
-        done: impl FnOnce(bool, &mut gpui::App) + 'static,
+        done: impl FnOnce(Result<bool, SharedString>, &mut gpui::App) + 'static,
         cx: &mut Context<Self>,
     ) {
         let doc_id = match self.doc_of_path(path) {
@@ -180,15 +197,33 @@ impl OverleafBridge {
             _ => {
                 let error =
                     t!("The commented file is no longer open live with Overleaf. Try again.");
-                return self.refuse(error.to_string(), cx);
+                self.refuse(error.to_string(), cx);
+                return done(Err(error.into()), cx);
             }
         };
         if content.trim().is_empty() || quote.is_empty() {
-            return;
+            let error = t!("The selected text changed. Select it again before commenting.");
+            return done(Err(error.into()), cx);
         }
         let thread_id = object_id();
         let thread = thread_id.clone();
-        self.review_rest(
+        let (done, failed) = {
+            let done = std::rc::Rc::new(std::cell::Cell::new(Some(done)));
+            let failing = done.clone();
+            (
+                move |anchored, cx: &mut gpui::App| {
+                    if let Some(done) = done.take() {
+                        done(Ok(anchored), cx);
+                    }
+                },
+                move |error, cx: &mut gpui::App| {
+                    if let Some(done) = failing.take() {
+                        done(Err(error), cx);
+                    }
+                },
+            )
+        };
+        self.review_rest_or(
             thread_id.clone(),
             move |config, root| {
                 lattice_core::overleaf::reply_to_thread(config, root, &thread, &content)
@@ -203,6 +238,7 @@ impl OverleafBridge {
                 };
                 done(anchored, cx);
             },
+            failed,
             cx,
         );
     }

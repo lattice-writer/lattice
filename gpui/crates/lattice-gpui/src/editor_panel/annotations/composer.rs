@@ -169,15 +169,22 @@ impl EditorPanel {
             .file_name()
             .map(|name| name.to_string_lossy().into_owned())
             .unwrap_or_default();
+        let blocked = draft
+            .overleaf
+            .then(|| self.overleaf_comment_blocked())
+            .flatten();
         form::note_form(
             form::NoteForm {
                 quote: &draft.quote,
                 location: format!("{name}:{}", draft.line).into(),
                 field: &draft.field,
                 intent: draft.intent,
-                error: draft.error.clone(),
-                ready: true,
-                overleaf: false,
+                error: draft
+                    .error
+                    .clone()
+                    .or(blocked.map(|blocked| blocked.message())),
+                ready: !draft.sending && blocked.is_none(),
+                overleaf: draft.overleaf,
             },
             Rc::new(|this: &mut Self, intent, _| {
                 if let Some(draft) = &mut this.annotations.draft {

@@ -245,6 +245,17 @@ impl EditorPanel {
 }
 
 impl EditorPanel {
+    /// The comment threads marked in the source as last shown: each one's
+    /// thread id and UTF-16 span.
+    pub fn overleaf_comment_marks(&self) -> Vec<(String, i64, i64)> {
+        self.overleaf_review
+            .shown
+            .iter()
+            .flat_map(|(_, comments, _)| comments)
+            .map(|mark| (mark.thread_id.clone(), mark.from, mark.len))
+            .collect()
+    }
+
     /// The selection, as a comment would quote it: its start in UTF-16
     /// units and its text; none when nothing is selected.
     pub fn overleaf_selection(&self, cx: &App) -> Option<(i64, String)> {
