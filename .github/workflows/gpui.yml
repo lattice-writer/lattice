@@ -410,7 +410,7 @@ jobs:
             if (Test-Path "$($hive[0]):\SOFTWARE\MiKTeX.org") { reg export "$($hive[0])\SOFTWARE\MiKTeX.org" "$registry\$($hive[1]).reg" /y }
           }
           $bin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          # Saved (from main, below) when the tree is new to this key: a fresh
+          # Saved (below) when the tree is new to this key: a fresh
           # install, fonts added, or an older version's tree.
           $older = "${{ steps.miktex-cache.outputs.cache-matched-key }}" -ne "${{ steps.miktex-cache.outputs.cache-primary-key }}"
           "save=$((-not $restored) -or $added -or $older)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
@@ -422,10 +422,17 @@ jobs:
       # member): the WebView2 cutouts' region arithmetic, on every platform.
       - run: cargo test --release --locked -p gpui-webview --lib
       # After the tests, so the packages and formats the documents fetched on
-      # first use are in it. Saved only from main (a tag's cache is visible to
-      # that tag alone) and only when the tree is new to the key.
+      # first use are in it. Saved only when the tree is new to the key, from
+      # a whole run on main (every branch restores main's tree, and a key is
+      # never overwritten, so a run with `only`, which skips the unit tests,
+      # must not be first) and, as the Rust cache is, from any run started by
+      # hand on a branch, which only that branch's later dispatches restore
+      # (a tag's cache is visible to that tag alone). With no main run saving it
+      # lately, the repository held no MiKTeX tree at all, so every dispatch
+      # installed MiKTeX from the network, where its setup's "Timeout was
+      # reached" outlasted all seven attempts (runs 46118268114, 46122202543).
       - name: Save MiKTeX
-        if: ${{ !cancelled() && steps.miktex.outputs.save == 'True' && github.ref == 'refs/heads/main' && inputs.only == '' }}
+        if: ${{ !cancelled() && steps.miktex.outputs.save == 'True' && (github.ref == 'refs/heads/main' && inputs.only == '' || github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/')) }}
         uses: actions/cache/save@v5
         with:
           path: |
