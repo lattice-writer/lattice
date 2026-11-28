@@ -126,7 +126,8 @@ describe("gpui-e2e-verdict", () => {
   });
 
   it.skipIf(process.platform === "win32")("warns on a checked-in flaky-tier step that fails twice, and fails on it with --strict-flaky", () => {
-    const step = knownFailures().find((entry) => entry.tier === "flaky" && entry.platforms.includes("windows")).step;
+    const entry = knownFailures().find((candidate) => candidate.tier === "flaky");
+    const [step, platform] = [entry.step, entry.platforms[0]];
     const dir = mkdtempSync(path.join(tmpdir(), "verdict-"));
     try {
       const fixture = path.join(dir, "fixture");
@@ -136,12 +137,12 @@ describe("gpui-e2e-verdict", () => {
       chmodSync(app, 0o755);
       const result = path.join(dir, "result.json");
       writeFileSync(result, JSON.stringify({ passed: false, steps: [{ step, passed: false, module: "documents" }, { step: "fine", passed: true, module: null }] }));
-      const verdict = (...flags) => spawnSync(process.execPath, [path.join(import.meta.dirname, "gpui-e2e-verdict.mjs"), "--platform", "windows", ...flags, "--rerun-app", app, "--fixture", fixture, result], { encoding: "utf8", env: { ...process.env, GITHUB_STEP_SUMMARY: "" } });
+      const verdict = (...flags) => spawnSync(process.execPath, [path.join(import.meta.dirname, "gpui-e2e-verdict.mjs"), "--platform", platform, ...flags, "--rerun-app", app, "--fixture", fixture, result], { encoding: "utf8", env: { ...process.env, GITHUB_STEP_SUMMARY: "" } });
       const branch = verdict();
-      expect(branch.stdout).toContain(`::warning title=Flaky-tier e2e step failed twice (windows)::${step}`);
+      expect(branch.stdout).toContain(`::warning title=Flaky-tier e2e step failed twice (${platform})::${step}`);
       expect(branch.status).toBe(0);
       const main = verdict("--strict-flaky");
-      expect(main.stdout).toContain(`::error title=Flaky-tier e2e step failed twice on main (windows)::${step}`);
+      expect(main.stdout).toContain(`::error title=Flaky-tier e2e step failed twice on main (${platform})::${step}`);
       expect(main.status).toBe(1);
     } finally {
       rmSync(dir, { recursive: true, force: true });

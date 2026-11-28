@@ -188,10 +188,9 @@
       "step": "⌘P lists the files visited this session first, without the one on screen",
       "platforms": [
         "macos",
-        "windows",
         "linux"
       ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"rows\":[\"place-check.tex\",\"chapters/intro.tex\",\"chem-check.tex\",\"finder-notes.txt\",\"cite-check.tex\",\"figure-check.tex\",\"chapters/finder-notes.txt\",\"figures-check/plot.pdf_tex\"]} | Windows: failed in every main run (44162980527, 44213516921); observed {\"rows\":[\"place-check.tex\",\"chapters/intro.tex\",\"chem-check.tex\",\"cite-check.tex\",\"figure-check.tex\",\"references.bib\",\"figures-check/plot.pdf_tex\",\"figures-check/plot.svg\"]} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"rows\":[\"place-check.tex\",\"chapters/intro.tex\",\"chem-check.tex\",\"cite-check.tex\",\"figure-check.tex\",\"references.bib\",\"figures-check/plot.pdf_tex\",\"figures-check/plot.svg\"]}",
+      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"rows\":[\"place-check.tex\",\"chapters/intro.tex\",\"chem-check.tex\",\"finder-notes.txt\",\"cite-check.tex\",\"figure-check.tex\",\"chapters/finder-notes.txt\",\"figures-check/plot.pdf_tex\"]} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"rows\":[\"place-check.tex\",\"chapters/intro.tex\",\"chem-check.tex\",\"cite-check.tex\",\"figure-check.tex\",\"references.bib\",\"figures-check/plot.pdf_tex\",\"figures-check/plot.svg\"]}",
       "followup": "LEO-14"
     },
     {
@@ -469,14 +468,6 @@
         "macos"
       ],
       "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"pages\":0,\"held\":[],\"first_window_pages\":1,\"density\":null,\"scale_factor\":1}",
-      "followup": "LEO-14"
-    },
-    {
-      "step": "an editor tab drags from the center into the right dock",
-      "platforms": [
-        "windows"
-      ],
-      "reason": "Windows: failed in every main run (44162980527, 44213516921); observed {\"presented\":true,\"frames_drawn_by_window\":\"27/27\",\"dragging\":false,\"from\":[300,66],\"to\":[810.9449462890625,377],\"strip\":{\"tabs\":\"[(\\\"file-83b2meu\\\", Bounds { origin: Point { x: 208px, y: 52px }, size: Size { 69px × 28px…",
       "followup": "LEO-14"
     },
     {
@@ -1041,14 +1032,6 @@
       "followup": "LEO-15"
     },
     {
-      "step": "text typed just before quitting is still unsaved when the app quits",
-      "platforms": [
-        "windows"
-      ],
-      "reason": "Windows: failed in 1 of 4 main runs since #1103 (44409549661), so intermittent; observed {\"file\":\"\\\\\\\\?\\\\D:\\\\a\\\\_temp\\\\e2e-project\\\\quit-check.txt\"}",
-      "followup": "LEO-15"
-    },
-    {
       "step": "PDF: a ⌘-double-click on a figure drawn in an SVG asks before opening plot.svg",
       "platforms": [
         "macos",
@@ -1141,42 +1124,38 @@
     {
       "step": "Replace in project previews the matches, rewrites them on disk and the open editor shows it",
       "platforms": [
-        "windows",
         "linux"
       ],
       "tier": "flaky",
-      "reason": "Windows: failed, then passed when its module ran again, in main run 45111924272 and branch runs 45085529303, 45061259862, 45050360152; failed in both of #1159's attempts' first passes | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"previewed\":null,\"disk\":\"Before lattice-token and lattice-token.\\n\"}",
-      "followup": "LEO-104"
+      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"previewed\":null,\"disk\":\"Before lattice-token and lattice-token.\\n\"}",
+      "followup": "LEO-129"
     },
     {
       "step": "Return on a question asked over Settings answers as Cancel does, as the dialog starts on Cancel",
       "platforms": [
-        "windows",
         "linux"
       ],
       "tier": "flaky",
-      "reason": "Windows: failed, then passed on its module's rerun, in run 45061259862 (#1233's code, which does not touch the dialog) | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"outcome\":\"Open\",\"still_asking\":true,\"settings_open\":true}",
-      "followup": "LEO-105"
+      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"outcome\":\"Open\",\"still_asking\":true,\"settings_open\":true}",
+      "followup": "LEO-129"
     },
     {
       "step": "a click on the answer button of a question asked over Settings answers it, and Settings stays as it was",
       "platforms": [
-        "windows",
         "linux"
       ],
       "tier": "flaky",
-      "reason": "Windows: as the Return step, the same dialog over Settings; failed, then passed on its module's rerun, in run 45061259862 | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"at\":\"None\",\"outcome\":\"Cancelled\",\"still_asking\":false,\"settings_open\":true}",
-      "followup": "LEO-106"
+      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"at\":\"None\",\"outcome\":\"Cancelled\",\"still_asking\":false,\"settings_open\":true}",
+      "followup": "LEO-129"
     },
     {
       "step": "a click on the cancel button of a question asked over Settings answers it, and Settings stays as it was",
       "platforms": [
-        "windows",
         "linux"
       ],
       "tier": "flaky",
-      "reason": "Windows: the same loop and dialog as the answer button's step (confirm_clicks.rs), listed with it | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"at\":\"Some(Point { x: 781px, y: 520px })\",\"outcome\":\"Open\",\"still_asking\":true,\"settings_open\":true}",
-      "followup": "LEO-107"
+      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"at\":\"Some(Point { x: 781px, y: 520px })\",\"outcome\":\"Open\",\"still_asking\":true,\"settings_open\":true}",
+      "followup": "LEO-129"
     },
     {
       "step": "a word typed into a cell with native keys, an input method's arrow characters committed mid-word, is saved to the .lattice-sheet as that word alone, which stays valid JSON",
@@ -1208,12 +1187,11 @@
     {
       "step": "the pdf_compounds module runs to its end",
       "platforms": [
-        "windows",
         "linux"
       ],
       "tier": "flaky",
-      "reason": "Windows: the module did not finish in main run 45101740670 (d7f09af0, after #1235) and passed in every later main run | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"error\":\"No such file or directory (os error 2)\"}",
-      "followup": "LEO-111"
+      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"error\":\"No such file or directory (os error 2)\"}",
+      "followup": "LEO-129"
     },
     {
       "step": "leaving the tree fades its fill out",
