@@ -70,12 +70,12 @@ main blockquote { margin: 12px 0; padding: 2px 16px; border-left: 3px solid var(
 <p>Open the <strong>Agent</strong> panel (<code>⌘⌥3</code>). Then use one of:</p>
 <ul>
 <li><strong>Claude Code</strong> or <strong>Codex</strong> on your Mac, signed in as you. Install the CLI, sign in once in Terminal (for example <code>claude auth login</code>), and pick it in the model menu under the message box.</li>
-<li><strong>Another agent CLI</strong> you have installed, such as Cursor, Antigravity (<code>agy</code>), OpenCode or Droid.</li>
+<li><strong>Another agent CLI</strong> you have installed, such as Cursor, Antigravity (<code>agy</code>), OpenCode or Droid. A signed-out Antigravity shows <strong>Sign in</strong> in the model menu, which starts only when you click it.</li>
 <li><strong>Your own API</strong>: <strong>Settings › Agent › Model endpoint</strong> takes an <strong>OpenAI-compatible</strong> or <strong>Anthropic-compatible</strong> address (<strong>More protocols</strong> has others), a key (kept in your Keychain) and the <strong>Models to offer</strong>; <strong>Test connection</strong> checks it. The Agent runs it through Pi, a one-time download of about 150 MB that you install under <strong>Settings › Agent › Providers</strong>; no command-line tool is needed. Proofread, Polish and revision requests use the endpoint only once you choose one of its models as the proofreading model under <strong>Providers</strong>.</li>
 </ul>
 <p>The rest of <strong>Settings › Agent</strong>:</p>
 <ul>
-<li><strong>Providers</strong> sets the default provider and the models Lattice uses for its own small tasks (proofreading, commit messages, compile repair).</li>
+<li><strong>Providers</strong> sets the default provider and the models Lattice uses for its own small tasks (proofreading, commit messages, compile repair). An Antigravity model can do these too; it only reads the text it is given, and while <code>agy</code> is signed out its tasks answer that it isn&#39;t signed in instead of opening a sign-in.</li>
 <li><strong>Display</strong> sets the Agent&#39;s font size, from 11 to 20 px, apart from the editors&#39; sizes.</li>
 <li><strong>MCP</strong> adds tools such as Zotero to the Agent; <strong>Skills</strong> manages the skills it can use; <strong>Usage &amp; limits</strong> shows what you have used.</li>
 <li><strong>Archived threads</strong>: see <a href="#threads">below</a>.</li>
@@ -89,7 +89,7 @@ main blockquote { margin: 12px 0; padding: 2px 16px; border-left: 3px solid var(
 <li>To attach files to a message, choose <strong>+ › Files and folders</strong>, or drop them from the Finder on the Agent panel. Any kind of file works, such as a Word document or a spreadsheet; the Agent gets the file, and it isn&#39;t added to your project.</li>
 <li><strong>Polish</strong>, <strong>Revise</strong>, <strong>Proofread</strong> and <strong>Check references</strong> start common tasks. To work on one passage, select it in the editor first.</li>
 <li>In the editor, select text to <strong>Proofread</strong> (<code>⌘⌥P</code>), <strong>Polish</strong> or <strong>Rewrite with an instruction</strong> in place (<strong>Rewrite selection…</strong> in the command palette), with a reason for each edit.</li>
-<li><strong>Annotate</strong> a passage (select it, choose <strong>Annotate</strong>, write what should change), then <strong>Save and revise now</strong>: the Agent proposes an edit for each annotation and you accept or reject it in place. <strong>Revise from annotations</strong> in the command palette does every open annotation in rounds.</li>
+<li><strong>Annotate</strong> a passage (select it, choose <strong>Annotate</strong>, write what should change), then <strong>Save and revise now</strong>: the Agent proposes an edit for each annotation and you accept or reject it in place. In a paper split into section files, the Agent also reads the main document&#39;s preamble and, near a file&#39;s start or end, the text that comes just before or after it in the paper, but it changes only the annotated passage. <strong>Revise from annotations</strong> in the command palette does every open annotation in rounds.</li>
 <li>A failed build&#39;s <strong>Ask the agent</strong> sends that problem straight here.</li>
 <li>The permission menu in the panel&#39;s header decides when the Agent asks first: <strong>Never ask</strong>, <strong>Ask for risky actions</strong>, or <strong>Ask before outside edits and network</strong>.</li>
 <li>Long lines in the Agent&#39;s diffs wrap. The wrap button in a diff&#39;s toolbar, or <code>⌥Z</code>, turns wrapping off and on again, and Lattice remembers the choice.</li>

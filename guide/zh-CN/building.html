@@ -71,7 +71,7 @@ main blockquote { margin: 12px 0; padding: 2px 16px; border-left: 3px solid var(
 <ul>
 <li><strong>从头编译</strong>：删除编译中间文件后重新编译。编译表现异常时可以试试。</li>
 <li><strong>清理缓存</strong>：只删除中间文件。</li>
-<li><strong>停止编译</strong>：停止正在进行的编译。</li>
+<li><strong>停止编译</strong>：停止正在进行的编译。之后要等你修改了其中某个文件，Lattice 才会再自动编译它们；<code>⌘S</code> 和编译按钮仍会立即编译。</li>
 </ul>
 <p>编辑器上方的 ⋯ 菜单里也有 <strong>从头编译</strong> 和 <strong>停止编译</strong>。</p>
 <p>打开项目后，<strong>设置 › 编辑编译 › 编译</strong> 里还有 <strong>编译方式</strong>（pdfLaTeX、XeLaTeX 或 LuaLaTeX；项目里的 <code>latexmkrc</code> 会覆盖它）、<strong>允许 shell escape</strong> 和 <strong>遇到首个错误即停止</strong>（默认关闭，TeX 会像 Overleaf 那样越过错误继续编译）。LuaLaTeX 项目还有 <strong>实时预览</strong>，边写边在 PDF 中显示修改；第一次使用时会下载它的引擎。</p>

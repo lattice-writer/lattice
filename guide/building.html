@@ -71,7 +71,7 @@ main blockquote { margin: 12px 0; padding: 2px 16px; border-left: 3px solid var(
 <ul>
 <li><strong>Clean rebuild</strong> deletes the build&#39;s intermediate files and builds from scratch. Try it when a build behaves strangely.</li>
 <li><strong>Clean aux files</strong> only deletes them.</li>
-<li><strong>Stop build</strong> stops a build that is running.</li>
+<li><strong>Stop build</strong> stops a build that is running. Lattice then doesn&#39;t build those files on its own again until you change one of them; <code>⌘S</code> and the build button still build at once.</li>
 </ul>
 <p>The ⋯ menu above the editor has <strong>Clean rebuild</strong> and <strong>Stop the build</strong> too.</p>
 <p>With a project open, <strong>Settings › Editor &amp; builds › Builds</strong> also has the <strong>Compile engine</strong> (pdfLaTeX, XeLaTeX or LuaLaTeX; a <code>latexmkrc</code> in the project overrides it), <strong>Allow shell escape</strong>, and <strong>Stop on first error</strong> (off by default, so TeX carries on past errors as Overleaf does). A LuaLaTeX project gets <strong>Live preview</strong> too, which shows your edits in the PDF as you type; it downloads its engine the first time.</p>
