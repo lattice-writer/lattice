@@ -74,4 +74,13 @@ pub enum EditorPanelEvent {
     /// A note's pin or card asked something of the window
     /// (`editor_panel/annotations.rs`).
     Annotation(crate::annotations::AnnotationRequest),
+    /// Post comment `id`, written in the composer, as an Overleaf thread on
+    /// UTF-16 `from` of the file, quoting `quote`; the window answers with
+    /// `answer_overleaf_comment`.
+    OverleafComment {
+        id: u64,
+        from: i64,
+        quote: String,
+        body: String,
+    },
 }

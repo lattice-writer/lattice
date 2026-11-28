@@ -567,6 +567,7 @@ pub(super) const MODULE: super::registry::Module = super::registry::Module {
         "gpui/crates/lattice-gpui/src/overleaf",
         "gpui/crates/lattice-gpui/src/shell/overleaf_flow",
         "gpui/crates/lattice-gpui/src/shell/overleaf_collab.rs",
+        "gpui/crates/lattice-gpui/src/editor_panel/annotations/overleaf_draft.rs",
     ],
     run: |run, cx, steps, fixture| Box::pin(run.overleaf(cx, steps, &fixture.root)),
 };

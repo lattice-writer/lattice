@@ -337,7 +337,6 @@ impl Shell {
                 self.annotation_rounds()
                     .update(cx, |rounds, cx| rounds.revise(Some(ids), cx));
             }
-            AnnotationRequest::CommentOnOverleaf => self.annotate_selection(window, cx),
             AnnotationRequest::ShareToOverleaf(id) => self.share_annotation(id, window, cx),
         }
     }

@@ -2,9 +2,10 @@
 //! main.tex live against the stand-in (`scenario::overleaf_mock`):
 //!
 //! - the selection toolbar offers Comment on Overleaf; a native click on it opens the
-//!   collaboration panel's composer on the selection, as the palette's
-//!   Annotate selection does; the comment typed and sent with Enter is
-//!   posted and anchored on Overleaf;
+//!   composer beside the selection, as Annotate does for a local note
+//!   (#1396); the comment typed and sent with ⌘↵ goes out as one comment
+//!   op, is marked on its passage here, and leaves the keyboard in the
+//!   editor on the passage;
 //! - a local note saved on another passage offers Share to Overleaf in its
 //!   card; a native click posts it on the same passage, and the local note
 //!   is resolved once Overleaf has it.
@@ -107,26 +108,85 @@ impl Run {
             native::send_mouse(native, native::Mouse::Up, button.center())?;
         }
         let offered = button.is_some();
+        let watched = editor.clone();
         let composing = self
-            .wait_for(cx, Duration::from_secs(5), |shell, cx| {
-                shell.read(cx).overleaf_collab.read(cx).composing_comment()
+            .wait_for(cx, Duration::from_secs(5), move |_, cx| {
+                watched.read(cx).composing_overleaf_comment()
             })
             .await;
+        let in_panel = cx.update(|cx| {
+            self.shell
+                .read(cx)
+                .overleaf_collab
+                .read(cx)
+                .composing_comment()
+        });
         if composing {
             let _front = self.focused(cx, "overleaf toolbar comment").await?;
             self.pause(cx, Duration::from_millis(300)).await;
             self.type_text(cx, COMMENT).await?;
-            self.press(cx, '\n', false).await?;
+            if std::env::var_os("LATTICE_E2E_SHOTS").is_some() {
+                for (appearance, theme) in [
+                    (lattice_ui::Appearance::Light, "light"),
+                    (lattice_ui::Appearance::Dark, "dark"),
+                ] {
+                    cx.update(|cx| lattice_ui::LatticeTheme::set_appearance(appearance, cx));
+                    self.adapter_shot(cx, &format!("overleaf-comment-popover-{theme}"))
+                        .await;
+                }
+                cx.update(|cx| {
+                    lattice_ui::LatticeTheme::set_appearance(lattice_ui::Appearance::Light, cx)
+                });
+            }
+            self.press(cx, '\n', true).await?;
         }
         let anchored = self
             .wait_for(cx, Duration::from_secs(15), |_, _| {
                 anchored(mock, COMMENTED, COMMENT)
             })
             .await;
+        let thread = mock
+            .comments("main.tex")
+            .into_iter()
+            .find(|range| range.quote == COMMENTED)
+            .map(|range| (range.thread_id, range.position));
+        // One comment op, on the passage.
+        let ops = mock
+            .updates()
+            .iter()
+            .flat_map(|update| update["op"].as_array().cloned().unwrap_or_default())
+            .filter(|op| op["c"].as_str() == Some(COMMENTED))
+            .count();
+        let watched = editor.clone();
+        let wanted = thread.clone();
+        let marked = self
+            .wait_for(cx, Duration::from_secs(10), move |_, cx| {
+                let editor = watched.read(cx);
+                !editor.composing_overleaf_comment()
+                    && wanted.as_ref().is_some_and(|(id, position)| {
+                        editor.overleaf_comment_marks().iter().any(|(mark, from, len)| {
+                            mark == id
+                                && from == position
+                                && *len == COMMENTED.encode_utf16().count() as i64
+                        })
+                    })
+            })
+            .await;
+        let zed = cx.update(|cx| editor.read(cx).editor().clone());
+        let (focused, selection) = self.with_window(cx, |_, window, cx| {
+            (
+                zed.focus_handle(cx).is_focused(window),
+                editor.read(cx).overleaf_selection(cx),
+            )
+        })?;
+        let caret = focused
+            && selection.as_ref().is_some_and(|(from, quote)| {
+                quote == COMMENTED && thread.as_ref().is_some_and(|(_, at)| at == from)
+            });
         steps.check(
-            "in a linked project the selection toolbar offers Comment on Overleaf, which opens the comment on the selection; sent with Enter, it is anchored on Overleaf",
-            selected && shown && offered && composing && anchored && mock.rejected().is_empty(),
-            json!({ "selected": selected, "shown": shown, "button": button.map(|b| format!("{b:?}")), "composing": composing, "anchored": anchored, "comments": mock.comments("main.tex") }),
+            "in a linked project the selection toolbar's Comment on Overleaf opens the composer beside the selection; sent with ⌘↵, it goes out as one comment op, is marked on the passage, and the keyboard is back in the editor on it",
+            selected && shown && offered && composing && !in_panel && anchored && ops == 1 && marked && caret && mock.rejected().is_empty(),
+            json!({ "selected": selected, "shown": shown, "button": button.map(|b| format!("{b:?}")), "composing": composing, "in_panel": in_panel, "anchored": anchored, "ops": ops, "marked": marked, "focused": focused, "selection": selection, "comments": mock.comments("main.tex") }),
         );
         Ok(())
     }

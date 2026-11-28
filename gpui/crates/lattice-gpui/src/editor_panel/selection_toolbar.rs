@@ -387,9 +387,7 @@ impl EditorPanel {
         }
         if let ToolbarAction::CommentOnOverleaf = action {
             self.dismiss_toolbar(cx);
-            cx.emit(super::EditorPanelEvent::Annotation(
-                crate::annotations::AnnotationRequest::CommentOnOverleaf,
-            ));
+            self.comment_on_overleaf(window, cx);
             return;
         }
         let text = self.buffer.read(cx).text();
