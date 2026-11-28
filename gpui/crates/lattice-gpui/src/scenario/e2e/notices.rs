@@ -142,7 +142,18 @@ impl Run {
         let start = point(x, viewport.height - px(44. + height / 2.));
         native::send_mouse(native, native::Mouse::Moved, start)?;
         self.pause(cx, Duration::from_millis(100)).await;
+        // The press lands on the cards' hitboxes as last drawn, and the
+        // runner's llvmpipe presents at 240–430 ms a frame, so a pause does
+        // not mean the fanned-out stack has been drawn: wait for its cards
+        // to rest in a drawn frame.
+        self.settled(cx, |cx| format!("{:?}", stack.read(cx).cards()))
+            .await;
         native::send_mouse(native, native::Mouse::Down, start)?;
+        // The drag's own listeners go in with the frame after the press
+        // (`NoticeStack::begin_swipe`); at 240–430 ms a frame the moves
+        // below would all come before it. Three ticks: the press is read
+        // in the first, and a whole frame draws after it.
+        self.frame_ticks(cx, 3).await;
         for step in 1..=8 {
             self.pause(cx, Duration::from_millis(16)).await;
             native::send_mouse(
@@ -151,11 +162,29 @@ impl Run {
                 point(start.x + px(step as f32 * 10.), start.y),
             )?;
         }
+        // The card's exit (160 ms) is watched for as the stack takes the
+        // card down, not polled: on Linux CI one frame takes llvmpipe longer
+        // than the exit to present (`Run::frame_ticks`), so the exit can
+        // start and end between two polls, and the release is read only
+        // after the frame being presented.
+        let exited = std::rc::Rc::new(std::cell::Cell::new(false));
+        let _watch = cx.update(|cx| {
+            let exited = exited.clone();
+            let front = front_title.clone();
+            cx.observe(&stack, move |stack, cx| {
+                let stack = stack.read(cx);
+                if stack.leaving() > 0
+                    && front
+                        .as_ref()
+                        .is_some_and(|front| !stack.titles().iter().any(|t| t == front))
+                {
+                    exited.set(true);
+                }
+            })
+        });
         native::send_mouse(native, native::Mouse::Up, point(start.x + px(80.), start.y))?;
         let leaving = self
-            .wait_for(cx, Duration::from_millis(300), |_, cx| {
-                stack.read(cx).leaving() > 0
-            })
+            .wait_for(cx, Duration::from_secs(1), |_, _| exited.get())
             .await;
         self.pause(cx, SETTLE).await;
         let titles = cx.update(|cx| stack.read(cx).titles());

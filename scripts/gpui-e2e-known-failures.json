@@ -1216,51 +1216,11 @@
       "followup": "LEO-111"
     },
     {
-      "step": "leaving the tree fades its fill out",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"lit\":null,\"leaving\":1}",
-      "followup": "LEO-129"
-    },
-    {
-      "step": "the palette's custom colour takes a drag on its field to 30% saturation and 95% brightness, and Return highlights the selection in that colour behind its swatch",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"laid_out\":true,\"dragged\":{\"s\":34.90195846557617,\"v\":100,\"hex\":\"#FFF1A6\"},\"applied\":false,\"swatch\":null,\"removed\":true}",
-      "followup": "LEO-129"
-    },
-    {
-      "step": "in a short file the highlighter palette opens whole inside the window, centred on its caret, over the toolbar or flipped under it as the Tauri app's popover is, never past the editor's top edge",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"shown\":true,\"areas\":[\"Bounds { origin: Point { x: 296px, y: 136px }, size: Size { 377px × 34px } }\",\"Bounds { origin: Point { x: 557px, y: 169px }, size: Size { 212px × 209px } }\"],\"trigger\":\"Bounds { origin: Point { x: 656px, y: 139px }, size: Size { 14px × 28px } }\",\"window\":\"Size { 1440px × 900…",
-      "followup": "LEO-129"
-    },
-    {
-      "step": "swiping a card to the right past 40px dismisses it with its exit",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"front\":\"Stack check 5\",\"leaving\":false,\"titles\":[\"Stack check 4\",\"Stack check 5\"]}",
-      "followup": "LEO-129"
-    },
-    {
       "step": "⌘-click adds a row without opening it, and ⇧-click selects the rows shown between",
       "platforms": [
         "linux"
       ],
       "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"added\":[\"figure-check.tex\"],\"front\":\"chapters/intro.tex\",\"ranged\":[\"figure-check.tex\",\"main.tex\",\"references.bib\"],\"rows\":[\"chapters\",\"chapters/intro.tex\",\"figures\",\"figures-check\",\"cite-check.tex\",\"figure-check.tex\",\"main.tex\",\"references.bib\"]}",
-      "followup": "LEO-129"
-    },
-    {
-      "step": "PDF: each document's place is kept, and its own tab opens where it was left",
-      "platforms": [
-        "linux"
-      ],
-      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"left\":\"ViewPlace { page: 0, scale: 1.2, fit: None, top: (0, 110.58331, 170.0) }\",\"kept\":\"Some(ViewPlace { page: 0, scale: 1.4, fit: None, top: (0, 138.49997, 156.50763) })\",\"built\":true,\"tab\":true,\"reopened\":\"Some(ViewPlace { page: 0, scale: 1.2, fit: None, top: (0, 110.58331, 170.0) })\"}",
       "followup": "LEO-129"
     },
     {

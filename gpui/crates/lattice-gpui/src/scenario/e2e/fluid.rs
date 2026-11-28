@@ -193,8 +193,17 @@ impl Run {
         let away = self.with_window(cx, |_, window, _| {
             point(window.viewport_size().width / 2., px(20.))
         })?;
+        // Waited for rather than paused on: the fade is 60 ms, but on Linux
+        // CI the move is read only after the frame being presented, which
+        // llvmpipe takes up to 430 ms over (LEO-129). A fill left on
+        // screen never clears, so this still fails it.
         native::send_mouse(native, native::Mouse::Moved, away)?;
-        self.pause(cx, SETTLE).await;
+        self.wait_for(cx, Duration::from_secs(1), |_, cx| {
+            tree.read(cx)
+                .hover_snapshot(cx)
+                .is_some_and(|away| away.lit.is_none() && away.leaving == 0)
+        })
+        .await;
         let away_snapshot = snapshot(cx);
         steps.check(
             "leaving the tree fades its fill out",
