@@ -229,7 +229,6 @@ fn keeps_a_line_that_fits_the_budget_exactly() {
         after.following,
         vec![excerpt("sections/results.tex", &line)]
     );
-    let mut files = files;
     files.insert(
         "main.tex",
         files["main.tex"].replace("\\section{Method}\n", ""),

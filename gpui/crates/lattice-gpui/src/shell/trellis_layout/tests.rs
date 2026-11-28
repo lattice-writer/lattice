@@ -760,7 +760,7 @@ fn a_panel_left_with_only_a_slot_closes_while_a_document_is_open_elsewhere() {
     find_panel(&mut doc, "panel-doc-2").views = vec![slot.clone()];
     find_panel(&mut doc, "panel-doc-2").selected = slot.clone();
     doc.views.insert(slot.clone(), record);
-    assert_eq!(stranded_slots(&doc, false), [slot.clone()]);
+    assert_eq!(stranded_slots(&doc, false), std::slice::from_ref(&slot));
     // A preset's or focus mode's empty slot is its own.
     assert!(stranded_slots(&doc, true).is_empty());
 

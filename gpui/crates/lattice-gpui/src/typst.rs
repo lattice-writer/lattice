@@ -59,11 +59,14 @@ pub struct TypstSupport {
     /// fetched again on every build.
     replaced_outdated: bool,
     /// What runs once the helper is installed: the compiles that asked.
-    waiting: Vec<Box<dyn FnOnce(&mut App)>>,
+    waiting: Vec<Then>,
     _task: Option<Task<()>>,
 }
 
 impl Global for TypstSupport {}
+
+/// A compile waiting for the helper to be installed.
+type Then = Box<dyn FnOnce(&mut App)>;
 
 fn support_mut(cx: &mut App) -> Option<&mut TypstSupport> {
     if cx.has_global::<TypstSupport>() {

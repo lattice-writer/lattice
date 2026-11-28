@@ -137,13 +137,13 @@ fn show_about(cx: &mut App) {
         );
         window
             .update(cx, |_, window, cx| {
-                let _ = window.prompt(
+                drop(window.prompt(
                     gpui::PromptLevel::Info,
                     crate::flavor::current().name,
                     Some(&detail),
                     &[tc!("dialog button", "OK")],
                     cx,
-                );
+                ));
             })
             .ok();
     }

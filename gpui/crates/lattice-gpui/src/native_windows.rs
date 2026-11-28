@@ -312,7 +312,7 @@ pub fn capture_client(native: Native) -> Result<image::RgbaImage> {
         return Err(anyhow!("read {lines} of the capture's {height} rows"));
     }
     // GDI's pixels are BGRA with an undefined alpha.
-    for pixel in pixels.chunks_exact_mut(4) {
+    for pixel in pixels.as_chunks_mut::<4>().0 {
         pixel.swap(0, 2);
         pixel[3] = 255;
     }
