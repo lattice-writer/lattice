@@ -35,12 +35,9 @@ impl FileTreePanel {
     ) {
         let keystroke = &event.keystroke;
         let modifiers = keystroke.modifiers;
-        // A row being named keeps ⌘C and ⌘V for its field.
-        if self.naming.is_some()
-            || !modifiers.platform
-            || modifiers.shift
-            || modifiers.alt
-            || modifiers.control
+        // A row being named keeps ⌘C and ⌘V for its field. ⌘ off macOS is
+        // Ctrl (`Modifiers::secondary`), as the Tauri app's `mod` key is.
+        if self.naming.is_some() || !modifiers.secondary(cx) || modifiers.number_of_modifiers() != 1
         {
             return;
         }

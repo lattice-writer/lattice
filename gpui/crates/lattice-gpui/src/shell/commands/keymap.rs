@@ -344,6 +344,15 @@ fn default_bindings() -> Vec<KeyBinding> {
     bindings.extend(crate::editor_panel::proofread::bindings());
     bindings.extend(crate::papers::audit::bindings());
     bindings.extend(submission::bindings());
+    // A text field redoes on Ctrl+Shift+Z as well as Ctrl+Y off macOS, as
+    // the Tauri app's fields do in WebView2 and WebKitGTK; gpui-kit binds
+    // only Ctrl+Y there.
+    #[cfg(not(target_os = "macos"))]
+    bindings.push(KeyBinding::new(
+        "ctrl-shift-z",
+        gpui_kit::component::input::Redo,
+        Some("Input"),
+    ));
     #[cfg(target_os = "macos")]
     bindings.extend([
         KeyBinding::new("cmd-q", Quit, None),

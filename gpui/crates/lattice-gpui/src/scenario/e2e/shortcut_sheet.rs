@@ -298,7 +298,6 @@ impl Run {
             let view = view.clone();
             move |_, window, cx| {
                 window.focus(&view.focus_handle(cx), cx);
-                #[cfg(target_os = "macos")]
                 view.update(cx, |view, cx| view.select((0, 0), (0, 8), cx));
             }
         })?;

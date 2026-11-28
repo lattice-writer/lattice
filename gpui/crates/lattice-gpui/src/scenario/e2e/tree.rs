@@ -208,7 +208,12 @@ impl Run {
             window.focus(&focus, cx);
             window.dispatch_event(
                 gpui::PlatformInput::KeyDown(gpui::KeyDownEvent {
-                    keystroke: gpui::Keystroke::parse("cmd-v").expect("cmd-v parses"),
+                    keystroke: gpui::Keystroke::parse(if cfg!(target_os = "macos") {
+                        "cmd-v"
+                    } else {
+                        "ctrl-v"
+                    })
+                    .expect("the paste key parses"),
                     is_held: false,
                     prefer_character_input: false,
                 }),

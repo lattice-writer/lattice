@@ -670,48 +670,12 @@
       "followup": "LEO-14"
     },
     {
-      "step": "⌘⌥P opens the proofread card under the selection, offering the agent's two edits",
-      "platforms": [
-        "windows",
-        "linux"
-      ],
-      "reason": "Windows: failed in every main run (44162980527, 44213516921); observed {\"card\":null} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"card\":null}",
-      "followup": "LEO-15"
-    },
-    {
-      "step": "without an agent to answer, the card says it could not proofread",
-      "platforms": [
-        "windows",
-        "linux"
-      ],
-      "reason": "Windows: failed in every main run (44162980527, 44213516921); observed {\"failed\":false} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"failed\":false}",
-      "followup": "LEO-15"
-    },
-    {
       "step": "a mix of sources and figures dropped on an editor says to drop them separately",
       "platforms": [
         "macos"
       ],
       "reason": "macOS: failed in main run 44431384013 (2e39149ce) on the hosted runner, passes on the crew Macs; observed {\"notice\":\"the app became active outside a foreground section, after step \\\"a Finder source dropped on an editor is imported into th…: the app became active outside a foreground section, after step \\\"a Finder source dropped on an editor is imported into the project and opens\\\"\\nlattice_gpui::scenario::input_lock\"}",
       "followup": "LEO-14"
-    },
-    {
-      "step": "a name pasted into the rename field longer than 24 characters keeps its first 24, and ⌘Z undoes the paste",
-      "platforms": [
-        "windows",
-        "linux"
-      ],
-      "reason": "Windows: failed in every main run (44162980527, 44213516921); observed {\"pasted\":\"abcdefghijklmnopqrstuvwxyz0123\",\"field\":\"abcdefghijklmnopqrstuvwx\",\"original\":\"Workspace 3\",\"undone\":\"Workspace 3\",\"redone\":\"Workspace 3\"} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"pasted\":\"abcdefghijklmnopqrstuvwxyz0123\",\"field\":\"abcdefghijklmnopqrstuvwx\",\"original\":\"Workspace 3\",\"undone\":\"Workspace 3\",\"redone\":\"Workspace 3\"}",
-      "followup": "LEO-15"
-    },
-    {
-      "step": "the tree's ⌘C copies the row's path and ⌘V duplicates it beside itself",
-      "platforms": [
-        "windows",
-        "linux"
-      ],
-      "reason": "Windows: failed in every main run (44162980527, 44213516921); observed {\"selected\":true,\"clipboard\":\"abcdefghijklmnopqrstuvwxyz0123\",\"pasted\":false} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"selected\":true,\"clipboard\":\"abcdefghijklmnopqrstuvwxyz0123\",\"pasted\":false}",
-      "followup": "LEO-15"
     },
     {
       "step": "PDF: a drag selects text and ⌘C / Ctrl+C copies it",
@@ -743,15 +707,6 @@
         "windows"
       ],
       "reason": "Windows: failed in every main run (44162980527, 44213516921); observed {\"state\":[\"Some(Preview)\",false,false]}",
-      "followup": "LEO-15"
-    },
-    {
-      "step": "in focus mode Escape in the PDF first clears its selection, then leaves focus mode",
-      "platforms": [
-        "windows",
-        "linux"
-      ],
-      "reason": "Windows: failed in every main run (44162980527, 44213516921); observed {\"selected\":false,\"cleared\":true,\"stayed\":false,\"left\":true} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"selected\":false,\"cleared\":true,\"stayed\":false,\"left\":true}",
       "followup": "LEO-15"
     },
     {
