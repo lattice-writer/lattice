@@ -573,10 +573,9 @@
       "step": "the last build's .aux numbers a label for its card (sec:method: section 2, page 1)",
       "platforms": [
         "macos",
-        "windows",
         "linux"
       ],
-      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"compiled\":[\"\",\"\"]} | Windows: failed in every main run (44162980527, 44213516921); observed {\"compiled\":null} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"compiled\":null}",
+      "reason": "macOS: failed in every main run (44173099111, 44154544765, 44162980527); observed {\"compiled\":[\"\",\"\"]} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"compiled\":null}",
       "followup": "LEO-14"
     },
     {
@@ -644,14 +643,6 @@
       "followup": "LEO-14"
     },
     {
-      "step": "the ring is drawn over the manuscript, and a press anywhere takes it down",
-      "platforms": [
-        "windows"
-      ],
-      "reason": "Windows: failed in 1 of 2 main runs (44162980527), so intermittent; observed {\"at\":\"Point { x: 402.83472px, y: 430.5px }\",\"ringing\":\"Some(Build)\"}",
-      "followup": "LEO-14"
-    },
-    {
       "step": "opening the tutorial shows the checklist with the sample",
       "platforms": [
         "macos"
@@ -679,10 +670,9 @@
       "step": "the editor's overlay scrollbar shows while the text scrolls, a 4px thumb 5px off the edge, and hides within 0.8 s once it rests",
       "platforms": [
         "macos",
-        "windows",
         "linux"
       ],
-      "reason": "macOS: failed in 2 of 3 main runs (44154544765, 44162980527), so intermittent; observed {\"at_rest\":false,\"bar\":{\"shown\":true,\"thumb\":{\"x\":450,\"y\":251.59600830078125,\"width\":4,\"height\":33.05373001098633},\"track_width\":10,\"gap_to_edge\":5,\"hidden_after_ms\":1343}} | Windows: failed in every main run (44162980527, 44213516921); observed {\"at_rest\":false,\"bar\":{\"shown\":true,\"thumb\":{\"x\":450,\"y\":265.361572265625,\"width\":4,\"height\":38.92496109008789},\"track_width\":10,\"gap_to_edge\":5,\"hidden_after_ms\":1303}} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"at_rest\":false,\"bar\":{\"shown\":true,\"thumb\":{\"x\":577,\"y\":319.2269287109375,\"width\":4,\"height\":66.51053619384766},\"track_width\":10,\"gap_to_edge\":5,\"hidden_after_ms\":1948}}",
+      "reason": "macOS: failed in 2 of 3 main runs (44154544765, 44162980527), so intermittent; observed {\"at_rest\":false,\"bar\":{\"shown\":true,\"thumb\":{\"x\":450,\"y\":251.59600830078125,\"width\":4,\"height\":33.05373001098633},\"track_width\":10,\"gap_to_edge\":5,\"hidden_after_ms\":1343}} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"at_rest\":false,\"bar\":{\"shown\":true,\"thumb\":{\"x\":577,\"y\":319.2269287109375,\"width\":4,\"height\":66.51053619384766},\"track_width\":10,\"gap_to_edge\":5,\"hidden_after_ms\":1948}}",
       "followup": "LEO-14"
     },
     {
@@ -729,21 +719,12 @@
       "followup": "LEO-15"
     },
     {
-      "step": "the TeX package reminder offers Update and Later, and an update started from it reports its end in a notice (stand-in installer)",
-      "platforms": [
-        "windows"
-      ],
-      "reason": "Windows: failed in every main run (44162980527, 44213516921); observed {\"actions\":null,\"answered\":false,\"updated\":false,\"titles\":[\"Your TeX packages are out of date\"]}",
-      "followup": "LEO-15"
-    },
-    {
       "step": "a mix of sources and figures dropped on an editor says to drop them separately",
       "platforms": [
-        "windows",
         "macos"
       ],
-      "reason": "Windows: failed in 1 of 2 main runs (44162980527), so intermittent; observed {\"notice\":\"Build succeeded in 2.0 s: #42f4b8\"} | macOS: failed in main run 44431384013 (2e39149ce) on the hosted runner, passes on the crew Macs; observed {\"notice\":\"the app became active outside a foreground section, after step \\\"a Finder source dropped on an editor is imported into th…: the app became active outside a foreground section, after step \\\"a Finder source dropped on an editor is imported into the project and opens\\\"\\nlattice_gpui::scenario::input_lock\"}",
-      "followup": "LEO-15"
+      "reason": "macOS: failed in main run 44431384013 (2e39149ce) on the hosted runner, passes on the crew Macs; observed {\"notice\":\"the app became active outside a foreground section, after step \\\"a Finder source dropped on an editor is imported into th…: the app became active outside a foreground section, after step \\\"a Finder source dropped on an editor is imported into the project and opens\\\"\\nlattice_gpui::scenario::input_lock\"}",
+      "followup": "LEO-14"
     },
     {
       "step": "a name pasted into the rename field longer than 24 characters keeps its first 24, and ⌘Z undoes the paste",
@@ -789,14 +770,6 @@
       "followup": "LEO-15"
     },
     {
-      "step": "the submission module runs to its end",
-      "platforms": [
-        "windows"
-      ],
-      "reason": "Windows: failed in 1 of 2 main runs (44162980527), so intermittent; an earlier step of the submission module failed, which stops the module",
-      "followup": "LEO-15"
-    },
-    {
       "step": "the paper reads in the visual editor's Preview, its page drawn",
       "platforms": [
         "windows"
@@ -819,38 +792,6 @@
         "windows"
       ],
       "reason": "Windows: failed in every main run (44162980527, 44213516921); observed {\"unsaved_before\":false,\"disk\":\"draft\\n\"}",
-      "followup": "LEO-15"
-    },
-    {
-      "step": "ctrl-shift-l lists @sec:method and writes \\ref{sec:method} at the caret, the caret after it",
-      "platforms": [
-        "windows"
-      ],
-      "reason": "Windows: failed in 1 of 2 main runs (44162980527), so intermittent; observed {\"rows\":[\"@sec:approach\",\"@sec:target\"],\"closed\":false,\"line\":\"\\\\section{Introduction}\",\"caret\":74}",
-      "followup": "LEO-15"
-    },
-    {
-      "step": "⇧⌘L / Ctrl+Shift+L lists a label typed in the chapter before it is saved",
-      "platforms": [
-        "windows"
-      ],
-      "reason": "Windows: failed in 1 of 2 main runs (44162980527), so intermittent; observed {\"rows\":[]}",
-      "followup": "LEO-15"
-    },
-    {
-      "step": "⌘⇧O / Ctrl+Shift+O lists the manuscript's sections and labels, one typed and not saved among them, and a label picked opens its file",
-      "platforms": [
-        "windows"
-      ],
-      "reason": "Windows: failed in 1 of 2 main runs (44162980527), so intermittent; observed {\"rows\":[\"@fig:unsaved\",\"@sec:approach\",\"@sec:target\",\"@Introduction\",\"@Method\"],\"landed\":false}",
-      "followup": "LEO-15"
-    },
-    {
-      "step": "the card_previews module runs to its end",
-      "platforms": [
-        "windows"
-      ],
-      "reason": "Windows: failed in 1 of 2 main runs (44162980527), so intermittent; an earlier step of the card_previews module failed, which stops the module",
       "followup": "LEO-15"
     },
     {
@@ -909,8 +850,7 @@
     {
       "step": "a missing package's Install offers its providers, installs the pick and builds (stand-in installer)",
       "platforms": [
-        "macos",
-        "windows"
+        "macos"
       ],
       "reason": "Flaky: one of the 8 steps behind 207 of 274 e2e failures over 265 runs (scripts/gpui-e2e-quarantine.json); it passed in these main runs but fails others at random",
       "followup": "LEO-14"
@@ -918,8 +858,7 @@
     {
       "step": "closing the focused document's tab leaves the keyboard in the window",
       "platforms": [
-        "macos",
-        "windows"
+        "macos"
       ],
       "reason": "Flaky: one of the 8 steps behind 207 of 274 e2e failures over 265 runs (scripts/gpui-e2e-quarantine.json); it passed in these main runs but fails others at random",
       "followup": "LEO-14"
@@ -934,21 +873,12 @@
       "followup": "LEO-14"
     },
     {
-      "step": "renaming a label rewrites its \\label and every \\ref",
-      "platforms": [
-        "windows"
-      ],
-      "reason": "Windows: passed in every main run but failed in branch run 44225936391, whose GPUI sources equal main's, so intermittent",
-      "followup": "LEO-15"
-    },
-    {
       "step": "the bar's PDF toggle shows or hides the PDF, and Exit focus leaves focus mode",
       "platforms": [
-        "windows",
         "linux"
       ],
-      "reason": "Windows: passed in every main run but failed in branch run 44225936391, whose GPUI sources equal main's, so intermittent | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"toggled\":false,\"left\":false}",
-      "followup": "LEO-15"
+      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"toggled\":false,\"left\":false}",
+      "followup": "LEO-129"
     },
     {
       "step": "Manual only: an edit to the open file reloads it and does not build",
@@ -959,51 +889,11 @@
       "followup": "LEO-15"
     },
     {
-      "step": "Go to on a reference card closes the card and puts the caret on its \\label's line",
-      "platforms": [
-        "windows"
-      ],
-      "reason": "Windows: failed in 1 of 5 main runs (44272220139), so intermittent; observed {\"card\":\"Bounds { origin: Point { x: 278px, y: 330px }, size: Size { 333px × 174px } }\",\"went\":false,\"closed\":false,\"line\":10,\"at\":[17,45]}",
-      "followup": "LEO-15"
-    },
-    {
-      "step": "resting on the rail opens the outline; a row puts the caret on its heading and keeps it current",
-      "platforms": [
-        "windows"
-      ],
-      "reason": "Windows: failed in 1 of 5 main runs (44274671758), so intermittent; observed {\"opened\":false,\"method\":1,\"line\":7,\"jumped\":true,\"current\":1,\"closed\":true}",
-      "followup": "LEO-15"
-    },
-    {
-      "step": "a file closed straight after a jump comes back to the jumped-to line",
-      "platforms": [
-        "windows"
-      ],
-      "reason": "Windows: failed in 1 of 5 main runs (44274671758), so intermittent; observed {\"caret\":7113,\"top\":0,\"line_250\":7113}",
-      "followup": "LEO-15"
-    },
-    {
-      "step": "a closed file renamed in the tree opens at the place it was left under its old name",
-      "platforms": [
-        "windows"
-      ],
-      "reason": "Windows: failed in 1 of 5 main runs (44274671758), so intermittent; observed {\"renamed\":true,\"caret\":7113,\"top\":0,\"line_250\":7113}",
-      "followup": "LEO-15"
-    },
-    {
       "step": "what a Finder drop on the tree brings in is selected",
       "platforms": [
         "windows"
       ],
       "reason": "Windows: failed in 1 of 5 main runs (44276458780), so intermittent; observed {\"selected\":[\"cite-check.tex\"]}",
-      "followup": "LEO-15"
-    },
-    {
-      "step": "Export figures for a journal saves the editor first, then writes the drawing's figure as a PDF in a folder of its own and says so, and a second run meanwhile starts nothing",
-      "platforms": [
-        "windows"
-      ],
-      "reason": "Windows: failed in main run 44408832005, the first after the step landed (passes on the crew Macs); observed {\"saved\":false,\"notices\":[\"Could not save main.tex\"],\"folders\":[],\"figures\":[],\"second_run_wrote\":0}",
       "followup": "LEO-15"
     },
     {
@@ -1025,11 +915,10 @@
     {
       "step": "⌘G / Ctrl+G opens Go to line, and the line typed there with Enter is where the caret goes",
       "platforms": [
-        "windows",
         "linux"
       ],
-      "reason": "Windows: failed in 1 of 4 main runs since #1103 (44409549661), so intermittent; observed {\"opened\":true,\"closed\":false,\"row\":0} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"opened\":true,\"closed\":false,\"row\":0}",
-      "followup": "LEO-15"
+      "reason": "Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"opened\":true,\"closed\":false,\"row\":0}",
+      "followup": "LEO-129"
     },
     {
       "step": "PDF: a ⌘-double-click on a figure drawn in an SVG asks before opening plot.svg",
@@ -1062,30 +951,6 @@
         "windows"
       ],
       "reason": "Windows: failed in main run 44454326816 on the hosted runner; observed {\"last\":\"knuth1984\",\"settled\":false,\"queue\":true,\"open\":\"knuth1984\"}",
-      "followup": "LEO-15"
-    },
-    {
-      "step": "a field typed in the .bib form lands in the source, and ⌘Z steps it back",
-      "platforms": [
-        "windows"
-      ],
-      "reason": "Windows: failed in main run 44454326816 on the hosted runner; observed {\"typed\":true,\"landed\":true,\"undone\":false}",
-      "followup": "LEO-15"
-    },
-    {
-      "step": "a field typed back to its first value in the .bib form is written back",
-      "platforms": [
-        "windows"
-      ],
-      "reason": "Windows: failed in main run 44454326816 on the hosted runner; observed {\"retyped\":true,\"changed\":true,\"back\":false}",
-      "followup": "LEO-15"
-    },
-    {
-      "step": "a .bib reference renamed after a delete before it was undone stays in front under its new key",
-      "platforms": [
-        "windows"
-      ],
-      "reason": "Windows: failed in main run 44454326816 on the hosted runner; observed {\"listed\":false,\"deleted\":false,\"back\":false,\"keyBox\":true,\"inFront\":\"second2\"}",
       "followup": "LEO-15"
     },
     {
@@ -1205,11 +1070,10 @@
       "step": "a panel whose last tab closes (a split document, the PDF, the last document) goes at once, with no Empty panel drawn",
       "platforms": [
         "macos",
-        "windows",
         "linux"
       ],
-      "reason": "macOS: order-dependent on the Mac mini: fails when pdf runs before dock (pnpm ci:local full gate for #1368 at b57fccf45, and script/e2e --only design_calls,manuscripts,pdf,dock on both that branch and a main-equivalent tree at 7e617ea63, each observed {\"split_gone\":true,\"pdf_gone\":false}), while --only dock alone passes on both; tracked under LEO-129 | Windows: failed in main runs 45505984609 (a2d78773a) and 45507027636; observed {\"split_gone\":true,\"pdf_gone\":false} | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"documents_closed\":6,\"docs_empty_in_update\":[],\"docs_empty_after_frame\":[],\"split\":\"panel-3csr4kp\",\"split_gone\":true,\"empty_in_update\":[],\"empty_after_frame\":[],\"pdf_gone\":false,\"pdf_empty_in_update\":[],\"pdf_empty_after_frame\":[]}",
-      "followup": "LEO-15"
+      "reason": "macOS: order-dependent on the Mac mini: fails when pdf runs before dock (pnpm ci:local full gate for #1368 at b57fccf45, and script/e2e --only design_calls,manuscripts,pdf,dock on both that branch and a main-equivalent tree at 7e617ea63, each observed {\"split_gone\":true,\"pdf_gone\":false}), while --only dock alone passes on both; tracked under LEO-129 | Linux: failed in branch run 45483277041 (GPUI sources as main's plus the Linux input layer); observed {\"documents_closed\":6,\"docs_empty_in_update\":[],\"docs_empty_after_frame\":[],\"split\":\"panel-3csr4kp\",\"split_gone\":true,\"empty_in_update\":[],\"empty_after_frame\":[],\"pdf_gone\":false,\"pdf_empty_in_update\":[],\"pdf_empty_after_frame\":[]}",
+      "followup": "LEO-14"
     },
     {
       "step": "a drag of a split's divider after a Finder drag left lights no folder of the tree and no editor",
