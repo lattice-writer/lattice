@@ -8,9 +8,16 @@
 //! `asset/<project-relative path>`.
 //!
 //! The scheme's URLs differ by platform, as Wry maps them: `lattice://island/…`
-//! on macOS and Linux, `http://lattice.island/…` on Windows (WebView2 serves
-//! custom schemes as a host under `http`). [`url`] and [`origin`] give the
-//! right one; nothing else in the app spells either out.
+//! on macOS and Linux, `https://lattice.island/…` on Windows (WebView2 serves
+//! custom schemes as a host under `http` or, as the islands ask, `https`).
+//! [`url`] and [`origin`] give the right one; nothing else in the app spells
+//! either out.
+//!
+//! On Windows it has to be `https`: a page under `http://lattice.island` is
+//! not a secure context, so it lacks the APIs only those get, and the shared
+//! code the pages run calls one (`crypto.randomUUID`) as it loads. The Tauri
+//! app's `http://tauri.localhost` is secure as a `localhost` name; WebKit
+//! counts `lattice://` as secure on macOS and Linux.
 //!
 //! What a page may read is only what was granted ([`Grants`]): the HTML viewer
 //! grants exactly the images and frames its document names, as the Tauri app
@@ -33,7 +40,7 @@ const HOST: &str = "island";
 /// The origin pages served by this protocol have.
 pub fn origin() -> String {
     if cfg!(target_os = "windows") {
-        format!("http://{SCHEME}.{HOST}")
+        format!("https://{SCHEME}.{HOST}")
     } else {
         format!("{SCHEME}://{HOST}")
     }

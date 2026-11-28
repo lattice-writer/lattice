@@ -140,6 +140,12 @@ impl Island {
             .with_hotkeys_zoom(false)
             .with_back_forward_navigation_gestures(false)
             .with_devtools(cfg!(debug_assertions));
+        // A secure context, as `protocol::origin` says.
+        #[cfg(target_os = "windows")]
+        {
+            use wry::WebViewBuilderExtWindows as _;
+            builder = builder.with_https_scheme(true);
+        }
         builder = self.take_file_drops(builder, window, cx);
         if let Some(ground) = self.config.ground {
             let rgba = Rgba::from(ground);
