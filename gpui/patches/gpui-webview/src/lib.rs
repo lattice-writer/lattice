@@ -147,7 +147,7 @@ impl WebView {
             cutouts,
         };
         #[cfg(target_os = "linux")]
-        linux::track(&this.webview, cx);
+        linux::track(&this.webview, window.window_handle().window_id(), cx);
         this
     }
 
